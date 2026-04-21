@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, APP_CONFIG } from '@/lib/constants';
 import type { SpotType, SpotMapPin } from '@/lib/types';
 import SideMenu from './SideMenu';
 
@@ -16,6 +16,14 @@ interface TopBarProps {
   onOpenAuth?:  () => void;
 }
 
+interface NominatimPlace {
+  name:        string;
+  lat:         number;
+  lon:         number;
+  displayExtra: string;
+  type:        string;
+}
+
 export default function TopBar({
   onSearch, onFilterType, onAddSpot, activeType,
   spots, onCitySelect, onSpotSelect, onOpenAuth,
@@ -25,19 +33,42 @@ export default function TopBar({
   const [query,      setQuery]      = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Città con spot count
+  /* ── Nominatim live geocoding ── */
+  const [places,        setPlaces]        = useState<NominatimPlace[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+
+  useEffect(() => {
+    if (query.trim().length < 2) { setPlaces([]); return; }
+    const t = setTimeout(async () => {
+      setPlacesLoading(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=it&accept-language=it`;
+        const res  = await fetch(url, { headers: { 'User-Agent': 'ChrispyMaps/1.0' } });
+        const data = await res.json() as Array<{ name: string; lat: string; lon: string; type: string; display_name: string }>;
+        setPlaces(data.map(r => ({
+          name:        r.name || r.display_name.split(',')[0],
+          lat:         parseFloat(r.lat),
+          lon:         parseFloat(r.lon),
+          type:        r.type,
+          displayExtra: r.display_name.split(',').slice(1, 3).join(',').trim(),
+        })));
+      } catch { setPlaces([]); }
+      setPlacesLoading(false);
+    }, 380);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  /* ── Spot locali che matchano ── */
+  const spotMatches = query.trim().length >= 1
+    ? spots.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).slice(0, 5)
+    : [];
+
+  /* ── Città con spot count ── */
   const cityCount: Record<string, number> = {};
   spots.forEach(s => { if (s.city) cityCount[s.city] = (cityCount[s.city] ?? 0) + 1; });
-  const topCities = Object.entries(cityCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topCities = Object.entries(cityCount).sort((a, b) => b[1] - a[1]).slice(0, 12);
 
-  // Suggerimenti live
-  const suggestions = query.trim().length >= 1 ? getSuggestions(query, spots, cityCount) : [];
-
-  const handleSearch = useCallback((val: string) => {
-    setQuery(val);
-    onSearch(val);
-  }, [onSearch]);
-
+  /* ── Handlers ── */
   const handleTypeToggle = useCallback((type: SpotType) => {
     onFilterType(activeType === type ? null : type);
   }, [activeType, onFilterType]);
@@ -51,15 +82,24 @@ export default function TopBar({
     setSearchOpen(false);
     setQuery('');
     onSearch('');
+    setPlaces([]);
   };
 
   const pickCity = (cityValue: string) => {
     const coords = CITTA_COORDS[cityValue];
     if (coords) {
       onCitySelect(cityValue, coords[0], coords[1]);
-      handleSearch(cityValue);
+      onSearch('');
       setSearchOpen(false);
+      setQuery('');
     }
+  };
+
+  const pickPlace = (p: NominatimPlace) => {
+    onCitySelect(p.name, p.lat, p.lon);
+    onSearch('');
+    setQuery('');
+    setSearchOpen(false);
   };
 
   const pickSpot = (pin: SpotMapPin) => {
@@ -74,6 +114,8 @@ export default function TopBar({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [searchOpen]);
+
+  const hasResults = places.length > 0 || spotMatches.length > 0;
 
   return (
     <>
@@ -147,9 +189,9 @@ export default function TopBar({
             <input
               ref={inputRef}
               type="search"
-              placeholder="Città, nome spot, zona..."
+              placeholder="Cerca città, spot, quartiere..."
               value={query}
-              onChange={e => handleSearch(e.target.value)}
+              onChange={e => setQuery(e.target.value)}
               style={{
                 flex: 1, border: 'none', background: 'transparent',
                 fontSize: 18, padding: '4px 0', outline: 'none',
@@ -158,6 +200,9 @@ export default function TopBar({
               autoComplete="off"
               spellCheck={false}
             />
+            {placesLoading && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>...</span>
+            )}
             <button onClick={closeSearch} style={{
               background: 'none', border: 'none', color: 'var(--gray-400)',
               fontSize: 22, cursor: 'pointer', padding: '0 4px', flexShrink: 0,
@@ -166,42 +211,47 @@ export default function TopBar({
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 24px' }}>
 
-            {/* ── Risultati live (quando si digita) ── */}
+            {/* ── Risultati con query ── */}
             {query.trim().length >= 1 && (
-              suggestions.length === 0 ? (
-                <div style={{ color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 14, padding: '24px 0', textAlign: 'center' }}>
-                  Nessun risultato per &quot;{query}&quot;
-                </div>
-              ) : (
-                <>
-                  {/* Città che matchano */}
-                  {suggestions.filter(s => s.kind === 'city').length > 0 && (
-                    <div style={{ marginBottom: 8 }}>
-                      <SectionLabel>📍 Città</SectionLabel>
-                      {suggestions.filter(s => s.kind === 'city').map((s, i) => (
-                        <SuggestionRow key={`c${i}`} s={s} onPickCity={pickCity} onPickSpot={pickSpot} />
-                      ))}
-                    </div>
-                  )}
-                  {/* Spot che matchano */}
-                  {suggestions.filter(s => s.kind === 'spot').length > 0 && (
-                    <div>
-                      <SectionLabel>🎯 Spot</SectionLabel>
-                      {suggestions.filter(s => s.kind === 'spot').map((s, i) => (
-                        <SuggestionRow key={`s${i}`} s={s} onPickCity={pickCity} onPickSpot={pickSpot} />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )
+              <>
+                {/* Luoghi via Nominatim */}
+                {places.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <SectionLabel>📍 Luoghi</SectionLabel>
+                    {places.map((p, i) => (
+                      <PlaceRow key={i} place={p} onPick={() => pickPlace(p)} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Spot nel database */}
+                {spotMatches.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <SectionLabel>🎯 Spot nel database</SectionLabel>
+                    {spotMatches.map(pin => (
+                      <SpotRow key={pin.id} pin={pin} onPick={() => pickSpot(pin)} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Nessun risultato */}
+                {!hasResults && !placesLoading && (
+                  <div style={{
+                    color: 'var(--gray-400)', fontFamily: 'var(--font-mono)',
+                    fontSize: 14, padding: '24px 0', textAlign: 'center',
+                  }}>
+                    Nessun risultato per &quot;{query}&quot;
+                  </div>
+                )}
+              </>
             )}
 
-            {/* ── Stato vuoto: città con spot + browse per regione ── */}
+            {/* ── Empty state ── */}
             {query.trim().length === 0 && (
               <>
-                {/* Città con spot nella mappa */}
+                {/* Città con spot */}
                 {topCities.length > 0 && (
-                  <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 28 }}>
                     <SectionLabel>🔥 Città con spot</SectionLabel>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {topCities.map(([city, count]) => {
@@ -210,8 +260,8 @@ export default function TopBar({
                         return (
                           <button key={city} onClick={() => pickCity(city)} disabled={!hasCoords} style={{
                             fontFamily: 'var(--font-mono)', fontSize: 14,
-                            padding: '7px 12px',
-                            border: '1px solid var(--orange)',
+                            padding: '7px 13px',
+                            border: '1px solid rgba(255,106,0,0.5)',
                             borderRadius: 20,
                             background: 'rgba(255,106,0,0.08)',
                             color: 'var(--bone)',
@@ -222,7 +272,7 @@ export default function TopBar({
                             <span style={{
                               background: 'var(--orange)', color: '#000',
                               borderRadius: 10, padding: '1px 6px',
-                              fontSize: 10, fontWeight: 700, lineHeight: 1.4,
+                              fontSize: 10, fontWeight: 700, lineHeight: 1.5,
                             }}>{count}</span>
                           </button>
                         );
@@ -231,10 +281,30 @@ export default function TopBar({
                   </div>
                 )}
 
-                {/* Browse per regione stile Subito */}
-                <div>
-                  <SectionLabel>🗺️ Esplora per regione</SectionLabel>
-                  <RegionBrowser cityCount={cityCount} onPickCity={pickCity} />
+                {/* Hint cerca qualsiasi luogo */}
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
+                  padding: '16px',
+                  background: 'var(--gray-800)',
+                  border: '1px solid var(--gray-700)',
+                  borderRadius: 10,
+                }}>
+                  <span style={{ fontSize: 24, flexShrink: 0 }}>🗺️</span>
+                  <div>
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 14,
+                      color: 'var(--bone)', marginBottom: 4,
+                    }}>
+                      Cerca qualsiasi luogo
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 12,
+                      color: 'var(--gray-400)', lineHeight: 1.5,
+                    }}>
+                      Digita il nome di una città, quartiere o zona.<br />
+                      Es: &quot;Merano&quot;, &quot;Pigneto Roma&quot;, &quot;Navigli&quot;...
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -247,176 +317,89 @@ export default function TopBar({
   );
 }
 
-/* ── Utility ── */
+/* ═══════════════════════════════════════
+   SUB-COMPONENTS
+═══════════════════════════════════════ */
 
-type Suggestion =
-  | { kind: 'spot';  pin: SpotMapPin }
-  | { kind: 'city';  value: string; label: string; count: number };
-
-function getSuggestions(q: string, spots: SpotMapPin[], cityCount: Record<string, number>): Suggestion[] {
-  const ql = q.toLowerCase();
-  const results: Suggestion[] = [];
-
-  // Città italiane prima (anche senza spot)
-  CITTA_ITALIANE
-    .filter(c => c.value !== 'altro' && (
-      c.label.toLowerCase().includes(ql) ||
-      c.value.toLowerCase().includes(ql)
-    ))
-    .slice(0, 5)
-    .forEach(c => {
-      results.push({ kind: 'city', value: c.value, label: c.label, count: cityCount[c.value] ?? 0 });
-    });
-
-  // Poi spot per nome
-  spots
-    .filter(s => s.name.toLowerCase().includes(ql))
-    .slice(0, 6)
-    .forEach(pin => results.push({ kind: 'spot', pin }));
-
-  return results;
-}
-
-function SuggestionRow({ s, onPickCity, onPickSpot }: {
-  s: Suggestion; onPickCity: (v: string) => void; onPickSpot: (p: SpotMapPin) => void;
-}) {
+function PlaceRow({ place, onPick }: { place: NominatimPlace; onPick: () => void }) {
   const [hover, setHover] = useState(false);
-  const bg = hover ? 'rgba(255,106,0,0.08)' : 'var(--gray-700)';
 
-  if (s.kind === 'city') {
-    return (
-      <button onClick={() => onPickCity(s.value)}
-        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', marginBottom: 4, background: bg, border: '1px solid var(--gray-600)', borderRadius: 6, cursor: 'pointer', textAlign: 'left' }}>
-        <span style={{ fontSize: 20 }}>🏙️</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)' }}>{s.label}</div>
-          <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 1 }}>{s.count > 0 ? `${s.count} spot` : 'Nessuno spot ancora'}</div>
-        </div>
-        <span style={{ color: 'var(--orange)', fontSize: 18 }}>→</span>
-      </button>
-    );
-  }
-  const tipo = TIPI_SPOT[s.pin.type];
+  const placeEmoji = place.type === 'city' || place.type === 'town' || place.type === 'village'
+    ? '🏙️'
+    : place.type === 'administrative'
+    ? '📍'
+    : '📌';
+
   return (
-    <button onClick={() => onPickSpot(s.pin)}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', marginBottom: 4, background: bg, border: '1px solid var(--gray-600)', borderRadius: 6, cursor: 'pointer', textAlign: 'left' }}>
-      <span style={{ fontSize: 22 }}>{tipo.emoji}</span>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)' }}>{s.pin.name}</div>
-        <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 1 }}>{s.pin.city ? `${s.pin.city} · ` : ''}{tipo.label}</div>
+    <button
+      onClick={onPick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        width: '100%', padding: '11px 14px', marginBottom: 4,
+        background: hover ? 'rgba(255,106,0,0.08)' : 'var(--gray-700)',
+        border: '1px solid var(--gray-600)',
+        borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+        transition: 'background 0.1s',
+      }}
+    >
+      <span style={{ fontSize: 20, flexShrink: 0 }}>{placeEmoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {place.name}
+        </div>
+        {place.displayExtra && (
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+            marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {place.displayExtra}
+          </div>
+        )}
       </div>
-      <span style={{ color: 'var(--gray-400)', fontSize: 18 }}>📍</span>
+      <span style={{ color: 'var(--orange)', fontSize: 18, flexShrink: 0 }}>→</span>
     </button>
   );
 }
 
-/* ── RegionBrowser: lista regioni espandibili stile Subito ── */
-function RegionBrowser({ cityCount, onPickCity }: {
-  cityCount: Record<string, number>;
-  onPickCity: (city: string) => void;
-}) {
-  const [openRegion, setOpenRegion] = useState<string | null>(null);
+function SpotRow({ pin, onPick }: { pin: SpotMapPin; onPick: () => void }) {
+  const [hover, setHover] = useState(false);
+  const tipo = TIPI_SPOT[pin.type];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {REGIONI_ITALIA.map(regione => {
-        const isOpen   = openRegion === regione.label;
-        // Count total spots in region
-        const totalInRegion = regione.cities.reduce((acc, c) => acc + (cityCount[c] ?? 0), 0);
-
-        return (
-          <div key={regione.label}>
-            {/* Region row */}
-            <button
-              onClick={() => setOpenRegion(isOpen ? null : regione.label)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '12px 14px',
-                background: isOpen ? 'rgba(255,106,0,0.06)' : 'var(--gray-800)',
-                border: `1px solid ${isOpen ? 'rgba(255,106,0,0.3)' : 'var(--gray-700)'}`,
-                borderRadius: isOpen ? '6px 6px 0 0' : 6,
-                cursor: 'pointer', textAlign: 'left',
-                transition: 'background 0.12s',
-              }}
-            >
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{regione.emoji}</span>
-              <span style={{
-                flex: 1, fontFamily: 'var(--font-mono)', fontSize: 15,
-                color: isOpen ? 'var(--orange)' : 'var(--bone)',
-              }}>
-                {regione.label}
-              </span>
-              {totalInRegion > 0 && (
-                <span style={{
-                  background: 'var(--orange)', color: '#000',
-                  borderRadius: 10, padding: '1px 7px',
-                  fontSize: 10, fontWeight: 700, lineHeight: 1.5,
-                }}>
-                  {totalInRegion}
-                </span>
-              )}
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 14,
-                color: 'var(--gray-400)', marginLeft: 4,
-                transform: isOpen ? 'rotate(90deg)' : 'none',
-                display: 'inline-block', transition: 'transform 0.15s',
-              }}>
-                ›
-              </span>
-            </button>
-
-            {/* Cities grid (expanded) */}
-            {isOpen && (
-              <div style={{
-                background: 'rgba(255,106,0,0.03)',
-                border: '1px solid rgba(255,106,0,0.2)',
-                borderTop: 'none',
-                borderRadius: '0 0 6px 6px',
-                padding: '10px 12px 12px',
-                display: 'flex', flexWrap: 'wrap', gap: 6,
-              }}>
-                {regione.cities.map(cityValue => {
-                  const cityInfo  = CITTA_ITALIANE.find(c => c.value === cityValue);
-                  if (!cityInfo) return null;
-                  const count     = cityCount[cityValue] ?? 0;
-                  const hasCoords = !!CITTA_COORDS[cityValue];
-                  return (
-                    <button
-                      key={cityValue}
-                      onClick={() => { if (hasCoords) onPickCity(cityValue); }}
-                      disabled={!hasCoords}
-                      style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 13,
-                        padding: '5px 11px',
-                        border: `1px solid ${count > 0 ? 'var(--orange)' : 'var(--gray-700)'}`,
-                        borderRadius: 16,
-                        background: count > 0 ? 'rgba(255,106,0,0.1)' : 'transparent',
-                        color: count > 0 ? 'var(--bone)' : 'var(--gray-400)',
-                        cursor: hasCoords ? 'pointer' : 'default',
-                        display: 'flex', alignItems: 'center', gap: 5,
-                      }}
-                    >
-                      {cityInfo.label}
-                      {count > 0 && (
-                        <span style={{
-                          background: 'var(--orange)', color: '#000',
-                          borderRadius: 8, padding: '0 5px',
-                          fontSize: 9, fontWeight: 700, lineHeight: 1.5,
-                        }}>
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <button
+      onClick={onPick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        width: '100%', padding: '11px 14px', marginBottom: 4,
+        background: hover ? 'rgba(255,106,0,0.08)' : 'var(--gray-700)',
+        border: '1px solid var(--gray-600)',
+        borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+        transition: 'background 0.1s',
+      }}
+    >
+      <span style={{ fontSize: 22, flexShrink: 0 }}>{tipo.emoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {pin.name}
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 1,
+        }}>
+          {pin.city ? `${pin.city} · ` : ''}{tipo.label}
+        </div>
+      </div>
+      <span style={{ color: 'var(--gray-400)', fontSize: 16, flexShrink: 0 }}>📍</span>
+    </button>
   );
 }
 
@@ -447,7 +430,10 @@ function FilterChip({ label, active, color, onClick, count }: {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+    <div style={{
+      fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)',
+      textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8,
+    }}>
       {children}
     </div>
   );
