@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG, PALETTE } from '@/lib/constants';
+import 'leaflet/dist/leaflet.css';
 
 // Leaflet viene importato dinamicamente (ssr:false nel parent)
 let L: typeof import('leaflet') | null = null;
