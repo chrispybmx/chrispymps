@@ -15,7 +15,7 @@ export function supabaseServer() {
   const cookieStore = cookies();
   return createServerClient(SUPABASE_URL, SUPABASE_ANON, {
     cookies: {
-      get(name) { return cookieStore.get(name)?.value; },
+      get(name: string) { return cookieStore.get(name)?.value; },
       set() {}, // noop in server components
       remove() {},
     },
