@@ -11,8 +11,19 @@ const SpotSchema = z.object({
   city:         z.string().max(60).optional(),
   description:  z.string().max(500).optional(),
   guardians:    z.string().max(200).optional(),
-  access_token: z.string().min(1),
+  access_token: z.string().min(1).max(2048),
 });
+
+// Tipi MIME accettati
+const ALLOWED_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg':  'jpg',
+  'image/png':  'png',
+  'image/webp': 'webp',
+};
+
+// Max 5MB per foto
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   let formData: FormData;
@@ -30,8 +41,9 @@ export async function POST(req: NextRequest) {
   let parsed: z.infer<typeof SpotSchema>;
   try {
     parsed = SpotSchema.parse(JSON.parse(rawData));
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: 'Dati non validi: ' + String(e) }, { status: 422 });
+  } catch {
+    // Non esponiamo i dettagli Zod al client
+    return NextResponse.json({ ok: false, error: 'Dati non validi. Controlla tutti i campi.' }, { status: 422 });
   }
 
   const supabase = supabaseAdmin();
@@ -53,7 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Profilo non trovato. Riprova.' }, { status: 400 });
   }
 
-  // 3. Crea spot
+  // 3. Crea spot (errori DB non esposti al client)
   const { data: spot, error: spotErr } = await supabase
     .from('spots')
     .insert({
@@ -73,19 +85,36 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (spotErr || !spot) {
-    return NextResponse.json({ ok: false, error: 'Errore creazione spot: ' + spotErr?.message }, { status: 500 });
+    console.error('[submit-spot] DB error:', spotErr?.message);
+    return NextResponse.json({ ok: false, error: 'Errore interno. Riprova più tardi.' }, { status: 500 });
   }
 
-  // 4. Upload foto (max 5)
+  // 4. Upload foto (max 5, con validazione)
   const photoUrls: string[] = [];
   for (let i = 0; i < 5; i++) {
     const file = formData.get(`photo_${i}`);
     if (!file || !(file instanceof Blob)) continue;
-    const ext    = file.type.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg';
+
+    // Valida dimensione
+    if (file.size > MAX_PHOTO_SIZE) continue;
+
+    // Valida MIME
+    const mimeType = file.type.toLowerCase();
+    const ext = ALLOWED_MIME[mimeType];
+    if (!ext) continue;
+
     const path   = `${spot.id}/${i}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    const { error: uploadErr } = await supabase.storage.from('spot-photos').upload(path, buffer, { contentType: file.type, upsert: true });
-    if (uploadErr) { console.error('[submit-spot] foto upload error:', uploadErr.message); continue; }
+
+    const { error: uploadErr } = await supabase.storage
+      .from('spot-photos')
+      .upload(path, buffer, { contentType: mimeType, upsert: true });
+
+    if (uploadErr) {
+      console.error('[submit-spot] foto upload error:', uploadErr.message);
+      continue;
+    }
+
     const { data: urlData } = supabase.storage.from('spot-photos').getPublicUrl(path);
     photoUrls.push(urlData.publicUrl);
   }
@@ -102,8 +131,8 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Notifica admin (fire-and-forget)
-  const fakeContributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
-  sendAdminNotification(spot, fakeContributor as any).catch(console.error);
+  const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
+  sendAdminNotification(spot, contributor as any).catch(() => {});
 
   return NextResponse.json({ ok: true, data: { id: spot.id, slug: spot.slug } }, { status: 201 });
 }
