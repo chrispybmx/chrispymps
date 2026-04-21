@@ -1,0 +1,26 @@
+# env
+.env
+.env.local
+.env.*.local
+
+# Next.js
+.next/
+out/
+build/
+
+# node
+node_modules/
+
+# Vercel
+.vercel
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output temporanei
+tmp/
+*.log
+
+# TypeScript
+*.tsbuildinfo
