@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabaseBrowser } from '@/lib/supabase';
+import { supabaseBrowser } from '@/lib/supabase-browser';
 import { getProfile, type UserSession } from '@/lib/auth-client';
 
 /**
