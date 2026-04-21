@@ -30,8 +30,8 @@ const securityHeaders = [
       "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co",
       // Worker per Leaflet
       "worker-src blob:",
-      // Frame: nessuno
-      "frame-src 'none'",
+      // Frame: solo OSM per anteprima mappa
+      "frame-src https://*.openstreetmap.org",
       // Object: nessuno
       "object-src 'none'",
       // Base URI limitata
