@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, APP_CONFIG } from '@/lib/constants';
 import type { SpotType, SpotMapPin } from '@/lib/types';
 import SideMenu from './SideMenu';
 
@@ -164,28 +164,45 @@ export default function TopBar({
             }} aria-label="Chiudi">✕</button>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 24px' }}>
 
-            {/* Risultati live */}
+            {/* ── Risultati live (quando si digita) ── */}
             {query.trim().length >= 1 && (
               suggestions.length === 0 ? (
-                <div style={{ color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 14, padding: '20px 0', textAlign: 'center' }}>
+                <div style={{ color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 14, padding: '24px 0', textAlign: 'center' }}>
                   Nessun risultato per &quot;{query}&quot;
                 </div>
               ) : (
-                suggestions.map((s, i) => (
-                  <SuggestionRow key={i} s={s} onPickCity={pickCity} onPickSpot={pickSpot} />
-                ))
+                <>
+                  {/* Città che matchano */}
+                  {suggestions.filter(s => s.kind === 'city').length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <SectionLabel>📍 Città</SectionLabel>
+                      {suggestions.filter(s => s.kind === 'city').map((s, i) => (
+                        <SuggestionRow key={`c${i}`} s={s} onPickCity={pickCity} onPickSpot={pickSpot} />
+                      ))}
+                    </div>
+                  )}
+                  {/* Spot che matchano */}
+                  {suggestions.filter(s => s.kind === 'spot').length > 0 && (
+                    <div>
+                      <SectionLabel>🎯 Spot</SectionLabel>
+                      {suggestions.filter(s => s.kind === 'spot').map((s, i) => (
+                        <SuggestionRow key={`s${i}`} s={s} onPickCity={pickCity} onPickSpot={pickSpot} />
+                      ))}
+                    </div>
+                  )}
+                </>
               )
             )}
 
-            {/* Stato vuoto */}
+            {/* ── Stato vuoto: città con spot + browse per regione ── */}
             {query.trim().length === 0 && (
               <>
-                {/* Città */}
+                {/* Città con spot nella mappa */}
                 {topCities.length > 0 && (
                   <div style={{ marginBottom: 24 }}>
-                    <SectionLabel>🏙️ Esplora per città</SectionLabel>
+                    <SectionLabel>🔥 Città con spot</SectionLabel>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {topCities.map(([city, count]) => {
                         const cityLabel = CITTA_ITALIANE.find(c => c.value === city)?.label ?? city;
@@ -193,9 +210,10 @@ export default function TopBar({
                         return (
                           <button key={city} onClick={() => pickCity(city)} disabled={!hasCoords} style={{
                             fontFamily: 'var(--font-mono)', fontSize: 14,
-                            padding: '8px 14px',
-                            border: '1px solid var(--gray-600)',
-                            borderRadius: 4, background: 'var(--gray-700)',
+                            padding: '7px 12px',
+                            border: '1px solid var(--orange)',
+                            borderRadius: 20,
+                            background: 'rgba(255,106,0,0.08)',
                             color: 'var(--bone)',
                             cursor: hasCoords ? 'pointer' : 'default',
                             display: 'flex', alignItems: 'center', gap: 6,
@@ -204,7 +222,7 @@ export default function TopBar({
                             <span style={{
                               background: 'var(--orange)', color: '#000',
                               borderRadius: 10, padding: '1px 6px',
-                              fontSize: 11, fontWeight: 700,
+                              fontSize: 10, fontWeight: 700, lineHeight: 1.4,
                             }}>{count}</span>
                           </button>
                         );
@@ -213,21 +231,10 @@ export default function TopBar({
                   </div>
                 )}
 
-                {/* Tipi */}
+                {/* Browse per regione stile Subito */}
                 <div>
-                  <SectionLabel>🎯 Filtra per tipo</SectionLabel>
-                  {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([type, info]) => {
-                    const cnt = spots.filter(s => s.type === type).length;
-                    return (
-                      <TypeRow
-                        key={type}
-                        info={info}
-                        active={activeType === type}
-                        count={cnt}
-                        onClick={() => { onFilterType(activeType === type ? null : type); closeSearch(); }}
-                      />
-                    );
-                  })}
+                  <SectionLabel>🗺️ Esplora per regione</SectionLabel>
+                  <RegionBrowser cityCount={cityCount} onPickCity={pickCity} />
                 </div>
               </>
             )}
@@ -249,18 +256,24 @@ type Suggestion =
 function getSuggestions(q: string, spots: SpotMapPin[], cityCount: Record<string, number>): Suggestion[] {
   const ql = q.toLowerCase();
   const results: Suggestion[] = [];
-  spots.filter(s =>
-    s.name.toLowerCase().includes(ql) || (s.city ?? '').toLowerCase().includes(ql)
-  ).slice(0, 6).forEach(pin => results.push({ kind: 'spot', pin }));
 
+  // Città italiane prima (anche senza spot)
   CITTA_ITALIANE
-    .filter(c => c.label.toLowerCase().includes(ql) || c.value.toLowerCase().includes(ql))
-    .slice(0, 3)
+    .filter(c => c.value !== 'altro' && (
+      c.label.toLowerCase().includes(ql) ||
+      c.value.toLowerCase().includes(ql)
+    ))
+    .slice(0, 5)
     .forEach(c => {
-      if (!results.find(r => r.kind === 'city' && (r as { kind: 'city'; value: string }).value === c.value)) {
-        results.push({ kind: 'city', value: c.value, label: c.label, count: cityCount[c.value] ?? 0 });
-      }
+      results.push({ kind: 'city', value: c.value, label: c.label, count: cityCount[c.value] ?? 0 });
     });
+
+  // Poi spot per nome
+  spots
+    .filter(s => s.name.toLowerCase().includes(ql))
+    .slice(0, 6)
+    .forEach(pin => results.push({ kind: 'spot', pin }));
+
   return results;
 }
 
@@ -299,28 +312,111 @@ function SuggestionRow({ s, onPickCity, onPickSpot }: {
   );
 }
 
-function TypeRow({ info, active, count, onClick }: {
-  info: typeof TIPI_SPOT[keyof typeof TIPI_SPOT]; active: boolean; count: number; onClick: () => void;
+/* ── RegionBrowser: lista regioni espandibili stile Subito ── */
+function RegionBrowser({ cityCount, onPickCity }: {
+  cityCount: Record<string, number>;
+  onPickCity: (city: string) => void;
 }) {
-  const [hover, setHover] = useState(false);
+  const [openRegion, setOpenRegion] = useState<string | null>(null);
+
   return (
-    <button onClick={onClick}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-        padding: '11px 14px', marginBottom: 4, borderRadius: 4, cursor: 'pointer', textAlign: 'left',
-        background: active ? 'rgba(255,106,0,0.12)' : hover ? 'rgba(255,106,0,0.06)' : 'none',
-        border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-700)'}`,
-        transition: 'all 0.12s',
-      }}>
-      <span style={{ fontSize: 24 }}>{info.emoji}</span>
-      <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 15, color: active ? 'var(--orange)' : 'var(--bone)' }}>
-        {info.label}
-      </div>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: count > 0 ? 'var(--orange)' : 'var(--gray-400)' }}>
-        {count > 0 ? `${count} spot` : '—'}
-      </span>
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {REGIONI_ITALIA.map(regione => {
+        const isOpen   = openRegion === regione.label;
+        // Count total spots in region
+        const totalInRegion = regione.cities.reduce((acc, c) => acc + (cityCount[c] ?? 0), 0);
+
+        return (
+          <div key={regione.label}>
+            {/* Region row */}
+            <button
+              onClick={() => setOpenRegion(isOpen ? null : regione.label)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '12px 14px',
+                background: isOpen ? 'rgba(255,106,0,0.06)' : 'var(--gray-800)',
+                border: `1px solid ${isOpen ? 'rgba(255,106,0,0.3)' : 'var(--gray-700)'}`,
+                borderRadius: isOpen ? '6px 6px 0 0' : 6,
+                cursor: 'pointer', textAlign: 'left',
+                transition: 'background 0.12s',
+              }}
+            >
+              <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{regione.emoji}</span>
+              <span style={{
+                flex: 1, fontFamily: 'var(--font-mono)', fontSize: 15,
+                color: isOpen ? 'var(--orange)' : 'var(--bone)',
+              }}>
+                {regione.label}
+              </span>
+              {totalInRegion > 0 && (
+                <span style={{
+                  background: 'var(--orange)', color: '#000',
+                  borderRadius: 10, padding: '1px 7px',
+                  fontSize: 10, fontWeight: 700, lineHeight: 1.5,
+                }}>
+                  {totalInRegion}
+                </span>
+              )}
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 14,
+                color: 'var(--gray-400)', marginLeft: 4,
+                transform: isOpen ? 'rotate(90deg)' : 'none',
+                display: 'inline-block', transition: 'transform 0.15s',
+              }}>
+                ›
+              </span>
+            </button>
+
+            {/* Cities grid (expanded) */}
+            {isOpen && (
+              <div style={{
+                background: 'rgba(255,106,0,0.03)',
+                border: '1px solid rgba(255,106,0,0.2)',
+                borderTop: 'none',
+                borderRadius: '0 0 6px 6px',
+                padding: '10px 12px 12px',
+                display: 'flex', flexWrap: 'wrap', gap: 6,
+              }}>
+                {regione.cities.map(cityValue => {
+                  const cityInfo  = CITTA_ITALIANE.find(c => c.value === cityValue);
+                  if (!cityInfo) return null;
+                  const count     = cityCount[cityValue] ?? 0;
+                  const hasCoords = !!CITTA_COORDS[cityValue];
+                  return (
+                    <button
+                      key={cityValue}
+                      onClick={() => { if (hasCoords) onPickCity(cityValue); }}
+                      disabled={!hasCoords}
+                      style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 13,
+                        padding: '5px 11px',
+                        border: `1px solid ${count > 0 ? 'var(--orange)' : 'var(--gray-700)'}`,
+                        borderRadius: 16,
+                        background: count > 0 ? 'rgba(255,106,0,0.1)' : 'transparent',
+                        color: count > 0 ? 'var(--bone)' : 'var(--gray-400)',
+                        cursor: hasCoords ? 'pointer' : 'default',
+                        display: 'flex', alignItems: 'center', gap: 5,
+                      }}
+                    >
+                      {cityInfo.label}
+                      {count > 0 && (
+                        <span style={{
+                          background: 'var(--orange)', color: '#000',
+                          borderRadius: 8, padding: '0 5px',
+                          fontSize: 9, fontWeight: 700, lineHeight: 1.5,
+                        }}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
