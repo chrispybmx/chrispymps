@@ -185,6 +185,18 @@ export default function SpotSheet({ spot, onClose, onFlag }: SpotSheetProps) {
             </span>
           </div>
 
+          {/* Inviato da @username */}
+          {spot.submitted_by_username && (
+            <a href={`/u/${spot.submitted_by_username}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 12, textDecoration: 'none' }}>
+              <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--orange)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#000', flexShrink: 0 }}>
+                {spot.submitted_by_username[0].toUpperCase()}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)' }}>
+                inviato da <strong style={{ color: 'var(--orange)' }}>@{spot.submitted_by_username}</strong>
+              </span>
+            </a>
+          )}
+
           {spot.description && (
             <p style={{ color: 'var(--bone)', fontSize: 15, lineHeight: 1.55, marginBottom: 12 }}>
               {spot.description}
