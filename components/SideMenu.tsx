@@ -2,10 +2,13 @@
 
 import { useEffect } from 'react';
 import { LINKS, APP_CONFIG } from '@/lib/constants';
+import { useUser } from '@/hooks/useUser';
+import { signOut } from '@/lib/auth-client';
 
 interface SideMenuProps {
-  open:    boolean;
-  onClose: () => void;
+  open:        boolean;
+  onClose:     () => void;
+  onOpenAuth?: () => void;
 }
 
 const MENU_ITEMS = [
@@ -18,7 +21,8 @@ const MENU_ITEMS = [
   { href: '/map/about',    label: 'Chi siamo',   emoji: '🏴' },
 ];
 
-export default function SideMenu({ open, onClose }: SideMenuProps) {
+export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
+  const user = useUser();
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -58,12 +62,39 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
         }}
       >
         {/* Header */}
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--gray-700)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--orange)' }}>{APP_CONFIG.siteName}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>{APP_CONFIG.tagline.toUpperCase()}</div>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--gray-700)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)' }}>{APP_CONFIG.siteName}</div>
+            <button onClick={onClose} className="btn-ghost" aria-label="Chiudi menu" style={{ fontSize: 20 }}>✕</button>
           </div>
-          <button onClick={onClose} className="btn-ghost" aria-label="Chiudi menu" style={{ fontSize: 20 }}>✕</button>
+
+          {/* User section */}
+          {user === undefined ? (
+            <div style={{ height: 40 }} />
+          ) : user ? (
+            /* Loggato */
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <a href={`/u/${user.username}`} onClick={onClose} style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--orange)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 18, color: '#000', textDecoration: 'none', flexShrink: 0 }}>
+                {user.username[0].toUpperCase()}
+              </a>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <a href={`/u/${user.username}`} onClick={onClose} style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  @{user.username}
+                </a>
+                <button onClick={() => { signOut(); onClose(); }} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+                  Esci →
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Non loggato */
+            <button
+              onClick={() => { onOpenAuth?.(); onClose(); }}
+              style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 14, background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 6, color: 'var(--orange)', padding: '10px 14px', cursor: 'pointer', textAlign: 'left' }}
+            >
+              🔑 Accedi / Registrati
+            </button>
+          )}
         </div>
 
         {/* Voci */}
