@@ -123,7 +123,7 @@ export default function TopBar({ onSearch, onFilterType, onAddSpot, activeType }
           gap: 8,
           transition: 'top 0.15s ease-out',
         }}
-        style2={{ scrollbarWidth: 'none' } as React.CSSProperties}
+        ref={(el) => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
       >
         {/* Pulsante "Tutti" */}
         <button
