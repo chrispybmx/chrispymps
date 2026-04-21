@@ -24,6 +24,15 @@ interface AdminEvent {
   cover_url?: string;
   link_url?: string;
   status: string;
+  spot_id?: string | null;
+  spot?: { name: string; slug: string } | null;
+}
+
+interface SpotOption {
+  id: string;
+  name: string;
+  slug: string;
+  city?: string;
 }
 
 interface AdminNews {
@@ -39,7 +48,7 @@ interface AdminNews {
 }
 
 const EMPTY_EVENT: Omit<AdminEvent, 'id'> = {
-  title: '', description: '', location: '', city: '', event_date: '', cover_url: '', link_url: '', status: 'published',
+  title: '', description: '', location: '', city: '', event_date: '', cover_url: '', link_url: '', status: 'published', spot_id: null, spot: null,
 };
 const EMPTY_NEWS: Omit<AdminNews, 'id' | 'created_at'> = {
   title: '', excerpt: '', body: '', cover_url: '', tags: '', status: 'draft',
@@ -481,6 +490,45 @@ function EventForm({
 }) {
   const set = (k: keyof AdminEvent, v: string) => onChange({ ...event, [k]: v });
 
+  /* ── Spot search state ── */
+  const [spotQ,      setSpotQ]      = useState('');
+  const [spotRes,    setSpotRes]    = useState<SpotOption[]>([]);
+  const [spotBusy,   setSpotBusy]   = useState(false);
+  const [spotOpen,   setSpotOpen]   = useState(false);
+
+  useEffect(() => {
+    if (spotQ.length < 2) { setSpotRes([]); setSpotOpen(false); return; }
+    const t = setTimeout(async () => {
+      setSpotBusy(true);
+      try {
+        const r = await fetch('/api/admin/all-spots').then(x => x.json());
+        if (r.ok) {
+          const q = spotQ.toLowerCase();
+          const filtered = (r.data as Array<{ id: string; name: string; slug: string; city?: string; status: string }>)
+            .filter(s => s.status === 'approved' && (
+              s.name.toLowerCase().includes(q) ||
+              (s.city ?? '').toLowerCase().includes(q)
+            ))
+            .slice(0, 8)
+            .map(s => ({ id: s.id, name: s.name, slug: s.slug, city: s.city }));
+          setSpotRes(filtered);
+          setSpotOpen(filtered.length > 0);
+        }
+      } catch { /* noop */ }
+      setSpotBusy(false);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [spotQ]);
+
+  const selectSpot = (s: SpotOption) => {
+    onChange({ ...event, spot_id: s.id, spot: { name: s.name, slug: s.slug } });
+    setSpotQ('');
+    setSpotRes([]);
+    setSpotOpen(false);
+  };
+
+  const clearSpot = () => onChange({ ...event, spot_id: null, spot: null });
+
   return (
     <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, padding: 20 }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--orange)', marginBottom: 20 }}>
@@ -504,6 +552,84 @@ function EventForm({
               <option value="published">✅ Pubblicato</option>
               <option value="draft">📝 Bozza</option>
             </select>
+          </div>
+        </div>
+
+        {/* ── Spot collegato ── */}
+        <div>
+          <label style={labelStyle}>📍 Spot collegato (opzionale)</label>
+          {event.spot_id ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 12px',
+              background: 'rgba(255,106,0,0.08)',
+              border: '1px solid rgba(255,106,0,0.35)',
+              borderRadius: 4,
+            }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', flex: 1 }}>
+                📍 {event.spot?.name ?? event.spot_id}
+              </span>
+              <button
+                onClick={clearSpot}
+                style={{ background: 'transparent', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1 }}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <input
+                style={inputStyle}
+                value={spotQ}
+                onChange={e => setSpotQ(e.target.value)}
+                onBlur={() => setTimeout(() => setSpotOpen(false), 180)}
+                placeholder="Cerca uno spot nel database..."
+              />
+              {spotBusy && (
+                <span style={{
+                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+                }}>
+                  ...
+                </span>
+              )}
+              {spotOpen && spotRes.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30,
+                  background: 'var(--gray-800)',
+                  border: '1px solid var(--gray-600)',
+                  borderRadius: '0 0 6px 6px',
+                  maxHeight: 220, overflowY: 'auto',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                }}>
+                  {spotRes.map(s => (
+                    <div
+                      key={s.id}
+                      onMouseDown={() => selectSpot(s)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '9px 12px', cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.08)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', flex: 1 }}>
+                        {s.name}
+                      </span>
+                      {s.city && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
+                          {s.city}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginTop: 4 }}>
+            Collega un park/spot del database → comparirà come link diretto nella pagina eventi
           </div>
         </div>
 
