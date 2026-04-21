@@ -13,11 +13,12 @@ interface TopBarProps {
   spots:        SpotMapPin[];
   onCitySelect: (city: string, lat: number, lon: number) => void;
   onSpotSelect: (pin: SpotMapPin) => void;
+  onOpenAuth?:  () => void;
 }
 
 export default function TopBar({
   onSearch, onFilterType, onAddSpot, activeType,
-  spots, onCitySelect, onSpotSelect,
+  spots, onCitySelect, onSpotSelect, onOpenAuth,
 }: TopBarProps) {
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -234,7 +235,7 @@ export default function TopBar({
         </div>
       )}
 
-      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} onOpenAuth={onOpenAuth} />
     </>
   );
 }
