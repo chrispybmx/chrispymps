@@ -15,6 +15,7 @@ export default function AdminEditClient({ spot: initial }: Props) {
   const [newCond, setNewCond] = useState<SpotCondition>(initial.condition);
   const [photos,  setPhotos]  = useState<SpotPhoto[]>(initial.spot_photos ?? []);
   const [deletingPhoto, setDeletingPhoto] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [tags,    setTags]    = useState<string>((initial as Spot & { tags?: string }).tags ?? '');
   const [activeTab, setActiveTab] = useState<'dati' | 'foto' | 'condizione'>('dati');
 
@@ -72,6 +73,35 @@ export default function AdminEditClient({ spot: initial }: Props) {
     } catch { showMsg('❌ Errore'); }
     finally { setDeletingPhoto(null); }
   }, []);
+
+  const handleUploadPhotos = useCallback(async (files: FileList) => {
+    if (!files.length) return;
+    setUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append('spot_id', spot.id);
+      Array.from(files).slice(0, 5).forEach((f, i) => fd.append(`photo_${i}`, f));
+      const res  = await fetch('/api/admin/upload-photo', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (json.ok) {
+        // Ricarica le foto aggiornate
+        const { data } = await fetch(`/api/spots/${spot.slug}`).then(r => r.json());
+        if (data?.spot_photos) setPhotos(data.spot_photos);
+        else {
+          // fallback: aggiungi le URL alle foto esistenti
+          const newPhotos = json.urls.map((url: string, i: number) => ({
+            id: `new_${Date.now()}_${i}`, spot_id: spot.id, url,
+            position: photos.length + i, created_at: new Date().toISOString(),
+          }));
+          setPhotos(p => [...p, ...newPhotos]);
+        }
+        showMsg(`✅ ${json.urls.length} foto caricate!`);
+      } else {
+        showMsg('❌ ' + json.error);
+      }
+    } catch { showMsg('❌ Errore upload'); }
+    finally { setUploadingPhoto(false); }
+  }, [spot.id, spot.slug, photos.length]);
 
   const handleDelete = async () => {
     if (!window.confirm(`Eliminare definitivamente "${spot.name}"?\nQuesta azione non può essere annullata.`)) return;
@@ -225,16 +255,51 @@ export default function AdminEditClient({ spot: initial }: Props) {
         {/* ── TAB FOTO ── */}
         {activeTab === 'foto' && (
           <>
+            {/* Upload zone */}
+            <label style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 8, padding: '24px 16px',
+              border: `2px dashed ${uploadingPhoto ? 'var(--orange)' : 'var(--gray-600)'}`,
+              borderRadius: 8, cursor: uploadingPhoto ? 'wait' : 'pointer',
+              background: uploadingPhoto ? 'rgba(255,106,0,0.06)' : 'var(--gray-700)',
+              marginBottom: 16, transition: 'all 0.15s',
+            }}>
+              <span style={{ fontSize: 32 }}>{uploadingPhoto ? '⏳' : '📸'}</span>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', textAlign: 'center' }}>
+                {uploadingPhoto ? 'Caricamento in corso...' : 'Clicca per aggiungere foto'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--gray-400)' }}>
+                JPG, PNG · max 5 foto alla volta
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                disabled={uploadingPhoto}
+                style={{ display: 'none' }}
+                onChange={e => { if (e.target.files?.length) handleUploadPhotos(e.target.files); }}
+              />
+            </label>
+
+            {/* Griglia foto esistenti */}
             {photos.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 40 }}>
-                <div style={{ fontSize: 40, marginBottom: 10 }}>📷</div>
-                <p style={{ fontFamily: 'var(--font-mono)', color: 'var(--gray-400)', fontSize: 14 }}>Nessuna foto per questo spot.</p>
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <p style={{ fontFamily: 'var(--font-mono)', color: 'var(--gray-400)', fontSize: 13 }}>
+                  Nessuna foto ancora. Caricane una sopra.
+                </p>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {photos.map((photo, i) => (
+                {photos
+                  .sort((a, b) => a.position - b.position)
+                  .map((photo, i) => (
                   <div key={photo.id} style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--gray-700)' }}>
-                    <img src={photo.url} alt={`Foto ${i + 1}`} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                    <img
+                      src={photo.url}
+                      alt={`Foto ${i + 1}`}
+                      style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }}
+                      loading="lazy"
+                    />
                     {i === 0 && (
                       <div style={{ position: 'absolute', top: 6, left: 6, background: 'var(--orange)', color: '#000', fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', borderRadius: 2 }}>
                         COVER
@@ -259,9 +324,6 @@ export default function AdminEditClient({ spot: initial }: Props) {
                 ))}
               </div>
             )}
-            <p style={{ color: 'var(--gray-400)', fontSize: 12, fontFamily: 'var(--font-mono)', marginTop: 16, lineHeight: 1.5 }}>
-              Per aggiungere foto, chiedi all'utente di caricarle tramite il form spot, oppure gestiscile direttamente su Supabase Storage.
-            </p>
           </>
         )}
 
