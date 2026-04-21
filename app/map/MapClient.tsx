@@ -1,25 +1,21 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useCallback, Suspense } from 'react';
+import { useState, useCallback } from 'react';
 import type { SpotMapPin, SpotType, Spot } from '@/lib/types';
 import TopBar from '@/components/TopBar';
 import SpotSheet from '@/components/SpotSheet';
 import AddSpotModal from '@/components/AddSpotModal';
 import SupportModal from '@/components/SupportModal';
+import DiscoverStrip from '@/components/DiscoverStrip';
 
-// Leaflet non può girare server-side
 const SpotMap = dynamic(() => import('@/components/SpotMap'), {
   ssr: false,
   loading: () => (
     <div style={{
-      flex: 1,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--gray-800)',
-      fontFamily: 'var(--font-mono)',
-      color: 'var(--orange)',
-      fontSize: 18,
-      animation: 'flicker 4s infinite',
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--gray-800)', fontFamily: 'var(--font-mono)',
+      color: 'var(--orange)', fontSize: 18, animation: 'flicker 4s infinite',
     }}>
       CARICAMENTO MAPPA...
     </div>
@@ -31,36 +27,45 @@ interface MapClientProps {
 }
 
 export default function MapClient({ initialSpots }: MapClientProps) {
-  const [spots]          = useState<SpotMapPin[]>(initialSpots);
-  const [filterType,   setFilterType]   = useState<SpotType | null>(null);
-  const [searchQuery,  setSearchQuery]  = useState('');
-  const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
-  const [addOpen,      setAddOpen]      = useState(false);
-  const [supportOpen,  setSupportOpen]  = useState(false);
-  const [addLat,       setAddLat]       = useState<number | undefined>();
-  const [addLon,       setAddLon]       = useState<number | undefined>();
-  const [loadingSpot,  setLoadingSpot]  = useState(false);
+  const [spots]         = useState<SpotMapPin[]>(initialSpots);
+  const [filterType,    setFilterType]    = useState<SpotType | null>(null);
+  const [searchQuery,   setSearchQuery]   = useState('');
+  const [selectedSpot,  setSelectedSpot]  = useState<Spot | null>(null);
+  const [addOpen,       setAddOpen]       = useState(false);
+  const [supportOpen,   setSupportOpen]   = useState(false);
+  const [addLat,        setAddLat]        = useState<number | undefined>();
+  const [addLon,        setAddLon]        = useState<number | undefined>();
+  const [loadingSpot,   setLoadingSpot]   = useState(false);
+  const [flyTarget,     setFlyTarget]     = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
 
-  const handleSpotClick = useCallback(async (pin: SpotMapPin) => {
+  // Click su un pin o su un suggerimento della ricerca
+  const openSpot = useCallback(async (pin: SpotMapPin) => {
     setLoadingSpot(true);
+    // Fly to spot first
+    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 16 });
     try {
       const res = await fetch(`/api/spots/${pin.slug}`);
       if (res.ok) {
         const json = await res.json();
         setSelectedSpot(json.data);
+      } else {
+        setSelectedSpot(pin as unknown as Spot);
       }
     } catch {
-      // Fallback: mostra dati parziali dal pin
       setSelectedSpot(pin as unknown as Spot);
     } finally {
       setLoadingSpot(false);
     }
   }, []);
 
+  // Selezione città dalla ricerca → vola sulla mappa
+  const handleCitySelect = useCallback((city: string, lat: number, lon: number) => {
+    setFlyTarget({ lat, lon, zoom: 14 });
+    setSearchQuery(city);
+  }, []);
+
   const handleAddSpotAt = useCallback((lat: number, lon: number) => {
-    setAddLat(lat);
-    setAddLon(lon);
-    setAddOpen(true);
+    setAddLat(lat); setAddLon(lon); setAddOpen(true);
   }, []);
 
   const handleFlag = useCallback(async (spotId: string) => {
@@ -74,8 +79,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
     alert('Segnalazione inviata. Grazie!');
   }, []);
 
-  // Topbar height + filtri = 56 + 44 = 100px
-  const topOffset = 100;
+  const topOffset = 100; // topbar 56 + filtri 44
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -84,13 +88,15 @@ export default function MapClient({ initialSpots }: MapClientProps) {
         onFilterType={setFilterType}
         onAddSpot={() => setAddOpen(true)}
         activeType={filterType}
+        spots={spots}
+        onCitySelect={handleCitySelect}
+        onSpotSelect={openSpot}
       />
 
-      {/* Mappa a tutto schermo sotto la topbar */}
+      {/* Mappa a tutto schermo */}
       <div style={{
         position: 'fixed',
-        top: topOffset,
-        left: 0, right: 0,
+        top: topOffset, left: 0, right: 0,
         bottom: 'var(--strip-height)',
         zIndex: 1,
       }}>
@@ -98,26 +104,34 @@ export default function MapClient({ initialSpots }: MapClientProps) {
           spots={spots}
           filterType={filterType}
           searchQuery={searchQuery}
-          onSpotClick={handleSpotClick}
+          onSpotClick={openSpot}
           onAddSpotAt={handleAddSpotAt}
+          flyTarget={flyTarget}
         />
       </div>
 
-      {/* Loading overlay spot */}
+      {/* Loading overlay */}
       {loadingSpot && (
         <div style={{
           position: 'fixed',
           bottom: 'calc(var(--strip-height) + 16px)',
           left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(10,10,10,0.9)',
-          color: 'var(--orange)',
-          fontFamily: 'var(--font-mono)',
+          color: 'var(--orange)', fontFamily: 'var(--font-mono)',
           fontSize: 14, padding: '8px 16px',
           borderRadius: 4, zIndex: 46,
           border: '1px solid var(--gray-600)',
         }}>
           CARICAMENTO...
         </div>
+      )}
+
+      {/* Discover strip — suggerisce spot a caso */}
+      {!selectedSpot && (
+        <DiscoverStrip
+          spots={spots}
+          onSpotClick={openSpot}
+        />
       )}
 
       {/* Scheda spot */}
