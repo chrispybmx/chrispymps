@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
-import AuthModal from './AuthModal';
 import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
+import { signIn, signUp, checkUsername } from '@/lib/auth-client';
 
 interface AddSpotModalProps {
   open:        boolean;
@@ -17,6 +17,7 @@ interface AddSpotModalProps {
 
 type Step           = 'gps' | 'foto' | 'dati' | 'invio';
 type LocationMethod = 'gps' | 'search' | null;
+type AuthTab        = 'accedi' | 'registrati';
 
 const STEP_ORDER: Step[] = ['gps', 'foto', 'dati', 'invio'];
 const STEP_LABELS: Record<Step, string> = {
@@ -33,30 +34,57 @@ interface NominatimResult {
   lon:          string;
   type:         string;
   address?: {
-    city?:        string;
-    town?:        string;
-    village?:     string;
+    city?:         string;
+    town?:         string;
+    village?:      string;
     municipality?: string;
-    county?:      string;
+    county?:       string;
   };
 }
 
-export default function AddSpotModal({ open, onClose, initialLat, initialLon }: AddSpotModalProps) {
-  const user     = useUser();
-  const [authOpen, setAuthOpen] = useState(false);
+/* ─── shared input styles (same as AuthModal) ─── */
+const inp: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box',
+  background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
+  borderRadius: 4, color: 'var(--bone)', fontFamily: 'var(--font-mono)',
+  fontSize: 15, padding: '10px 12px', outline: 'none',
+};
+const lbl: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+  textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5,
+};
 
+export default function AddSpotModal({ open, onClose, initialLat, initialLon }: AddSpotModalProps) {
+  const user = useUser();
+
+  /* ── Spot form state ── */
   const [step,    setStep]    = useState<Step>('gps');
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [photos,  setPhotos]  = useState<File[]>([]);
 
-  // Metodo di posizionamento
-  const [locMethod,    setLocMethod]    = useState<LocationMethod>(null);
-  const [searchQuery,  setSearchQuery]  = useState('');
-  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
-  const [searching,    setSearching]    = useState(false);
+  /* ── Location state ── */
+  const [locMethod,      setLocMethod]      = useState<LocationMethod>(null);
+  const [searchQuery,    setSearchQuery]    = useState('');
+  const [searchResults,  setSearchResults]  = useState<NominatimResult[]>([]);
+  const [searching,      setSearching]      = useState(false);
   const [selectedResult, setSelectedResult] = useState<NominatimResult | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── Inline auth state ── */
+  const [authTab,      setAuthTab]      = useState<AuthTab>('registrati');
+  const [authError,    setAuthError]    = useState<string | null>(null);
+  const [authLoading,  setAuthLoading]  = useState(false);
+  const [authDone,     setAuthDone]     = useState<'ok' | 'confirm_email' | null>(null);
+  // registrati
+  const [regUsername,  setRegUsername]  = useState('');
+  const [regEmail,     setRegEmail]     = useState('');
+  const [regPassword,  setRegPassword]  = useState('');
+  const [usernameOk,   setUsernameOk]   = useState<boolean | null>(null);
+  const [checkingUn,   setCheckingUn]   = useState(false);
+  // accedi
+  const [loginEmail,    setLoginEmail]    = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   const [form, setForm] = useState({
     name:        '',
@@ -82,17 +110,13 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const getGPS = useCallback(() => {
     if (!navigator.geolocation) { setError('Geolocalizzazione non disponibile.'); return; }
     navigator.geolocation.getCurrentPosition(
-      pos => {
-        update('lat', pos.coords.latitude);
-        update('lon', pos.coords.longitude);
-        setError(null);
-      },
+      pos => { update('lat', pos.coords.latitude); update('lon', pos.coords.longitude); setError(null); },
       () => setError('Impossibile ottenere la posizione. Sei nello spot?'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, [update]);
 
-  // Nominatim search con debounce
+  /* ── Nominatim search con debounce ── */
   useEffect(() => {
     if (locMethod !== 'search') return;
     if (searchQuery.trim().length < 3) { setSearchResults([]); return; }
@@ -104,20 +128,15 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         const res  = await fetch(url, { headers: { 'Accept-Language': 'it' } });
         const data = await res.json();
         setSearchResults(data);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
+      } catch { setSearchResults([]); }
+      finally { setSearching(false); }
     }, 400);
   }, [searchQuery, locMethod]);
 
   const pickResult = (r: NominatimResult) => {
     const lat = parseFloat(r.lat);
     const lon = parseFloat(r.lon);
-    update('lat', lat);
-    update('lon', lon);
-    // Auto-compila città
+    update('lat', lat); update('lon', lon);
     const cityName = r.address?.city || r.address?.town || r.address?.village || r.address?.municipality || '';
     if (cityName) {
       const match = CITTA_ITALIANE.find(c =>
@@ -126,25 +145,54 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       );
       if (match) update('city', match.value);
     }
-    setSelectedResult(r);
-    setSearchResults([]);
-    setError(null);
+    setSelectedResult(r); setSearchResults([]); setError(null);
   };
 
   const resetLocation = () => {
-    setLocMethod(null);
-    setSearchQuery('');
-    setSearchResults([]);
-    setSelectedResult(null);
-    update('lat', 0);
-    update('lon', 0);
-    update('city', '');
+    setLocMethod(null); setSearchQuery(''); setSearchResults([]);
+    setSelectedResult(null); update('lat', 0); update('lon', 0); update('city', '');
   };
 
-  const stepIndex = STEP_ORDER.indexOf(step);
-  const goNext = () => { setError(null); setStep(STEP_ORDER[stepIndex + 1]); };
-  const goPrev = () => { setError(null); setStep(STEP_ORDER[stepIndex - 1]); };
+  /* ── Auth handlers ── */
+  let unDebounce: ReturnType<typeof setTimeout>;
+  const onUsernameChange = (val: string) => {
+    const clean = val.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+    setRegUsername(clean); setUsernameOk(null);
+    clearTimeout(unDebounce);
+    if (clean.length < 3) return;
+    setCheckingUn(true);
+    unDebounce = setTimeout(async () => {
+      const free = await checkUsername(clean);
+      setUsernameOk(free); setCheckingUn(false);
+    }, 600);
+  };
 
+  const handleSignUp = async () => {
+    if (!regUsername || !regEmail || !regPassword) { setAuthError('Compila tutti i campi.'); return; }
+    if (regUsername.length < 3) { setAuthError('Username troppo corto (min 3 caratteri).'); return; }
+    if (regPassword.length < 6) { setAuthError('Password troppo corta (min 6 caratteri).'); return; }
+    setAuthLoading(true); setAuthError(null);
+    try {
+      const result = await signUp(regEmail, regPassword, regUsername);
+      setAuthDone(result);
+      // If email confirm not required → user session will appear via useUser
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto');
+    } finally { setAuthLoading(false); }
+  };
+
+  const handleSignIn = async () => {
+    if (!loginEmail || !loginPassword) { setAuthError('Inserisci email e password.'); return; }
+    setAuthLoading(true); setAuthError(null);
+    try {
+      await signIn(loginEmail, loginPassword);
+      // useUser() will re-render automatically — auth gate disappears
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto');
+    } finally { setAuthLoading(false); }
+  };
+
+  /* ── Spot submit ── */
   const handleSubmit = async () => {
     if (!user) return;
     setLoading(true); setError(null);
@@ -170,38 +218,33 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       setStep('invio');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore sconosciuto');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleClose = () => {
     setStep('gps'); setError(null); setPhotos([]);
     setLocMethod(null); setSearchQuery(''); setSearchResults([]); setSelectedResult(null);
     setForm({ name: '', type: '' as SpotType | '', lat: 0, lon: 0, city: '', description: '', notes: '' });
+    setAuthError(null); setAuthDone(null);
+    setRegUsername(''); setRegEmail(''); setRegPassword('');
+    setLoginEmail(''); setLoginPassword('');
     onClose();
   };
 
   if (!open) return null;
 
-  const totalSteps  = STEP_ORDER.length - 1;
-  const progressPct = step === 'invio' ? 100 : (stepIndex / (totalSteps - 1)) * 100;
-  const isLoading   = user === undefined;
-  const hasCoords   = form.lat !== 0 && form.lon !== 0;
-
-  // Street View URL
-  const streetViewUrl = hasCoords
-    ? `https://www.google.com/maps/@${form.lat},${form.lon},3a,90y,210h,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`
-    : '';
-  // Mini OSM embed
-  const osmEmbed = hasCoords
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${form.lon - 0.003},${form.lat - 0.002},${form.lon + 0.003},${form.lat + 0.002}&layer=mapnik&marker=${form.lat},${form.lon}`
-    : '';
+  const stepIndex    = STEP_ORDER.indexOf(step);
+  const goNext       = () => { setError(null); setStep(STEP_ORDER[stepIndex + 1]); };
+  const goPrev       = () => { setError(null); setStep(STEP_ORDER[stepIndex - 1]); };
+  const totalSteps   = STEP_ORDER.length - 1;
+  const progressPct  = step === 'invio' ? 100 : (stepIndex / (totalSteps - 1)) * 100;
+  const isLoading    = user === undefined;
+  const hasCoords    = form.lat !== 0 && form.lon !== 0;
+  const osmEmbed     = hasCoords ? `https://www.openstreetmap.org/export/embed.html?bbox=${form.lon - 0.003},${form.lat - 0.002},${form.lon + 0.003},${form.lat + 0.002}&layer=mapnik&marker=${form.lat},${form.lon}` : '';
+  const streetViewUrl = hasCoords ? `https://www.google.com/maps/@${form.lat},${form.lon},3a,90y,210h,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656` : '';
 
   return (
     <>
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} defaultTab="registrati" />
-
       {/* Overlay */}
       <div onClick={handleClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 69, backdropFilter: 'blur(4px)' }} aria-hidden />
 
@@ -232,7 +275,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           <button onClick={handleClose} className="btn-ghost" aria-label="Chiudi" style={{ fontSize: 20 }}>✕</button>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar — visible only when logged in and not on success */}
         {user && step !== 'invio' && (
           <div style={{ height: 3, background: 'var(--gray-700)' }}>
             <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--orange)', transition: 'width 0.3s ease-out' }} />
@@ -241,24 +284,146 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
         <div style={{ padding: '20px 20px 0' }}>
 
+          {/* ── Loading ── */}
           {isLoading && (
             <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-400)', fontSize: 15 }}>...</div>
           )}
 
-          {/* ── AUTH GATE ── */}
+          {/* ═══════════════════════════════════════════════
+              ── AUTH GATE (inline, no second modal) ──
+              Shown when user is null (not loading, not logged in)
+              ═══════════════════════════════════════════════ */}
           {!isLoading && !user && (
-            <div style={{ textAlign: 'center', padding: '20px 0 32px' }}>
-              <div style={{ fontSize: 52, marginBottom: 16 }}>🏴</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 12 }}>ACCEDI PER AGGIUNGERE</div>
-              <p style={{ color: 'var(--bone)', lineHeight: 1.7, marginBottom: 24, fontSize: 15 }}>
-                Devi avere un account per aggiungere spot.<br />
-                Il tuo <strong style={{ color: 'var(--orange)' }}>@username</strong> sarà visibile sullo spot.
-              </p>
-              <button onClick={() => setAuthOpen(true)} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}>
-                🔑 Accedi / Registrati
-              </button>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>Gratuito, niente spam.</p>
-            </div>
+
+            /* email confirm screen */
+            authDone === 'confirm_email' ? (
+              <div style={{ textAlign: 'center', padding: '32px 0 40px' }}>
+                <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 10 }}>
+                  CONTROLLA LA TUA EMAIL
+                </div>
+                <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 8 }}>
+                  Ti abbiamo inviato un link di conferma a<br />
+                  <strong style={{ color: 'var(--orange)' }}>{regEmail}</strong>
+                </p>
+                <p style={{ color: 'var(--gray-400)', fontSize: 13, marginBottom: 24 }}>
+                  Dopo la conferma accedi e potrai aggiungere il tuo spot.
+                </p>
+                <button
+                  onClick={() => { setAuthDone(null); setAuthTab('accedi'); }}
+                  className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  🔑 Vai ad Accedi
+                </button>
+              </div>
+
+            ) : (
+              <div>
+                {/* Intro text */}
+                <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+                  Crea un account gratuito o accedi — il tuo{' '}
+                  <strong style={{ color: 'var(--orange)' }}>@username</strong>{' '}
+                  apparirà sullo spot.
+                </p>
+
+                {/* Tab switcher */}
+                <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--gray-700)' }}>
+                  {(['registrati', 'accedi'] as AuthTab[]).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => { setAuthTab(t); setAuthError(null); }}
+                      style={{
+                        flex: 1, fontFamily: 'var(--font-mono)', fontSize: 14,
+                        padding: '12px 0', border: 'none', background: 'transparent',
+                        color: authTab === t ? 'var(--orange)' : 'var(--gray-400)',
+                        borderBottom: `2px solid ${authTab === t ? 'var(--orange)' : 'transparent'}`,
+                        cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em',
+                        transition: 'color 0.15s',
+                      }}
+                    >
+                      {t === 'accedi' ? '🔑 Accedi' : '🏴 Registrati'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* REGISTRATI */}
+                {authTab === 'registrati' && (
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <div>
+                      <label style={lbl}>Username *</label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          style={{ ...inp, paddingLeft: 28, borderColor: usernameOk === false ? '#ff4444' : usernameOk === true ? '#00c851' : 'var(--gray-600)' }}
+                          value={regUsername}
+                          onChange={e => onUsernameChange(e.target.value)}
+                          placeholder="es. chrispy_bmx"
+                          maxLength={30}
+                        />
+                        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>@</span>
+                        {checkingUn && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontSize: 12 }}>...</span>}
+                        {!checkingUn && usernameOk === true  && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#00c851' }}>✓</span>}
+                        {!checkingUn && usernameOk === false && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#ff4444' }}>✗</span>}
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 4 }}>
+                        Solo lettere, numeri e _. Min 3 caratteri.
+                      </div>
+                      {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff4444', marginTop: 2 }}>Username già in uso</div>}
+                    </div>
+                    <div>
+                      <label style={lbl}>Email *</label>
+                      <input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="la-tua@email.com" />
+                    </div>
+                    <div>
+                      <label style={lbl}>Password * (min 6 caratteri)</label>
+                      <input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
+                    </div>
+                    {authError && <AuthErr msg={authError} />}
+                    <button
+                      onClick={handleSignUp}
+                      disabled={authLoading || usernameOk === false}
+                      className="btn-primary"
+                      style={{ width: '100%', justifyContent: 'center', opacity: (authLoading || usernameOk === false) ? 0.6 : 1 }}
+                    >
+                      {authLoading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT E CONTINUA'}
+                    </button>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textAlign: 'center', lineHeight: 1.5 }}>
+                      Gratuito, niente spam. Accetti i termini community BMX.
+                    </p>
+                  </div>
+                )}
+
+                {/* ACCEDI */}
+                {authTab === 'accedi' && (
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <div>
+                      <label style={lbl}>Email</label>
+                      <input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="la-tua@email.com" onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
+                    </div>
+                    <div>
+                      <label style={lbl}>Password</label>
+                      <input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
+                    </div>
+                    {authError && <AuthErr msg={authError} />}
+                    <button
+                      onClick={handleSignIn}
+                      disabled={authLoading}
+                      className="btn-primary"
+                      style={{ width: '100%', justifyContent: 'center', opacity: authLoading ? 0.6 : 1 }}
+                    >
+                      {authLoading ? '⏳ Accesso...' : '🔑 ENTRA E CONTINUA'}
+                    </button>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
+                      Non hai un account?{' '}
+                      <button onClick={() => { setAuthTab('registrati'); setAuthError(null); }} style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                        Registrati →
+                      </button>
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
           )}
 
           {/* ── STEP 1: POSIZIONE ── */}
@@ -275,7 +440,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               </div>
 
-              {/* Selezione metodo — solo se nessun metodo scelto */}
+              {/* Selezione metodo */}
               {!locMethod && (
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -300,7 +465,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               )}
 
-              {/* ── GPS path ── */}
+              {/* GPS path */}
               {locMethod === 'gps' && (
                 <div style={{ marginBottom: 16 }}>
                   <button onClick={getGPS} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}>
@@ -317,10 +482,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               )}
 
-              {/* ── SEARCH path (Nominatim) ── */}
+              {/* SEARCH path (Nominatim) */}
               {locMethod === 'search' && (
                 <div style={{ marginBottom: 16 }}>
-                  {/* Barra di ricerca */}
                   {!selectedResult && (
                     <div style={{ position: 'relative', marginBottom: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 6, padding: '10px 14px' }}>
@@ -331,42 +495,26 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                           placeholder="es. Skatepark Dergano Milano, Piazza Navona Roma..."
                           value={searchQuery}
                           onChange={e => setSearchQuery(e.target.value)}
-                          style={{
-                            flex: 1, border: 'none', background: 'transparent',
-                            fontSize: 15, color: 'var(--bone)', outline: 'none',
-                            fontFamily: 'var(--font-mono)',
-                          }}
+                          style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 15, color: 'var(--bone)', outline: 'none', fontFamily: 'var(--font-mono)' }}
                         />
                         {searchQuery && (
                           <button onClick={() => { setSearchQuery(''); setSearchResults([]); }} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: 18, cursor: 'pointer', padding: 0, flexShrink: 0 }}>✕</button>
                         )}
                       </div>
-
-                      {/* Risultati dropdown */}
                       {searchResults.length > 0 && (
                         <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--gray-700)', border: '1px solid var(--orange)', borderRadius: 6, overflow: 'hidden', zIndex: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
                           {searchResults.map(r => (
                             <button
                               key={r.place_id}
                               onClick={() => pickResult(r)}
-                              style={{
-                                display: 'flex', alignItems: 'flex-start', gap: 10,
-                                width: '100%', padding: '11px 14px', background: 'none',
-                                border: 'none', borderTop: '1px solid var(--gray-600)',
-                                color: 'var(--bone)', textAlign: 'left', cursor: 'pointer',
-                                transition: 'background 0.1s',
-                              }}
+                              style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', padding: '11px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--gray-600)', color: 'var(--bone)', textAlign: 'left', cursor: 'pointer', transition: 'background 0.1s' }}
                               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.1)')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                             >
                               <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>📍</span>
                               <div>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.4 }}>
-                                  {r.display_name.split(',').slice(0, 2).join(',')}
-                                </div>
-                                <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 2 }}>
-                                  {r.display_name.split(',').slice(2, 4).join(',').trim()}
-                                </div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.4 }}>{r.display_name.split(',').slice(0, 2).join(',')}</div>
+                                <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 2 }}>{r.display_name.split(',').slice(2, 4).join(',').trim()}</div>
                               </div>
                             </button>
                           ))}
@@ -380,47 +528,18 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     </div>
                   )}
 
-                  {/* Risultato selezionato + preview */}
                   {selectedResult && hasCoords && (
                     <div style={{ marginBottom: 12 }}>
-                      {/* Mini mappa OSM */}
                       <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--gray-600)', marginBottom: 10, height: 160 }}>
-                        <iframe
-                          src={osmEmbed}
-                          style={{ width: '100%', height: '100%', border: 'none' }}
-                          loading="lazy"
-                          title="Anteprima posizione"
-                        />
+                        <iframe src={osmEmbed} style={{ width: '100%', height: '100%', border: 'none' }} loading="lazy" title="Anteprima posizione" />
                       </div>
-
-                      {/* Info + azioni */}
                       <div style={{ background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)', borderRadius: 6, padding: '10px 12px', marginBottom: 8 }}>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', marginBottom: 4 }}>
-                          ✅ Posizione trovata
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--bone)', lineHeight: 1.5 }}>
-                          {selectedResult.display_name.split(',').slice(0, 3).join(',')}
-                        </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 3 }}>
-                          {form.lat.toFixed(6)}, {form.lon.toFixed(6)}
-                        </div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', marginBottom: 4 }}>✅ Posizione trovata</div>
+                        <div style={{ fontSize: 12, color: 'var(--bone)', lineHeight: 1.5 }}>{selectedResult.display_name.split(',').slice(0, 3).join(',')}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 3 }}>{form.lat.toFixed(6)}, {form.lon.toFixed(6)}</div>
                       </div>
-
-                      {/* Street View link */}
-                      <a
-                        href={streetViewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '10px 14px',
-                          background: 'var(--gray-700)',
-                          border: '1px solid var(--gray-600)',
-                          borderRadius: 6, textDecoration: 'none',
-                          fontFamily: 'var(--font-mono)', fontSize: 13,
-                          color: 'var(--bone)', marginBottom: 8,
-                          transition: 'border-color 0.15s',
-                        }}
+                      <a href={streetViewUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 6, textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 8, transition: 'border-color 0.15s' }}
                         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
                         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
                       >
@@ -431,7 +550,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                         </div>
                         <span style={{ color: 'var(--gray-400)' }}>↗</span>
                       </a>
-
                       <button onClick={() => { setSelectedResult(null); setSearchQuery(''); setSearchResults([]); update('lat', 0); update('lon', 0); }} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', padding: '4px 0' }}>
                         ← Cerca di nuovo
                       </button>
@@ -460,12 +578,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               {error && <Err msg={error} />}
 
               {locMethod && (
-                <button
-                  onClick={goNext}
-                  disabled={!hasCoords}
-                  className="btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', marginTop: 4, opacity: hasCoords ? 1 : 0.5 }}
-                >
+                <button onClick={goNext} disabled={!hasCoords} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 4, opacity: hasCoords ? 1 : 0.5 }}>
                   Avanti →
                 </button>
               )}
@@ -537,18 +650,18 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               <button onClick={handleClose} className="btn-primary" style={{ padding: '12px 32px' }}>Torna alla mappa</button>
             </div>
           )}
+
         </div>
       </div>
     </>
   );
 }
 
-/* ── Shared styles ── */
+/* ─── Shared sub-components ─── */
 const methodBtn: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 14,
   width: '100%', padding: '14px 16px',
-  background: 'var(--gray-700)',
-  border: '1px solid var(--gray-600)',
+  background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
   borderRadius: 8, cursor: 'pointer', textAlign: 'left',
   transition: 'border-color 0.15s, background 0.15s',
 };
@@ -558,6 +671,14 @@ function Err({ msg }: { msg: string }) {
     <p style={{ color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 13, marginBottom: 12, padding: '8px 12px', background: 'rgba(255,106,0,0.08)', borderRadius: 2, border: '1px solid rgba(255,106,0,0.3)' }}>
       ⚠ {msg}
     </p>
+  );
+}
+
+function AuthErr({ msg }: { msg: string }) {
+  return (
+    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '8px 12px' }}>
+      ⚠ {msg}
+    </div>
   );
 }
 
