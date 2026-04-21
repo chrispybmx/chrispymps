@@ -46,8 +46,10 @@ export interface Spot {
   wax_needed:           boolean;
   guardians?:           string;
   difficulty?:          string;
-  submitted_by?:        string;
-  reviewer_notes?:      string;
+  submitted_by?:          string;
+  submitted_by_user_id?:  string;
+  submitted_by_username?: string;
+  reviewer_notes?:        string;
   created_at:           string;
   approved_at?:         string;
   updated_at:           string;
