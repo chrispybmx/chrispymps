@@ -80,6 +80,35 @@ export const PALETTE = {
   gray400: '#888888',
 } as const;
 
+// ===== COORDINATE CITTÀ (per fly-to sulla mappa) =====
+export const CITTA_COORDS: Record<string, [number, number]> = {
+  verona:           [45.4384, 10.9916],
+  milano:           [45.4654, 9.1859],
+  roma:             [41.9028, 12.4964],
+  torino:           [45.0703, 7.6869],
+  bologna:          [44.4938, 11.3426],
+  firenze:          [43.7696, 11.2558],
+  napoli:           [40.8518, 14.2681],
+  venezia:          [45.4408, 12.3155],
+  padova:           [45.4064, 11.8768],
+  brescia:          [45.5416, 10.2118],
+  bergamo:          [45.6983, 9.6773],
+  trento:           [46.0748, 11.1217],
+  vicenza:          [45.5455, 11.5354],
+  modena:           [44.6471, 10.9252],
+  parma:            [44.8015, 10.3279],
+  genova:           [44.4056, 8.9463],
+  bari:             [41.1171, 16.8719],
+  palermo:          [38.1157, 13.3615],
+  catania:          [37.5079, 15.0830],
+  cagliari:         [39.2238, 9.1217],
+  trieste:          [45.6495, 13.7768],
+  perugia:          [43.1107, 12.3908],
+  ancona:           [43.6158, 13.5189],
+  pescara:          [42.4618, 14.2147],
+  'reggio-calabria':[38.1113, 15.6474],
+};
+
 // ===== LINK ESTERNI =====
 export const LINKS = {
   kofi:       'https://ko-fi.com/chrispy_bmx',
