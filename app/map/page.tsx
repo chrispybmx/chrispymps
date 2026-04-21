@@ -5,27 +5,51 @@ import type { SpotMapPin } from '@/lib/types';
 import { APP_CONFIG } from '@/lib/constants';
 
 export const metadata: Metadata = {
-  title:       `${APP_CONFIG.siteName} — Find Your Spot`,
-  description: APP_CONFIG.description,
+  title:       'Mappa Spot BMX, Skate & Scooter Italia | Chrispy Maps',
+  description: 'Trova spot BMX, skatepark, park scooter e street spot in tutta Italia. Mappa interattiva community-driven con centinaia di spot verificati. Cerca per città, tipo e distanza.',
+  alternates: { canonical: `${APP_CONFIG.url}/map` },
+  keywords: [
+    'mappa spot BMX Italia', 'skatepark vicino a me', 'spot scooter Italia',
+    'trovare skatepark', 'BMX spot map Italy', 'park scooter vicino',
+    'mappa skate Italia', 'spot street BMX', 'bowl skate Italia',
+  ],
   openGraph: {
-    title:       `${APP_CONFIG.siteName} — Find Your Spot`,
-    description: 'La mappa BMX street italiana, community-driven. Trova o segnala spot nella tua città.',
+    title:       'Chrispy Maps — Mappa Spot BMX, Skate & Scooter Italia',
+    description: 'La mappa community italiana per trovare spot BMX, skatepark e park scooter. Centinaia di spot verificati in tutta Italia.',
     url:         `${APP_CONFIG.url}/map`,
-    images:      [{ url: '/og-image.jpg', width: 1200, height: 630 }],
+    images:      [{ url: '/og-image.jpg', width: 1200, height: 630, alt: 'Mappa spot BMX e skatepark Italia' }],
   },
 };
 
-// Rivalidazione ogni 5 minuti — aggiornamenti spot appaiono entro 5 min senza rebuild
 export const revalidate = 300;
+
+const mapJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'Chrispy Maps — Mappa Spot BMX Italia',
+  url: `${APP_CONFIG.url}/map`,
+  description: 'Mappa interattiva community-driven per trovare spot BMX, skatepark, park scooter e street spot in tutta Italia.',
+  applicationCategory: 'SportsApplication',
+  operatingSystem: 'Web, iOS, Android',
+  inLanguage: 'it-IT',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+  author: {
+    '@type': 'Person',
+    name: 'Christian Ceresato',
+    alternateName: 'Chrispy BMX',
+  },
+  about: {
+    '@type': 'Thing',
+    name: 'BMX, Skateboarding, Scooter',
+    description: 'Sport di street e park: BMX freestyle, skateboard, monopattino freestyle',
+  },
+};
 
 async function getSpots(): Promise<SpotMapPin[]> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from('spots')
-    .select(`
-      id, slug, name, type, lat, lon, city, condition,
-      spot_photos (url, position)
-    `)
+    .select(`id, slug, name, type, lat, lon, city, condition, spot_photos (url, position)`)
     .eq('status', 'approved')
     .order('approved_at', { ascending: false });
 
@@ -38,14 +62,8 @@ async function getSpots(): Promise<SpotMapPin[]> {
     const photos = (s.spot_photos ?? []) as { url: string; position: number }[];
     const sorted = [...photos].sort((a, b) => a.position - b.position);
     return {
-      id:        s.id,
-      slug:      s.slug,
-      name:      s.name,
-      type:      s.type,
-      lat:       s.lat,
-      lon:       s.lon,
-      city:      s.city,
-      condition: s.condition,
+      id: s.id, slug: s.slug, name: s.name, type: s.type,
+      lat: s.lat, lon: s.lon, city: s.city, condition: s.condition,
       cover_url: sorted[0]?.url,
     } as SpotMapPin;
   });
@@ -54,5 +72,13 @@ async function getSpots(): Promise<SpotMapPin[]> {
 export default async function MapPage() {
   const spots = await getSpots();
 
-  return <MapClient initialSpots={spots} />;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(mapJsonLd) }}
+      />
+      <MapClient initialSpots={spots} />
+    </>
+  );
 }
