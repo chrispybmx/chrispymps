@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { SpotMapPin, SpotType } from '@/lib/types';
-import { TIPI_SPOT, CONDIZIONI, APP_CONFIG, PALETTE } from '@/lib/constants';
+import { TIPI_SPOT, APP_CONFIG, PALETTE } from '@/lib/constants';
 import 'leaflet/dist/leaflet.css';
 
-// Leaflet viene importato dinamicamente (ssr:false nel parent)
 let L: typeof import('leaflet') | null = null;
 
 interface SpotMapProps {
@@ -14,53 +13,53 @@ interface SpotMapProps {
   searchQuery: string;
   onSpotClick: (pin: SpotMapPin) => void;
   onAddSpotAt: (lat: number, lon: number) => void;
+  flyTarget?:  { lat: number; lon: number; zoom?: number } | null;
 }
 
-function pinIcon(type: SpotType, condition: string): string {
+function pinSvg(type: SpotType, condition: string): string {
   const info  = TIPI_SPOT[type];
-  const color = condition === 'alive' ? info.color
-              : condition === 'bustato' ? PALETTE.orange
-              : PALETTE.gray600;
-  const bustato = condition !== 'alive' ? `
-    <line x1="4" y1="4" x2="20" y2="20" stroke="${PALETTE.orange}" stroke-width="2"/>
+  const color = condition === 'alive'    ? info.color
+              : condition === 'bustato'  ? '#888'
+              : '#444';
+
+  const cross = condition !== 'alive' ? `
+    <line x1="10" y1="10" x2="26" y2="26" stroke="${PALETTE.orange}" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="26" y1="10" x2="10" y2="26" stroke="${PALETTE.orange}" stroke-width="2.5" stroke-linecap="round"/>
   ` : '';
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
-    <path d="M16 0C7.2 0 0 7.2 0 16c0 8 16 24 16 24S32 24 32 16C32 7.2 24.8 0 16 0z"
-          fill="${color}" stroke="#0a0a0a" stroke-width="1.5"/>
-    <text x="16" y="22" text-anchor="middle" font-size="14">${info.emoji}</text>
-    ${bustato}
+  const glow = condition === 'alive' ? `<circle cx="20" cy="20" r="18" fill="${color}" opacity="0.12"/>` : '';
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+    ${glow}
+    <path d="M20 0C8.95 0 0 8.95 0 20c0 11.05 20 30 20 30S40 31.05 40 20C40 8.95 31.05 0 20 0z"
+          fill="${color}" stroke="#0a0a0a" stroke-width="2"/>
+    <circle cx="20" cy="20" r="12" fill="rgba(0,0,0,0.25)"/>
+    <text x="20" y="21" text-anchor="middle" font-size="16" dominant-baseline="middle">${info.emoji}</text>
+    ${cross}
   </svg>`;
 }
 
-export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, onAddSpotAt }: SpotMapProps) {
+export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, onAddSpotAt, flyTarget }: SpotMapProps) {
   const mapRef      = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<import('leaflet').Map | null>(null);
   const markersRef  = useRef<import('leaflet').LayerGroup | null>(null);
   const [locating, setLocating] = useState(false);
-  const [addMode,  setAddMode]  = useState(false);
 
-  // Filtra spots in base a tipo e ricerca
   const filtered = spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return (
-        s.name.toLowerCase().includes(q) ||
-        (s.city ?? '').toLowerCase().includes(q)
-      );
+      return s.name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
     }
     return true;
   });
 
-  // Init mappa Leaflet
+  // Init mappa
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
     import('leaflet').then((leaflet) => {
       L = leaflet;
-
-      // Fix icone di default di Leaflet in Next.js
       delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -72,30 +71,16 @@ export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, o
         center: APP_CONFIG.mapCenter,
         zoom:   APP_CONFIG.mapZoom,
         zoomControl: false,
-        attributionControl: true,
       });
 
-      // Tiles OpenStreetMap
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
         className: 'osm-tiles',
       }).addTo(map);
 
-      // Zoom control in basso a destra
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-      // Layer group per i marker
       markersRef.current = L.layerGroup().addTo(map);
-
-      // Click su mappa in "add mode"
-      map.on('click', (e) => {
-        if (addMode) {
-          onAddSpotAt(e.latlng.lat, e.latlng.lng);
-          setAddMode(false);
-        }
-      });
-
       mapInstance.current = map;
     });
 
@@ -112,32 +97,31 @@ export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, o
   // Aggiorna marker quando cambiano i filtri
   useEffect(() => {
     if (!mapInstance.current || !markersRef.current || !L) return;
-
     markersRef.current.clearLayers();
 
     filtered.forEach((pin) => {
-      const svg  = pinIcon(pin.type, pin.condition);
+      const svg  = pinSvg(pin.type, pin.condition);
       const icon = L!.divIcon({
         html:        svg,
         className:   'spot-pin',
-        iconSize:    [32, 40],
-        iconAnchor:  [16, 40],
-        popupAnchor: [0, -42],
+        iconSize:    [40, 50],
+        iconAnchor:  [20, 50],
+        popupAnchor: [0, -52],
       });
 
       const marker = L!.marker([pin.lat, pin.lon], { icon });
 
-      // Popup leggero al hover su desktop
+      const tipo = TIPI_SPOT[pin.type];
       const popupContent = `
-        <div style="font-family:'Barlow Condensed',sans-serif;min-width:140px;">
-          <div style="font-family:'VT323',monospace;font-size:16px;color:#ff6a00;">${pin.name}</div>
-          ${pin.city ? `<div style="font-size:12px;color:#888;">${pin.city}</div>` : ''}
-          <div style="font-size:11px;color:#888;margin-top:4px;">${TIPI_SPOT[pin.type].emoji} ${TIPI_SPOT[pin.type].label}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;min-width:150px;padding:2px 0">
+          <div style="font-family:'VT323',monospace;font-size:17px;color:#ff6a00;line-height:1.2">${pin.name}</div>
+          ${pin.city ? `<div style="font-size:12px;color:#888;margin-top:2px">📍 ${pin.city}</div>` : ''}
+          <div style="font-size:11px;color:#888;margin-top:4px">${tipo.emoji} ${tipo.label}</div>
+          <div style="font-size:11px;color:#555;margin-top:2px">Tocca per dettagli</div>
         </div>
       `;
-      marker.bindPopup(popupContent, { maxWidth: 200, closeButton: false });
-
-      marker.on('click', () => onSpotClick(pin));
+      marker.bindPopup(popupContent, { maxWidth: 220, closeButton: false });
+      marker.on('click',     () => onSpotClick(pin));
       marker.on('mouseover', () => marker.openPopup());
       marker.on('mouseout',  () => marker.closePopup());
 
@@ -145,7 +129,17 @@ export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, o
     });
   }, [filtered, onSpotClick]);
 
-  // Geolocalizzazione "Near me"
+  // Fly-to quando cambia flyTarget
+  useEffect(() => {
+    if (!mapInstance.current || !flyTarget) return;
+    mapInstance.current.flyTo(
+      [flyTarget.lat, flyTarget.lon],
+      flyTarget.zoom ?? APP_CONFIG.mapZoomCity,
+      { duration: 1.4 }
+    );
+  }, [flyTarget]);
+
+  // Geolocalizzazione
   const locateMe = useCallback(() => {
     if (!mapInstance.current || !navigator.geolocation) return;
     setLocating(true);
@@ -165,7 +159,6 @@ export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, o
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {/* Mappa */}
       <div
         ref={mapRef}
         style={{ width: '100%', height: '100%' }}
@@ -176,71 +169,42 @@ export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, o
       {/* Controlli floating */}
       <div style={{
         position: 'absolute',
-        bottom: 'calc(var(--strip-height) + 16px + env(safe-area-inset-bottom))',
+        bottom: 'calc(var(--strip-height, 48px) + 16px + env(safe-area-inset-bottom))',
         right: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
+        display: 'flex', flexDirection: 'column', gap: 8,
         zIndex: 10,
       }}>
-        {/* Near me */}
         <button
-          onClick={locateMe}
-          disabled={locating}
-          title="Mostra spot vicino a me"
-          aria-label="Cerca spot vicino a me"
+          onClick={locateMe} disabled={locating}
+          title="Spot vicino a me" aria-label="Spot vicino a me"
           style={{
             width: 44, height: 44,
             background: 'var(--gray-800)',
             border: '1px solid var(--gray-600)',
             borderRadius: 4,
             color: locating ? 'var(--orange)' : 'var(--bone)',
-            fontSize: 20,
-            cursor: 'pointer',
+            fontSize: 20, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: 'var(--vhs-pin)',
-            transition: 'color 0.2s',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
             animation: locating ? 'spin-slow 1s linear infinite' : 'none',
           }}
         >
           {locating ? '⌛' : '📍'}
         </button>
 
-        {/* Contatore filtrati */}
         <div style={{
           background: 'var(--gray-800)',
           border: '1px solid var(--gray-700)',
-          borderRadius: 4,
-          padding: '6px 10px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 13,
-          color: 'var(--orange)',
-          textAlign: 'center',
-          boxShadow: 'var(--vhs-pin)',
+          borderRadius: 4, padding: '6px 10px',
+          fontFamily: 'var(--font-mono)', fontSize: 14,
+          color: 'var(--orange)', textAlign: 'center',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+          minWidth: 44,
         }}>
-          {filtered.length}<br />
-          <span style={{ color: 'var(--gray-400)', fontSize: 10 }}>SPOT</span>
+          {filtered.length}
+          <div style={{ color: 'var(--gray-400)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SPOT</div>
         </div>
       </div>
-
-      {/* Banner add mode */}
-      {addMode && (
-        <div style={{
-          position: 'absolute',
-          top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(255,106,0,0.95)',
-          color: '#000',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 16,
-          padding: '10px 20px',
-          borderRadius: 4,
-          pointerEvents: 'none',
-          zIndex: 20,
-        }}>
-          📍 TAP SULLA MAPPA per posizionare lo spot
-        </div>
-      )}
     </div>
   );
 }
