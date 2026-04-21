@@ -8,6 +8,7 @@ import SpotSheet from '@/components/SpotSheet';
 import AddSpotModal from '@/components/AddSpotModal';
 import SupportModal from '@/components/SupportModal';
 import DiscoverStrip from '@/components/DiscoverStrip';
+import AuthModal from '@/components/AuthModal';
 
 const SpotMap = dynamic(() => import('@/components/SpotMap'), {
   ssr: false,
@@ -37,6 +38,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   const [addLon,        setAddLon]        = useState<number | undefined>();
   const [loadingSpot,   setLoadingSpot]   = useState(false);
   const [flyTarget,     setFlyTarget]     = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
+  const [authOpen,      setAuthOpen]      = useState(false);
 
   // Click su un pin o su un suggerimento della ricerca
   const openSpot = useCallback(async (pin: SpotMapPin) => {
@@ -91,6 +93,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
         spots={spots}
         onCitySelect={handleCitySelect}
         onSpotSelect={openSpot}
+        onOpenAuth={() => setAuthOpen(true)}
       />
 
       {/* Mappa a tutto schermo */}
@@ -153,6 +156,12 @@ export default function MapClient({ initialSpots }: MapClientProps) {
       <SupportModal
         open={supportOpen}
         onClose={() => setSupportOpen(false)}
+      />
+
+      {/* Auth modal (da SideMenu o altri trigger) */}
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
       />
     </div>
   );
