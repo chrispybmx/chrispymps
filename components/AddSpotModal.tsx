@@ -1,25 +1,26 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, SUPERFICI, DIFFICOLTA } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 import type { SpotType, SubmitSpotPayload } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 
 interface AddSpotModalProps {
-  open:          boolean;
-  onClose:       () => void;
-  initialLat?:   number;
-  initialLon?:   number;
+  open:         boolean;
+  onClose:      () => void;
+  initialLat?:  number;
+  initialLon?:  number;
 }
 
 type Step = 'gps' | 'foto' | 'dati' | 'info' | 'invio';
 
-const STEPS: Record<Step, { label: string; n: number }> = {
-  gps:   { label: 'Posizione', n: 1 },
-  foto:  { label: 'Foto',      n: 2 },
-  dati:  { label: 'Dettagli',  n: 3 },
-  info:  { label: 'Chi sei',   n: 4 },
-  invio: { label: 'Inviato!',  n: 5 },
+const STEP_ORDER: Step[] = ['gps', 'foto', 'dati', 'info', 'invio'];
+const STEP_LABELS: Record<Step, string> = {
+  gps:   'Posizione',
+  foto:  'Foto',
+  dati:  'Dettagli',
+  info:  'Chi sei',
+  invio: 'Inviato!',
 };
 
 const LS_KEY = 'cmps_contributor';
@@ -31,51 +32,43 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [photos,  setPhotos]  = useState<File[]>([]);
 
   const [form, setForm] = useState({
-    name:                 '',
-    type:                 '' as SpotType | '',
-    lat:                  initialLat ?? 0,
-    lon:                  initialLon ?? 0,
-    city:                 '',
-    description:          '',
-    surface:              '',
-    wax_needed:           false,
-    guardians:            '',
-    difficulty:           '',
-    contributor_name:     '',
-    contributor_email:    '',
-    instagram_handle:     '',
-    subscribe_newsletter: true,
+    name:              '',
+    type:              '' as SpotType | '',
+    lat:               initialLat ?? 0,
+    lon:               initialLon ?? 0,
+    city:              '',
+    description:       '',
+    notes:             '',
+    contributor_name:  '',
+    contributor_email: '',
   });
 
-  // Ripristina nome/email da localStorage (friction zero per invii successivi)
+  // Ripristina nome/email da localStorage
   useEffect(() => {
     if (!open) return;
     try {
       const saved = localStorage.getItem(LS_KEY);
       if (saved) {
-        const { name, email, instagram } = JSON.parse(saved);
+        const { name, email } = JSON.parse(saved);
         setForm((f) => ({
           ...f,
           contributor_name:  name  || f.contributor_name,
           contributor_email: email || f.contributor_email,
-          instagram_handle:  instagram || f.instagram_handle,
         }));
       }
     } catch {}
   }, [open]);
 
-  // Aggiorna lat/lon iniziali se passati come prop
   useEffect(() => {
     if (initialLat && initialLon) {
       setForm((f) => ({ ...f, lat: initialLat, lon: initialLon }));
     }
   }, [initialLat, initialLon]);
 
-  const updateForm = useCallback(<K extends keyof typeof form>(key: K, value: typeof form[K]) => {
+  const update = useCallback(<K extends keyof typeof form>(key: K, value: typeof form[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   }, []);
 
-  // Geolocalizzazione
   const getGPS = useCallback(() => {
     if (!navigator.geolocation) {
       setError('Geolocalizzazione non disponibile su questo dispositivo.');
@@ -83,65 +76,46 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        updateForm('lat', pos.coords.latitude);
-        updateForm('lon', pos.coords.longitude);
+        update('lat', pos.coords.latitude);
+        update('lon', pos.coords.longitude);
         setError(null);
       },
       () => setError('Impossibile ottenere la posizione. Assicurati di essere nello spot.'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [updateForm]);
+  }, [update]);
 
-  const nextStep = () => {
-    setError(null);
-    const order: Step[] = ['gps', 'foto', 'dati', 'info', 'invio'];
-    const idx = order.indexOf(step);
-    if (idx < order.length - 1) setStep(order[idx + 1]);
-  };
-
-  const prevStep = () => {
-    setError(null);
-    const order: Step[] = ['gps', 'foto', 'dati', 'info', 'invio'];
-    const idx = order.indexOf(step);
-    if (idx > 0) setStep(order[idx - 1]);
-  };
+  const stepIndex = STEP_ORDER.indexOf(step);
+  const goNext = () => { setError(null); setStep(STEP_ORDER[stepIndex + 1]); };
+  const goPrev = () => { setError(null); setStep(STEP_ORDER[stepIndex - 1]); };
 
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
-
     try {
       const fd = new FormData();
       const payload: SubmitSpotPayload = {
-        name:                 form.name,
-        type:                 form.type as SpotType,
-        lat:                  form.lat,
-        lon:                  form.lon,
-        city:                 form.city || undefined,
-        description:          form.description || undefined,
-        surface:              form.surface || undefined,
-        wax_needed:           form.wax_needed,
-        guardians:            form.guardians || undefined,
-        difficulty:           form.difficulty || undefined,
-        contributor_name:     form.contributor_name,
-        contributor_email:    form.contributor_email,
-        instagram_handle:     form.instagram_handle || undefined,
-        subscribe_newsletter: form.subscribe_newsletter,
+        name:              form.name,
+        type:              form.type as SpotType,
+        lat:               form.lat,
+        lon:               form.lon,
+        city:              form.city    || undefined,
+        description:       form.description || undefined,
+        guardians:         form.notes   || undefined,
+        contributor_name:  form.contributor_name,
+        contributor_email: form.contributor_email,
       };
       fd.append('data', JSON.stringify(payload));
       photos.forEach((p, i) => fd.append(`photo_${i}`, p));
 
-      const res = await fetch('/api/submit-spot', { method: 'POST', body: fd });
+      const res  = await fetch('/api/submit-spot', { method: 'POST', body: fd });
       const json = await res.json();
-
       if (!json.ok) throw new Error(json.error ?? 'Errore durante l\'invio');
 
-      // Salva nome/email per la prossima volta
       try {
         localStorage.setItem(LS_KEY, JSON.stringify({
-          name:      form.contributor_name,
-          email:     form.contributor_email,
-          instagram: form.instagram_handle,
+          name:  form.contributor_name,
+          email: form.contributor_email,
         }));
       } catch {}
 
@@ -157,13 +131,23 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setStep('gps');
     setError(null);
     setPhotos([]);
+    setForm({
+      name: '', type: '' as SpotType | '',
+      lat: 0, lon: 0, city: '',
+      description: '', notes: '',
+      contributor_name: '', contributor_email: '',
+    });
     onClose();
   };
 
   if (!open) return null;
 
+  const totalSteps = STEP_ORDER.length - 1; // escludi 'invio' dal conteggio
+  const progressPct = step === 'invio' ? 100 : ((stepIndex) / (totalSteps - 1)) * 100;
+
   return (
     <>
+      {/* Overlay */}
       <div
         onClick={handleClose}
         style={{
@@ -175,6 +159,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         aria-hidden="true"
       />
 
+      {/* Drawer */}
       <div
         role="dialog"
         aria-modal="true"
@@ -198,7 +183,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 20px 16px',
+          padding: '12px 20px 14px',
           borderBottom: '1px solid var(--gray-700)',
         }}>
           <div>
@@ -207,7 +192,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             </h2>
             {step !== 'invio' && (
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginTop: 2 }}>
-                STEP {STEPS[step].n}/4 — {STEPS[step].label.toUpperCase()}
+                STEP {stepIndex + 1}/{totalSteps} — {STEP_LABELS[step].toUpperCase()}
               </div>
             )}
           </div>
@@ -219,7 +204,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           <div style={{ height: 3, background: 'var(--gray-700)' }}>
             <div style={{
               height: '100%',
-              width: `${(STEPS[step].n / 4) * 100}%`,
+              width: `${progressPct}%`,
               background: 'var(--orange)',
               transition: 'width 0.3s ease-out',
             }} />
@@ -227,11 +212,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         )}
 
         <div style={{ padding: '20px 20px 0' }}>
-          {/* STEP 1: GPS */}
+
+          {/* ── STEP 1: GPS ── */}
           {step === 'gps' && (
             <div>
               <p style={{ color: 'var(--bone)', marginBottom: 20, lineHeight: 1.5 }}>
-                Sei fisicamente nello spot? Premi il pulsante per salvare la posizione GPS precisa.
+                Sei nello spot? Premi il pulsante per salvare la posizione GPS.
               </p>
 
               <button onClick={getGPS} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 16 }}>
@@ -253,7 +239,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <select
                   className="input-vhs"
                   value={form.city}
-                  onChange={(e) => updateForm('city', e.target.value)}
+                  onChange={(e) => update('city', e.target.value)}
                   style={{ marginTop: 6 }}
                 >
                   <option value="">Seleziona città...</option>
@@ -263,10 +249,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </select>
               </div>
 
-              {error && <ErrorMsg msg={error} />}
+              {error && <Err msg={error} />}
 
               <button
-                onClick={nextStep}
+                onClick={goNext}
                 disabled={form.lat === 0}
                 className="btn-primary"
                 style={{ width: '100%', justifyContent: 'center', marginTop: 4, opacity: form.lat === 0 ? 0.5 : 1 }}
@@ -276,43 +262,42 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             </div>
           )}
 
-          {/* STEP 2: FOTO */}
+          {/* ── STEP 2: FOTO ── */}
           {step === 'foto' && (
             <div>
               <p style={{ color: 'var(--gray-400)', marginBottom: 16, fontSize: 14 }}>
-                Carica fino a 5 foto. La prima sarà la cover. Sono gradite foto recenti che mostrano lo spot.
+                Carica fino a 5 foto. La prima sarà la cover.
               </p>
               <PhotoUpload photos={photos} onChange={setPhotos} />
-              {error && <ErrorMsg msg={error} />}
-              <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-                <button onClick={prevStep} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
-                <button onClick={nextStep} className="btn-primary"   style={{ flex: 2, justifyContent: 'center' }}>Avanti →</button>
-              </div>
+              {error && <Err msg={error} />}
+              <NavButtons onPrev={goPrev} onNext={goNext} />
             </div>
           )}
 
-          {/* STEP 3: DATI SPOT */}
+          {/* ── STEP 3: DATI SPOT ── */}
           {step === 'dati' && (
             <div>
-              <div style={{ marginBottom: 14 }}>
+              {/* Nome */}
+              <div style={{ marginBottom: 16 }}>
                 <label className="input-label">Nome spot *</label>
                 <input
                   type="text"
                   className="input-vhs"
                   value={form.name}
-                  onChange={(e) => updateForm('name', e.target.value)}
+                  onChange={(e) => update('name', e.target.value)}
                   placeholder="es. Gradoni Piazza Bra"
                   style={{ marginTop: 6 }}
                 />
               </div>
 
-              <div style={{ marginBottom: 14 }}>
+              {/* Tipo */}
+              <div style={{ marginBottom: 16 }}>
                 <label className="input-label">Tipo spot *</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                   {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([type, info]) => (
                     <button
                       key={type}
-                      onClick={() => updateForm('type', type)}
+                      onClick={() => update('type', type)}
                       style={{
                         padding: '6px 12px',
                         border: `1px solid ${form.type === type ? info.color : 'var(--gray-600)'}`,
@@ -331,65 +316,38 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               </div>
 
-              <div style={{ marginBottom: 14 }}>
+              {/* Descrizione */}
+              <div style={{ marginBottom: 16 }}>
                 <label className="input-label">Descrizione (opzionale)</label>
                 <textarea
                   className="input-vhs"
                   value={form.description}
-                  onChange={(e) => updateForm('description', e.target.value)}
+                  onChange={(e) => update('description', e.target.value)}
                   placeholder="Cosa c'è nello spot? Com'è il fondo?"
                   rows={3}
                   style={{ marginTop: 6, resize: 'vertical' }}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div>
-                  <label className="input-label">Superficie</label>
-                  <select className="input-vhs" value={form.surface} onChange={(e) => updateForm('surface', e.target.value)} style={{ marginTop: 6 }}>
-                    <option value="">—</option>
-                    {SUPERFICI.map((s) => <option key={s} value={s.toLowerCase()}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="input-label">Livello</label>
-                  <select className="input-vhs" value={form.difficulty} onChange={(e) => updateForm('difficulty', e.target.value)} style={{ marginTop: 6 }}>
-                    <option value="">—</option>
-                    {DIFFICOLTA.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={form.wax_needed}
-                    onChange={(e) => updateForm('wax_needed', e.target.checked)}
-                    style={{ width: 18, height: 18, accentColor: 'var(--orange)' }}
-                  />
-                  <span style={{ color: 'var(--bone)', fontSize: 15 }}>🕯️ Necessita cera</span>
-                </label>
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <label className="input-label">Note accesso (guardiani, orari, rischi)</label>
+              {/* Note */}
+              <div style={{ marginBottom: 16 }}>
+                <label className="input-label">Note (guardiani, orari, accesso…)</label>
                 <input
                   type="text"
                   className="input-vhs"
-                  value={form.guardians}
-                  onChange={(e) => updateForm('guardians', e.target.value)}
-                  placeholder='es. "Evitare ore di punta" oppure "Sempre libero"'
+                  value={form.notes}
+                  onChange={(e) => update('notes', e.target.value)}
+                  placeholder='es. "Evitare ore di punta" / "Sempre libero"'
                   style={{ marginTop: 6 }}
                 />
               </div>
 
-              {error && <ErrorMsg msg={error} />}
+              {error && <Err msg={error} />}
 
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button onClick={prevStep} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
+                <button onClick={goPrev} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
                 <button
-                  onClick={nextStep}
+                  onClick={goNext}
                   disabled={!form.name || !form.type}
                   className="btn-primary"
                   style={{ flex: 2, justifyContent: 'center', opacity: (!form.name || !form.type) ? 0.5 : 1 }}
@@ -400,52 +358,49 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             </div>
           )}
 
-          {/* STEP 4: INFO CONTRIBUTOR */}
+          {/* ── STEP 4: CHI SEI ── */}
           {step === 'info' && (
             <div>
               <p style={{ color: 'var(--gray-400)', marginBottom: 16, fontSize: 14, lineHeight: 1.5 }}>
-                Per avvisarti quando lo spot è online. Non spammiamo.
+                Ti avvisiamo via email quando lo spot è approvato online.
               </p>
 
               <div style={{ marginBottom: 14 }}>
                 <label className="input-label">Il tuo nome *</label>
-                <input type="text" className="input-vhs" value={form.contributor_name}
-                  onChange={(e) => updateForm('contributor_name', e.target.value)}
-                  placeholder="Come vuoi essere creditato sulla mappa" style={{ marginTop: 6 }} />
+                <input
+                  type="text"
+                  className="input-vhs"
+                  value={form.contributor_name}
+                  onChange={(e) => update('contributor_name', e.target.value)}
+                  placeholder="Come vuoi essere creditato"
+                  style={{ marginTop: 6 }}
+                />
               </div>
 
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 20 }}>
                 <label className="input-label">Email *</label>
-                <input type="email" className="input-vhs" value={form.contributor_email}
-                  onChange={(e) => updateForm('contributor_email', e.target.value)}
-                  placeholder="Per conferma e notifica approvazione" style={{ marginTop: 6 }} />
+                <input
+                  type="email"
+                  className="input-vhs"
+                  value={form.contributor_email}
+                  onChange={(e) => update('contributor_email', e.target.value)}
+                  placeholder="Per conferma e notifica"
+                  style={{ marginTop: 6 }}
+                />
               </div>
 
-              <div style={{ marginBottom: 14 }}>
-                <label className="input-label">Instagram (opzionale)</label>
-                <input type="text" className="input-vhs" value={form.instagram_handle}
-                  onChange={(e) => updateForm('instagram_handle', e.target.value.replace('@', ''))}
-                  placeholder="handle senza @" style={{ marginTop: 6 }} />
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginBottom: 20 }}>
-                <input type="checkbox" checked={form.subscribe_newsletter}
-                  onChange={(e) => updateForm('subscribe_newsletter', e.target.checked)}
-                  style={{ width: 18, height: 18, marginTop: 2, accentColor: 'var(--orange)', flexShrink: 0 }} />
-                <span style={{ color: 'var(--bone)', fontSize: 14, lineHeight: 1.5 }}>
-                  Voglio ricevere aggiornamenti quando vengono aggiunti spot nella mia zona
-                </span>
-              </label>
-
-              {error && <ErrorMsg msg={error} />}
+              {error && <Err msg={error} />}
 
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={prevStep} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
+                <button onClick={goPrev} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
                 <button
                   onClick={handleSubmit}
                   disabled={loading || !form.contributor_name || !form.contributor_email}
                   className="btn-primary"
-                  style={{ flex: 2, justifyContent: 'center', opacity: loading || !form.contributor_name || !form.contributor_email ? 0.5 : 1 }}
+                  style={{
+                    flex: 2, justifyContent: 'center',
+                    opacity: (loading || !form.contributor_name || !form.contributor_email) ? 0.5 : 1,
+                  }}
                 >
                   {loading ? '⏳ Invio...' : '🏴 INVIA SPOT'}
                 </button>
@@ -453,7 +408,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             </div>
           )}
 
-          {/* STEP 5: SUCCESSO */}
+          {/* ── STEP 5: SUCCESSO ── */}
           {step === 'invio' && (
             <div style={{ textAlign: 'center', padding: '20px 0 40px' }}>
               <div style={{ fontSize: 60, marginBottom: 16 }}>🏴</div>
@@ -461,7 +416,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 SPOT INVIATO!
               </h3>
               <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 24 }}>
-                Grazie! Lo guardo entro 24-48 ore.<br />
+                Grazie! Lo revisionerò entro 24-48 ore.<br />
                 Ti mando un'email quando è online.
               </p>
               <button onClick={handleClose} className="btn-primary" style={{ padding: '12px 32px' }}>
@@ -469,13 +424,16 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               </button>
             </div>
           )}
+
         </div>
       </div>
     </>
   );
 }
 
-function ErrorMsg({ msg }: { msg: string }) {
+/* ── Utility components ── */
+
+function Err({ msg }: { msg: string }) {
   return (
     <p style={{
       color: 'var(--orange)',
@@ -492,14 +450,11 @@ function ErrorMsg({ msg }: { msg: string }) {
   );
 }
 
-// Piccola utility CSS inline
-const inputLabelStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 12,
-  color: 'var(--gray-400)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  display: 'block',
-};
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(global as any).__inputLabel = inputLabelStyle; // hack per usarlo come className
+function NavButtons({ onPrev, onNext }: { onPrev: () => void; onNext: () => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+      <button onClick={onPrev} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
+      <button onClick={onNext} className="btn-primary"   style={{ flex: 2, justifyContent: 'center' }}>Avanti →</button>
+    </div>
+  );
+}
