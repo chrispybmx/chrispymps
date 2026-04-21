@@ -14,6 +14,11 @@ interface SpotMapProps {
   onSpotClick: (pin: SpotMapPin) => void;
   onAddSpotAt: (lat: number, lon: number) => void;
   flyTarget?:  { lat: number; lon: number; zoom?: number } | null;
+  // Radius search
+  radiusMode?:   boolean;
+  radiusCenter?: { lat: number; lon: number } | null;
+  radiusKm?:     number;
+  onMapClick?:   (lat: number, lon: number) => void;
 }
 
 function pinSvg(type: SpotType, condition: string): string {
@@ -39,11 +44,20 @@ function pinSvg(type: SpotType, condition: string): string {
   </svg>`;
 }
 
-export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, onAddSpotAt, flyTarget }: SpotMapProps) {
-  const mapRef      = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<import('leaflet').Map | null>(null);
-  const markersRef  = useRef<import('leaflet').LayerGroup | null>(null);
+export default function SpotMap({
+  spots, filterType, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
+  radiusMode, radiusCenter, radiusKm, onMapClick,
+}: SpotMapProps) {
+  const mapRef          = useRef<HTMLDivElement>(null);
+  const mapInstance     = useRef<import('leaflet').Map | null>(null);
+  const markersRef      = useRef<import('leaflet').LayerGroup | null>(null);
+  const circleRef       = useRef<import('leaflet').Circle | null>(null);
+  const centerMarkerRef = useRef<import('leaflet').Marker | null>(null);
+  const onMapClickRef   = useRef(onMapClick);
   const [locating, setLocating] = useState(false);
+
+  // Keep callback ref fresh
+  useEffect(() => { onMapClickRef.current = onMapClick; });
 
   const filtered = spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
@@ -82,6 +96,11 @@ export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, o
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       markersRef.current = L.layerGroup().addTo(map);
       mapInstance.current = map;
+
+      // Radius mode: forward all map clicks
+      map.on('click', (e) => {
+        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+      });
     });
 
     return () => {
@@ -139,7 +158,69 @@ export default function SpotMap({ spots, filterType, searchQuery, onSpotClick, o
     );
   }, [flyTarget]);
 
-  // Geolocalizzazione
+  // ── Radius: cursor crosshair quando in modalità raggio ──
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    const container = mapInstance.current.getContainer();
+    container.style.cursor = radiusMode ? 'crosshair' : '';
+  }, [radiusMode]);
+
+  // ── Radius: cerchio + marker centro ──
+  useEffect(() => {
+    if (!L) return;
+
+    const tryDraw = () => {
+      if (!mapInstance.current || !L) return;
+
+      // Rimuovi vecchi layer
+      circleRef.current?.remove();
+      circleRef.current = null;
+      centerMarkerRef.current?.remove();
+      centerMarkerRef.current = null;
+
+      if (radiusCenter && radiusKm) {
+        // Cerchio tratteggiato arancione
+        circleRef.current = L!.circle(
+          [radiusCenter.lat, radiusCenter.lon],
+          {
+            radius: radiusKm * 1000,
+            color: '#ff6a00',
+            fillColor: '#ff6a00',
+            fillOpacity: 0.05,
+            weight: 2,
+            dashArray: '10 6',
+          }
+        ).addTo(mapInstance.current);
+
+        // Marker centro
+        const svg = `<div style="
+          width:18px;height:18px;
+          background:#ff6a00;
+          border:3px solid #fff;
+          border-radius:50%;
+          box-shadow:0 0 0 2px #ff6a00, 0 2px 8px rgba(0,0,0,0.6);
+        "></div>`;
+        const icon = L!.divIcon({ html: svg, className: '', iconSize: [18, 18], iconAnchor: [9, 9] });
+        centerMarkerRef.current = L!.marker([radiusCenter.lat, radiusCenter.lon], {
+          icon, zIndexOffset: 1000,
+        }).addTo(mapInstance.current);
+
+        // Fly to fit the circle
+        mapInstance.current.fitBounds(circleRef.current.getBounds(), { padding: [40, 40], maxZoom: 13 });
+      }
+    };
+
+    // Map might not be ready yet
+    if (mapInstance.current) {
+      tryDraw();
+    } else {
+      const t = setTimeout(tryDraw, 300);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radiusCenter, radiusKm]);
+
+  // ── Geolocalizzazione
   const locateMe = useCallback(() => {
     if (!mapInstance.current || !navigator.geolocation) return;
     setLocating(true);
