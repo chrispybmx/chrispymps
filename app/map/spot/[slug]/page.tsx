@@ -27,22 +27,34 @@ async function getSpot(slug: string): Promise<Spot | null> {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const spot = await getSpot(params.slug);
   if (!spot) return { title: 'Spot non trovato' };
-  const tipo = TIPI_SPOT[spot.type];
-  const cover = spot.spot_photos?.[0]?.url;
+  const tipo   = TIPI_SPOT[spot.type];
+  const cover  = spot.spot_photos?.[0]?.url;
+  const city   = spot.city ?? 'Italia';
+  const title  = `${spot.name} — Spot ${tipo.label} a ${city}`;
+  const desc   = spot.description
+    ? `${spot.description} Spot ${tipo.label} a ${city}.`
+    : `${spot.name} è uno spot ${tipo.label} a ${city}. Trova foto, condizione attuale e coordinate GPS su Chrispy Maps.`;
+  const url    = `${APP_CONFIG.url}/map/spot/${spot.slug}`;
+
   return {
-    title:       `${spot.name} — ${spot.city ?? 'Italia'}`,
-    description: spot.description ?? `Spot BMX ${tipo.label} a ${spot.city ?? 'Italia'}.`,
+    title,
+    description: desc,
+    alternates: { canonical: url },
+    keywords: [
+      `spot BMX ${city}`, `${tipo.label} ${city}`, `${spot.name} BMX`,
+      `skatepark ${city}`, `spot scooter ${city}`, spot.name,
+    ],
     openGraph: {
-      title:       `${spot.name} — ChrispyMPS`,
-      description: spot.description ?? `Spot BMX ${tipo.label} a ${spot.city ?? 'Italia'}. Condition: ${spot.condition}.`,
-      url:         `${APP_CONFIG.url}/map/spot/${spot.slug}`,
-      images:      cover ? [{ url: cover, width: 1200, height: 630 }] : [{ url: '/og-image.jpg' }],
+      title:       `${spot.name} — Spot ${tipo.label} ${city} | Chrispy Maps`,
+      description: desc,
+      url,
+      images:      cover ? [{ url: cover, width: 1200, height: 630, alt: `${spot.name} — spot ${tipo.label} a ${city}` }] : [{ url: '/og-image.jpg' }],
       type:        'article',
     },
     twitter: {
       card:        'summary_large_image',
-      title:       `${spot.name} — ChrispyMPS`,
-      description: spot.description ?? `Spot BMX ${tipo.label} a ${spot.city ?? 'Italia'}.`,
+      title:       `${spot.name} — ${tipo.label} a ${city}`,
+      description: desc,
       images:      cover ? [cover] : ['/og-image.jpg'],
     },
   };
@@ -220,17 +232,45 @@ export default async function SpotPage({ params }: Props) {
           </a>
         </div>
 
-        {/* JSON-LD structured data */}
+        {/* JSON-LD: BreadcrumbList */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify({
             '@context': 'https://schema.org',
-            '@type': 'Place',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Mappa', item: `${APP_CONFIG.url}/map` },
+              ...(spot.city ? [{ '@type': 'ListItem', position: 2, name: `Spot ${spot.city}`, item: `${APP_CONFIG.url}/map/${spot.city}` }] : []),
+              { '@type': 'ListItem', position: spot.city ? 3 : 2, name: spot.name, item: `${APP_CONFIG.url}/map/spot/${spot.slug}` },
+            ],
+          })}}
+        />
+        {/* JSON-LD: SportsActivityLocation + Place */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': ['SportsActivityLocation', 'Place'],
             name: spot.name,
-            description: spot.description,
-            geo: { '@type': 'GeoCoordinates', latitude: spot.lat, longitude: spot.lon },
-            address: { '@type': 'PostalAddress', addressLocality: spot.city, addressCountry: 'IT' },
-            image: photos[0]?.url,
+            description: spot.description ?? `Spot ${TIPI_SPOT[spot.type].label} a ${spot.city ?? 'Italia'} per BMX, skateboard e scooter.`,
+            url: `${APP_CONFIG.url}/map/spot/${spot.slug}`,
+            geo: {
+              '@type': 'GeoCoordinates',
+              latitude:  spot.lat,
+              longitude: spot.lon,
+            },
+            address: {
+              '@type': 'PostalAddress',
+              addressLocality: spot.city ?? '',
+              addressCountry: 'IT',
+            },
+            image: photos.map(p => p.url),
+            sport: ['BMX', 'Skateboarding', 'Scooter Freestyle'],
+            amenityFeature: [
+              { '@type': 'LocationFeatureSpecification', name: 'Tipo spot', value: TIPI_SPOT[spot.type].label },
+              { '@type': 'LocationFeatureSpecification', name: 'Condizione', value: spot.condition },
+              ...(spot.surface ? [{ '@type': 'LocationFeatureSpecification', name: 'Superficie', value: spot.surface }] : []),
+            ],
           })}}
         />
       </div>
