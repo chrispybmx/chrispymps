@@ -175,7 +175,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
           title="Ricerca per raggio"
           style={{
             position: 'absolute',
-            bottom: 'calc(var(--strip-height, 48px) + 16px + env(safe-area-inset-bottom))',
+            bottom: 'calc(16px + env(safe-area-inset-bottom))',
             left: 16,
             width: 44, height: 44,
             background: radiusMode ? 'var(--orange)' : 'var(--gray-800)',
