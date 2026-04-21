@@ -91,12 +91,12 @@ export const LINKS = {
 
 // ===== CONFIG =====
 export const APP_CONFIG = {
-  siteName:    'ChrispyMPS',
+  siteName:    'Chrispy Maps',
   tagline:     'Find Your Spot',
   description: 'La mappa BMX street italiana, community-driven.',
   url:         'https://chrispybmx.com',
   mapUrl:      'https://chrispybmx.com/map',
-  mapCenter:   [45.46, 12.34] as [number, number], // Italia
+  mapCenter:   [42.5, 12.5] as [number, number], // Centro Italia
   mapZoom:     6,
   mapZoomCity: 13,
   maxPhotos:   5,
