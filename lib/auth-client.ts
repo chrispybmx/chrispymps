@@ -1,4 +1,4 @@
-import { supabaseBrowser } from './supabase';
+import { supabaseBrowser } from './supabase-browser';
 
 export interface UserSession {
   id:          string;
