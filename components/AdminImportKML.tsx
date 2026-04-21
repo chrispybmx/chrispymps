@@ -224,10 +224,10 @@ export default function AdminImportKML({ onImportDone }: Props) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setSpots(p => p.map(s => ({ ...s, enabled: true }))} className="btn-ghost" style={{ fontSize: 13 }}>
+          <button onClick={() => setSpots(p => p.map(s => ({ ...s, enabled: true })))} className="btn-ghost" style={{ fontSize: 13 }}>
             Tutti
           </button>
-          <button onClick={() => setSpots(p => p.map(s => ({ ...s, enabled: false }))} className="btn-ghost" style={{ fontSize: 13 }}>
+          <button onClick={() => setSpots(p => p.map(s => ({ ...s, enabled: false })))} className="btn-ghost" style={{ fontSize: 13 }}>
             Nessuno
           </button>
         </div>
