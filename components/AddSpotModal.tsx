@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
-import type { SpotType, SubmitSpotPayload } from '@/lib/types';
+import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import AuthModal from './AuthModal';
 import { useUser } from '@/hooks/useUser';
@@ -15,7 +15,9 @@ interface AddSpotModalProps {
   initialLon?: number;
 }
 
-type Step = 'gps' | 'foto' | 'dati' | 'invio';
+type Step           = 'gps' | 'foto' | 'dati' | 'invio';
+type LocationMethod = 'gps' | 'search' | null;
+
 const STEP_ORDER: Step[] = ['gps', 'foto', 'dati', 'invio'];
 const STEP_LABELS: Record<Step, string> = {
   gps:   'Posizione',
@@ -24,14 +26,37 @@ const STEP_LABELS: Record<Step, string> = {
   invio: 'Inviato!',
 };
 
+interface NominatimResult {
+  place_id:     number;
+  display_name: string;
+  lat:          string;
+  lon:          string;
+  type:         string;
+  address?: {
+    city?:        string;
+    town?:        string;
+    village?:     string;
+    municipality?: string;
+    county?:      string;
+  };
+}
+
 export default function AddSpotModal({ open, onClose, initialLat, initialLon }: AddSpotModalProps) {
-  const user        = useUser();
+  const user     = useUser();
   const [authOpen, setAuthOpen] = useState(false);
 
   const [step,    setStep]    = useState<Step>('gps');
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [photos,  setPhotos]  = useState<File[]>([]);
+
+  // Metodo di posizionamento
+  const [locMethod,    setLocMethod]    = useState<LocationMethod>(null);
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
+  const [searching,    setSearching]    = useState(false);
+  const [selectedResult, setSelectedResult] = useState<NominatimResult | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState({
     name:        '',
@@ -44,7 +69,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   });
 
   useEffect(() => {
-    if (initialLat && initialLon) setForm(f => ({ ...f, lat: initialLat, lon: initialLon }));
+    if (initialLat && initialLon) {
+      setForm(f => ({ ...f, lat: initialLat, lon: initialLon }));
+      setLocMethod('gps');
+    }
   }, [initialLat, initialLon]);
 
   const update = useCallback(<K extends keyof typeof form>(key: K, val: typeof form[K]) => {
@@ -54,11 +82,64 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const getGPS = useCallback(() => {
     if (!navigator.geolocation) { setError('Geolocalizzazione non disponibile.'); return; }
     navigator.geolocation.getCurrentPosition(
-      pos => { update('lat', pos.coords.latitude); update('lon', pos.coords.longitude); setError(null); },
+      pos => {
+        update('lat', pos.coords.latitude);
+        update('lon', pos.coords.longitude);
+        setError(null);
+      },
       () => setError('Impossibile ottenere la posizione. Sei nello spot?'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, [update]);
+
+  // Nominatim search con debounce
+  useEffect(() => {
+    if (locMethod !== 'search') return;
+    if (searchQuery.trim().length < 3) { setSearchResults([]); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=6&addressdetails=1&accept-language=it`;
+        const res  = await fetch(url, { headers: { 'Accept-Language': 'it' } });
+        const data = await res.json();
+        setSearchResults(data);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+  }, [searchQuery, locMethod]);
+
+  const pickResult = (r: NominatimResult) => {
+    const lat = parseFloat(r.lat);
+    const lon = parseFloat(r.lon);
+    update('lat', lat);
+    update('lon', lon);
+    // Auto-compila città
+    const cityName = r.address?.city || r.address?.town || r.address?.village || r.address?.municipality || '';
+    if (cityName) {
+      const match = CITTA_ITALIANE.find(c =>
+        c.label.toLowerCase().includes(cityName.toLowerCase()) ||
+        cityName.toLowerCase().includes(c.label.toLowerCase())
+      );
+      if (match) update('city', match.value);
+    }
+    setSelectedResult(r);
+    setSearchResults([]);
+    setError(null);
+  };
+
+  const resetLocation = () => {
+    setLocMethod(null);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSelectedResult(null);
+    update('lat', 0);
+    update('lon', 0);
+    update('city', '');
+  };
 
   const stepIndex = STEP_ORDER.indexOf(step);
   const goNext = () => { setError(null); setStep(STEP_ORDER[stepIndex + 1]); };
@@ -68,24 +149,21 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     if (!user) return;
     setLoading(true); setError(null);
     try {
-      // Ottieni access token per autenticare la chiamata server
       const { data: { session } } = await supabaseBrowser().auth.getSession();
       const token = session?.access_token ?? '';
-
-      const fd = new FormData();
+      const fd    = new FormData();
       const payload = {
-        name:        form.name,
-        type:        form.type as SpotType,
-        lat:         form.lat,
-        lon:         form.lon,
-        city:        form.city        || undefined,
-        description: form.description || undefined,
-        guardians:   form.notes       || undefined,
+        name:         form.name,
+        type:         form.type as SpotType,
+        lat:          form.lat,
+        lon:          form.lon,
+        city:         form.city        || undefined,
+        description:  form.description || undefined,
+        guardians:    form.notes       || undefined,
         access_token: token,
       };
       fd.append('data', JSON.stringify(payload));
       photos.forEach((p, i) => fd.append(`photo_${i}`, p));
-
       const res  = await fetch('/api/submit-spot', { method: 'POST', body: fd });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? 'Errore durante l\'invio');
@@ -99,6 +177,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
   const handleClose = () => {
     setStep('gps'); setError(null); setPhotos([]);
+    setLocMethod(null); setSearchQuery(''); setSearchResults([]); setSelectedResult(null);
     setForm({ name: '', type: '' as SpotType | '', lat: 0, lon: 0, city: '', description: '', notes: '' });
     onClose();
   };
@@ -108,10 +187,19 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const totalSteps  = STEP_ORDER.length - 1;
   const progressPct = step === 'invio' ? 100 : (stepIndex / (totalSteps - 1)) * 100;
   const isLoading   = user === undefined;
+  const hasCoords   = form.lat !== 0 && form.lon !== 0;
+
+  // Street View URL
+  const streetViewUrl = hasCoords
+    ? `https://www.google.com/maps/@${form.lat},${form.lon},3a,90y,210h,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`
+    : '';
+  // Mini OSM embed
+  const osmEmbed = hasCoords
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${form.lon - 0.003},${form.lat - 0.002},${form.lon + 0.003},${form.lat + 0.002}&layer=mapnik&marker=${form.lat},${form.lon}`
+    : '';
 
   return (
     <>
-      {/* Auth Modal (se non loggato) */}
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} defaultTab="registrati" />
 
       {/* Overlay */}
@@ -153,41 +241,30 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
         <div style={{ padding: '20px 20px 0' }}>
 
-          {/* Loading auth */}
           {isLoading && (
-            <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-400)', fontSize: 15 }}>
-              ...
-            </div>
+            <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-400)', fontSize: 15 }}>...</div>
           )}
 
           {/* ── AUTH GATE ── */}
           {!isLoading && !user && (
             <div style={{ textAlign: 'center', padding: '20px 0 32px' }}>
               <div style={{ fontSize: 52, marginBottom: 16 }}>🏴</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 12 }}>
-                ACCEDI PER AGGIUNGERE
-              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 12 }}>ACCEDI PER AGGIUNGERE</div>
               <p style={{ color: 'var(--bone)', lineHeight: 1.7, marginBottom: 24, fontSize: 15 }}>
                 Devi avere un account per aggiungere spot.<br />
                 Il tuo <strong style={{ color: 'var(--orange)' }}>@username</strong> sarà visibile sullo spot.
               </p>
-              <button
-                onClick={() => { setAuthOpen(true); }}
-                className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
-              >
+              <button onClick={() => setAuthOpen(true)} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}>
                 🔑 Accedi / Registrati
               </button>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>
-                Gratuito, niente spam.
-              </p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>Gratuito, niente spam.</p>
             </div>
           )}
 
-          {/* ── STEP 1: GPS ── */}
+          {/* ── STEP 1: POSIZIONE ── */}
           {!isLoading && user && step === 'gps' && (
             <div>
-              {/* Info utente */}
+              {/* Badge utente */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '10px 12px', background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.2)', borderRadius: 6 }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--orange)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 16, color: '#000', flexShrink: 0 }}>
                   {user.username[0].toUpperCase()}
@@ -198,29 +275,200 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               </div>
 
-              <p style={{ color: 'var(--bone)', marginBottom: 20, lineHeight: 1.5 }}>
-                Sei nello spot? Premi il pulsante per salvare la posizione GPS.
-              </p>
-              <button onClick={getGPS} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 16 }}>
-                📍 Usa la mia posizione GPS
-              </button>
-              {form.lat !== 0 && (
-                <div style={{ background: 'var(--gray-700)', padding: 12, borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 16 }}>
-                  ✅ {form.lat.toFixed(6)}, {form.lon.toFixed(6)}
+              {/* Selezione metodo — solo se nessun metodo scelto */}
+              {!locMethod && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Come vuoi indicare la posizione?
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <button onClick={() => setLocMethod('gps')} style={methodBtn}>
+                      <span style={{ fontSize: 28 }}>📍</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Sono nello spot</div>
+                        <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Usa il GPS del telefono</div>
+                      </div>
+                    </button>
+                    <button onClick={() => setLocMethod('search')} style={methodBtn}>
+                      <span style={{ fontSize: 28 }}>🔍</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Conosco la posizione</div>
+                        <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Cerca l&apos;indirizzo o il nome del posto</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               )}
-              <div style={{ marginBottom: 16 }}>
-                <label className="input-label">Città (opzionale)</label>
-                <select className="input-vhs" value={form.city} onChange={e => update('city', e.target.value)} style={{ marginTop: 6 }}>
-                  <option value="">Seleziona città...</option>
-                  {CITTA_ITALIANE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-              </div>
+
+              {/* ── GPS path ── */}
+              {locMethod === 'gps' && (
+                <div style={{ marginBottom: 16 }}>
+                  <button onClick={getGPS} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}>
+                    📍 Usa la mia posizione GPS
+                  </button>
+                  {hasCoords && (
+                    <div style={{ background: 'var(--gray-700)', padding: 12, borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 4 }}>
+                      ✅ {form.lat.toFixed(6)}, {form.lon.toFixed(6)}
+                    </div>
+                  )}
+                  <button onClick={resetLocation} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', padding: '4px 0' }}>
+                    ← Cambia metodo
+                  </button>
+                </div>
+              )}
+
+              {/* ── SEARCH path (Nominatim) ── */}
+              {locMethod === 'search' && (
+                <div style={{ marginBottom: 16 }}>
+                  {/* Barra di ricerca */}
+                  {!selectedResult && (
+                    <div style={{ position: 'relative', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 6, padding: '10px 14px' }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{searching ? '⏳' : '🔍'}</span>
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="es. Skatepark Dergano Milano, Piazza Navona Roma..."
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                          style={{
+                            flex: 1, border: 'none', background: 'transparent',
+                            fontSize: 15, color: 'var(--bone)', outline: 'none',
+                            fontFamily: 'var(--font-mono)',
+                          }}
+                        />
+                        {searchQuery && (
+                          <button onClick={() => { setSearchQuery(''); setSearchResults([]); }} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: 18, cursor: 'pointer', padding: 0, flexShrink: 0 }}>✕</button>
+                        )}
+                      </div>
+
+                      {/* Risultati dropdown */}
+                      {searchResults.length > 0 && (
+                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--gray-700)', border: '1px solid var(--orange)', borderRadius: 6, overflow: 'hidden', zIndex: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+                          {searchResults.map(r => (
+                            <button
+                              key={r.place_id}
+                              onClick={() => pickResult(r)}
+                              style={{
+                                display: 'flex', alignItems: 'flex-start', gap: 10,
+                                width: '100%', padding: '11px 14px', background: 'none',
+                                border: 'none', borderTop: '1px solid var(--gray-600)',
+                                color: 'var(--bone)', textAlign: 'left', cursor: 'pointer',
+                                transition: 'background 0.1s',
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.1)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                            >
+                              <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>📍</span>
+                              <div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.4 }}>
+                                  {r.display_name.split(',').slice(0, 2).join(',')}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 2 }}>
+                                  {r.display_name.split(',').slice(2, 4).join(',').trim()}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {searchQuery.trim().length >= 3 && searchResults.length === 0 && !searching && (
+                        <div style={{ marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)' }}>
+                          Nessun risultato. Prova con un indirizzo diverso.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Risultato selezionato + preview */}
+                  {selectedResult && hasCoords && (
+                    <div style={{ marginBottom: 12 }}>
+                      {/* Mini mappa OSM */}
+                      <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--gray-600)', marginBottom: 10, height: 160 }}>
+                        <iframe
+                          src={osmEmbed}
+                          style={{ width: '100%', height: '100%', border: 'none' }}
+                          loading="lazy"
+                          title="Anteprima posizione"
+                        />
+                      </div>
+
+                      {/* Info + azioni */}
+                      <div style={{ background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)', borderRadius: 6, padding: '10px 12px', marginBottom: 8 }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', marginBottom: 4 }}>
+                          ✅ Posizione trovata
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--bone)', lineHeight: 1.5 }}>
+                          {selectedResult.display_name.split(',').slice(0, 3).join(',')}
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 3 }}>
+                          {form.lat.toFixed(6)}, {form.lon.toFixed(6)}
+                        </div>
+                      </div>
+
+                      {/* Street View link */}
+                      <a
+                        href={streetViewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '10px 14px',
+                          background: 'var(--gray-700)',
+                          border: '1px solid var(--gray-600)',
+                          borderRadius: 6, textDecoration: 'none',
+                          fontFamily: 'var(--font-mono)', fontSize: 13,
+                          color: 'var(--bone)', marginBottom: 8,
+                          transition: 'border-color 0.15s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
+                      >
+                        <span style={{ fontSize: 18 }}>🧍</span>
+                        <div style={{ flex: 1 }}>
+                          <div>Verifica su Street View</div>
+                          <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 1 }}>Si apre Google Maps in una nuova tab</div>
+                        </div>
+                        <span style={{ color: 'var(--gray-400)' }}>↗</span>
+                      </a>
+
+                      <button onClick={() => { setSelectedResult(null); setSearchQuery(''); setSearchResults([]); update('lat', 0); update('lon', 0); }} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', padding: '4px 0' }}>
+                        ← Cerca di nuovo
+                      </button>
+                    </div>
+                  )}
+
+                  {!selectedResult && (
+                    <button onClick={resetLocation} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', padding: '4px 0' }}>
+                      ← Cambia metodo
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Città */}
+              {locMethod && (
+                <div style={{ marginBottom: 16 }}>
+                  <label className="input-label">Città (opzionale)</label>
+                  <select className="input-vhs" value={form.city} onChange={e => update('city', e.target.value)} style={{ marginTop: 6 }}>
+                    <option value="">Seleziona città...</option>
+                    {CITTA_ITALIANE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+              )}
+
               {error && <Err msg={error} />}
-              <button onClick={goNext} disabled={form.lat === 0} className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center', marginTop: 4, opacity: form.lat === 0 ? 0.5 : 1 }}>
-                Avanti →
-              </button>
+
+              {locMethod && (
+                <button
+                  onClick={goNext}
+                  disabled={!hasCoords}
+                  className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', marginTop: 4, opacity: hasCoords ? 1 : 0.5 }}
+                >
+                  Avanti →
+                </button>
+              )}
             </div>
           )}
 
@@ -294,6 +542,16 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     </>
   );
 }
+
+/* ── Shared styles ── */
+const methodBtn: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 14,
+  width: '100%', padding: '14px 16px',
+  background: 'var(--gray-700)',
+  border: '1px solid var(--gray-600)',
+  borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+  transition: 'border-color 0.15s, background 0.15s',
+};
 
 function Err({ msg }: { msg: string }) {
   return (
