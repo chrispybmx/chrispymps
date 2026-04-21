@@ -6,7 +6,7 @@ import type { SpotType, SubmitSpotPayload } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import AuthModal from './AuthModal';
 import { useUser } from '@/hooks/useUser';
-import { supabaseBrowser } from '@/lib/supabase';
+import { supabaseBrowser } from '@/lib/supabase-browser';
 
 interface AddSpotModalProps {
   open:        boolean;
