@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import type { Spot } from '@/lib/types';
+import SpotInteractions from '@/components/SpotInteractions';
 
 export const revalidate = 300;
 
@@ -231,6 +232,11 @@ export default async function SpotPage({ params }: Props) {
             📍 Altri spot {spot.city ? `a ${spot.city}` : 'in Italia'}
           </a>
         </div>
+
+        {/* SpotInteractions: stelle, preferiti, commenti */}
+      </div>
+      <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
+      <div style={{ padding: '0 20px 0' }}>
 
         {/* JSON-LD: BreadcrumbList */}
         <script
