@@ -234,32 +234,36 @@ function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: st
 
 /* ── Street View Pane ── */
 function StreetViewPane({ lat, lon, alwaysShow = false }: { lat: number; lon: number; alwaysShow?: boolean }) {
-  const ref   = useRef<HTMLDivElement>(null);
-  const svRef = useRef<any>(null);
+  const ref    = useRef<HTMLDivElement>(null);
+  const svRef  = useRef<any>(null);
+  const posRef = useRef({ lat, lon }); // sempre aggiornato — usato in initSV per evitare coordinate stantie
   const [svStatus, setSvStatus] = useState<'idle' | 'loading' | 'ok' | 'nodata' | 'nokey'>('idle');
-  const [show, setShow] = useState(alwaysShow);
+  const [show, setShow]         = useState(alwaysShow);
+
+  // Mantieni posRef aggiornato ad ogni render
+  useEffect(() => { posRef.current = { lat, lon }; });
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
-  /* Init / aggiorna posizione Street View */
+  /* Init panorama — legge sempre le coordinate da posRef per evitare stale closure */
   useEffect(() => {
     if (!show || !apiKey) { if (!apiKey) setSvStatus('nokey'); return; }
     setSvStatus('loading');
 
     const initSV = () => {
       if (!ref.current || !window.google?.maps) return;
+      const { lat: curLat, lon: curLon } = posRef.current;
       if (svRef.current) {
-        svRef.current.setPosition({ lat, lng: lon });
+        svRef.current.setPosition({ lat: curLat, lng: curLon });
+        setSvStatus('loading');
         return;
       }
       const sv = new window.google.maps.StreetViewPanorama(ref.current, {
-        position: { lat, lng: lon },
+        position: { lat: curLat, lng: curLon },
         pov: { heading: 0, pitch: 0 },
         zoom: 1,
-        addressControl:        false,
-        fullscreenControl:     false,
-        motionTrackingControl: false,
-        linksControl:          true,
+        addressControl: false, fullscreenControl: false,
+        motionTrackingControl: false, linksControl: true,
       });
       sv.addListener('status_changed', () => {
         setSvStatus(sv.getStatus() === 'OK' ? 'ok' : 'nodata');
@@ -271,13 +275,12 @@ function StreetViewPane({ lat, lon, alwaysShow = false }: { lat: number; lon: nu
       initSV();
     } else if (!document.querySelector('#gm-api-script')) {
       const s = document.createElement('script');
-      s.id  = 'gm-api-script';
+      s.id = 'gm-api-script';
       s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
       s.onload = initSV;
       s.onerror = () => setSvStatus('nokey');
       document.head.appendChild(s);
     } else {
-      /* Script già in caricamento — aspetta */
       const t = setInterval(() => {
         if (window.google?.maps?.StreetViewPanorama) { clearInterval(t); initSV(); }
       }, 150);
@@ -286,29 +289,73 @@ function StreetViewPane({ lat, lon, alwaysShow = false }: { lat: number; lon: nu
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, apiKey]);
 
-  /* Aggiorna posizione senza re-creare il panorama */
+  /* Quando le coord cambiano e il panorama esiste già → spostalo */
   useEffect(() => {
-    if (svRef.current && show) svRef.current.setPosition({ lat, lng: lon });
+    if (!svRef.current || !show) return;
+    svRef.current.setPosition({ lat, lng: lon });
+    setSvStatus('loading');
   }, [lat, lon, show]);
 
-  /* Senza API key → link diretto */
+  const PanoContainer = ({ height = 220 }: { height?: number }) => (
+    <div style={{ position: 'relative', height, background: 'var(--gray-800)', borderRadius: alwaysShow ? 8 : 0, overflow: 'hidden' }}>
+      <div ref={ref} style={{ width: '100%', height: '100%' }} />
+      {svStatus === 'loading' && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-800)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)' }}>Caricamento Street View...</span>
+        </div>
+      )}
+      {svStatus === 'nodata' && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{ fontSize: 28 }}>🏗️</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textAlign: 'center' }}>
+            Nessuna panoramica qui
+          </span>
+          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)' }}>
+            Apri in Google Maps →
+          </a>
+        </div>
+      )}
+    </div>
+  );
+
+  /* Senza API key */
   if (!apiKey) {
+    if (alwaysShow) {
+      return (
+        <div style={{ height: 220, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', textDecoration: 'none' }}>
+            🧍 Apri in Street View →
+          </a>
+        </div>
+      );
+    }
     return (
       <div style={{ padding: '10px 14px', background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 8 }}>
-        <a
-          href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
+        <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
           target="_blank" rel="noopener noreferrer"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', textDecoration: 'none' }}
-        >
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', textDecoration: 'none' }}>
           🧍 Verifica in Street View →
         </a>
       </div>
     );
   }
 
+  /* alwaysShow: nessun toggle, contenitore diretto da 220px con bordo */
+  if (alwaysShow) {
+    return (
+      <div style={{ border: '1px solid var(--gray-600)', borderRadius: 8, overflow: 'hidden' }}>
+        <PanoContainer height={220} />
+      </div>
+    );
+  }
+
+  /* Toggle mode (GPS o vecchio flow mappa) */
   return (
     <div>
-      {/* Toggle */}
       <button
         onClick={() => setShow(s => !s)}
         style={{
@@ -322,47 +369,13 @@ function StreetViewPane({ lat, lon, alwaysShow = false }: { lat: number; lon: nu
       >
         🧍 {show ? 'Nascondi' : 'Verifica in'} Street View
       </button>
-
       {show && (
         <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-600)', marginTop: 6 }}>
-          {/* Header */}
-          <div style={{
-            background: 'var(--gray-700)', borderBottom: '1px solid var(--gray-600)',
-            padding: '5px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Google Street View
-            </span>
-            {svStatus === 'nodata' && (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ff6a00' }}>Nessuna immagine disponibile</span>
-            )}
-            {svStatus === 'loading' && (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)' }}>Caricamento...</span>
-            )}
+          <div style={{ background: 'var(--gray-700)', borderBottom: '1px solid var(--gray-600)', padding: '5px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Google Street View</span>
+            {svStatus === 'nodata' && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ff6a00' }}>Nessuna immagine</span>}
           </div>
-
-          {/* Panorama container */}
-          <div style={{ position: 'relative', height: 220, background: 'var(--gray-800)' }}>
-            <div ref={ref} style={{ width: '100%', height: '100%' }} />
-            {svStatus === 'nodata' && (
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}>
-                <span style={{ fontSize: 32 }}>🏗️</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)' }}>
-                  Nessuna panoramica Street View qui
-                </span>
-                <a
-                  href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)' }}
-                >
-                  Apri in Google Maps →
-                </a>
-              </div>
-            )}
-          </div>
+          <PanoContainer height={220} />
         </div>
       )}
     </div>
@@ -838,7 +851,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     >
                       <option value="">— Seleziona regione —</option>
                       {REGIONI_ITALIA.map(r => (
-                        <option key={r.label} value={r.label}>{r.emoji} {r.label}</option>
+                        <option key={r.label} value={r.label}>{r.label}</option>
                       ))}
                     </select>
                   </div>
