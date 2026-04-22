@@ -58,9 +58,31 @@ export default function TopBar({
     return () => clearTimeout(t);
   }, [query]);
 
-  /* ── Spot locali che matchano ── */
-  const spotMatches = query.trim().length >= 1
-    ? spots.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).slice(0, 5)
+  /* ── Spot locali che matchano (nome o username) ── */
+  const q = query.trim().toLowerCase();
+  const isAtSearch = q.startsWith('@'); // es. "@chrispy"
+
+  const spotMatches = q.length >= 1
+    ? spots.filter(s => {
+        if (isAtSearch) return s.submitted_by_username?.toLowerCase().includes(q.slice(1)) ?? false;
+        return s.name.toLowerCase().includes(q);
+      }).slice(0, 6)
+    : [];
+
+  /* ── Utenti unici che matchano ── */
+  const userMatches: { username: string; count: number }[] = q.length >= 2
+    ? Object.entries(
+        spots.reduce((acc, s) => {
+          const un = s.submitted_by_username?.toLowerCase() ?? '';
+          const needle = isAtSearch ? q.slice(1) : q;
+          if (un && un.includes(needle)) {
+            acc[s.submitted_by_username!] = (acc[s.submitted_by_username!] ?? 0) + 1;
+          }
+          return acc;
+        }, {} as Record<string, number>)
+      )
+        .map(([username, count]) => ({ username, count }))
+        .slice(0, 4)
     : [];
 
   /* ── Città con spot count ── */
@@ -115,7 +137,7 @@ export default function TopBar({
     return () => window.removeEventListener('keydown', onKey);
   }, [searchOpen]);
 
-  const hasResults = places.length > 0 || spotMatches.length > 0;
+  const hasResults = places.length > 0 || spotMatches.length > 0 || userMatches.length > 0;
 
   return (
     <>
@@ -230,7 +252,7 @@ export default function TopBar({
             <input
               ref={inputRef}
               type="search"
-              placeholder="Cerca città, spot, quartiere..."
+              placeholder="Cerca città, spot, @utente..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               style={{
@@ -265,10 +287,49 @@ export default function TopBar({
                   </div>
                 )}
 
+                {/* Utenti */}
+                {userMatches.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <SectionLabel>👤 Utenti</SectionLabel>
+                    {userMatches.map(({ username, count }) => (
+                      <a
+                        key={username}
+                        href={`/u/${username}`}
+                        onClick={() => setSearchOpen(false)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '10px 14px', marginBottom: 4, textDecoration: 'none',
+                          background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
+                          borderRadius: 8, transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--gray-700)')}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: '50%', background: 'var(--orange)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontFamily: 'var(--font-mono)', fontSize: 13, color: '#000', flexShrink: 0,
+                        }}>
+                          {username[0].toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)' }}>
+                            @{username}
+                          </div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
+                            {count} spot
+                          </div>
+                        </div>
+                        <span style={{ color: 'var(--orange)', fontSize: 16, flexShrink: 0 }}>→</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+
                 {/* Spot nel database */}
                 {spotMatches.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
-                    <SectionLabel>🎯 Spot nel database</SectionLabel>
+                    <SectionLabel>🎯 Spot</SectionLabel>
                     {spotMatches.map(pin => (
                       <SpotRow key={pin.id} pin={pin} onPick={() => pickSpot(pin)} />
                     ))}
