@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, REGIONI_ITALIA } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
@@ -149,24 +149,17 @@ function LocationMapPicker({
   );
 }
 
-/* ── Selettore Regione → Città con ricerca testuale ── */
+/* ── Selettore città con ricerca testuale ── */
 function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [activeRegion, setActiveRegion] = useState<string | null>(null);
-  const [search,       setSearch]       = useState('');
-  const [open,         setOpen]         = useState(false);
+  const [search, setSearch] = useState('');
+  const [open,   setOpen]   = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const regionCities = activeRegion
-    ? REGIONI_ITALIA.find(r => r.label === activeRegion)?.cities ?? []
-    : [];
-
-  const pool = activeRegion
-    ? CITTA_ITALIANE.filter(c => regionCities.includes(c.value))
-    : CITTA_ITALIANE.filter(c => c.value !== 'altro');
+  const pool = CITTA_ITALIANE.filter(c => c.value !== 'altro');
 
   const filtered = search.trim().length >= 1
-    ? pool.filter(c => c.label.toLowerCase().includes(search.toLowerCase()))
-    : pool.slice(0, 40);
+    ? pool.filter(c => c.label.toLowerCase().includes(search.toLowerCase())).slice(0, 30)
+    : [];
 
   const selectedLabel = CITTA_ITALIANE.find(c => c.value === value)?.label ?? '';
 
@@ -177,88 +170,57 @@ function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: st
   };
 
   return (
-    <div>
-      {/* Region chips - scroll orizzontale */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 8,
-        WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'] }}>
-        {REGIONI_ITALIA.map(r => (
-          <button
-            key={r.label}
-            onClick={() => {
-              const next = r.label === activeRegion ? null : r.label;
-              setActiveRegion(next);
-              setSearch('');
-              onChange('');
-              setOpen(true);
-              setTimeout(() => inputRef.current?.focus(), 50);
-            }}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11, whiteSpace: 'nowrap',
-              padding: '3px 9px', flexShrink: 0,
-              border: `1px solid ${r.label === activeRegion ? 'var(--orange)' : 'var(--gray-600)'}`,
-              borderRadius: 2,
-              background: r.label === activeRegion ? 'rgba(255,106,0,0.15)' : 'transparent',
-              color: r.label === activeRegion ? 'var(--orange)' : 'var(--gray-400)',
-              cursor: 'pointer',
-            }}
-          >
-            {r.emoji} {r.label}
-          </button>
-        ))}
-      </div>
+    <div style={{ position: 'relative' }}>
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder='Es. "Bologna", "Milano", "Trento"...'
+        value={search || selectedLabel}
+        onChange={e => { setSearch(e.target.value); setOpen(true); onChange(''); }}
+        onFocus={() => { if (!value) setOpen(true); }}
+        style={{ ...inp, paddingRight: value ? 30 : 12 }}
+        autoComplete="off"
+      />
+      {value && (
+        <button
+          onClick={() => { onChange(''); setSearch(''); inputRef.current?.focus(); }}
+          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+            background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
+          ✕
+        </button>
+      )}
 
-      {/* Search input */}
-      <div style={{ position: 'relative' }}>
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={activeRegion ? `Città in ${activeRegion}...` : 'Cerca città (es. "bo" → Bologna, Bolzano)'}
-          value={search || selectedLabel}
-          onChange={e => { setSearch(e.target.value); setOpen(true); onChange(''); }}
-          onFocus={() => setOpen(true)}
-          style={{ ...inp, paddingRight: value ? 30 : 12 }}
-          autoComplete="off"
-        />
-        {value && (
-          <button onClick={() => { onChange(''); setSearch(''); setOpen(false); }}
-            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
-            ✕
-          </button>
-        )}
-
-        {/* Dropdown risultati */}
-        {open && filtered.length > 0 && (
-          <div style={{
-            position: 'absolute', left: 0, right: 0, top: '100%',
-            background: 'var(--gray-700)', border: '1px solid var(--gray-500)',
-            borderTop: 'none', borderRadius: '0 0 6px 6px',
-            maxHeight: 200, overflowY: 'auto', zIndex: 100,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-          }}>
-            {filtered.map(c => (
-              <button
-                key={c.value}
-                onMouseDown={e => { e.preventDefault(); pickCity(c.value, c.label); }}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: 14,
-                  background: c.value === value ? 'rgba(255,106,0,0.12)' : 'none',
-                  border: 'none', borderBottom: '1px solid var(--gray-600)',
-                  color: c.value === value ? 'var(--orange)' : 'var(--bone)',
-                  cursor: 'pointer',
-                }}
-              >
-                {c.label}
-                {c.value === value && <span style={{ marginLeft: 8, color: 'var(--orange)', fontSize: 12 }}>✓</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Dropdown risultati */}
+      {open && filtered.length > 0 && (
+        <div style={{
+          position: 'absolute', left: 0, right: 0, top: '100%',
+          background: 'var(--gray-700)', border: '1px solid var(--gray-500)',
+          borderTop: 'none', borderRadius: '0 0 6px 6px',
+          maxHeight: 180, overflowY: 'auto', zIndex: 100,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+        }}>
+          {filtered.map(c => (
+            <button
+              key={c.value}
+              onMouseDown={e => { e.preventDefault(); pickCity(c.value, c.label); }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: 14,
+                background: c.value === value ? 'rgba(255,106,0,0.12)' : 'none',
+                border: 'none', borderBottom: '1px solid var(--gray-600)',
+                color: c.value === value ? 'var(--orange)' : 'var(--bone)',
+                cursor: 'pointer',
+              }}
+            >
+              {c.label}
+              {c.value === value && <span style={{ marginLeft: 8, color: 'var(--orange)', fontSize: 12 }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Chiudi dropdown cliccando fuori */}
-      {open && (
+      {open && filtered.length > 0 && (
         <div onClick={() => setOpen(false)}
           style={{ position: 'fixed', inset: 0, zIndex: 99 }} aria-hidden />
       )}
