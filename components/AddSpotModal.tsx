@@ -95,6 +95,24 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [loginEmail,    setLoginEmail]    = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
+  /* ── Reverse geocoding: ricava città da lat/lon ── */
+  // IMPORTANTE: dichiarata PRIMA dell'useEffect che la usa come dependency (evita TDZ)
+  const reverseGeocode = useCallback(async (lat: number, lon: number) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=it`;
+      const res  = await fetch(url, { headers: { 'Accept-Language': 'it' } });
+      const data = await res.json();
+      const cn = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '';
+      if (cn) {
+        const match = CITTA_ITALIANE.find(c =>
+          c.label.toLowerCase().includes(cn.toLowerCase()) ||
+          cn.toLowerCase().includes(c.label.toLowerCase())
+        );
+        if (match) setCity(match.value);
+      }
+    } catch { /* silenziamo: la città resterà vuota */ }
+  }, []);
+
   /* ── Sync initialLat/Lon (tap sulla mappa) ── */
   useEffect(() => {
     if (initialLat != null && initialLon != null) {
@@ -121,23 +139,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setLoginEmail(''); setLoginPassword('');
     onClose();
   }, [initialLat, initialLon, onClose]);
-
-  /* ── Reverse geocoding: ricava città da lat/lon ── */
-  const reverseGeocode = useCallback(async (lat: number, lon: number) => {
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=it`;
-      const res  = await fetch(url, { headers: { 'Accept-Language': 'it' } });
-      const data = await res.json();
-      const cn = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '';
-      if (cn) {
-        const match = CITTA_ITALIANE.find(c =>
-          c.label.toLowerCase().includes(cn.toLowerCase()) ||
-          cn.toLowerCase().includes(c.label.toLowerCase())
-        );
-        if (match) setCity(match.value);
-      }
-    } catch { /* silenziamo: la città resterà vuota */ }
-  }, []);
 
   /* ── GPS ── */
   const getGPS = () => {
