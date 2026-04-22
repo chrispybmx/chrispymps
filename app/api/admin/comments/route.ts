@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, data: comments ?? [] });
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /* ── DELETE: elimina un commento per id ── */
 export async function DELETE(req: NextRequest) {
   if (!isAdminAuthenticated()) {
@@ -30,8 +32,8 @@ export async function DELETE(req: NextRequest) {
   }
 
   const { comment_id } = await req.json().catch(() => ({}));
-  if (!comment_id) {
-    return NextResponse.json({ ok: false, error: 'comment_id mancante' }, { status: 400 });
+  if (!comment_id || !UUID_RE.test(String(comment_id))) {
+    return NextResponse.json({ ok: false, error: 'comment_id non valido' }, { status: 400 });
   }
 
   const admin = supabaseAdmin();
