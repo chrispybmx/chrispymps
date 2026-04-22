@@ -20,29 +20,34 @@ export function useUser(): UserSession | null | undefined {
       if (cancelled) return;
       if (!session?.user) { setUser(null); return; }
 
-      // Fast path: username nel JWT (nessuna richiesta DB extra)
+      const uid = session.user.id;
+      const cacheKey = `cmaps_un_${uid}`;
+
+      // 1. Fast path: username nel JWT user_metadata (nessuna richiesta DB)
       const metaUsername = session.user.user_metadata?.username as string | undefined;
       if (metaUsername) {
-        setUser({
-          id:          session.user.id,
-          email:       session.user.email ?? '',
-          username:    metaUsername,
-          accessToken: session.access_token,
-        });
+        try { localStorage.setItem(cacheKey, metaUsername); } catch {}
+        setUser({ id: uid, email: session.user.email ?? '', username: metaUsername, accessToken: session.access_token });
         return;
       }
 
-      // Fallback: query profilo (utenti vecchi senza user_metadata)
+      // 2. Cache localStorage (istantaneo per utenti già loggati)
+      let cachedUsername: string | null = null;
+      try { cachedUsername = localStorage.getItem(cacheKey); } catch {}
+      if (cachedUsername) {
+        setUser({ id: uid, email: session.user.email ?? '', username: cachedUsername, accessToken: session.access_token });
+        // Aggiorna cache in background senza bloccare
+        getProfile(uid).then(p => { if (p) try { localStorage.setItem(cacheKey, p.username); } catch {} }).catch(() => {});
+        return;
+      }
+
+      // 3. Fallback DB (solo al primo login assoluto)
       try {
-        const profile = await getProfile(session.user.id);
+        const profile = await getProfile(uid);
         if (cancelled) return;
         if (!profile) { setUser(null); return; }
-        setUser({
-          id:          session.user.id,
-          email:       session.user.email ?? '',
-          username:    profile.username,
-          accessToken: session.access_token,
-        });
+        try { localStorage.setItem(cacheKey, profile.username); } catch {}
+        setUser({ id: uid, email: session.user.email ?? '', username: profile.username, accessToken: session.access_token });
       } catch {
         if (!cancelled) setUser(null);
       }
