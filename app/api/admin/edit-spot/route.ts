@@ -14,8 +14,8 @@ const Schema = z.object({
   guardians:   z.string().max(200).optional().nullable(),
   difficulty:  z.string().optional().nullable(),
   youtube_url: z.string().url().optional().nullable(),
-  lat:         z.number().optional(),
-  lon:         z.number().optional(),
+  lat:         z.number().min(-90).max(90).optional(),
+  lon:         z.number().min(-180).max(180).optional(),
 });
 
 export async function POST(req: NextRequest) {
