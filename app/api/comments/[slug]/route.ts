@@ -68,7 +68,9 @@ export async function POST(req: NextRequest, { params }: Props) {
     .eq('id', user.id)
     .maybeSingle();
 
-  const username = profile?.username ?? (user.user_metadata?.username as string) ?? user.email?.split('@')[0] ?? 'anonimo';
+  let username = profile?.username ?? (user.user_metadata?.username as string) ?? user.email?.split('@')[0] ?? 'anonimo';
+  if (typeof username !== 'string' || username.length === 0) username = 'anonimo';
+  username = username.slice(0, 50);
 
   // Inserisci commento
   const { data: comment, error: insertErr } = await admin
