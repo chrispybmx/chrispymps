@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, REGIONI_ITALIA, CITTA_COORDS } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
@@ -53,11 +53,12 @@ function parseGoogleMapsUrl(url: string): { lat: number; lon: number } | null {
 
 /* ── Mappa interattiva con pin draggabile (Leaflet) ── */
 function LocationMapPicker({
-  lat, lon, onPick,
+  lat, lon, onPick, height = 280,
 }: {
   lat: number | null;
   lon: number | null;
   onPick: (lat: number, lon: number) => void;
+  height?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<import('leaflet').Map | null>(null);
@@ -139,7 +140,7 @@ function LocationMapPicker({
 
   return (
     <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-600)' }}>
-      <div ref={containerRef} style={{ width: '100%', height: 280 }} />
+      <div ref={containerRef} style={{ width: '100%', height }} />
       <div style={{
         position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
         background: 'rgba(10,10,10,0.82)', borderRadius: 4, padding: '3px 10px',
@@ -232,11 +233,11 @@ function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: st
 }
 
 /* ── Street View Pane ── */
-function StreetViewPane({ lat, lon }: { lat: number; lon: number }) {
+function StreetViewPane({ lat, lon, alwaysShow = false }: { lat: number; lon: number; alwaysShow?: boolean }) {
   const ref   = useRef<HTMLDivElement>(null);
   const svRef = useRef<any>(null);
   const [svStatus, setSvStatus] = useState<'idle' | 'loading' | 'ok' | 'nodata' | 'nokey'>('idle');
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(alwaysShow);
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
@@ -368,6 +369,27 @@ function StreetViewPane({ lat, lon }: { lat: number; lon: number }) {
   );
 }
 
+/* ── Select città filtrata per regione ── */
+function RegionCitySelect({ value, onChange, regionLabel }: { value: string; onChange: (v: string) => void; regionLabel: string }) {
+  const regionData = REGIONI_ITALIA.find(r => r.label === regionLabel);
+  const cities = (regionData?.cities ?? [])
+    .map(c => CITTA_ITALIANE.find(ci => ci.value === c))
+    .filter(Boolean) as { value: string; label: string }[];
+
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      style={{ ...inp, cursor: 'pointer' }}
+    >
+      <option value="">— Seleziona città —</option>
+      {cities.map(c => (
+        <option key={c.value} value={c.value}>{c.label}</option>
+      ))}
+    </select>
+  );
+}
+
 /* ══════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════ */
@@ -380,6 +402,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [lon,  setLon]  = useState<number | null>(initialLon ?? null);
   const [city, setCity] = useState('');
   const [locMode, setLocMode] = useState<'gps' | 'map' | null>(initialLat != null ? 'map' : null);
+  const [mapSubStep, setMapSubStep] = useState<'area' | 'via'>('area');
+  const [regione,   setRegione]   = useState('');
+  const [cap,       setCap]       = useState('');
 
   /* GPS */
   const [gpsState, setGpsState] = useState<'idle' | 'loading' | 'ok' | 'error'>(
@@ -452,6 +477,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setStep('posizione');
     setLat(initialLat ?? null); setLon(initialLon ?? null); setCity('');
     setLocMode(initialLat != null ? 'map' : null);
+    setMapSubStep('area'); setRegione(''); setCap('');
     setGpsState(initialLat != null ? 'ok' : 'idle');
     setAddrQuery(''); setAddrError(null);
     setGmapsUrl(''); setGmapsError(null); setGmapsOpen(false);
@@ -479,27 +505,29 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     );
   };
 
-  /* Ricerca indirizzo → centra mappa */
+  /* Ricerca indirizzo → centra mappa (vincolata alla città selezionata) */
   const handleAddrSearch = async () => {
     if (!addrQuery.trim()) return;
     setAddrLoading(true); setAddrError(null);
     try {
-      const q = `${addrQuery.trim()}, Italia`;
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1&accept-language=it`, { headers: { 'Accept-Language': 'it' } });
+      const cityLabel = CITTA_ITALIANE.find(c => c.value === city)?.label ?? '';
+      const capPart   = cap ? `, ${cap}` : '';
+      const q = cityLabel
+        ? `${addrQuery.trim()}${capPart}, ${cityLabel}, Italia`
+        : `${addrQuery.trim()}, Italia`;
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1&accept-language=it`,
+        { headers: { 'Accept-Language': 'it' } }
+      );
       const data = await res.json();
-      if (!data.length) { setAddrError('Indirizzo non trovato.'); return; }
-      const r = data[0];
-      setLat(parseFloat(r.lat));
-      setLon(parseFloat(r.lon));
-      // Auto-città
-      const cn = r.address?.city || r.address?.town || r.address?.village || '';
-      if (cn) {
-        const match = CITTA_ITALIANE.find(c =>
-          c.label.toLowerCase().includes(cn.toLowerCase()) ||
-          cn.toLowerCase().includes(c.label.toLowerCase())
-        );
-        if (match) setCity(match.value);
+      if (!data.length) {
+        setAddrError(cityLabel
+          ? `Indirizzo non trovato a ${cityLabel}. Controlla il nome della via.`
+          : 'Indirizzo non trovato.');
+        return;
       }
+      setLat(parseFloat(data[0].lat));
+      setLon(parseFloat(data[0].lon));
     } catch { setAddrError('Errore di rete.'); }
     finally { setAddrLoading(false); }
   };
@@ -793,20 +821,99 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               )}
 
-              {/* ── MAPPA interattiva ── */}
-              {locMode === 'map' && (
+              {/* ── MAPPA — SUB-STEP 1: Seleziona area ── */}
+              {locMode === 'map' && mapSubStep === 'area' && (
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Dove si trova lo spot?
+                  </p>
+
+                  {/* Regione */}
+                  <div>
+                    <label style={lbl}>Regione *</label>
+                    <select
+                      value={regione}
+                      onChange={e => { setRegione(e.target.value); setCity(''); setCap(''); }}
+                      style={{ ...inp, cursor: 'pointer' }}
+                    >
+                      <option value="">— Seleziona regione —</option>
+                      {REGIONI_ITALIA.map(r => (
+                        <option key={r.label} value={r.label}>{r.emoji} {r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Città filtrata per regione */}
+                  {regione && (
+                    <div>
+                      <label style={lbl}>Città *</label>
+                      <RegionCitySelect value={city} onChange={setCity} regionLabel={regione} />
+                    </div>
+                  )}
+
+                  {/* CAP opzionale */}
+                  {city && (
+                    <div>
+                      <label style={lbl}>CAP <span style={{ color: 'var(--gray-500)', textTransform: 'none' }}>(opzionale — aiuta a trovare l&apos;indirizzo)</span></label>
+                      <input
+                        type="text" inputMode="numeric" maxLength={5}
+                        style={inp}
+                        value={cap}
+                        onChange={e => setCap(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                        placeholder="Es. 20121"
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button onClick={() => { setLocMode(null); setRegione(''); setCity(''); setCap(''); }} style={backLink}>
+                      ← Cambia metodo
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!city) return;
+                        const coords = CITTA_COORDS[city];
+                        if (coords) { setLat(coords[0]); setLon(coords[1]); }
+                        setMapSubStep('via');
+                      }}
+                      disabled={!city}
+                      className="btn-primary"
+                      style={{ flex: 1, justifyContent: 'center', opacity: !city ? 0.4 : 1 }}
+                    >
+                      Continua →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── MAPPA — SUB-STEP 2: Via + Mappa + Street View ── */}
+              {locMode === 'map' && mapSubStep === 'via' && (
                 <div style={{ display: 'grid', gap: 12 }}>
 
-                  {/* Ricerca indirizzo */}
+                  {/* Pill area selezionata */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.2)', borderRadius: 6 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>
+                      📍 {CITTA_ITALIANE.find(c => c.value === city)?.label}{cap ? ` · ${cap}` : ''} · {regione}
+                    </span>
+                    <button
+                      onClick={() => { setMapSubStep('area'); setLat(null); setLon(null); setAddrQuery(''); setAddrError(null); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      Cambia →
+                    </button>
+                  </div>
+
+                  {/* Input via */}
                   <div>
-                    <label style={lbl}>Cerca indirizzo (per centrare la mappa)</label>
+                    <label style={lbl}>Via / Indirizzo</label>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <input
                         type="text" style={{ ...inp, flex: 1 }}
                         value={addrQuery}
                         onChange={e => setAddrQuery(e.target.value)}
-                        placeholder='Es. "Via Roma 12, Milano" o "Skatepark di Trento"'
+                        placeholder='Es. "Via Petrarca 12" o "Piazza della Repubblica"'
                         onKeyDown={e => e.key === 'Enter' && handleAddrSearch()}
+                        autoFocus
                       />
                       <button
                         onClick={handleAddrSearch}
@@ -818,42 +925,55 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       </button>
                     </div>
                     {addrError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff6a00', marginTop: 4 }}>{addrError}</div>}
+                    {!hasCoords && !addrError && (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
+                        Oppure clicca direttamente sulla mappa per posizionare il pin
+                      </div>
+                    )}
                   </div>
 
-                  {/* Mappa Leaflet interattiva */}
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                      Clicca sulla mappa per posizionare il pin — poi trascinalo per essere preciso
+                  {/* Mappa + Street View affiancati (si impilano su mobile) */}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+
+                    {/* Mappa Leaflet */}
+                    <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+                        Mappa — clicca o trascina il pin
+                      </div>
+                      <LocationMapPicker
+                        lat={lat} lon={lon} height={220}
+                        onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }}
+                      />
                     </div>
-                    <LocationMapPicker lat={lat} lon={lon} onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }} />
+
+                    {/* Street View */}
+                    <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+                        Street View — verifica il posto
+                      </div>
+                      {hasCoords ? (
+                        <StreetViewPane lat={lat!} lon={lon!} alwaysShow />
+                      ) : (
+                        <div style={{ height: 220, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 28 }}>🧍</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', padding: '0 16px' }}>
+                            Cerca un indirizzo per<br />vedere Street View
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Street View preview */}
-                  {hasCoords && (
-                    <StreetViewPane lat={lat!} lon={lon!} />
-                  )}
-
-                  {/* Incolla link Google Maps / Street View */}
+                  {/* Incolla URL Google Maps come alternativa */}
                   <div>
                     <button
                       onClick={() => { setGmapsOpen(o => !o); setGmapsError(null); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        background: 'none', border: 'none',
-                        fontFamily: 'var(--font-mono)', fontSize: 12,
-                        color: gmapsOpen ? 'var(--orange)' : 'var(--gray-400)',
-                        cursor: 'pointer', padding: 0,
-                        textDecoration: 'underline', textUnderlineOffset: 3,
-                      }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: gmapsOpen ? 'var(--orange)' : 'var(--gray-500)', cursor: 'pointer', padding: 0, textDecoration: 'underline', textUnderlineOffset: 3 }}
                     >
-                      🧍 Hai trovato la posizione in Street View? Incolla il link →
+                      Hai il link di Google Maps? Incollalo qui →
                     </button>
-
                     {gmapsOpen && (
                       <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', lineHeight: 1.5 }}>
-                          In Google Maps / Street View: tasto destro → &quot;Copia coordinate&quot; o copia l&apos;URL dalla barra del browser e incollalo qui.
-                        </div>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <input
                             type="text" style={{ ...inp, flex: 1, fontSize: 13 }}
@@ -862,28 +982,15 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                             placeholder="https://maps.google.com/... o 45.4384, 10.9916"
                             onKeyDown={e => e.key === 'Enter' && handleGmapsPaste()}
                           />
-                          <button
-                            onClick={handleGmapsPaste}
-                            disabled={!gmapsUrl.trim()}
-                            className="btn-primary"
-                            style={{ padding: '10px 14px', fontSize: 13, flexShrink: 0 }}
-                          >
-                            OK
-                          </button>
+                          <button onClick={handleGmapsPaste} disabled={!gmapsUrl.trim()} className="btn-primary" style={{ padding: '10px 14px', fontSize: 13, flexShrink: 0 }}>OK</button>
                         </div>
                         {gmapsError && <ErrBox msg={gmapsError} />}
                       </div>
                     )}
                   </div>
 
-                  {/* Selezione città */}
-                  <div>
-                    <label style={lbl}>Città</label>
-                    <RegionCityPicker value={city} onChange={setCity} />
-                  </div>
-
-                  <button onClick={() => { setLocMode(null); setAddrQuery(''); setAddrError(null); setGmapsOpen(false); }} style={backLink}>
-                    ← Cambia metodo
+                  <button onClick={() => { setMapSubStep('area'); setLat(null); setLon(null); setAddrQuery(''); setAddrError(null); }} style={backLink}>
+                    ← Indietro
                   </button>
                 </div>
               )}
