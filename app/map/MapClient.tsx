@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo } from 'react';
 import type { SpotMapPin, SpotType, Spot } from '@/lib/types';
+import { REGIONI_ITALIA } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
 import SpotSheet from '@/components/SpotSheet';
 import AddSpotModal from '@/components/AddSpotModal';
@@ -42,6 +43,8 @@ interface MapClientProps {
 export default function MapClient({ initialSpots }: MapClientProps) {
   const [spots]         = useState<SpotMapPin[]>(initialSpots);
   const [filterType,    setFilterType]    = useState<SpotType | null>(null);
+  const [filterRegionLabel,  setFilterRegionLabel]  = useState<string | null>(null);
+  const [filterRegionCities, setFilterRegionCities] = useState<string[] | null>(null);
   const [searchQuery,   setSearchQuery]   = useState('');
   const [selectedSpot,  setSelectedSpot]  = useState<Spot | null>(null);
   const [selectedIdx,   setSelectedIdx]   = useState<number>(-1);
@@ -59,15 +62,24 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   const [radiusKm,     setRadiusKm]     = useState(50);
   const [gpsLoading,   setGpsLoading]   = useState(false);
 
+  /* ── Filtro regione ── */
+  const handleFilterRegion = useCallback((label: string | null) => {
+    setFilterRegionLabel(label);
+    if (!label) { setFilterRegionCities(null); return; }
+    const region = REGIONI_ITALIA.find(r => r.label === label);
+    setFilterRegionCities(region?.cities ?? null);
+  }, []);
+
   /* ── Filtro: calcolato in MapClient per usarlo anche in SpotSheet (prev/next) ── */
   const filtered = useMemo(() => spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
+    if (filterRegionCities && s.city && !filterRegionCities.includes(s.city)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return s.name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
     }
     return true;
-  }), [spots, filterType, searchQuery]);
+  }), [spots, filterType, filterRegionCities, searchQuery]);
 
   const spotsInRadius = useMemo(() => {
     if (!radiusCenter) return [];
@@ -103,7 +115,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   /* ── Apri spot ── */
   const openSpot = useCallback(async (pin: SpotMapPin) => {
     setLoadingSpot(true);
-    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 16 });
+    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 17 });
     // Trova indice nello array filtered
     const idx = filtered.findIndex(s => s.id === pin.id);
     setSelectedIdx(idx);
@@ -155,8 +167,10 @@ export default function MapClient({ initialSpots }: MapClientProps) {
       <TopBar
         onSearch={setSearchQuery}
         onFilterType={setFilterType}
+        onFilterRegion={handleFilterRegion}
         onAddSpot={() => setAddOpen(true)}
         activeType={filterType}
+        activeRegion={filterRegionLabel}
         spots={spots}
         onCitySelect={handleCitySelect}
         onSpotSelect={openSpot}
@@ -168,6 +182,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
         <SpotMap
           spots={spots}
           filterType={filterType}
+          filterRegionCities={filterRegionCities}
           searchQuery={searchQuery}
           onSpotClick={openSpot}
           onAddSpotAt={handleAddSpotAt}
