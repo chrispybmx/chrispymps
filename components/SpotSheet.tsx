@@ -318,9 +318,9 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
                   boxShadow: '0 -4px 20px rgba(0,0,0,0.6)',
                 }}>
                   <div style={{ padding: '5px 12px 2px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Apri con…</div>
-                  <NavOption icon="🗺️" label="Google Maps" onClick={() => openNav(googleUrl)} />
-                  <NavOption icon="🍎" label="Apple Maps"  onClick={() => openNav(appleMaps)} />
-                  <NavOption icon="🔵" label="Waze"        onClick={() => openNav(wazeUrl)} />
+                  <NavOption label="Google Maps" onClick={() => openNav(googleUrl)} />
+                  <NavOption label="Apple Maps"  onClick={() => openNav(appleMaps)} />
+                  <NavOption label="Waze"        onClick={() => openNav(wazeUrl)} />
                 </div>
               )}
             </div>
@@ -413,10 +413,10 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
 
 /* ── Sub-components ── */
 
-function NavOption({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+function NavOption({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 10,
+      display: 'flex', alignItems: 'center',
       width: '100%', padding: '10px 14px',
       background: 'none', border: 'none', borderTop: '1px solid var(--gray-600)',
       color: 'var(--bone)', fontSize: 14, cursor: 'pointer', textAlign: 'left',
@@ -425,7 +425,6 @@ function NavOption({ icon, label, onClick }: { icon: string; label: string; onCl
     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.1)')}
     onMouseLeave={e => (e.currentTarget.style.background = 'none')}
     >
-      <span style={{ fontSize: 18 }}>{icon}</span>
       {label}
     </button>
   );
