@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, APP_CONFIG, PALETTE } from '@/lib/constants';
 import 'leaflet/dist/leaflet.css';
 
 let L: typeof import('leaflet') | null = null;
+
+/* Zoom sotto il quale mostriamo i cluster città invece dei pin individuali */
+const CLUSTER_ZOOM = 10;
 
 interface SpotMapProps {
   spots:       SpotMapPin[];
@@ -21,54 +24,76 @@ interface SpotMapProps {
   onMapClick?:   (lat: number, lon: number) => void;
 }
 
+/* ── SVG pin individuale (più piccolo rispetto a prima) ── */
 function pinSvg(type: SpotType, condition: string): string {
   const info  = TIPI_SPOT[type];
-  const color = condition === 'alive'    ? info.color
-              : condition === 'bustato'  ? '#888'
+  const color = condition === 'alive'   ? info.color
+              : condition === 'bustato' ? '#888'
               : '#444';
-
   const cross = condition !== 'alive' ? `
-    <line x1="10" y1="10" x2="26" y2="26" stroke="${PALETTE.orange}" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="26" y1="10" x2="10" y2="26" stroke="${PALETTE.orange}" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="9" y1="9" x2="21" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
+    <line x1="21" y1="9" x2="9" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
   ` : '';
+  const glow = condition === 'alive' ? `<circle cx="15" cy="15" r="13" fill="${color}" opacity="0.12"/>` : '';
 
-  const glow = condition === 'alive' ? `<circle cx="20" cy="20" r="18" fill="${color}" opacity="0.12"/>` : '';
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">
     ${glow}
-    <path d="M20 0C8.95 0 0 8.95 0 20c0 11.05 20 30 20 30S40 31.05 40 20C40 8.95 31.05 0 20 0z"
-          fill="${color}" stroke="#0a0a0a" stroke-width="2"/>
-    <circle cx="20" cy="20" r="12" fill="rgba(0,0,0,0.25)"/>
-    <text x="20" y="21" text-anchor="middle" font-size="16" dominant-baseline="middle">${info.emoji}</text>
+    <path d="M15 0C6.72 0 0 6.72 0 15c0 8.28 15 23 15 23S30 23.28 30 15C30 6.72 23.28 0 15 0z"
+          fill="${color}" stroke="#0a0a0a" stroke-width="1.5"/>
+    <circle cx="15" cy="15" r="9" fill="rgba(0,0,0,0.22)"/>
+    <text x="15" y="15.5" text-anchor="middle" font-size="12" dominant-baseline="middle">${info.emoji}</text>
     ${cross}
   </svg>`;
+}
+
+/* ── Computa cluster per città ── */
+function computeClusters(spots: SpotMapPin[]) {
+  const cityMap = new Map<string, SpotMapPin[]>();
+  for (const s of spots) {
+    const key = s.city ?? `__${s.lat.toFixed(1)}_${s.lon.toFixed(1)}`;
+    if (!cityMap.has(key)) cityMap.set(key, []);
+    cityMap.get(key)!.push(s);
+  }
+  return Array.from(cityMap.entries()).map(([key, pins]) => ({
+    key,
+    city: pins[0].city ?? null,
+    lat:  pins.reduce((s, p) => s + p.lat, 0) / pins.length,
+    lon:  pins.reduce((s, p) => s + p.lon, 0) / pins.length,
+    count: pins.length,
+    spots: pins,
+  }));
 }
 
 export default function SpotMap({
   spots, filterType, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   radiusMode, radiusCenter, radiusKm, onMapClick,
 }: SpotMapProps) {
-  const mapRef          = useRef<HTMLDivElement>(null);
-  const mapInstance     = useRef<import('leaflet').Map | null>(null);
-  const markersRef      = useRef<import('leaflet').LayerGroup | null>(null);
-  const circleRef       = useRef<import('leaflet').Circle | null>(null);
-  const centerMarkerRef = useRef<import('leaflet').Marker | null>(null);
-  const onMapClickRef   = useRef(onMapClick);
+  const mapRef           = useRef<HTMLDivElement>(null);
+  const mapInstance      = useRef<import('leaflet').Map | null>(null);
+  const markersRef       = useRef<import('leaflet').LayerGroup | null>(null);
+  const circleRef        = useRef<import('leaflet').Circle | null>(null);
+  const centerMarkerRef  = useRef<import('leaflet').Marker | null>(null);
+  const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
+  const onMapClickRef    = useRef(onMapClick);
+  const onSpotClickRef   = useRef(onSpotClick);
   const [locating, setLocating] = useState(false);
+  const [zoom, setZoom]         = useState(APP_CONFIG.mapZoom ?? 6);
 
-  // Keep callback ref fresh
-  useEffect(() => { onMapClickRef.current = onMapClick; });
+  useEffect(() => { onMapClickRef.current  = onMapClick; });
+  useEffect(() => { onSpotClickRef.current = onSpotClick; });
 
-  const filtered = spots.filter((s) => {
+  const filtered = useMemo(() => spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return s.name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
     }
     return true;
-  });
+  }), [spots, filterType, searchQuery]);
 
-  // Init mappa
+  const clusters = useMemo(() => computeClusters(filtered), [filtered]);
+
+  /* ── Init mappa ── */
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
@@ -89,15 +114,17 @@ export default function SpotMap({
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-        className: 'osm-tiles',
+        maxZoom: 19, className: 'osm-tiles',
       }).addTo(map);
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       markersRef.current = L.layerGroup().addTo(map);
       mapInstance.current = map;
 
-      // Radius mode: forward all map clicks
+      /* Aggiorna stato zoom React */
+      map.on('zoomend', () => setZoom(map.getZoom()));
+
+      /* Click sulla mappa → radius mode */
       map.on('click', (e) => {
         onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
       });
@@ -108,47 +135,105 @@ export default function SpotMap({
         mapInstance.current.remove();
         mapInstance.current = null;
         markersRef.current  = null;
+        userMarkerRef.current = null;
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Aggiorna marker quando cambiano i filtri
+  /* ── Render marker (cluster o pin) al cambio di zoom / filtri ── */
   useEffect(() => {
     if (!mapInstance.current || !markersRef.current || !L) return;
     markersRef.current.clearLayers();
 
-    filtered.forEach((pin) => {
-      const svg  = pinSvg(pin.type, pin.condition);
-      const icon = L!.divIcon({
-        html:        svg,
-        className:   'spot-pin',
-        iconSize:    [40, 50],
-        iconAnchor:  [20, 50],
-        popupAnchor: [0, -52],
+    if (zoom < CLUSTER_ZOOM) {
+      /* ── CLUSTER VIEW: un cerchio per città ── */
+      clusters.forEach((c) => {
+        if (!L || !markersRef.current) return;
+
+        const isOne = c.count === 1;
+        const radius = isOne ? 9 : Math.min(9 + Math.sqrt(c.count) * 3, 26);
+        const label  = isOne
+          ? TIPI_SPOT[c.spots[0].type].emoji
+          : String(c.count);
+
+        const html = `<div style="
+          width:${radius * 2}px; height:${radius * 2}px;
+          background: rgba(255,106,0,0.85);
+          border: 2px solid #fff;
+          border-radius: 50%;
+          display:flex; align-items:center; justify-content:center;
+          font-family:'VT323',monospace;
+          font-size:${isOne ? 14 : Math.max(11, 16 - String(c.count).length * 1.5)}px;
+          color:#000; font-weight:700;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.55);
+          cursor: pointer;
+        ">${label}</div>`;
+
+        const icon = L!.divIcon({
+          html,
+          className: 'spot-cluster',
+          iconSize:  [radius * 2, radius * 2],
+          iconAnchor:[radius, radius],
+        });
+
+        const marker = L!.marker([c.lat, c.lon], { icon });
+        const cityName = c.city
+          ? c.city.charAt(0).toUpperCase() + c.city.slice(1)
+          : 'Zona';
+
+        marker.bindTooltip(
+          `<span style="font-family:monospace;font-size:12px"><b>${cityName}</b> · ${c.count} spot</span>`,
+          { permanent: false, direction: 'top', offset: [0, -radius - 2] }
+        );
+
+        marker.on('click', () => {
+          if (!mapInstance.current) return;
+          // Zoom in sulla città
+          mapInstance.current.flyTo([c.lat, c.lon], CLUSTER_ZOOM + 1, { duration: 1.0 });
+          // Se singolo spot → aprilo subito
+          if (c.count === 1) onSpotClickRef.current(c.spots[0]);
+        });
+
+        markersRef.current!.addLayer(marker);
       });
 
-      const marker = L!.marker([pin.lat, pin.lon], { icon });
+    } else {
+      /* ── PIN VIEW: pin individuali ── */
+      filtered.forEach((pin) => {
+        if (!L || !markersRef.current) return;
 
-      const tipo = TIPI_SPOT[pin.type];
-      const popupContent = `
-        <div style="font-family:'Barlow Condensed',sans-serif;min-width:150px;padding:2px 0">
-          <div style="font-family:'VT323',monospace;font-size:17px;color:#ff6a00;line-height:1.2">${pin.name}</div>
-          ${pin.city ? `<div style="font-size:12px;color:#888;margin-top:2px">📍 ${pin.city}</div>` : ''}
-          <div style="font-size:11px;color:#888;margin-top:4px">${tipo.emoji} ${tipo.label}</div>
-          <div style="font-size:11px;color:#555;margin-top:2px">Tocca per dettagli</div>
-        </div>
-      `;
-      marker.bindPopup(popupContent, { maxWidth: 220, closeButton: false });
-      marker.on('click',     () => onSpotClick(pin));
-      marker.on('mouseover', () => marker.openPopup());
-      marker.on('mouseout',  () => marker.closePopup());
+        const svg  = pinSvg(pin.type, pin.condition);
+        const icon = L!.divIcon({
+          html:        svg,
+          className:   'spot-pin',
+          iconSize:    [30, 38],
+          iconAnchor:  [15, 38],
+          popupAnchor: [0, -40],
+        });
 
-      markersRef.current!.addLayer(marker);
-    });
-  }, [filtered, onSpotClick]);
+        const marker = L!.marker([pin.lat, pin.lon], { icon });
+        const tipo   = TIPI_SPOT[pin.type];
 
-  // Fly-to quando cambia flyTarget
+        const popupContent = `
+          <div style="font-family:'Barlow Condensed',sans-serif;min-width:130px;padding:2px 0">
+            <div style="font-family:'VT323',monospace;font-size:16px;color:#ff6a00;line-height:1.2">${pin.name}</div>
+            ${pin.city ? `<div style="font-size:11px;color:#888;margin-top:2px">📍 ${pin.city}</div>` : ''}
+            <div style="font-size:11px;color:#888;margin-top:3px">${tipo.emoji} ${tipo.label}</div>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent, { maxWidth: 200, closeButton: false });
+        marker.on('click',     () => onSpotClickRef.current(pin));
+        marker.on('mouseover', () => marker.openPopup());
+        marker.on('mouseout',  () => marker.closePopup());
+
+        markersRef.current!.addLayer(marker);
+      });
+    }
+  }, [filtered, clusters, zoom]);
+
+  /* ── Fly-to ── */
   useEffect(() => {
     if (!mapInstance.current || !flyTarget) return;
     mapInstance.current.flyTo(
@@ -158,79 +243,63 @@ export default function SpotMap({
     );
   }, [flyTarget]);
 
-  // ── Radius: cursor crosshair quando in modalità raggio ──
+  /* ── Radius cursor ── */
   useEffect(() => {
     if (!mapInstance.current) return;
-    const container = mapInstance.current.getContainer();
-    container.style.cursor = radiusMode ? 'crosshair' : '';
+    mapInstance.current.getContainer().style.cursor = radiusMode ? 'crosshair' : '';
   }, [radiusMode]);
 
-  // ── Radius: cerchio + marker centro ──
+  /* ── Radius circle ── */
   useEffect(() => {
     if (!L) return;
-
     const tryDraw = () => {
       if (!mapInstance.current || !L) return;
-
-      // Rimuovi vecchi layer
-      circleRef.current?.remove();
-      circleRef.current = null;
-      centerMarkerRef.current?.remove();
-      centerMarkerRef.current = null;
+      circleRef.current?.remove(); circleRef.current = null;
+      centerMarkerRef.current?.remove(); centerMarkerRef.current = null;
 
       if (radiusCenter && radiusKm) {
-        // Cerchio tratteggiato arancione
         circleRef.current = L!.circle(
           [radiusCenter.lat, radiusCenter.lon],
-          {
-            radius: radiusKm * 1000,
-            color: '#ff6a00',
-            fillColor: '#ff6a00',
-            fillOpacity: 0.05,
-            weight: 2,
-            dashArray: '10 6',
-          }
+          { radius: radiusKm * 1000, color: '#ff6a00', fillColor: '#ff6a00', fillOpacity: 0.05, weight: 2, dashArray: '10 6' }
         ).addTo(mapInstance.current);
 
-        // Marker centro
-        const svg = `<div style="
-          width:18px;height:18px;
-          background:#ff6a00;
-          border:3px solid #fff;
-          border-radius:50%;
-          box-shadow:0 0 0 2px #ff6a00, 0 2px 8px rgba(0,0,0,0.6);
-        "></div>`;
-        const icon = L!.divIcon({ html: svg, className: '', iconSize: [18, 18], iconAnchor: [9, 9] });
-        centerMarkerRef.current = L!.marker([radiusCenter.lat, radiusCenter.lon], {
-          icon, zIndexOffset: 1000,
-        }).addTo(mapInstance.current);
+        const svg = `<div style="width:16px;height:16px;background:#ff6a00;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #ff6a00,0 2px 8px rgba(0,0,0,0.6)"></div>`;
+        const icon = L!.divIcon({ html: svg, className: '', iconSize: [16, 16], iconAnchor: [8, 8] });
+        centerMarkerRef.current = L!.marker([radiusCenter.lat, radiusCenter.lon], { icon, zIndexOffset: 1000 }).addTo(mapInstance.current);
 
-        // Fly to fit the circle
         mapInstance.current.fitBounds(circleRef.current.getBounds(), { padding: [40, 40], maxZoom: 13 });
       }
     };
-
-    // Map might not be ready yet
-    if (mapInstance.current) {
-      tryDraw();
-    } else {
-      const t = setTimeout(tryDraw, 300);
-      return () => clearTimeout(t);
-    }
+    if (mapInstance.current) tryDraw();
+    else { const t = setTimeout(tryDraw, 300); return () => clearTimeout(t); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [radiusCenter, radiusKm]);
 
-  // ── Geolocalizzazione
+  /* ── Geolocalizzazione con dot persistente ── */
   const locateMe = useCallback(() => {
     if (!mapInstance.current || !navigator.geolocation) return;
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        mapInstance.current!.flyTo(
-          [pos.coords.latitude, pos.coords.longitude],
-          APP_CONFIG.mapZoomCity,
-          { duration: 1.2 }
-        );
+        const { latitude, longitude } = pos.coords;
+        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.2 });
+
+        if (L) {
+          const dotSvg = `<div style="
+            width:14px;height:14px;
+            background:#4285f4;border:3px solid #fff;border-radius:50%;
+            box-shadow:0 0 0 2px #4285f4,0 2px 8px rgba(0,0,0,0.55);
+          "></div>`;
+          const icon = L.divIcon({ html: dotSvg, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
+
+          if (userMarkerRef.current) {
+            userMarkerRef.current.setLatLng([latitude, longitude]);
+          } else {
+            userMarkerRef.current = L.marker([latitude, longitude], { icon, zIndexOffset: 2000 })
+              .addTo(mapInstance.current!)
+              .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
+          }
+        }
         setLocating(false);
       },
       () => setLocating(false),
@@ -255,14 +324,13 @@ export default function SpotMap({
         display: 'flex', flexDirection: 'column', gap: 8,
         zIndex: 10,
       }}>
+        {/* Localizza */}
         <button
           onClick={locateMe} disabled={locating}
-          title="Spot vicino a me" aria-label="Spot vicino a me"
+          title="Mostrami sulla mappa" aria-label="Mostrami sulla mappa"
           style={{
-            width: 44, height: 44,
-            background: 'var(--gray-800)',
-            border: '1px solid var(--gray-600)',
-            borderRadius: 4,
+            width: 44, height: 44, background: 'var(--gray-800)',
+            border: '1px solid var(--gray-600)', borderRadius: 4,
             color: locating ? 'var(--orange)' : 'var(--bone)',
             fontSize: 20, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -273,14 +341,13 @@ export default function SpotMap({
           {locating ? '⌛' : '📍'}
         </button>
 
+        {/* Contatore */}
         <div style={{
-          background: 'var(--gray-800)',
-          border: '1px solid var(--gray-700)',
-          borderRadius: 4, padding: '6px 10px',
+          background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
+          borderRadius: 4, padding: '6px 8px',
           fontFamily: 'var(--font-mono)', fontSize: 14,
           color: 'var(--orange)', textAlign: 'center',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
-          minWidth: 44,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.5)', minWidth: 44,
         }}>
           {filtered.length}
           <div style={{ color: 'var(--gray-400)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SPOT</div>
