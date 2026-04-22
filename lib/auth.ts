@@ -72,17 +72,20 @@ export function isAdminAuthenticated(): boolean {
 export function loginAdmin(password: string): { success: boolean; token?: string } {
   const adminPw = getAdminPassword();
 
-  // Confronto timing-safe
+  // Confronto timing-safe: i buffer DEVONO avere la stessa lunghezza
+  // altrimenti timingSafeEqual lancia eccezione, rivelando la lunghezza attesa
   let match = false;
-  try {
-    match = timingSafeEqual(
-      Buffer.from(password),
-      Buffer.from(adminPw)
-    );
-  } catch {
-    match = false;
+  const bufA = Buffer.from(password);
+  const bufB = Buffer.from(adminPw);
+  if (bufA.length === bufB.length) {
+    try {
+      match = timingSafeEqual(bufA, bufB);
+    } catch {
+      match = false;
+    }
   }
-
+  // Se le lunghezze differiscono: match resta false
+  // Non usare return anticipato: manteniamo il tempo di esecuzione costante
   if (!match) return { success: false };
 
   const token = generateToken();
