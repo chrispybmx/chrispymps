@@ -69,7 +69,6 @@ export default async function SpotPage({ params }: Props) {
   const cond  = CONDIZIONI[spot.condition];
   const photos = spot.spot_photos ?? [];
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
-  const shareUrl = `${APP_CONFIG.url}/map/spot/${spot.slug}`;
 
   const embedUrl = spot.youtube_url
     ? spot.youtube_url.replace(
@@ -78,94 +77,183 @@ export default async function SpotPage({ params }: Props) {
       )
     : null;
 
+  /* OpenStreetMap embed bounds (±0.004° ~400m) */
+  const delta = 0.004;
+  const osmEmbed = `https://www.openstreetmap.org/export/embed.html?bbox=${spot.lon - delta},${spot.lat - delta},${spot.lon + delta},${spot.lat + delta}&layer=mapnik&marker=${spot.lat},${spot.lon}`;
+
   return (
     <main style={{
       background: 'var(--black)',
       minHeight: '100dvh',
-      paddingBottom: 'calc(var(--strip-height) + 24px)',
+      paddingBottom: 'calc(var(--strip-height) + 32px)',
       maxWidth: 680,
       margin: '0 auto',
     }}>
-      {/* Back */}
-      <div style={{ padding: '16px 20px 0' }}>
-        <Link href="/map" style={{ color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 14, textDecoration: 'none' }}>
-          ← TORNA ALLA MAPPA
-        </Link>
+
+      {/* ── MAPPA FULL-WIDTH IN ALTO ── */}
+      <div style={{ position: 'relative', width: '100%' }}>
+        <iframe
+          src={osmEmbed}
+          width="100%"
+          height="240"
+          style={{ border: 'none', display: 'block', background: '#1a1a1a' }}
+          title={`Posizione di ${spot.name} sulla mappa`}
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin"
+        />
+        {/* Back button sopra la mappa */}
+        <div style={{
+          position: 'absolute', top: 12, left: 12,
+          background: 'rgba(10,10,10,0.82)', borderRadius: 6,
+          backdropFilter: 'blur(8px)',
+        }}>
+          <Link href="/map" style={{
+            color: 'var(--orange)', fontFamily: 'var(--font-mono)',
+            fontSize: 13, textDecoration: 'none',
+            padding: '6px 12px', display: 'block',
+          }}>
+            ← MAPPA
+          </Link>
+        </div>
+        {/* Condition badge sopra la mappa */}
+        <div style={{
+          position: 'absolute', top: 12, right: 12,
+          background: cond.bg, color: cond.color,
+          fontFamily: 'var(--font-mono)', fontSize: 12,
+          padding: '5px 10px', borderRadius: 4, textTransform: 'uppercase',
+        }}>
+          ● {cond.label}
+        </div>
       </div>
 
-      {/* Foto hero */}
+      {/* ── FOTO HERO ── */}
       {photos.length > 0 && (
-        <div style={{ marginTop: 16, position: 'relative' }}>
+        <div style={{ position: 'relative' }}>
           <img
             src={photos[0].url}
             alt={spot.name}
-            style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover' }}
+            style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }}
           />
-          {/* Condition badge */}
-          <div style={{
-            position: 'absolute', top: 12, right: 12,
-            background: cond.bg, color: cond.color,
-            fontFamily: 'var(--font-mono)', fontSize: 13,
-            padding: '4px 10px', borderRadius: 2, textTransform: 'uppercase',
-          }}>
-            ● {cond.label}
-          </div>
+          {photos.length > 1 && (
+            <div style={{
+              position: 'absolute', bottom: 10, right: 10,
+              background: 'rgba(0,0,0,0.65)', borderRadius: 12,
+              padding: '4px 10px', fontSize: 11, color: '#fff',
+              fontFamily: 'var(--font-mono)',
+            }}>
+              📷 {photos.length} foto
+            </div>
+          )}
         </div>
       )}
 
       <div style={{ padding: '20px 20px 0' }}>
-        {/* Titolo */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
-          <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 32, color: 'var(--orange)', margin: 0, lineHeight: 1.1 }}>
+
+        {/* ── HEADER: Tipo + Titolo + Publisher ── */}
+        <div style={{ marginBottom: 20 }}>
+          {/* Badge tipo */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            fontFamily: 'var(--font-mono)', fontSize: 12,
+            color: tipo.color, marginBottom: 8,
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+          }}>
+            <span style={{ fontSize: 16 }}>{tipo.emoji}</span>
+            {tipo.label}
+          </div>
+
+          {/* Titolo */}
+          <h1 style={{
+            fontFamily: 'var(--font-mono)', fontSize: 34,
+            color: 'var(--orange)', margin: '0 0 10px', lineHeight: 1.1,
+          }}>
             {spot.name}
           </h1>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 13,
-            color: tipo.color, border: `1px solid ${tipo.color}`,
-            padding: '4px 10px', borderRadius: 2, textTransform: 'uppercase',
-            flexShrink: 0,
-          }}>
-            {tipo.emoji} {tipo.label}
-          </span>
+
+          {/* Città */}
+          {spot.city && (
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 14,
+              color: 'var(--gray-400)', marginBottom: 10,
+            }}>
+              📍 {spot.city}{spot.region ? `, ${spot.region}` : ''}
+            </div>
+          )}
+
+          {/* Publisher — più visibile */}
+          {spot.submitted_by_username && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'var(--gray-800)',
+              border: '1px solid var(--gray-700)',
+              borderRadius: 20, padding: '6px 14px',
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: 'var(--orange)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-mono)', fontSize: 13,
+                color: '#000', fontWeight: 700,
+              }}>
+                {spot.submitted_by_username[0].toUpperCase()}
+              </div>
+              <div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 13,
+                  color: 'var(--bone)', lineHeight: 1.2,
+                }}>
+                  @{spot.submitted_by_username}
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}>
+                  ha pubblicato questo spot
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {spot.city && (
-          <p style={{ color: 'var(--gray-400)', marginBottom: 16 }}>
-            📍 {spot.city}{spot.region ? `, ${spot.region}` : ''}
-          </p>
-        )}
-
+        {/* ── DESCRIZIONE ── */}
         {spot.description && (
-          <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 20 }}>
+          <p style={{
+            color: 'var(--bone)', lineHeight: 1.7,
+            marginBottom: 24, fontSize: 15,
+          }}>
             {spot.description}
           </p>
         )}
 
-        {/* Meta grid */}
+        {/* ── META INFO ── */}
         <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr',
           gap: '12px 20px', marginBottom: 24,
           padding: '16px', background: 'var(--gray-800)',
-          borderRadius: 4, border: '1px solid var(--gray-700)',
+          borderRadius: 8, border: '1px solid var(--gray-700)',
         }}>
-          {spot.surface  && <MetaRow label="Superficie" value={spot.surface} />}
+          {spot.surface   && <MetaRow label="Superficie" value={spot.surface} />}
           {spot.difficulty && <MetaRow label="Livello"   value={spot.difficulty} />}
           <MetaRow label="Cera" value={spot.wax_needed ? '🕯️ Necessaria' : 'Non necessaria'} />
-          {spot.guardians && <div style={{ gridColumn: '1/-1' }}><MetaRow label="Note accesso" value={spot.guardians} /></div>}
+          {spot.guardians && (
+            <div style={{ gridColumn: '1/-1' }}>
+              <MetaRow label="Note accesso" value={spot.guardians} />
+            </div>
+          )}
           <MetaRow label="Aggiornato" value={new Date(spot.condition_updated_at).toLocaleDateString('it-IT')} />
         </div>
 
-        {/* Galleria foto aggiuntive */}
+        {/* ── GALLERIA FOTO AGGIUNTIVE ── */}
         {photos.length > 1 && (
           <div style={{ marginBottom: 24 }}>
             <SectionTitle>FOTO ({photos.length})</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 6 }}>
               {photos.map((photo, i) => (
                 <img
                   key={photo.id}
                   src={photo.url}
                   alt={`Foto ${i + 1} di ${spot.name}`}
-                  style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 4, display: 'block' }}
+                  style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, display: 'block' }}
                   loading="lazy"
                 />
               ))}
@@ -173,11 +261,11 @@ export default async function SpotPage({ params }: Props) {
           </div>
         )}
 
-        {/* Video YouTube */}
+        {/* ── VIDEO YOUTUBE ── */}
         {embedUrl && (
           <div style={{ marginBottom: 24 }}>
             <SectionTitle>▶ VIDEO @CHRISPY_BMX</SectionTitle>
-            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 4 }}>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 6 }}>
               <iframe
                 src={embedUrl}
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
@@ -190,31 +278,8 @@ export default async function SpotPage({ params }: Props) {
           </div>
         )}
 
-        {/* Mappa mini (link) */}
-        <div style={{ marginBottom: 24 }}>
-          <SectionTitle>POSIZIONE GPS</SectionTitle>
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${spot.lat}&mlon=${spot.lon}&zoom=17`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ display: 'block', textDecoration: 'none' }}
-          >
-            <div style={{
-              background: 'var(--gray-800)',
-              border: '1px solid var(--gray-700)',
-              borderRadius: 4, padding: '14px 16px',
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--orange)', fontSize: 14,
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              📍 {spot.lat.toFixed(6)}, {spot.lon.toFixed(6)}
-              <span style={{ marginLeft: 'auto', color: 'var(--gray-400)', fontSize: 12 }}>Apri mappa ↗</span>
-            </div>
-          </a>
-        </div>
-
-        {/* CTA */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+        {/* ── CTA BUTTONS ── */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 32, flexWrap: 'wrap' }}>
           <a
             href={mapsUrl}
             target="_blank"
@@ -229,15 +294,15 @@ export default async function SpotPage({ params }: Props) {
             className="btn-secondary"
             style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', minWidth: 140 }}
           >
-            📍 Altri spot {spot.city ? `a ${spot.city}` : 'in Italia'}
+            📍 Altri spot{spot.city ? ` a ${spot.city}` : ''}
           </a>
         </div>
-
-        {/* SpotInteractions: stelle, preferiti, commenti */}
       </div>
-      <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
-      <div style={{ padding: '0 20px 0' }}>
 
+      {/* ── SPOT INTERACTIONS: stelle, cuore, commenti ── */}
+      <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
+
+      <div style={{ padding: '0 20px' }}>
         {/* JSON-LD: BreadcrumbList */}
         <script
           type="application/ld+json"
@@ -251,7 +316,6 @@ export default async function SpotPage({ params }: Props) {
             ],
           })}}
         />
-        {/* JSON-LD: SportsActivityLocation + Place */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify({
@@ -272,11 +336,6 @@ export default async function SpotPage({ params }: Props) {
             },
             image: photos.map(p => p.url),
             sport: ['BMX', 'Skateboarding', 'Scooter Freestyle'],
-            amenityFeature: [
-              { '@type': 'LocationFeatureSpecification', name: 'Tipo spot', value: TIPI_SPOT[spot.type].label },
-              { '@type': 'LocationFeatureSpecification', name: 'Condizione', value: spot.condition },
-              ...(spot.surface ? [{ '@type': 'LocationFeatureSpecification', name: 'Superficie', value: spot.surface }] : []),
-            ],
           })}}
         />
       </div>
@@ -287,7 +346,10 @@ export default async function SpotPage({ params }: Props) {
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em',
+      }}>{label}</div>
       <div style={{ fontSize: 14, color: 'var(--bone)', marginTop: 2 }}>{value}</div>
     </div>
   );
