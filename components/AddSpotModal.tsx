@@ -307,6 +307,7 @@ function GoogleMapPicker({
       const s = document.createElement('script');
       s.id  = 'gm-api-script';
       s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+      s.setAttribute('referrerpolicy', 'no-referrer'); // bypass HTTP-referrer restrictions on the key
       s.onload  = initMap;
       s.onerror = () => setStatus('error');
       document.head.appendChild(s);
