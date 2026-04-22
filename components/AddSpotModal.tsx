@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
@@ -15,7 +15,16 @@ interface AddSpotModalProps {
   initialLon?: number;
 }
 
+type Step    = 'posizione' | 'foto' | 'dettagli' | 'successo';
 type AuthTab = 'accedi' | 'registrati';
+
+const STEPS: Step[] = ['posizione', 'foto', 'dettagli'];
+const STEP_LABEL: Record<Step, string> = {
+  posizione: '1 — Posizione',
+  foto:      '2 — Foto',
+  dettagli:  '3 — Dettagli',
+  successo:  '',
+};
 
 /* ─── shared styles ─── */
 const inp: React.CSSProperties = {
@@ -26,39 +35,42 @@ const inp: React.CSSProperties = {
 };
 const lbl: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
-  textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5,
+  textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6,
 };
 
 export default function AddSpotModal({ open, onClose, initialLat, initialLon }: AddSpotModalProps) {
   const user      = useUser();
   const isLoading = user === undefined;
 
-  /* ── Form ── */
+  /* ── Wizard step ── */
+  const [step, setStep] = useState<Step>('posizione');
+
+  /* ── Posizione ── */
+  const [lat,        setLat]        = useState<number | null>(initialLat ?? null);
+  const [lon,        setLon]        = useState<number | null>(initialLon ?? null);
+  const [city,       setCity]       = useState('');
+  const [gpsState,   setGpsState]   = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [locMode,    setLocMode]    = useState<'gps' | 'search' | null>(initialLat != null ? 'gps' : null);
+  const [searchQuery,   setSearchQuery]   = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching,     setSearching]     = useState(false);
+  const [pickedAddress, setPickedAddress] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── Foto ── */
+  const [photos, setPhotos] = useState<File[]>([]);
+
+  /* ── Dettagli ── */
   const [name,        setName]        = useState('');
   const [type,        setType]        = useState<SpotType | ''>('');
-  const [lat,         setLat]         = useState<number | null>(initialLat ?? null);
-  const [lon,         setLon]         = useState<number | null>(initialLon ?? null);
-  const [city,        setCity]        = useState('');
   const [description, setDescription] = useState('');
   const [notes,       setNotes]       = useState('');
-  const [photos,      setPhotos]      = useState<File[]>([]);
-
-  /* ── GPS ── */
-  const [gpsState, setGpsState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
-
-  /* ── Location search ── */
-  const [searchMode,     setSearchMode]     = useState(false);
-  const [searchQuery,    setSearchQuery]    = useState('');
-  const [searchResults,  setSearchResults]  = useState<any[]>([]);
-  const [searching,      setSearching]      = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ── Submit ── */
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
-  const [done,       setDone]       = useState(false);
 
-  /* ── Inline auth ── */
+  /* ── Auth inline ── */
   const [authTab,      setAuthTab]      = useState<AuthTab>('accedi');
   const [authError,    setAuthError]    = useState<string | null>(null);
   const [authLoading,  setAuthLoading]  = useState(false);
@@ -71,24 +83,32 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [loginEmail,    setLoginEmail]    = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  /* ── Sync initialLat/Lon ── */
+  /* ── Sync initialLat/Lon (es. tap sulla mappa) ── */
   useEffect(() => {
     if (initialLat != null && initialLon != null) {
       setLat(initialLat); setLon(initialLon);
+      setLocMode('gps'); setGpsState('ok');
     }
   }, [initialLat, initialLon]);
 
-  /* ── Auto-GPS quando il modal si apre (solo se non ci sono coords già) ── */
-  useEffect(() => {
-    if (!open || !user || initialLat != null) return;
-    if (lat != null) return; // già impostata
-    getGPS();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, user]);
+  /* ── Reset completo alla chiusura ── */
+  const handleClose = useCallback(() => {
+    setStep('posizione');
+    setLat(initialLat ?? null); setLon(initialLon ?? null); setCity('');
+    setGpsState('idle'); setLocMode(initialLat != null ? 'gps' : null);
+    setSearchQuery(''); setSearchResults([]); setPickedAddress('');
+    setPhotos([]);
+    setName(''); setType(''); setDescription(''); setNotes('');
+    setError(null); setSubmitting(false);
+    setAuthError(null); setAuthDone(null);
+    setRegUsername(''); setRegEmail(''); setRegPassword('');
+    setLoginEmail(''); setLoginPassword('');
+    onClose();
+  }, [initialLat, initialLon, onClose]);
 
   /* ── Nominatim search ── */
   useEffect(() => {
-    if (!searchMode) return;
+    if (locMode !== 'search') return;
     if (searchQuery.trim().length < 3) { setSearchResults([]); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
@@ -101,21 +121,22 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       } catch { setSearchResults([]); }
       finally { setSearching(false); }
     }, 400);
-  }, [searchQuery, searchMode]);
+  }, [searchQuery, locMode]);
 
   const getGPS = () => {
     if (!navigator.geolocation) { setGpsState('error'); return; }
     setGpsState('loading');
     navigator.geolocation.getCurrentPosition(
       pos => { setLat(pos.coords.latitude); setLon(pos.coords.longitude); setGpsState('ok'); },
-      ()  => { setGpsState('error'); },
+      ()  => setGpsState('error'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
   const pickSearchResult = (r: any) => {
     setLat(parseFloat(r.lat)); setLon(parseFloat(r.lon));
-    // Auto-set città se riconosciuta
+    const label = r.display_name.split(',').slice(0, 3).join(',');
+    setPickedAddress(label);
     const cityName = r.address?.city || r.address?.town || r.address?.village || '';
     if (cityName) {
       const match = CITTA_ITALIANE.find(c =>
@@ -124,7 +145,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       );
       if (match) setCity(match.value);
     }
-    setSearchMode(false); setSearchQuery(''); setSearchResults([]);
+    setSearchResults([]); setSearchQuery('');
   };
 
   /* ── Auth handlers ── */
@@ -164,125 +185,93 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     } finally { setAuthLoading(false); }
   };
 
-  /* ── Submit spot ── */
+  /* ── Submit ── */
   const handleSubmit = async () => {
-    if (!user) return;
-    if (!name.trim()) { setError('Inserisci il nome dello spot.'); return; }
-    if (!type)        { setError('Seleziona il tipo di spot.'); return; }
-    if (lat == null)  { setError('Posizione mancante. Usa il GPS o cerca un indirizzo.'); return; }
-
+    if (!user || !name.trim() || !type || lat == null) return;
     setSubmitting(true); setError(null);
     try {
-      const sb = supabaseBrowser();
-      const { data: { session } } = await sb.auth.getSession();
+      const { data: { session } } = await supabaseBrowser().auth.getSession();
       if (!session?.access_token) {
         setError('Sessione scaduta. Chiudi il modal, ricarica la pagina e riprova.');
         return;
       }
       const fd = new FormData();
       fd.append('data', JSON.stringify({
-        name:         name.trim(),
-        type,
-        lat,
-        lon:          lon!,
-        city:         city        || undefined,
-        description:  description || undefined,
-        guardians:    notes       || undefined,
+        name: name.trim(), type, lat, lon: lon!,
+        city: city || undefined,
+        description: description || undefined,
+        guardians: notes || undefined,
         access_token: session.access_token,
       }));
       photos.forEach((p, i) => fd.append(`photo_${i}`, p));
-
       const res  = await fetch('/api/submit-spot', { method: 'POST', body: fd });
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error ?? 'Errore durante l\'invio');
-      setDone(true);
+      if (!json.ok) throw new Error(json.error ?? 'Errore durante l\'invio.');
+      setStep('successo');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore sconosciuto. Riprova.');
     } finally { setSubmitting(false); }
   };
 
-  const handleClose = () => {
-    setName(''); setType(''); setLat(initialLat ?? null); setLon(initialLon ?? null);
-    setCity(''); setDescription(''); setNotes(''); setPhotos([]);
-    setGpsState('idle'); setSearchMode(false); setSearchQuery(''); setSearchResults([]);
-    setError(null); setDone(false);
-    setAuthError(null); setAuthDone(null);
-    setRegUsername(''); setRegEmail(''); setRegPassword('');
-    setLoginEmail(''); setLoginPassword('');
-    onClose();
-  };
-
   if (!open) return null;
 
-  const hasCoords = lat != null && lon != null;
-  const canSubmit = !!name.trim() && !!type && hasCoords && !submitting;
+  const hasCoords  = lat != null && lon != null;
+  const stepIndex  = STEPS.indexOf(step as Step);
+  const progressPct = step === 'successo' ? 100 : ((stepIndex) / (STEPS.length - 1)) * 100;
 
   return (
     <>
       <div onClick={handleClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 69, backdropFilter: 'blur(4px)' }} aria-hidden />
 
-      <div
-        role="dialog" aria-modal aria-label="Aggiungi spot BMX"
-        style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: 'var(--gray-800)', borderTop: '2px solid var(--orange)',
-          borderRadius: '16px 16px 0 0', zIndex: 70,
-          maxHeight: '92dvh', overflowY: 'auto', overscrollBehavior: 'contain',
-          animation: 'slideUp 0.3s ease-out',
-          paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
-        }}
-      >
+      <div role="dialog" aria-modal aria-label="Aggiungi spot BMX" style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: 'var(--gray-800)', borderTop: '2px solid var(--orange)',
+        borderRadius: '16px 16px 0 0', zIndex: 70,
+        maxHeight: '92dvh', overflowY: 'auto', overscrollBehavior: 'contain',
+        animation: 'slideUp 0.3s ease-out',
+        paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
+      }}>
         <div className="bottom-sheet-handle" />
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 14px', borderBottom: '1px solid var(--gray-700)' }}>
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--orange)', margin: 0 }}>🏴 AGGIUNGI SPOT</h2>
+          <div>
+            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--orange)', margin: 0 }}>🏴 AGGIUNGI SPOT</h2>
+            {user && step !== 'successo' && (
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginTop: 2 }}>
+                {STEP_LABEL[step]}
+              </div>
+            )}
+          </div>
           <button onClick={handleClose} className="btn-ghost" aria-label="Chiudi" style={{ fontSize: 20 }}>✕</button>
         </div>
 
+        {/* Progress bar */}
+        {user && step !== 'successo' && (
+          <div style={{ height: 3, background: 'var(--gray-700)' }}>
+            <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--orange)', transition: 'width 0.3s ease-out' }} />
+          </div>
+        )}
+
         <div style={{ padding: '20px' }}>
 
-          {/* Loading auth */}
+          {/* ── Loading ── */}
           {isLoading && (
-            <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-400)' }}>
+            <div style={{ textAlign: 'center', padding: '48px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-400)' }}>
               Caricamento...
             </div>
           )}
 
-          {/* ── SUCCESSO ── */}
-          {done && (
-            <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
-              <div style={{ fontSize: 60, marginBottom: 16 }}>🏴</div>
-              <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--orange)', marginBottom: 10 }}>SPOT INVIATO!</h3>
-              <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 8 }}>
-                Grazie <strong style={{ color: 'var(--orange)' }}>@{user?.username}</strong>!
-              </p>
-              <div style={{
-                background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)',
-                borderRadius: 8, padding: '14px 16px', marginBottom: 24, textAlign: 'left',
-              }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', marginBottom: 6 }}>⏳ IN REVISIONE</div>
-                <p style={{ color: 'var(--bone)', fontSize: 14, lineHeight: 1.5, margin: 0 }}>
-                  Lo spot apparirà sulla mappa entro 24-48 ore, dopo la mia revisione.
-                  Riceverai una notifica quando sarà approvato.
-                </p>
-              </div>
-              <button onClick={handleClose} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                Torna alla mappa
-              </button>
-            </div>
-          )}
-
-          {/* ── AUTH GATE ── */}
-          {!isLoading && !user && !done && (
+          {/* ══════════════════════════
+              AUTH GATE
+          ══════════════════════════ */}
+          {!isLoading && !user && (
             authDone === 'confirm_email' ? (
               <div style={{ textAlign: 'center', padding: '32px 0 40px' }}>
                 <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 10 }}>
-                  CONTROLLA LA TUA EMAIL
-                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 10 }}>CONTROLLA LA TUA EMAIL</div>
                 <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 24 }}>
-                  Link di conferma inviato a <strong style={{ color: 'var(--orange)' }}>{regEmail}</strong>.<br />
+                  Link inviato a <strong style={{ color: 'var(--orange)' }}>{regEmail}</strong>.<br />
                   Dopo la conferma, accedi qui.
                 </p>
                 <button onClick={() => { setAuthDone(null); setAuthTab('accedi'); }} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
@@ -294,17 +283,15 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, marginBottom: 18 }}>
                   Accedi o crea un account — il tuo <strong style={{ color: 'var(--orange)' }}>@username</strong> apparirà sullo spot.
                 </p>
-                {/* Tabs */}
                 <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--gray-700)' }}>
                   {(['accedi', 'registrati'] as AuthTab[]).map(t => (
-                    <button key={t} onClick={() => { setAuthTab(t); setAuthError(null); }}
-                      style={{
-                        flex: 1, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '12px 0',
-                        border: 'none', background: 'transparent',
-                        color: authTab === t ? 'var(--orange)' : 'var(--gray-400)',
-                        borderBottom: `2px solid ${authTab === t ? 'var(--orange)' : 'transparent'}`,
-                        cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em',
-                      }}>
+                    <button key={t} onClick={() => { setAuthTab(t); setAuthError(null); }} style={{
+                      flex: 1, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '12px 0',
+                      border: 'none', background: 'transparent',
+                      color: authTab === t ? 'var(--orange)' : 'var(--gray-400)',
+                      borderBottom: `2px solid ${authTab === t ? 'var(--orange)' : 'transparent'}`,
+                      cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em',
+                    }}>
                       {t === 'accedi' ? '🔑 Accedi' : '🏴 Registrati'}
                     </button>
                   ))}
@@ -322,7 +309,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       <input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
                         placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
                     </div>
-                    {authError && <AuthErr msg={authError} />}
+                    {authError && <ErrBox msg={authError} />}
                     <button onClick={handleSignIn} disabled={authLoading} className="btn-primary"
                       style={{ width: '100%', justifyContent: 'center', opacity: authLoading ? 0.6 : 1 }}>
                       {authLoading ? '⏳ Accesso...' : '🔑 ENTRA'}
@@ -362,7 +349,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       <input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)}
                         placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
                     </div>
-                    {authError && <AuthErr msg={authError} />}
+                    {authError && <ErrBox msg={authError} />}
                     <button onClick={handleSignUp} disabled={authLoading || usernameOk === false} className="btn-primary"
                       style={{ width: '100%', justifyContent: 'center', opacity: (authLoading || usernameOk === false) ? 0.6 : 1 }}>
                       {authLoading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT'}
@@ -373,8 +360,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             )
           )}
 
-          {/* ── FORM (utente loggato, non completato) ── */}
-          {!isLoading && user && !done && (
+          {/* ══════════════════════════
+              STEP 1 — POSIZIONE
+          ══════════════════════════ */}
+          {!isLoading && user && step === 'posizione' && (
             <div style={{ display: 'grid', gap: 20 }}>
 
               {/* Badge utente */}
@@ -382,83 +371,175 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--orange)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, color: '#000', flexShrink: 0 }}>
                   {user.username[0].toUpperCase()}
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>@{user.username}</div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>@{user.username}</span>
               </div>
 
-              {/* ─── POSIZIONE ─── */}
-              <div>
-                <label style={lbl}>Posizione *</label>
+              {/* Selezione metodo */}
+              {!locMode && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Come vuoi indicare la posizione?
+                  </p>
+                  <button onClick={() => { setLocMode('gps'); getGPS(); }} style={methodBtn}>
+                    <span style={{ fontSize: 28 }}>📍</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Sono nello spot</div>
+                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Usa il GPS del telefono</div>
+                    </div>
+                  </button>
+                  <button onClick={() => setLocMode('search')} style={methodBtn}>
+                    <span style={{ fontSize: 28 }}>🔍</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Conosco la posizione</div>
+                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Cerca indirizzo o nome del posto</div>
+                    </div>
+                  </button>
+                </div>
+              )}
 
-                {!hasCoords && !searchMode && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <button onClick={getGPS} className="btn-primary" style={{ justifyContent: 'center' }}
-                      disabled={gpsState === 'loading'}>
-                      {gpsState === 'loading' ? '⏳ GPS in corso...' : '📍 Usa posizione attuale'}
+              {/* GPS path */}
+              {locMode === 'gps' && (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {gpsState === 'loading' && (
+                    <div style={{ textAlign: 'center', padding: '20px 0', fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14 }}>
+                      ⏳ Rilevamento GPS in corso...
+                    </div>
+                  )}
+                  {gpsState === 'ok' && hasCoords && (
+                    <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '12px 14px' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#00c851', marginBottom: 4 }}>✅ Posizione rilevata</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>{lat!.toFixed(6)}, {lon!.toFixed(6)}</div>
+                    </div>
+                  )}
+                  {gpsState === 'error' && (
+                    <ErrBox msg="GPS non disponibile. Prova a cercare l'indirizzo." />
+                  )}
+                  {gpsState !== 'loading' && !hasCoords && gpsState !== 'error' && (
+                    <button onClick={getGPS} className="btn-primary" style={{ justifyContent: 'center' }}>
+                      📍 Usa la mia posizione GPS
                     </button>
-                    <button onClick={() => setSearchMode(true)} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                  )}
+                  {gpsState === 'error' && (
+                    <button onClick={() => { setLocMode('search'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
                       🔍 Cerca indirizzo
                     </button>
-                    {gpsState === 'error' && (
-                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff4444', margin: 0 }}>
-                        GPS non disponibile. Cerca l&apos;indirizzo manualmente.
-                      </p>
-                    )}
-                  </div>
-                )}
+                  )}
+                  <button onClick={() => { setLocMode(null); setLat(null); setLon(null); setGpsState('idle'); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', padding: '4px 0', textAlign: 'left' }}>
+                    ← Cambia metodo
+                  </button>
+                </div>
+              )}
 
-                {!hasCoords && searchMode && (
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 6, padding: '10px 14px' }}>
-                      <span style={{ fontSize: 16, flexShrink: 0 }}>{searching ? '⏳' : '🔍'}</span>
-                      <input autoFocus type="text"
-                        placeholder="es. Skatepark Milano, Via Roma 10..."
-                        value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 15, color: 'var(--bone)', outline: 'none', fontFamily: 'var(--font-mono)' }} />
-                      <button onClick={() => { setSearchMode(false); setSearchQuery(''); setSearchResults([]); }}
-                        style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: 18, cursor: 'pointer', padding: 0 }}>✕</button>
-                    </div>
-                    {searchResults.length > 0 && (
-                      <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--gray-700)', border: '1px solid var(--orange)', borderRadius: 6, overflow: 'hidden', zIndex: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
-                        {searchResults.map((r: any) => (
-                          <button key={r.place_id} onClick={() => pickSearchResult(r)}
-                            style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', padding: '11px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--gray-600)', color: 'var(--bone)', textAlign: 'left', cursor: 'pointer' }}>
-                            <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>📍</span>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.4 }}>
-                              {r.display_name.split(',').slice(0, 3).join(',')}
-                            </div>
-                          </button>
-                        ))}
+              {/* Search path */}
+              {locMode === 'search' && (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {!hasCoords && (
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 6, padding: '10px 14px' }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{searching ? '⏳' : '🔍'}</span>
+                        <input autoFocus type="text"
+                          placeholder="es. Skatepark Dergano Milano, Via Roma 1..."
+                          value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                          style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 15, color: 'var(--bone)', outline: 'none', fontFamily: 'var(--font-mono)' }} />
+                        {searchQuery && (
+                          <button onClick={() => { setSearchQuery(''); setSearchResults([]); }}
+                            style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: 18, cursor: 'pointer', padding: 0 }}>✕</button>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {hasCoords && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 6 }}>
-                    <span style={{ fontSize: 18 }}>✅</span>
-                    <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)' }}>
-                      {lat!.toFixed(5)}, {lon!.toFixed(5)}
+                      {searchResults.length > 0 && (
+                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--gray-700)', border: '1px solid var(--orange)', borderRadius: 6, overflow: 'hidden', zIndex: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+                          {searchResults.map((r: any) => (
+                            <button key={r.place_id} onClick={() => pickSearchResult(r)}
+                              style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', padding: '11px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--gray-600)', color: 'var(--bone)', textAlign: 'left', cursor: 'pointer' }}>
+                              <span style={{ fontSize: 14, flexShrink: 0, marginTop: 2 }}>📍</span>
+                              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.4 }}>
+                                {r.display_name.split(',').slice(0, 3).join(',')}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {searchQuery.trim().length >= 3 && !searching && searchResults.length === 0 && (
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', marginTop: 8 }}>
+                          Nessun risultato. Prova con un indirizzo diverso.
+                        </p>
+                      )}
                     </div>
-                    <button onClick={() => { setLat(null); setLon(null); setGpsState('idle'); setSearchMode(false); }}
-                      style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer' }}>
-                      Cambia
+                  )}
+                  {hasCoords && (
+                    <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '12px 14px' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#00c851', marginBottom: 4 }}>✅ Posizione trovata</div>
+                      <div style={{ fontSize: 13, color: 'var(--bone)', lineHeight: 1.4, marginBottom: 4 }}>{pickedAddress}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>{lat!.toFixed(6)}, {lon!.toFixed(6)}</div>
+                    </div>
+                  )}
+                  {hasCoords && (
+                    <button onClick={() => { setLat(null); setLon(null); setPickedAddress(''); setSearchQuery(''); setSearchResults([]); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', padding: '4px 0', textAlign: 'left' }}>
+                      ← Cerca di nuovo
                     </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                  {!hasCoords && (
+                    <button onClick={() => { setLocMode(null); setSearchQuery(''); setSearchResults([]); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', padding: '4px 0', textAlign: 'left' }}>
+                      ← Cambia metodo
+                    </button>
+                  )}
+                </div>
+              )}
 
-              {/* ─── NOME ─── */}
+              {/* Città (opzionale, mostrata se c'è una posizione) */}
+              {locMode && hasCoords && (
+                <div>
+                  <label style={lbl}>Città (opzionale)</label>
+                  <select style={{ ...inp, appearance: 'none' }} value={city} onChange={e => setCity(e.target.value)}>
+                    <option value="">Seleziona città...</option>
+                    {CITTA_ITALIANE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Avanti */}
+              {locMode && (
+                <button onClick={() => setStep('foto')} disabled={!hasCoords} className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', opacity: hasCoords ? 1 : 0.45, marginTop: 4 }}>
+                  Avanti →
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════
+              STEP 2 — FOTO
+          ══════════════════════════ */}
+          {!isLoading && user && step === 'foto' && (
+            <div style={{ display: 'grid', gap: 20 }}>
+              <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+                Carica fino a 5 foto dello spot. La prima sarà la cover.<br />
+                <span style={{ fontSize: 13 }}>Puoi saltare questo step se non hai foto.</span>
+              </p>
+              <PhotoUpload photos={photos} onChange={setPhotos} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setStep('posizione')} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
+                <button onClick={() => setStep('dettagli')} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>Avanti →</button>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════
+              STEP 3 — DETTAGLI
+          ══════════════════════════ */}
+          {!isLoading && user && step === 'dettagli' && (
+            <div style={{ display: 'grid', gap: 18 }}>
               <div>
                 <label style={lbl}>Nome spot *</label>
-                <input type="text" style={inp}
-                  value={name} onChange={e => setName(e.target.value)}
+                <input type="text" style={inp} value={name} onChange={e => setName(e.target.value)}
                   placeholder='es. "Gradoni Piazza Bra"' maxLength={100} />
               </div>
-
-              {/* ─── TIPO ─── */}
               <div>
                 <label style={lbl}>Tipo *</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                   {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([t, info]) => (
                     <button key={t} onClick={() => setType(t)} style={{
                       padding: '6px 12px',
@@ -473,58 +554,54 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   ))}
                 </div>
               </div>
-
-              {/* ─── FOTO (opzionale) ─── */}
-              <div>
-                <label style={lbl}>Foto (opzionale, max 5)</label>
-                <PhotoUpload photos={photos} onChange={setPhotos} />
-              </div>
-
-              {/* ─── DETTAGLI OPZIONALI ─── */}
-              <div>
-                <label style={lbl}>Città (opzionale)</label>
-                <select style={{ ...inp, appearance: 'none' }} value={city} onChange={e => setCity(e.target.value)}>
-                  <option value="">Seleziona città...</option>
-                  {CITTA_ITALIANE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-              </div>
-
               <div>
                 <label style={lbl}>Descrizione (opzionale)</label>
-                <textarea style={{ ...inp, resize: 'vertical' }}
+                <textarea style={{ ...inp, resize: 'vertical' }} rows={2}
                   value={description} onChange={e => setDescription(e.target.value)}
-                  placeholder='es. "Gradoni in marmo, fondo buono. C&apos;è anche un ledge"'
-                  rows={2} maxLength={500} />
+                  placeholder='Es. "Gradoni in marmo, fondo buono. Presente anche un ledge."'
+                  maxLength={500} />
               </div>
-
               <div>
                 <label style={lbl}>Note accesso / guardiani (opzionale)</label>
-                <input type="text" style={inp}
-                  value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder='es. "Evitare ore di punta" / "Security alle 18"'
-                  maxLength={200} />
+                <input type="text" style={inp} value={notes} onChange={e => setNotes(e.target.value)}
+                  placeholder='Es. "Security alle 18" / "Sempre libero"' maxLength={200} />
               </div>
 
-              {/* ─── ERROR ─── */}
-              {error && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '10px 12px' }}>
-                  ⚠ {error}
-                </div>
-              )}
+              {error && <ErrBox msg={error} />}
 
-              {/* ─── SUBMIT ─── */}
-              <button
-                onClick={handleSubmit}
-                disabled={!canSubmit}
-                className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center', opacity: canSubmit ? 1 : 0.5, fontSize: 16, padding: '14px' }}
-              >
-                {submitting ? '⏳ Invio in corso...' : '🏴 INVIA SPOT'}
-              </button>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textAlign: 'center', margin: '-10px 0 0' }}>
-                Lo spot sarà visibile dopo revisione (24-48h)
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setStep('foto'); setError(null); }} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!name.trim() || !type || submitting}
+                  className="btn-primary"
+                  style={{ flex: 2, justifyContent: 'center', opacity: (!name.trim() || !type || submitting) ? 0.5 : 1 }}
+                >
+                  {submitting ? '⏳ Invio...' : '🏴 INVIA SPOT'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════
+              SUCCESSO
+          ══════════════════════════ */}
+          {step === 'successo' && (
+            <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
+              <div style={{ fontSize: 60, marginBottom: 16 }}>🏴</div>
+              <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--orange)', marginBottom: 10 }}>SPOT INVIATO!</h3>
+              <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 12 }}>
+                Grazie <strong style={{ color: 'var(--orange)' }}>@{user?.username}</strong>!
               </p>
-
+              <div style={{ background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)', borderRadius: 8, padding: '14px 16px', marginBottom: 24, textAlign: 'left' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', marginBottom: 6 }}>⏳ IN REVISIONE</div>
+                <p style={{ color: 'var(--bone)', fontSize: 14, lineHeight: 1.5, margin: 0 }}>
+                  Lo spot apparirà sulla mappa entro 24-48 ore, dopo la mia revisione manuale.
+                </p>
+              </div>
+              <button onClick={handleClose} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                Torna alla mappa
+              </button>
             </div>
           )}
 
@@ -534,9 +611,17 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   );
 }
 
-function AuthErr({ msg }: { msg: string }) {
+/* ─── sub-components ─── */
+const methodBtn: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 14,
+  width: '100%', padding: '16px', textAlign: 'left',
+  background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
+  borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
+};
+
+function ErrBox({ msg }: { msg: string }) {
   return (
-    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '8px 12px' }}>
+    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '10px 12px' }}>
       ⚠ {msg}
     </div>
   );
