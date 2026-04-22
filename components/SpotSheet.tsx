@@ -325,8 +325,9 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
               )}
             </div>
             <button onClick={handleShare} className="btn-secondary"
-              style={{ flex: 1, justifyContent: 'center', fontSize: 13, padding: '8px 10px' }}>
-              📤 Condividi
+              style={{ padding: '8px 11px', fontSize: 16, flexShrink: 0 }}
+              title="Condividi spot">
+              📤
             </button>
             <a href={`/map/spot/${spot.slug}`} className="btn-secondary"
               style={{ fontSize: 13, padding: '8px 12px', textDecoration: 'none',
