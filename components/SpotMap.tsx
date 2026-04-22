@@ -191,8 +191,9 @@ export default function SpotMap({
 
         marker.on('click', () => {
           if (!mapInstance.current) return;
-          // Zoom in sulla città
-          mapInstance.current.flyTo([c.lat, c.lon], CLUSTER_ZOOM + 1, { duration: 1.0 });
+          // Zoom diretto a livello street — senza secondo click
+          const targetZoom = c.count === 1 ? 17 : 15;
+          mapInstance.current.flyTo([c.lat, c.lon], targetZoom, { duration: 1.0 });
           // Se singolo spot → aprilo subito
           if (c.count === 1) onSpotClickRef.current(c.spots[0]);
         });
