@@ -786,13 +786,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     </button>
                   )}
 
-                  {/* Città — sempre visibile nel GPS path */}
-                  {hasCoords && (
-                    <div>
-                      <label style={lbl}>Città</label>
-                      <RegionCityPicker value={city} onChange={setCity} />
-                    </div>
-                  )}
 
                   <button onClick={() => { setLocMode(null); setLat(null); setLon(null); setGpsState('idle'); }} style={backLink}>
                     ← Cambia metodo
@@ -909,13 +902,24 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           {!isLoading && user && step === 'foto' && (
             <div style={{ display: 'grid', gap: 20 }}>
               <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-                Carica fino a 5 foto dello spot. La prima sarà la cover.<br />
-                <span style={{ fontSize: 13 }}>Puoi saltare se non hai foto.</span>
+                Carica almeno una foto dello spot. La prima sarà la cover.
+                {photos.length === 0 && (
+                  <span style={{ display: 'block', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)' }}>
+                    * Almeno una foto è obbligatoria
+                  </span>
+                )}
               </p>
               <PhotoUpload photos={photos} onChange={setPhotos} />
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setStep('posizione')} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
-                <button onClick={() => setStep('dettagli')} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>Avanti →</button>
+                <button
+                  onClick={() => setStep('dettagli')}
+                  disabled={photos.length === 0}
+                  className="btn-primary"
+                  style={{ flex: 2, justifyContent: 'center', opacity: photos.length === 0 ? 0.4 : 1 }}
+                >
+                  Avanti →
+                </button>
               </div>
             </div>
           )}
