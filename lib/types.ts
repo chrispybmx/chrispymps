@@ -68,6 +68,7 @@ export interface SpotMapPin {
   city?:     string;
   condition: SpotCondition;
   cover_url?: string; // prima foto
+  submitted_by_username?: string;
 }
 
 // Dati del form "Aggiungi Spot"
