@@ -44,6 +44,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   const [filterType,    setFilterType]    = useState<SpotType | null>(null);
   const [searchQuery,   setSearchQuery]   = useState('');
   const [selectedSpot,  setSelectedSpot]  = useState<Spot | null>(null);
+  const [selectedIdx,   setSelectedIdx]   = useState<number>(-1);
   const [addOpen,       setAddOpen]       = useState(false);
   const [supportOpen,   setSupportOpen]   = useState(false);
   const [addLat,        setAddLat]        = useState<number | undefined>();
@@ -57,6 +58,16 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   const [radiusCenter, setRadiusCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [radiusKm,     setRadiusKm]     = useState(50);
   const [gpsLoading,   setGpsLoading]   = useState(false);
+
+  /* ── Filtro: calcolato in MapClient per usarlo anche in SpotSheet (prev/next) ── */
+  const filtered = useMemo(() => spots.filter((s) => {
+    if (filterType && s.type !== filterType) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return s.name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
+    }
+    return true;
+  }), [spots, filterType, searchQuery]);
 
   const spotsInRadius = useMemo(() => {
     if (!radiusCenter) return [];
@@ -86,15 +97,16 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   }, []);
 
   const closeRadiusMode = useCallback(() => {
-    setRadiusMode(false);
-    setRadiusCenter(null);
+    setRadiusMode(false); setRadiusCenter(null);
   }, []);
 
-  // Click su un pin o su un suggerimento della ricerca
+  /* ── Apri spot ── */
   const openSpot = useCallback(async (pin: SpotMapPin) => {
     setLoadingSpot(true);
-    // Fly to spot first
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 16 });
+    // Trova indice nello array filtered
+    const idx = filtered.findIndex(s => s.id === pin.id);
+    setSelectedIdx(idx);
     try {
       const res = await fetch(`/api/spots/${pin.slug}`);
       if (res.ok) {
@@ -108,9 +120,14 @@ export default function MapClient({ initialSpots }: MapClientProps) {
     } finally {
       setLoadingSpot(false);
     }
-  }, []);
+  }, [filtered]);
 
-  // Selezione città dalla ricerca → vola sulla mappa
+  /* ── Navigazione prev/next ── */
+  const handleNavigate = useCallback(async (idx: number) => {
+    if (idx < 0 || idx >= filtered.length) return;
+    await openSpot(filtered[idx]);
+  }, [filtered, openSpot]);
+
   const handleCitySelect = useCallback((city: string, lat: number, lon: number) => {
     setFlyTarget({ lat, lon, zoom: 14 });
     setSearchQuery(city);
@@ -131,7 +148,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
     alert('Segnalazione inviata. Grazie!');
   }, []);
 
-  const topOffset = 100; // topbar 56 + filtri 44
+  const topOffset = 100;
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -147,12 +164,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
       />
 
       {/* Mappa a tutto schermo */}
-      <div style={{
-        position: 'fixed',
-        top: topOffset, left: 0, right: 0,
-        bottom: 'var(--strip-height)',
-        zIndex: 1,
-      }}>
+      <div style={{ position: 'fixed', top: topOffset, left: 0, right: 0, bottom: 'var(--strip-height)', zIndex: 1 }}>
         <SpotMap
           spots={spots}
           filterType={filterType}
@@ -166,17 +178,12 @@ export default function MapClient({ initialSpots }: MapClientProps) {
           onMapClick={handleMapClick}
         />
 
-        {/* ── Bottone toggle raggio (bottom-left) ── */}
+        {/* Bottone raggio */}
         <button
-          onClick={() => {
-            if (radiusMode) { closeRadiusMode(); }
-            else { setRadiusMode(true); }
-          }}
+          onClick={() => { if (radiusMode) closeRadiusMode(); else setRadiusMode(true); }}
           title="Ricerca per raggio"
           style={{
-            position: 'absolute',
-            bottom: 'calc(16px + env(safe-area-inset-bottom))',
-            left: 16,
+            position: 'absolute', bottom: 'calc(16px + env(safe-area-inset-bottom))', left: 16,
             width: 44, height: 44,
             background: radiusMode ? 'var(--orange)' : 'var(--gray-800)',
             border: `1px solid ${radiusMode ? 'var(--orange)' : 'var(--gray-600)'}`,
@@ -184,96 +191,67 @@ export default function MapClient({ initialSpots }: MapClientProps) {
             color: radiusMode ? '#000' : 'var(--bone)',
             fontSize: 22, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
-            zIndex: 10,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.5)', zIndex: 10,
           }}
-        >
-          🎯
-        </button>
+        >🎯</button>
 
-        {/* ── Toast "tap mappa" quando non c'è ancora il centro ── */}
+        {/* Toast tap mappa */}
         {radiusMode && !radiusCenter && (
           <div style={{
-            position: 'absolute',
-            top: 16, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(10,10,10,0.9)',
-            border: '1px solid var(--orange)',
-            borderRadius: 8,
-            padding: '8px 16px',
+            position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(10,10,10,0.9)', border: '1px solid var(--orange)',
+            borderRadius: 8, padding: '8px 16px',
             fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)',
-            zIndex: 20, whiteSpace: 'nowrap',
-            pointerEvents: 'none',
+            zIndex: 20, whiteSpace: 'nowrap', pointerEvents: 'none',
           }}>
             🎯 Tocca la mappa per centrare la ricerca
           </div>
         )}
-
       </div>
 
       {/* Loading overlay */}
       {loadingSpot && (
         <div style={{
-          position: 'fixed',
-          bottom: 'calc(var(--strip-height) + 16px)',
-          left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(10,10,10,0.9)',
-          color: 'var(--orange)', fontFamily: 'var(--font-mono)',
-          fontSize: 14, padding: '8px 16px',
-          borderRadius: 4, zIndex: 46,
-          border: '1px solid var(--gray-600)',
+          position: 'fixed', bottom: 'calc(var(--strip-height) + 16px)', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(10,10,10,0.9)', color: 'var(--orange)',
+          fontFamily: 'var(--font-mono)', fontSize: 14, padding: '8px 16px',
+          borderRadius: 4, zIndex: 46, border: '1px solid var(--gray-600)',
         }}>
           CARICAMENTO...
         </div>
       )}
 
-      {/* Radius sheet (sostituisce DiscoverStrip in modalità raggio) */}
+      {/* Radius sheet */}
       {radiusMode && (
         <RadiusSheet
-          radiusKm={radiusKm}
-          center={radiusCenter}
-          spots={spotsInRadius}
-          onSetRadius={setRadiusKm}
-          onUseGPS={handleUseGPS}
-          onClose={closeRadiusMode}
-          onSpotClick={openSpot}
-          gpsLoading={gpsLoading}
+          radiusKm={radiusKm} center={radiusCenter} spots={spotsInRadius}
+          onSetRadius={setRadiusKm} onUseGPS={handleUseGPS} onClose={closeRadiusMode}
+          onSpotClick={openSpot} gpsLoading={gpsLoading}
         />
       )}
 
-      {/* Discover strip — suggerisce spot a caso */}
+      {/* Discover strip */}
       {!selectedSpot && !radiusMode && (
-        <DiscoverStrip
-          spots={spots}
-          onSpotClick={openSpot}
-        />
+        <DiscoverStrip spots={spots} onSpotClick={openSpot} />
       )}
 
-      {/* Scheda spot */}
+      {/* SpotSheet con navigazione */}
       <SpotSheet
         spot={selectedSpot}
-        onClose={() => setSelectedSpot(null)}
+        onClose={() => { setSelectedSpot(null); setSelectedIdx(-1); }}
         onFlag={handleFlag}
+        allSpots={filtered}
+        currentIdx={selectedIdx >= 0 ? selectedIdx : undefined}
+        onNavigate={handleNavigate}
       />
 
-      {/* Modal aggiungi spot */}
       <AddSpotModal
         open={addOpen}
         onClose={() => { setAddOpen(false); setAddLat(undefined); setAddLon(undefined); }}
-        initialLat={addLat}
-        initialLon={addLon}
+        initialLat={addLat} initialLon={addLon}
       />
-
-      {/* Modal supporto */}
-      <SupportModal
-        open={supportOpen}
-        onClose={() => setSupportOpen(false)}
-      />
-
-      {/* Auth modal (da SideMenu o altri trigger) */}
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-      />
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }
