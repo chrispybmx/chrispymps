@@ -135,41 +135,79 @@ export default function TopBar({
         <button onClick={openSearch} className="btn-ghost" aria-label="Cerca spot" style={{ fontSize: 18 }}>
           🔍
         </button>
-        <a href="/preferiti" className="btn-ghost" aria-label="I miei preferiti" style={{ fontSize: 20, textDecoration: 'none', display: 'flex', alignItems: 'center' }} title="I miei spot preferiti">
-          ❤️
-        </a>
-        <button onClick={onAddSpot} className="btn-primary" style={{ marginLeft: 4, padding: '8px 14px', fontSize: 14 }} aria-label="Aggiungi spot">
+        <button onClick={onAddSpot} className="btn-primary" style={{ marginLeft: 8, padding: '8px 14px', fontSize: 14 }} aria-label="Aggiungi spot">
           + SPOT
         </button>
       </header>
 
-      {/* Filter chips */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 'var(--topbar-height)',
-          left: 0, right: 0,
+      {/* Filter chips + preferiti */}
+      <div style={{
+        position: 'fixed',
+        top: 'var(--topbar-height)',
+        left: 0, right: 0,
+        background: 'rgba(10,10,10,0.92)',
+        borderBottom: '1px solid var(--gray-700)',
+        zIndex: 38,
+        display: 'flex', alignItems: 'center',
+      }}>
+        {/* Chips scrollabili */}
+        <div
+          style={{
+            flex: 1,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            padding: '8px 0 8px 16px',
+            display: 'flex', gap: 8,
+          }}
+          ref={(el) => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
+        >
+          <FilterChip label="TUTTI" active={activeType === null} color="var(--orange)" onClick={() => onFilterType(null)} />
+          {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([type, info]) => (
+            <FilterChip
+              key={type}
+              label={`${info.emoji} ${info.label.toUpperCase()}`}
+              active={activeType === type}
+              color={info.color}
+              onClick={() => handleTypeToggle(type)}
+              count={spots.filter(s => s.type === type).length}
+            />
+          ))}
+        </div>
+
+        {/* Preferiti — fisso a destra, stesso stile chip */}
+        <div style={{
+          padding: '8px 12px 8px 8px',
+          flexShrink: 0,
+          borderLeft: '1px solid var(--gray-700)',
           background: 'rgba(10,10,10,0.92)',
-          borderBottom: '1px solid var(--gray-700)',
-          zIndex: 38,
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          padding: '8px 16px',
-          display: 'flex', gap: 8,
-        }}
-        ref={(el) => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
-      >
-        <FilterChip label="TUTTI" active={activeType === null} color="var(--orange)" onClick={() => onFilterType(null)} />
-        {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([type, info]) => (
-          <FilterChip
-            key={type}
-            label={`${info.emoji} ${info.label.toUpperCase()}`}
-            active={activeType === type}
-            color={info.color}
-            onClick={() => handleTypeToggle(type)}
-            count={spots.filter(s => s.type === type).length}
-          />
-        ))}
+        }}>
+          <a
+            href="/preferiti"
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13,
+              padding: '4px 12px',
+              border: '1px solid var(--gray-600)',
+              borderRadius: 2,
+              background: 'transparent',
+              color: 'var(--bone)',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              textDecoration: 'none',
+              display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,60,60,0.7)';
+              (e.currentTarget as HTMLElement).style.color = '#ff4d4d';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--gray-600)';
+              (e.currentTarget as HTMLElement).style.color = 'var(--bone)';
+            }}
+          >
+            ❤️ <span>I MIEI SPOT</span>
+          </a>
+        </div>
       </div>
 
       {/* ══ SEARCH OVERLAY ══ */}
