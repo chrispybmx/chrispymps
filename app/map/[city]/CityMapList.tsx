@@ -44,7 +44,8 @@ export default function CityMapList({ spots, cityLabel }: Props) {
     const r: Record<string, number>  = {};
     spots.forEach(s => { f[s.id] = isFav(s.id); r[s.id] = getMyRating(s.id); });
     setFavs(f); setRatings(r);
-  }, [spots]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spots.length]); // dipendenza sulla lunghezza, non sul riferimento dell'array
 
   const handleFav = (e: React.MouseEvent, id: string) => {
     e.preventDefault(); e.stopPropagation();
