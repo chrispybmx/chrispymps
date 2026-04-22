@@ -1,12 +1,11 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Spot, SpotMapPin } from '@/lib/types';
-import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import type { Spot } from '@/lib/types';
+import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 
-/* ── localStorage utils (condivisi con SpotSheet) ── */
+/* ── localStorage utils ── */
 const FAVS_KEY  = 'cmaps_favs_v1';
 const ratingKey = (id: string) => `cmaps_rating_${id}`;
 function isFav(id: string): boolean {
@@ -29,34 +28,17 @@ function saveRating(id: string, r: number): void {
   try { localStorage.setItem(ratingKey(id), String(r)); } catch {}
 }
 
-/* ── Mini SpotMap per la city page (no strip, no radius, no filter) ── */
-const CityMap = dynamic(() => import('./CityMapInner'), {
-  ssr: false,
-  loading: () => (
-    <div style={{ width: '100%', height: '100%', background: 'var(--gray-800)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14 }}>
-      CARICAMENTO MAPPA...
-    </div>
-  ),
-});
-
 interface Props {
   spots:     Spot[];
   cityLabel: string;
   city:      string;
 }
 
-export default function CityMapList({ spots, cityLabel, city }: Props) {
-  const [flyTarget,     setFlyTarget]     = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
-  const [activeIdx,     setActiveIdx]     = useState<number | null>(null);
-  const [favs,          setFavs]          = useState<Record<string, boolean>>({});
-  const [ratings,       setRatings]       = useState<Record<string, number>>({});
-  const [hoverStar,     setHoverStar]     = useState<{ id: string; star: number } | null>(null);
-  const listRef         = useRef<HTMLDivElement>(null);
-  const cardRefs        = useRef<(HTMLDivElement | null)[]>([]);
+export default function CityMapList({ spots, cityLabel }: Props) {
+  const [favs,      setFavs]      = useState<Record<string, boolean>>({});
+  const [ratings,   setRatings]   = useState<Record<string, number>>({});
+  const [hoverStar, setHoverStar] = useState<{ id: string; star: number } | null>(null);
 
-  /* Carica preferiti e rating da localStorage al mount */
   useEffect(() => {
     const f: Record<string, boolean> = {};
     const r: Record<string, number>  = {};
@@ -64,41 +46,15 @@ export default function CityMapList({ spots, cityLabel, city }: Props) {
     setFavs(f); setRatings(r);
   }, [spots]);
 
-  /* Centra la mappa sul primo spot all'avvio */
-  useEffect(() => {
-    if (spots.length > 0) {
-      const avgLat = spots.reduce((s, p) => s + p.lat, 0) / spots.length;
-      const avgLon = spots.reduce((s, p) => s + p.lon, 0) / spots.length;
-      setFlyTarget({ lat: avgLat, lon: avgLon, zoom: 14 });
-    }
-  }, [spots]);
-
-  const pins: SpotMapPin[] = spots.map(s => ({
-    id: s.id, slug: s.slug, name: s.name, type: s.type,
-    lat: s.lat, lon: s.lon, city: s.city, condition: s.condition,
-    cover_url: (s.spot_photos ?? [])[0]?.url,
-  }));
-
-  const handlePinClick = useCallback((pin: SpotMapPin) => {
-    const idx = spots.findIndex(s => s.id === pin.id);
-    setActiveIdx(idx);
-    // Scroll alla card
-    cardRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [spots]);
-
-  const handleCardHover = (idx: number) => {
-    const s = spots[idx];
-    setFlyTarget({ lat: s.lat, lon: s.lon, zoom: 16 });
-    setActiveIdx(idx);
-  };
-
-  const handleFav = (id: string) => {
+  const handleFav = (e: React.MouseEvent, id: string) => {
+    e.preventDefault(); e.stopPropagation();
     const added = toggleFav(id);
     setFavs(prev => ({ ...prev, [id]: added }));
   };
 
-  const handleRating = (id: string, r: number) => {
-    const next = r === ratings[id] ? 0 : r;
+  const handleStar = (e: React.MouseEvent, id: string, star: number) => {
+    e.preventDefault(); e.stopPropagation();
+    const next = star === ratings[id] ? 0 : star;
     saveRating(id, next);
     setRatings(prev => ({ ...prev, [id]: next }));
   };
@@ -106,143 +62,156 @@ export default function CityMapList({ spots, cityLabel, city }: Props) {
   if (spots.length === 0) return null;
 
   return (
-    <div>
-      {/* ── MAPPA ── sticky top, 300px */}
+    <div style={{ padding: '12px 12px 32px' }}>
+
+      {/* Header contatore */}
       <div style={{
-        position: 'sticky', top: 'var(--topbar-height, 56px)',
-        height: 300, zIndex: 10,
-        borderBottom: '2px solid var(--orange)',
-        background: 'var(--gray-800)',
+        fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+        textTransform: 'uppercase', letterSpacing: '0.07em',
+        marginBottom: 14, paddingLeft: 2,
       }}>
-        <CityMap
-          spots={pins}
-          activeId={activeIdx !== null ? spots[activeIdx]?.id : null}
-          flyTarget={flyTarget}
-          onPinClick={handlePinClick}
-        />
+        {spots.length} spot verificati a {cityLabel}
       </div>
 
-      {/* ── LISTA SPOT ── */}
-      <div ref={listRef} style={{ padding: '16px 16px 24px' }}>
-        {spots.map((spot, idx) => {
-          const photos  = (spot.spot_photos ?? []).slice().sort((a, b) => a.position - b.position);
-          const cover   = photos[0]?.url;
-          const tipo    = TIPI_SPOT[spot.type];
-          const cond    = CONDIZIONI[spot.condition];
-          const isActive = idx === activeIdx;
+      {/* Grid 2 colonne */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: 10,
+      }}>
+        {spots.map((spot) => {
+          const photos   = (spot.spot_photos ?? []).slice().sort((a, b) => a.position - b.position);
+          const cover    = photos[0]?.url;
+          const tipo     = TIPI_SPOT[spot.type];
+          const cond     = CONDIZIONI[spot.condition];
           const myRating = ratings[spot.id] ?? 0;
           const myFav    = favs[spot.id] ?? false;
 
           return (
-            <div
-              key={spot.id}
-              ref={el => { cardRefs.current[idx] = el; }}
-              onMouseEnter={() => handleCardHover(idx)}
-              style={{
-                marginBottom: 16,
-                background: 'var(--gray-800)',
-                border: `1px solid ${isActive ? 'var(--orange)' : 'var(--gray-700)'}`,
-                borderRadius: 10, overflow: 'hidden',
-                transition: 'border-color 0.2s, box-shadow 0.2s',
-                boxShadow: isActive ? '0 0 0 1px var(--orange)' : 'none',
-                scrollMarginTop: 'calc(var(--topbar-height, 56px) + 316px)',
-              }}
-            >
-              {/* Foto */}
-              {cover ? (
-                <div style={{ height: 200, overflow: 'hidden', position: 'relative' }}>
-                  <img src={cover} alt={spot.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  <div style={{ position: 'absolute', top: 8, left: 8,
-                    background: cond.bg, color: cond.color,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 7px', borderRadius: 2,
-                    textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    {cond.label}
-                  </div>
-                  {photos.length > 1 && (
-                    <div style={{ position: 'absolute', top: 8, right: 8,
-                      background: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: '2px 7px',
-                      fontFamily: 'var(--font-mono)', fontSize: 10, color: '#fff' }}>
-                      +{photos.length - 1} 📷
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ height: 60, background: 'var(--gray-700)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
-                  {tipo.emoji}
-                </div>
-              )}
+            <div key={spot.id} style={{ position: 'relative' }}>
+              <Link
+                href={`/map/spot/${spot.slug}`}
+                style={{ textDecoration: 'none', display: 'block' }}
+              >
+                <div style={{
+                  background: 'var(--gray-800)',
+                  border: '1px solid var(--gray-700)',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  transition: 'border-color 0.15s, transform 0.1s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--orange)';
+                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--gray-700)';
+                  (e.currentTarget as HTMLElement).style.transform = 'none';
+                }}
+                >
+                  {/* Foto */}
+                  <div style={{ position: 'relative', aspectRatio: '4/3', overflow: 'hidden', background: 'var(--gray-700)' }}>
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt={`${spot.name} — spot ${tipo.label} a ${cityLabel}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+                        {tipo.emoji}
+                      </div>
+                    )}
 
-              {/* Contenuto */}
-              <div style={{ padding: '12px 14px' }}>
-                {/* Titolo + tipo */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Link href={`/map/spot/${spot.slug}`} style={{ textDecoration: 'none', flex: 1, marginRight: 8 }}>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--orange)', lineHeight: 1.2 }}>
-                      {spot.name}
+                    {/* Condition badge top-left */}
+                    <div style={{
+                      position: 'absolute', top: 6, left: 6,
+                      background: cond.bg, color: cond.color,
+                      fontFamily: 'var(--font-mono)', fontSize: 9,
+                      padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase',
+                      letterSpacing: '0.05em', lineHeight: 1.4,
+                    }}>
+                      {cond.label}
                     </div>
-                  </Link>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color,
-                    border: `1px solid ${tipo.color}`, padding: '2px 6px', borderRadius: 2, flexShrink: 0 }}>
-                    {tipo.emoji} {tipo.label}
-                  </span>
-                </div>
 
-                {/* Stelle + preferiti */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <button key={star}
-                        onClick={() => handleRating(spot.id, star)}
-                        onMouseEnter={() => setHoverStar({ id: spot.id, star })}
-                        onMouseLeave={() => setHoverStar(null)}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          padding: '1px', fontSize: 18, lineHeight: 1,
-                          color: star <= ((hoverStar?.id === spot.id ? hoverStar.star : 0) || myRating)
-                            ? '#ffce4d' : 'var(--gray-600)',
-                          transition: 'color 0.1s',
-                        }}>★</button>
-                    ))}
-                    {myRating > 0 && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginLeft: 3 }}>
-                        {myRating}/5
-                      </span>
+                    {/* Numero foto top-right */}
+                    {photos.length > 1 && (
+                      <div style={{
+                        position: 'absolute', top: 6, right: 6,
+                        background: 'rgba(0,0,0,0.65)', borderRadius: 10,
+                        padding: '2px 6px', fontSize: 9, color: '#fff',
+                        fontFamily: 'var(--font-mono)',
+                      }}>
+                        📷 {photos.length}
+                      </div>
                     )}
                   </div>
-                  <button onClick={() => handleFav(spot.id)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 18, padding: '2px', lineHeight: 1,
-                  }} aria-label={myFav ? 'Rimuovi' : 'Salva'}>
-                    {myFav ? '❤️' : '🤍'}
-                  </button>
-                </div>
 
-                {/* Descrizione */}
-                {spot.description && (
-                  <p className="truncate-2" style={{ color: 'var(--gray-400)', fontSize: 13, lineHeight: 1.45, margin: '0 0 8px' }}>
-                    {spot.description}
-                  </p>
-                )}
-
-                {/* Footer: @username + link */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  {spot.submitted_by_username && (
-                    <a href={`/u/${spot.submitted_by_username}`} style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textDecoration: 'none',
+                  {/* Info strip */}
+                  <div style={{ padding: '8px 9px 10px' }}>
+                    {/* Tipo */}
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10,
+                      color: tipo.color, marginBottom: 4,
+                      display: 'flex', alignItems: 'center', gap: 3,
                     }}>
-                      @{spot.submitted_by_username}
-                    </a>
-                  )}
-                  <Link href={`/map/spot/${spot.slug}`} style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)',
-                    textDecoration: 'none', marginLeft: 'auto',
-                  }}>
-                    Dettagli →
-                  </Link>
+                      <span>{tipo.emoji}</span>
+                      <span style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tipo.label}</span>
+                    </div>
+
+                    {/* Titolo */}
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 14,
+                      color: 'var(--orange)', lineHeight: 1.2,
+                      overflow: 'hidden', textOverflow: 'ellipsis',
+                      display: '-webkit-box', WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const,
+                      marginBottom: 7,
+                    }}>
+                      {spot.name}
+                    </div>
+
+                    {/* Stelle (non-interactive preview) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <button
+                          key={star}
+                          onClick={e => handleStar(e, spot.id, star)}
+                          onMouseEnter={() => setHoverStar({ id: spot.id, star })}
+                          onMouseLeave={() => setHoverStar(null)}
+                          style={{
+                            background: 'none', border: 'none', padding: '1px 0',
+                            cursor: 'pointer', fontSize: 13, lineHeight: 1,
+                            color: star <= ((hoverStar?.id === spot.id ? hoverStar.star : 0) || myRating)
+                              ? '#ffce4d' : 'var(--gray-600)',
+                            transition: 'color 0.1s',
+                          }}
+                        >★</button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </Link>
+
+              {/* Favoriti (fuori dal Link per evitare navigazione) */}
+              <button
+                onClick={e => handleFav(e, spot.id)}
+                style={{
+                  position: 'absolute', bottom: 38, right: 7,
+                  background: 'rgba(10,10,10,0.7)', border: 'none',
+                  borderRadius: '50%', width: 26, height: 26,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', fontSize: 13, padding: 0,
+                  backdropFilter: 'blur(4px)',
+                  transition: 'transform 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.2)')}
+                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                aria-label={myFav ? 'Rimuovi dai preferiti' : 'Salva nei preferiti'}
+              >
+                {myFav ? '❤️' : '🤍'}
+              </button>
             </div>
           );
         })}
