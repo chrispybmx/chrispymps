@@ -167,10 +167,8 @@ export default function MapClient({ initialSpots }: MapClientProps) {
       <TopBar
         onSearch={setSearchQuery}
         onFilterType={setFilterType}
-        onFilterRegion={handleFilterRegion}
         onAddSpot={() => setAddOpen(true)}
         activeType={filterType}
-        activeRegion={filterRegionLabel}
         spots={spots}
         onCitySelect={handleCitySelect}
         onSpotSelect={openSpot}
