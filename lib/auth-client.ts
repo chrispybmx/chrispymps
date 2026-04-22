@@ -22,8 +22,8 @@ export async function signUp(email: string, password: string, username: string):
   const free = await checkUsername(username);
   if (!free) throw new Error('Username già in uso. Scegline un altro.');
 
-  // 2. Crea account Supabase
-  const { data, error } = await sb.auth.signUp({ email, password });
+  // 2. Crea account Supabase (username salvato anche in user_metadata per accesso rapido)
+  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username } } });
   if (error) throw new Error(translateAuthError(error.message));
   if (!data.user) throw new Error('Errore nella registrazione. Riprova.');
 
