@@ -232,150 +232,125 @@ function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-/* ── Street View Pane ── */
-function StreetViewPane({ lat, lon, alwaysShow = false }: { lat: number; lon: number; alwaysShow?: boolean }) {
-  const ref    = useRef<HTMLDivElement>(null);
-  const svRef  = useRef<any>(null);
-  const posRef = useRef({ lat, lon }); // sempre aggiornato — usato in initSV per evitare coordinate stantie
-  const [svStatus, setSvStatus] = useState<'idle' | 'loading' | 'ok' | 'nodata' | 'nokey'>('idle');
-  const [show, setShow]         = useState(alwaysShow);
+/* ── Google Maps con pegman integrato (Street View nativo) ── */
+function GoogleMapPicker({
+  lat, lon, onPick, height = 380,
+}: {
+  lat: number | null;
+  lon: number | null;
+  onPick: (lat: number, lon: number) => void;
+  height?: number;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef       = useRef<any>(null);
+  const markerRef    = useRef<any>(null);
+  const onPickRef    = useRef(onPick);
+  useEffect(() => { onPickRef.current = onPick; });
 
-  // Mantieni posRef aggiornato ad ogni render
-  useEffect(() => { posRef.current = { lat, lon }; });
+  /* Ref per coordinate iniziali — evita stale closure in initMap */
+  const initLatRef  = useRef(lat ?? 42.5);
+  const initLonRef  = useRef(lon ?? 12.5);
+  const initZoomRef = useRef(lat != null ? 15 : 6);
+  initLatRef.current  = lat ?? 42.5;
+  initLonRef.current  = lon ?? 12.5;
+  initZoomRef.current = lat != null ? 15 : 6;
 
+  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
-  /* Init panorama — legge sempre le coordinate da posRef per evitare stale closure */
+  const initMap = useCallback(() => {
+    if (!containerRef.current || !window.google?.maps) return;
+    if (mapRef.current) return; // già inizializzata
+
+    const center = { lat: initLatRef.current, lng: initLonRef.current };
+    const map = new window.google.maps.Map(containerRef.current, {
+      center,
+      zoom: initZoomRef.current,
+      streetViewControl: true,       // ← il pegman giallo
+      mapTypeControl: false,
+      fullscreenControl: false,
+      zoomControl: true,
+    });
+
+    /* Marker draggabile */
+    const marker = new window.google.maps.Marker({
+      position: center,
+      map,
+      draggable: true,
+      visible: initLatRef.current !== 42.5, // nascosto finché l'utente non clicca
+    });
+
+    marker.addListener('dragend', () => {
+      const pos = marker.getPosition();
+      if (pos) onPickRef.current(pos.lat(), pos.lng());
+    });
+
+    map.addListener('click', (e: any) => {
+      const pos = e.latLng;
+      marker.setPosition(pos);
+      marker.setVisible(true);
+      onPickRef.current(pos.lat(), pos.lng());
+    });
+
+    mapRef.current    = map;
+    markerRef.current = marker;
+    setStatus('ok');
+  }, []);
+
+  /* Carica lo script Maps JS API */
   useEffect(() => {
-    if (!show || !apiKey) { if (!apiKey) setSvStatus('nokey'); return; }
-    setSvStatus('loading');
+    if (!apiKey) { setStatus('error'); return; }
 
-    const initSV = () => {
-      if (!ref.current || !window.google?.maps) return;
-      const { lat: curLat, lon: curLon } = posRef.current;
-      if (svRef.current) {
-        svRef.current.setPosition({ lat: curLat, lng: curLon });
-        setSvStatus('loading');
-        return;
-      }
-      const sv = new window.google.maps.StreetViewPanorama(ref.current, {
-        position: { lat: curLat, lng: curLon },
-        pov: { heading: 0, pitch: 0 },
-        zoom: 1,
-        addressControl: false, fullscreenControl: false,
-        motionTrackingControl: false, linksControl: true,
-      });
-      sv.addListener('status_changed', () => {
-        setSvStatus(sv.getStatus() === 'OK' ? 'ok' : 'nodata');
-      });
-      svRef.current = sv;
-    };
+    if (window.google?.maps?.Map) { initMap(); return; }
 
-    if (window.google?.maps?.StreetViewPanorama) {
-      initSV();
-    } else if (!document.querySelector('#gm-api-script')) {
+    if (!document.querySelector('#gm-api-script')) {
       const s = document.createElement('script');
-      s.id = 'gm-api-script';
+      s.id  = 'gm-api-script';
       s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-      s.onload = initSV;
-      s.onerror = () => setSvStatus('nokey');
+      s.onload  = initMap;
+      s.onerror = () => setStatus('error');
       document.head.appendChild(s);
     } else {
       const t = setInterval(() => {
-        if (window.google?.maps?.StreetViewPanorama) { clearInterval(t); initSV(); }
+        if (window.google?.maps?.Map) { clearInterval(t); initMap(); }
       }, 150);
       return () => clearInterval(t);
     }
+
+    return () => { mapRef.current = null; markerRef.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [show, apiKey]);
+  }, [apiKey]);
 
-  /* Quando le coord cambiano e il panorama esiste già → spostalo */
+  /* Fly-to quando cambiano le coordinate dall'esterno (ricerca indirizzo / paste URL) */
   useEffect(() => {
-    if (!svRef.current || !show) return;
-    svRef.current.setPosition({ lat, lng: lon });
-    setSvStatus('loading');
-  }, [lat, lon, show]);
+    if (!mapRef.current || lat == null || lon == null) return;
+    const pos = { lat, lng: lon };
+    mapRef.current.panTo(pos);
+    if (mapRef.current.getZoom() < 15) mapRef.current.setZoom(15);
+    if (markerRef.current) { markerRef.current.setPosition(pos); markerRef.current.setVisible(true); }
+  }, [lat, lon]);
 
-  const PanoContainer = ({ height = 220 }: { height?: number }) => (
-    <div style={{ position: 'relative', height, background: 'var(--gray-800)', borderRadius: alwaysShow ? 8 : 0, overflow: 'hidden' }}>
-      <div ref={ref} style={{ width: '100%', height: '100%' }} />
-      {svStatus === 'loading' && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-800)' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)' }}>Caricamento Street View...</span>
-        </div>
-      )}
-      {svStatus === 'nodata' && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <span style={{ fontSize: 28 }}>🏗️</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textAlign: 'center' }}>
-            Nessuna panoramica qui
-          </span>
-          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
-            target="_blank" rel="noopener noreferrer"
-            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)' }}>
-            Apri in Google Maps →
-          </a>
-        </div>
-      )}
-    </div>
-  );
-
-  /* Senza API key */
-  if (!apiKey) {
-    if (alwaysShow) {
-      return (
-        <div style={{ height: 220, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
-            target="_blank" rel="noopener noreferrer"
-            style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', textDecoration: 'none' }}>
-            🧍 Apri in Street View →
-          </a>
-        </div>
-      );
-    }
-    return (
-      <div style={{ padding: '10px 14px', background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 8 }}>
-        <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`}
-          target="_blank" rel="noopener noreferrer"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', textDecoration: 'none' }}>
-          🧍 Verifica in Street View →
-        </a>
-      </div>
-    );
+  /* Fallback Leaflet se l'API key manca o il caricamento fallisce */
+  if (!apiKey || status === 'error') {
+    return <LocationMapPicker lat={lat} lon={lon} onPick={onPick} height={height} />;
   }
 
-  /* alwaysShow: nessun toggle, contenitore diretto da 220px con bordo */
-  if (alwaysShow) {
-    return (
-      <div style={{ border: '1px solid var(--gray-600)', borderRadius: 8, overflow: 'hidden' }}>
-        <PanoContainer height={220} />
-      </div>
-    );
-  }
-
-  /* Toggle mode (GPS o vecchio flow mappa) */
   return (
-    <div>
-      <button
-        onClick={() => setShow(s => !s)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          background: 'none', border: 'none',
-          fontFamily: 'var(--font-mono)', fontSize: 12,
-          color: show ? 'var(--orange)' : 'var(--gray-400)',
-          cursor: 'pointer', padding: '4px 0',
-          textDecoration: 'underline', textUnderlineOffset: 3,
-        }}
-      >
-        🧍 {show ? 'Nascondi' : 'Verifica in'} Street View
-      </button>
-      {show && (
-        <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-600)', marginTop: 6 }}>
-          <div style={{ background: 'var(--gray-700)', borderBottom: '1px solid var(--gray-600)', padding: '5px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Google Street View</span>
-            {svStatus === 'nodata' && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ff6a00' }}>Nessuna immagine</span>}
-          </div>
-          <PanoContainer height={220} />
+    <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-600)' }}>
+      <div ref={containerRef} style={{ width: '100%', height }} />
+      {status === 'loading' && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-800)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)' }}>Caricamento mappa...</span>
+        </div>
+      )}
+      {lat != null && status === 'ok' && (
+        <div style={{
+          position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(10,10,10,0.82)', borderRadius: 4, padding: '3px 10px',
+          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)',
+          pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 1,
+        }}>
+          📍 {lat.toFixed(5)}, {lon!.toFixed(5)}
         </div>
       )}
     </div>
@@ -945,36 +920,15 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     )}
                   </div>
 
-                  {/* Mappa + Street View affiancati (si impilano su mobile) */}
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-
-                    {/* Mappa Leaflet */}
-                    <div style={{ flex: '1 1 280px', minWidth: 0 }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                        Mappa — clicca o trascina il pin
-                      </div>
-                      <LocationMapPicker
-                        lat={lat} lon={lon} height={220}
-                        onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }}
-                      />
+                  {/* Google Maps con pegman — clicca il pin, poi trascina l'omino giallo per Street View */}
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+                      Mappa — clicca per posizionare · trascina 🟡 per Street View
                     </div>
-
-                    {/* Street View */}
-                    <div style={{ flex: '1 1 280px', minWidth: 0 }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                        Street View — verifica il posto
-                      </div>
-                      {hasCoords ? (
-                        <StreetViewPane lat={lat!} lon={lon!} alwaysShow />
-                      ) : (
-                        <div style={{ height: 220, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 28 }}>🧍</span>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', padding: '0 16px' }}>
-                            Cerca un indirizzo per<br />vedere Street View
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <GoogleMapPicker
+                      lat={lat} lon={lon} height={380}
+                      onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }}
+                    />
                   </div>
 
                   {/* Incolla URL Google Maps come alternativa */}
