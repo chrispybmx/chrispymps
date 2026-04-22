@@ -45,6 +45,39 @@ export async function signIn(email: string, password: string): Promise<void> {
   if (error) throw new Error(translateAuthError(error.message));
 }
 
+/** Login con Google (OAuth) */
+export async function signInWithGoogle(): Promise<void> {
+  const sb = supabaseBrowser();
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      queryParams: { access_type: 'offline', prompt: 'select_account' },
+    },
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Aggiorna username in user_metadata e crea profilo se mancante */
+export async function setupGoogleUsername(userId: string, username: string, accessToken: string): Promise<void> {
+  const sb = supabaseBrowser();
+
+  // 1. Crea profilo
+  const { error: profileErr } = await sb.from('profiles').insert({ id: userId, username });
+  if (profileErr && !profileErr.message.includes('duplicate')) throw new Error(profileErr.message);
+
+  // 2. Aggiorna user_metadata via API admin (server-side) — chiamiamo la nostra route
+  const res = await fetch('/api/auth/set-username', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ username }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? 'Errore aggiornamento username');
+  }
+}
+
 /** Logout */
 export async function signOut(): Promise<void> {
   await supabaseBrowser().auth.signOut();
