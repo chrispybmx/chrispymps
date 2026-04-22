@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, REGIONI_ITALIA } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
@@ -15,9 +15,8 @@ interface AddSpotModalProps {
   initialLon?: number;
 }
 
-type Step        = 'posizione' | 'foto' | 'dettagli' | 'successo';
-type AuthTab     = 'accedi' | 'registrati';
-type SearchPhase = 'form' | 'preview'; // sotto-stati del percorso "cerca indirizzo"
+type Step    = 'posizione' | 'foto' | 'dettagli' | 'successo';
+type AuthTab = 'accedi' | 'registrati';
 
 const STEPS: Step[] = ['posizione', 'foto', 'dettagli'];
 const STEP_LABEL: Record<Step, string> = {
@@ -27,10 +26,6 @@ const STEP_LABEL: Record<Step, string> = {
   successo:  '',
 };
 
-/* ─── quanto sposta ogni freccia (~55 m) ─── */
-const NUDGE = 0.0005;
-
-/* ─── shared styles ─── */
 const inp: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
   background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
@@ -42,47 +37,277 @@ const lbl: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6,
 };
 
+/* ── Estrai coordinate da URL Google Maps ── */
+function parseGoogleMapsUrl(url: string): { lat: number; lon: number } | null {
+  const m1 = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m1) return { lat: parseFloat(m1[1]), lon: parseFloat(m1[2]) };
+  const m2 = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m2) return { lat: parseFloat(m2[1]), lon: parseFloat(m2[2]) };
+  const m3 = url.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m3) return { lat: parseFloat(m3[1]), lon: parseFloat(m3[2]) };
+  return null;
+}
+
+/* ── Mappa interattiva con pin draggabile (Leaflet) ── */
+function LocationMapPicker({
+  lat, lon, onPick,
+}: {
+  lat: number | null;
+  lon: number | null;
+  onPick: (lat: number, lon: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef       = useRef<import('leaflet').Map | null>(null);
+  const markerRef    = useRef<import('leaflet').Marker | null>(null);
+  const onPickRef    = useRef(onPick);
+  useEffect(() => { onPickRef.current = onPick; });
+
+  /* Init mappa */
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    let cancelled = false;
+
+    import('leaflet').then((L) => {
+      if (cancelled || !containerRef.current) return;
+
+      delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      const center: [number, number] = lat != null ? [lat, lon!] : [42.5, 12.5];
+      const zoom = lat != null ? 15 : 6;
+
+      const map = L.map(containerRef.current!, { center, zoom, zoomControl: true });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, className: 'osm-tiles',
+      }).addTo(map);
+      mapRef.current = map;
+
+      /* Marker iniziale se abbiamo già le coordinate */
+      const addMarker = (eLat: number, eLon: number) => {
+        if (markerRef.current) {
+          markerRef.current.setLatLng([eLat, eLon]);
+        } else {
+          const m = L.marker([eLat, eLon], { draggable: true }).addTo(map);
+          markerRef.current = m;
+          m.on('dragend', () => {
+            const p = m.getLatLng();
+            onPickRef.current(p.lat, p.lng);
+          });
+        }
+        onPickRef.current(eLat, eLon);
+      };
+
+      if (lat != null && lon != null) addMarker(lat, lon);
+
+      /* Click sulla mappa → posiziona/sposta pin */
+      map.on('click', (e) => addMarker(e.latlng.lat, e.latlng.lng));
+    });
+
+    return () => {
+      cancelled = true;
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* Fly-to quando arrivano coordinate esterne (es. ricerca indirizzo o paste URL) */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || lat == null || lon == null) return;
+    map.flyTo([lat, lon], 16, { duration: 0.6 });
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lon]);
+    } else {
+      import('leaflet').then((L) => {
+        if (!mapRef.current) return;
+        const m = L.marker([lat, lon], { draggable: true }).addTo(mapRef.current);
+        markerRef.current = m;
+        m.on('dragend', () => {
+          const p = m.getLatLng();
+          onPickRef.current(p.lat, p.lng);
+        });
+      });
+    }
+  }, [lat, lon]);
+
+  return (
+    <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-600)' }}>
+      <div ref={containerRef} style={{ width: '100%', height: 280 }} />
+      <div style={{
+        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+        background: 'rgba(10,10,10,0.82)', borderRadius: 4, padding: '3px 10px',
+        fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)',
+        pointerEvents: 'none', whiteSpace: 'nowrap',
+      }}>
+        {lat != null ? `📍 ${lat.toFixed(5)}, ${lon!.toFixed(5)}` : 'Clicca sulla mappa per posizionare il pin'}
+      </div>
+    </div>
+  );
+}
+
+/* ── Selettore Regione → Città con ricerca testuale ── */
+function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [activeRegion, setActiveRegion] = useState<string | null>(null);
+  const [search,       setSearch]       = useState('');
+  const [open,         setOpen]         = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const regionCities = activeRegion
+    ? REGIONI_ITALIA.find(r => r.label === activeRegion)?.cities ?? []
+    : [];
+
+  const pool = activeRegion
+    ? CITTA_ITALIANE.filter(c => regionCities.includes(c.value))
+    : CITTA_ITALIANE.filter(c => c.value !== 'altro');
+
+  const filtered = search.trim().length >= 1
+    ? pool.filter(c => c.label.toLowerCase().includes(search.toLowerCase()))
+    : pool.slice(0, 40);
+
+  const selectedLabel = CITTA_ITALIANE.find(c => c.value === value)?.label ?? '';
+
+  const pickCity = (v: string, label: string) => {
+    onChange(v);
+    setSearch(label);
+    setOpen(false);
+  };
+
+  return (
+    <div>
+      {/* Region chips - scroll orizzontale */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 8,
+        WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'] }}>
+        {REGIONI_ITALIA.map(r => (
+          <button
+            key={r.label}
+            onClick={() => {
+              const next = r.label === activeRegion ? null : r.label;
+              setActiveRegion(next);
+              setSearch('');
+              onChange('');
+              setOpen(true);
+              setTimeout(() => inputRef.current?.focus(), 50);
+            }}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, whiteSpace: 'nowrap',
+              padding: '3px 9px', flexShrink: 0,
+              border: `1px solid ${r.label === activeRegion ? 'var(--orange)' : 'var(--gray-600)'}`,
+              borderRadius: 2,
+              background: r.label === activeRegion ? 'rgba(255,106,0,0.15)' : 'transparent',
+              color: r.label === activeRegion ? 'var(--orange)' : 'var(--gray-400)',
+              cursor: 'pointer',
+            }}
+          >
+            {r.emoji} {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search input */}
+      <div style={{ position: 'relative' }}>
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder={activeRegion ? `Città in ${activeRegion}...` : 'Cerca città (es. "bo" → Bologna, Bolzano)'}
+          value={search || selectedLabel}
+          onChange={e => { setSearch(e.target.value); setOpen(true); onChange(''); }}
+          onFocus={() => setOpen(true)}
+          style={{ ...inp, paddingRight: value ? 30 : 12 }}
+          autoComplete="off"
+        />
+        {value && (
+          <button onClick={() => { onChange(''); setSearch(''); setOpen(false); }}
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
+            ✕
+          </button>
+        )}
+
+        {/* Dropdown risultati */}
+        {open && filtered.length > 0 && (
+          <div style={{
+            position: 'absolute', left: 0, right: 0, top: '100%',
+            background: 'var(--gray-700)', border: '1px solid var(--gray-500)',
+            borderTop: 'none', borderRadius: '0 0 6px 6px',
+            maxHeight: 200, overflowY: 'auto', zIndex: 100,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}>
+            {filtered.map(c => (
+              <button
+                key={c.value}
+                onMouseDown={e => { e.preventDefault(); pickCity(c.value, c.label); }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: 14,
+                  background: c.value === value ? 'rgba(255,106,0,0.12)' : 'none',
+                  border: 'none', borderBottom: '1px solid var(--gray-600)',
+                  color: c.value === value ? 'var(--orange)' : 'var(--bone)',
+                  cursor: 'pointer',
+                }}
+              >
+                {c.label}
+                {c.value === value && <span style={{ marginLeft: 8, color: 'var(--orange)', fontSize: 12 }}>✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Chiudi dropdown cliccando fuori */}
+      {open && (
+        <div onClick={() => setOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 99 }} aria-hidden />
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   MAIN COMPONENT
+══════════════════════════════════════════════ */
 export default function AddSpotModal({ open, onClose, initialLat, initialLon }: AddSpotModalProps) {
   const user      = useUser();
   const isLoading = user === undefined;
 
-  /* ── Wizard step ── */
   const [step, setStep] = useState<Step>('posizione');
+  const [lat,  setLat]  = useState<number | null>(initialLat ?? null);
+  const [lon,  setLon]  = useState<number | null>(initialLon ?? null);
+  const [city, setCity] = useState('');
+  const [locMode, setLocMode] = useState<'gps' | 'map' | null>(initialLat != null ? 'map' : null);
 
-  /* ── Posizione condivisa ── */
-  const [lat,     setLat]     = useState<number | null>(initialLat ?? null);
-  const [lon,     setLon]     = useState<number | null>(initialLon ?? null);
-  const [city,    setCity]    = useState('');
-  const [locMode, setLocMode] = useState<'gps' | 'search' | null>(initialLat != null ? 'gps' : null);
-
-  /* ── GPS ── */
+  /* GPS */
   const [gpsState, setGpsState] = useState<'idle' | 'loading' | 'ok' | 'error'>(
     initialLat != null ? 'ok' : 'idle'
   );
 
-  /* ── Percorso "Conosco la posizione" ── */
-  const [searchPhase,    setSearchPhase]    = useState<SearchPhase>('form');
-  const [addrVia,        setAddrVia]        = useState('');
-  const [addrCitta,      setAddrCitta]      = useState('');
-  const [addrCap,        setAddrCap]        = useState('');
-  const [geocoding,      setGeocoding]      = useState(false);
-  const [geocodeError,   setGeocodeError]   = useState<string | null>(null);
-  const [pickedAddress,  setPickedAddress]  = useState('');
+  /* Ricerca indirizzo (per centrare la mappa) */
+  const [addrQuery,    setAddrQuery]    = useState('');
+  const [addrLoading,  setAddrLoading]  = useState(false);
+  const [addrError,    setAddrError]    = useState<string | null>(null);
 
-  /* ── Foto ── */
+  /* Incolla URL Google Maps */
+  const [gmapsUrl,    setGmapsUrl]    = useState('');
+  const [gmapsError,  setGmapsError]  = useState<string | null>(null);
+  const [gmapsOpen,   setGmapsOpen]   = useState(false);
+
+  /* Foto */
   const [photos, setPhotos] = useState<File[]>([]);
 
-  /* ── Dettagli ── */
+  /* Dettagli */
   const [name,        setName]        = useState('');
   const [type,        setType]        = useState<SpotType | ''>('');
   const [description, setDescription] = useState('');
   const [notes,       setNotes]       = useState('');
 
-  /* ── Submit ── */
+  /* Submit */
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
 
-  /* ── Auth inline ── */
+  /* Auth */
   const [authTab,      setAuthTab]      = useState<AuthTab>('accedi');
   const [authError,    setAuthError]    = useState<string | null>(null);
   const [authLoading,  setAuthLoading]  = useState(false);
@@ -95,12 +320,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [loginEmail,    setLoginEmail]    = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  /* ── Reverse geocoding: ricava città da lat/lon ── */
-  // IMPORTANTE: dichiarata PRIMA dell'useEffect che la usa come dependency (evita TDZ)
-  const reverseGeocode = useCallback(async (lat: number, lon: number) => {
+  /* Reverse geocode → auto-popola città */
+  const reverseGeocode = useCallback(async (eLat: number, eLon: number) => {
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=it`;
-      const res  = await fetch(url, { headers: { 'Accept-Language': 'it' } });
+      const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${eLat}&lon=${eLon}&format=json&addressdetails=1&accept-language=it`, { headers: { 'Accept-Language': 'it' } });
       const data = await res.json();
       const cn = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '';
       if (cn) {
@@ -110,27 +333,26 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         );
         if (match) setCity(match.value);
       }
-    } catch { /* silenziamo: la città resterà vuota */ }
+    } catch { /* silent */ }
   }, []);
 
-  /* ── Sync initialLat/Lon (tap sulla mappa) ── */
+  /* Sync initialLat/Lon */
   useEffect(() => {
     if (initialLat != null && initialLon != null) {
       setLat(initialLat); setLon(initialLon);
-      setLocMode('gps'); setGpsState('ok');
+      setLocMode('map'); setGpsState('ok');
       reverseGeocode(initialLat, initialLon);
     }
   }, [initialLat, initialLon, reverseGeocode]);
 
-  /* ── Reset ── */
+  /* Reset */
   const handleClose = useCallback(() => {
     setStep('posizione');
     setLat(initialLat ?? null); setLon(initialLon ?? null); setCity('');
-    setLocMode(initialLat != null ? 'gps' : null);
+    setLocMode(initialLat != null ? 'map' : null);
     setGpsState(initialLat != null ? 'ok' : 'idle');
-    setSearchPhase('form');
-    setAddrVia(''); setAddrCitta(''); setAddrCap(''); setPickedAddress('');
-    setGeocoding(false); setGeocodeError(null);
+    setAddrQuery(''); setAddrError(null);
+    setGmapsUrl(''); setGmapsError(null); setGmapsOpen(false);
     setPhotos([]);
     setName(''); setType(''); setDescription(''); setNotes('');
     setError(null); setSubmitting(false);
@@ -140,7 +362,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     onClose();
   }, [initialLat, initialLon, onClose]);
 
-  /* ── GPS ── */
+  /* GPS */
   const getGPS = () => {
     if (!navigator.geolocation) { setGpsState('error'); return; }
     setGpsState('loading');
@@ -150,32 +372,23 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         setLat(latitude); setLon(longitude); setGpsState('ok');
         reverseGeocode(latitude, longitude);
       },
-      ()  => setGpsState('error'),
+      () => setGpsState('error'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  /* ── Geocodifica via Nominatim ── */
-  const handleGeocode = async () => {
-    if (!addrVia.trim() && !addrCitta.trim()) {
-      setGeocodeError('Inserisci almeno via e città.');
-      return;
-    }
-    setGeocoding(true); setGeocodeError(null);
+  /* Ricerca indirizzo → centra mappa */
+  const handleAddrSearch = async () => {
+    if (!addrQuery.trim()) return;
+    setAddrLoading(true); setAddrError(null);
     try {
-      const q = [addrVia.trim(), addrCap.trim(), addrCitta.trim(), 'Italia']
-        .filter(Boolean).join(', ');
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1&accept-language=it`;
-      const res  = await fetch(url, { headers: { 'Accept-Language': 'it' } });
+      const q = `${addrQuery.trim()}, Italia`;
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1&accept-language=it`, { headers: { 'Accept-Language': 'it' } });
       const data = await res.json();
-      if (!data.length) {
-        setGeocodeError('Indirizzo non trovato. Prova a essere più preciso.');
-        return;
-      }
+      if (!data.length) { setAddrError('Indirizzo non trovato.'); return; }
       const r = data[0];
       setLat(parseFloat(r.lat));
       setLon(parseFloat(r.lon));
-      setPickedAddress(r.display_name.split(',').slice(0, 4).join(','));
       // Auto-città
       const cn = r.address?.city || r.address?.town || r.address?.village || '';
       if (cn) {
@@ -185,66 +398,23 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         );
         if (match) setCity(match.value);
       }
-      setSearchPhase('preview');
-    } catch {
-      setGeocodeError('Errore di rete. Controlla la connessione e riprova.');
-    } finally { setGeocoding(false); }
+    } catch { setAddrError('Errore di rete.'); }
+    finally { setAddrLoading(false); }
   };
 
-  /* ── Sposta pin di NUDGE gradi ── */
-  const nudge = (dLat: number, dLon: number) => {
-    setLat(prev => prev != null ? Math.round((prev + dLat) * 1e6) / 1e6 : prev);
-    setLon(prev => prev != null ? Math.round((prev + dLon) * 1e6) / 1e6 : prev);
+  /* Paste URL Google Maps */
+  const handleGmapsPaste = () => {
+    const parsed = parseGoogleMapsUrl(gmapsUrl);
+    if (!parsed) {
+      setGmapsError('URL non riconosciuto. Copia il link direttamente da Google Maps.');
+      return;
+    }
+    setLat(parsed.lat); setLon(parsed.lon);
+    setGmapsUrl(''); setGmapsError(null); setGmapsOpen(false);
+    reverseGeocode(parsed.lat, parsed.lon);
   };
 
-  /* ── Link Street View Google Maps ── */
-  const streetViewUrl = lat != null && lon != null
-    ? `https://www.google.com/maps/@${lat},${lon},3a,75y,0h,90t/data=!3m6!1e1`
-    : '';
-
-  /* ── OSM embed iframe URL ── */
-  const osmEmbed = lat != null && lon != null
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${lon - 0.003},${lat - 0.002},${lon + 0.003},${lat + 0.002}&layer=mapnik&marker=${lat},${lon}`
-    : '';
-
-  /* ── Auth handlers ── */
-  let unDebounce: ReturnType<typeof setTimeout>;
-  const onUsernameChange = (val: string) => {
-    const clean = val.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
-    setRegUsername(clean); setUsernameOk(null);
-    clearTimeout(unDebounce);
-    if (clean.length < 3) return;
-    setCheckingUn(true);
-    unDebounce = setTimeout(async () => {
-      const free = await checkUsername(clean);
-      setUsernameOk(free); setCheckingUn(false);
-    }, 600);
-  };
-
-  const handleSignUp = async () => {
-    if (!regUsername || !regEmail || !regPassword) { setAuthError('Compila tutti i campi.'); return; }
-    if (regUsername.length < 3) { setAuthError('Username min 3 caratteri.'); return; }
-    if (regPassword.length < 6) { setAuthError('Password min 6 caratteri.'); return; }
-    setAuthLoading(true); setAuthError(null);
-    try {
-      const result = await signUp(regEmail, regPassword, regUsername);
-      setAuthDone(result);
-    } catch (e) {
-      setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto');
-    } finally { setAuthLoading(false); }
-  };
-
-  const handleSignIn = async () => {
-    if (!loginEmail || !loginPassword) { setAuthError('Inserisci email e password.'); return; }
-    setAuthLoading(true); setAuthError(null);
-    try {
-      await signIn(loginEmail, loginPassword);
-    } catch (e) {
-      setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto');
-    } finally { setAuthLoading(false); }
-  };
-
-  /* ── Submit spot ── */
+  /* Submit */
   const handleSubmit = async () => {
     if (!user || !name.trim() || !type || lat == null) return;
     setSubmitting(true); setError(null);
@@ -272,15 +442,49 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     } finally { setSubmitting(false); }
   };
 
+  /* Auth handlers */
+  let unDebounce: ReturnType<typeof setTimeout>;
+  const onUsernameChange = (val: string) => {
+    const clean = val.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+    setRegUsername(clean); setUsernameOk(null);
+    clearTimeout(unDebounce);
+    if (clean.length < 3) return;
+    setCheckingUn(true);
+    unDebounce = setTimeout(async () => {
+      const free = await checkUsername(clean);
+      setUsernameOk(free); setCheckingUn(false);
+    }, 600);
+  };
+
+  const handleSignUp = async () => {
+    if (!regUsername || !regEmail || !regPassword) { setAuthError('Compila tutti i campi.'); return; }
+    if (regUsername.length < 3) { setAuthError('Username min 3 caratteri.'); return; }
+    if (regPassword.length < 6) { setAuthError('Password min 6 caratteri.'); return; }
+    setAuthLoading(true); setAuthError(null);
+    try { const result = await signUp(regEmail, regPassword, regUsername); setAuthDone(result); }
+    catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto'); }
+    finally { setAuthLoading(false); }
+  };
+
+  const handleSignIn = async () => {
+    if (!loginEmail || !loginPassword) { setAuthError('Inserisci email e password.'); return; }
+    setAuthLoading(true); setAuthError(null);
+    try { await signIn(loginEmail, loginPassword); }
+    catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto'); }
+    finally { setAuthLoading(false); }
+  };
+
   if (!open) return null;
 
-  const hasCoords = lat != null && lon != null;
-  const stepIndex = STEPS.indexOf(step as Step);
+  const hasCoords  = lat != null && lon != null;
+  const stepIndex  = STEPS.indexOf(step as Step);
   const progressPct = step === 'successo' ? 100 : (stepIndex / (STEPS.length - 1)) * 100;
 
   return (
     <>
-      <div onClick={handleClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 69, backdropFilter: 'blur(4px)' }} aria-hidden />
+      <div onClick={handleClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 69, backdropFilter: 'blur(4px)' }}
+        aria-hidden />
 
       <div role="dialog" aria-modal aria-label="Aggiungi spot BMX" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
@@ -299,7 +503,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             {user && step !== 'successo' && (
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginTop: 2 }}>
                 {STEP_LABEL[step]}
-                {step === 'posizione' && locMode === 'search' && searchPhase === 'preview' && ' — Verifica posizione'}
               </div>
             )}
           </div>
@@ -342,7 +545,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   Accedi o crea un account — il tuo <strong style={{ color: 'var(--orange)' }}>@username</strong> apparirà sullo spot.
                 </p>
 
-                {/* ── Google ── */}
                 <div style={{ marginBottom: 16 }}>
                   <GoogleSignInBtn onClick={async () => {
                     setAuthLoading(true); setAuthError(null);
@@ -372,19 +574,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
                 {authTab === 'accedi' && (
                   <div style={{ display: 'grid', gap: 14 }}>
-                    <div>
-                      <label style={lbl}>Email</label>
-                      <input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
-                        placeholder="la-tua@email.com" onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
-                    </div>
-                    <div>
-                      <label style={lbl}>Password</label>
-                      <input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
-                        placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
-                    </div>
+                    <div><label style={lbl}>Email</label><input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="la-tua@email.com" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
+                    <div><label style={lbl}>Password</label><input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
                     {authError && <ErrBox msg={authError} />}
-                    <button onClick={handleSignIn} disabled={authLoading} className="btn-primary"
-                      style={{ width: '100%', justifyContent: 'center', opacity: authLoading ? 0.6 : 1 }}>
+                    <button onClick={handleSignIn} disabled={authLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: authLoading ? 0.6 : 1 }}>
                       {authLoading ? '⏳ Accesso...' : '🔑 ENTRA'}
                     </button>
                     <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
@@ -413,15 +606,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       </div>
                       {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff4444', marginTop: 2 }}>Username già in uso</div>}
                     </div>
-                    <div>
-                      <label style={lbl}>Email *</label>
-                      <input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="la-tua@email.com" />
-                    </div>
-                    <div>
-                      <label style={lbl}>Password * (min 6 caratteri)</label>
-                      <input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)}
-                        placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
-                    </div>
+                    <div><label style={lbl}>Email *</label><input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="la-tua@email.com" /></div>
+                    <div><label style={lbl}>Password * (min 6 caratteri)</label><input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} /></div>
                     {authError && <ErrBox msg={authError} />}
                     <button onClick={handleSignUp} disabled={authLoading || usernameOk === false} className="btn-primary"
                       style={{ width: '100%', justifyContent: 'center', opacity: (authLoading || usernameOk === false) ? 0.6 : 1 }}>
@@ -435,7 +621,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
           {/* ══ STEP 1 — POSIZIONE ══ */}
           {!isLoading && user && step === 'posizione' && (
-            <div style={{ display: 'grid', gap: 20 }}>
+            <div style={{ display: 'grid', gap: 16 }}>
 
               {/* Badge utente */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.2)', borderRadius: 6 }}>
@@ -445,30 +631,34 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>@{user.username}</span>
               </div>
 
-              {/* Scelta metodo */}
+              {/* ── Scelta metodo (prima schermata) ── */}
               {!locMode && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Come vuoi indicare la posizione?
                   </p>
-                  <button onClick={() => { setLocMode('gps'); getGPS(); }} style={methodBtn}>
+                  <button onClick={() => { setLocMode('gps'); getGPS(); }} style={methodBtn}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}>
                     <span style={{ fontSize: 28 }}>📍</span>
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Sono nello spot</div>
                       <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Usa il GPS del telefono</div>
                     </div>
                   </button>
-                  <button onClick={() => setLocMode('search')} style={methodBtn}>
-                    <span style={{ fontSize: 28 }}>🔍</span>
+                  <button onClick={() => setLocMode('map')} style={methodBtn}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}>
+                    <span style={{ fontSize: 28 }}>🗺️</span>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Conosco la posizione</div>
-                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Inserisci via, CAP e città</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Cerca sulla mappa</div>
+                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Cerca l'indirizzo o clicca sulla mappa</div>
                     </div>
                   </button>
                 </div>
               )}
 
-              {/* ─── GPS path ─── */}
+              {/* ── GPS path ── */}
               {locMode === 'gps' && (
                 <div style={{ display: 'grid', gap: 12 }}>
                   {gpsState === 'loading' && (
@@ -482,184 +672,127 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>{lat!.toFixed(6)}, {lon!.toFixed(6)}</div>
                     </div>
                   )}
-                  {gpsState === 'error' && <ErrBox msg="GPS non disponibile. Usa la ricerca per indirizzo." />}
+                  {gpsState === 'error' && <ErrBox msg="GPS non disponibile. Usa la mappa." />}
                   {gpsState !== 'loading' && !hasCoords && gpsState !== 'error' && (
                     <button onClick={getGPS} className="btn-primary" style={{ justifyContent: 'center' }}>
                       📍 Usa la mia posizione GPS
                     </button>
                   )}
                   {gpsState === 'error' && (
-                    <button onClick={() => { setLocMode('search'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
-                      🔍 Cerca indirizzo
+                    <button onClick={() => { setLocMode('map'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                      🗺️ Cerca sulla mappa
                     </button>
                   )}
-                  <button onClick={() => { setLocMode(null); setLat(null); setLon(null); setGpsState('idle'); }}
-                    style={backLink}>← Cambia metodo</button>
-                </div>
-              )}
 
-              {/* ─── SEARCH path: FORM ─── */}
-              {locMode === 'search' && searchPhase === 'form' && (
-                <div style={{ display: 'grid', gap: 14 }}>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {/* Via */}
+                  {/* Città — sempre visibile nel GPS path */}
+                  {hasCoords && (
                     <div>
-                      <label style={lbl}>Via / Piazza *</label>
-                      <input
-                        type="text" style={inp}
-                        value={addrVia}
-                        onChange={e => setAddrVia(e.target.value)}
-                        placeholder='es. "Via Roma 12" oppure "Piazza del Popolo"'
-                        onKeyDown={e => e.key === 'Enter' && handleGeocode()}
-                      />
+                      <label style={lbl}>Città</label>
+                      <RegionCityPicker value={city} onChange={setCity} />
                     </div>
-                    {/* Riga CAP + Città */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8 }}>
-                      <div>
-                        <label style={lbl}>CAP</label>
-                        <input
-                          type="text" style={inp} inputMode="numeric"
-                          value={addrCap}
-                          onChange={e => setAddrCap(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                          placeholder="20121"
-                          onKeyDown={e => e.key === 'Enter' && handleGeocode()}
-                        />
-                      </div>
-                      <div>
-                        <label style={lbl}>Città *</label>
-                        <input
-                          type="text" style={inp}
-                          value={addrCitta}
-                          onChange={e => setAddrCitta(e.target.value)}
-                          placeholder='es. "Milano"'
-                          onKeyDown={e => e.key === 'Enter' && handleGeocode()}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
-                  {geocodeError && <ErrBox msg={geocodeError} />}
-
-                  <button
-                    onClick={handleGeocode}
-                    disabled={geocoding || (!addrVia.trim() && !addrCitta.trim())}
-                    className="btn-primary"
-                    style={{ justifyContent: 'center', opacity: geocoding ? 0.6 : 1 }}
-                  >
-                    {geocoding ? '⏳ Ricerca in corso...' : '🔍 Trova posizione →'}
-                  </button>
-
-                  <button onClick={() => { setLocMode(null); setGeocodeError(null); }} style={backLink}>
+                  <button onClick={() => { setLocMode(null); setLat(null); setLon(null); setGpsState('idle'); }} style={backLink}>
                     ← Cambia metodo
                   </button>
                 </div>
               )}
 
-              {/* ─── SEARCH path: PREVIEW (mappa + verifica) ─── */}
-              {locMode === 'search' && searchPhase === 'preview' && hasCoords && (
-                <div style={{ display: 'grid', gap: 16 }}>
+              {/* ── MAPPA interattiva ── */}
+              {locMode === 'map' && (
+                <div style={{ display: 'grid', gap: 12 }}>
 
-                  {/* Indirizzo trovato */}
-                  <div style={{ padding: '10px 12px', background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.2)', borderRadius: 6 }}>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Indirizzo trovato</div>
-                    <div style={{ fontSize: 13, color: 'var(--bone)', lineHeight: 1.4 }}>{pickedAddress}</div>
-                  </div>
-
-                  {/* Mappa OSM */}
-                  <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-600)', height: 200, position: 'relative' }}>
-                    <iframe
-                      key={`${lat}-${lon}`}
-                      src={osmEmbed}
-                      style={{ width: '100%', height: '100%', border: 'none' }}
-                      loading="lazy"
-                      title="Anteprima posizione"
-                    />
-                  </div>
-
-                  {/* Frecce di spostamento */}
+                  {/* Ricerca indirizzo */}
                   <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, textAlign: 'center' }}>
-                      Sposta il pin (~55 m per click)
+                    <label style={lbl}>Cerca indirizzo (per centrare la mappa)</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        type="text" style={{ ...inp, flex: 1 }}
+                        value={addrQuery}
+                        onChange={e => setAddrQuery(e.target.value)}
+                        placeholder='Es. "Via Roma 12, Milano" o "Skatepark di Trento"'
+                        onKeyDown={e => e.key === 'Enter' && handleAddrSearch()}
+                      />
+                      <button
+                        onClick={handleAddrSearch}
+                        disabled={addrLoading || !addrQuery.trim()}
+                        className="btn-secondary"
+                        style={{ padding: '10px 14px', fontSize: 14, flexShrink: 0, opacity: addrLoading ? 0.6 : 1 }}
+                      >
+                        {addrLoading ? '⏳' : '🔍'}
+                      </button>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, maxWidth: 180, margin: '0 auto' }}>
-                      <div />
-                      <NudgeBtn label="↑ N" onClick={() => nudge(+NUDGE, 0)} />
-                      <div />
-                      <NudgeBtn label="← O" onClick={() => nudge(0, -NUDGE)} />
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--orange)' }} />
-                      </div>
-                      <NudgeBtn label="E →" onClick={() => nudge(0, +NUDGE)} />
-                      <div />
-                      <NudgeBtn label="↓ S" onClick={() => nudge(-NUDGE, 0)} />
-                      <div />
-                    </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textAlign: 'center', marginTop: 8 }}>
-                      {lat!.toFixed(6)}, {lon!.toFixed(6)}
-                    </div>
+                    {addrError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff6a00', marginTop: 4 }}>{addrError}</div>}
                   </div>
 
-                  {/* Street View */}
-                  <a
-                    href={streetViewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '12px 14px',
-                      background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
-                      borderRadius: 8, textDecoration: 'none',
-                      transition: 'border-color 0.15s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
-                  >
-                    <span style={{ fontSize: 26 }}>🧍</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>Verifica con Street View</div>
-                      <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 2 }}>
-                        Si apre Google Maps — naviga e poi torna qui per aggiustare il pin
-                      </div>
-                    </div>
-                    <span style={{ color: 'var(--gray-400)', fontSize: 18 }}>↗</span>
-                  </a>
-
-                  {/* Città */}
+                  {/* Mappa Leaflet interattiva */}
                   <div>
-                    <label style={lbl}>Città (opzionale)</label>
-                    <select style={{ ...inp, appearance: 'none' }} value={city} onChange={e => setCity(e.target.value)}>
-                      <option value="">Seleziona città...</option>
-                      {CITTA_ITALIANE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                      Clicca sulla mappa per posizionare il pin — poi trascinalo per essere preciso
+                    </div>
+                    <LocationMapPicker lat={lat} lon={lon} onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }} />
                   </div>
 
-                  {/* Azioni */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {/* Incolla link Google Maps / Street View */}
+                  <div>
                     <button
-                      onClick={() => setStep('foto')}
-                      className="btn-primary"
-                      style={{ width: '100%', justifyContent: 'center' }}
-                    >
-                      ✅ Posizione corretta, avanti →
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSearchPhase('form');
-                        setLat(null); setLon(null); setPickedAddress('');
+                      onClick={() => { setGmapsOpen(o => !o); setGmapsError(null); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        background: 'none', border: 'none',
+                        fontFamily: 'var(--font-mono)', fontSize: 12,
+                        color: gmapsOpen ? 'var(--orange)' : 'var(--gray-400)',
+                        cursor: 'pointer', padding: 0,
+                        textDecoration: 'underline', textUnderlineOffset: 3,
                       }}
-                      style={backLink}
                     >
-                      ← Cerca un altro indirizzo
+                      🧍 Hai trovato la posizione in Street View? Incolla il link →
                     </button>
+
+                    {gmapsOpen && (
+                      <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', lineHeight: 1.5 }}>
+                          In Google Maps / Street View: tasto destro → &quot;Copia coordinate&quot; o copia l&apos;URL dalla barra del browser e incollalo qui.
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input
+                            type="text" style={{ ...inp, flex: 1, fontSize: 13 }}
+                            value={gmapsUrl}
+                            onChange={e => { setGmapsUrl(e.target.value); setGmapsError(null); }}
+                            placeholder="https://maps.google.com/... o 45.4384, 10.9916"
+                            onKeyDown={e => e.key === 'Enter' && handleGmapsPaste()}
+                          />
+                          <button
+                            onClick={handleGmapsPaste}
+                            disabled={!gmapsUrl.trim()}
+                            className="btn-primary"
+                            style={{ padding: '10px 14px', fontSize: 13, flexShrink: 0 }}
+                          >
+                            OK
+                          </button>
+                        </div>
+                        {gmapsError && <ErrBox msg={gmapsError} />}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Selezione città */}
+                  <div>
+                    <label style={lbl}>Città</label>
+                    <RegionCityPicker value={city} onChange={setCity} />
+                  </div>
+
+                  <button onClick={() => { setLocMode(null); setAddrQuery(''); setAddrError(null); setGmapsOpen(false); }} style={backLink}>
+                    ← Cambia metodo
+                  </button>
                 </div>
               )}
 
-              {/* Avanti per GPS */}
-              {locMode === 'gps' && hasCoords && (
+              {/* Avanti */}
+              {hasCoords && (
                 <button onClick={() => setStep('foto')} className="btn-primary"
                   style={{ width: '100%', justifyContent: 'center' }}>
-                  Avanti →
+                  ✅ Posizione confermata — Avanti →
                 </button>
               )}
             </div>
@@ -773,24 +906,6 @@ const backLink: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
   padding: '4px 0', textAlign: 'left' as const,
 };
-
-function NudgeBtn({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)',
-        background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
-        borderRadius: 4, padding: '8px 4px', cursor: 'pointer',
-        textAlign: 'center', transition: 'border-color 0.1s, background 0.1s',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--orange)'; e.currentTarget.style.background = 'rgba(255,106,0,0.1)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--gray-600)'; e.currentTarget.style.background = 'var(--gray-700)'; }}
-    >
-      {label}
-    </button>
-  );
-}
 
 function ErrBox({ msg }: { msg: string }) {
   return (
