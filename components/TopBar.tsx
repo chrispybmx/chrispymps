@@ -135,7 +135,10 @@ export default function TopBar({
         <button onClick={openSearch} className="btn-ghost" aria-label="Cerca spot" style={{ fontSize: 18 }}>
           🔍
         </button>
-        <button onClick={onAddSpot} className="btn-primary" style={{ marginLeft: 8, padding: '8px 14px', fontSize: 14 }} aria-label="Aggiungi spot">
+        <a href="/preferiti" className="btn-ghost" aria-label="I miei preferiti" style={{ fontSize: 20, textDecoration: 'none', display: 'flex', alignItems: 'center' }} title="I miei spot preferiti">
+          ❤️
+        </a>
+        <button onClick={onAddSpot} className="btn-primary" style={{ marginLeft: 4, padding: '8px 14px', fontSize: 14 }} aria-label="Aggiungi spot">
           + SPOT
         </button>
       </header>
