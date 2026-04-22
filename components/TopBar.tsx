@@ -1,17 +1,15 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, APP_CONFIG } from '@/lib/constants';
 import type { SpotType, SpotMapPin } from '@/lib/types';
 import SideMenu from './SideMenu';
 
 interface TopBarProps {
   onSearch:        (query: string) => void;
   onFilterType:    (type: SpotType | null) => void;
-  onFilterRegion:  (label: string | null) => void;
   onAddSpot:       () => void;
   activeType:      SpotType | null;
-  activeRegion:    string | null;
   spots:           SpotMapPin[];
   onCitySelect:    (city: string, lat: number, lon: number) => void;
   onSpotSelect:    (pin: SpotMapPin) => void;
@@ -27,7 +25,7 @@ interface NominatimPlace {
 }
 
 export default function TopBar({
-  onSearch, onFilterType, onFilterRegion, onAddSpot, activeType, activeRegion,
+  onSearch, onFilterType, onAddSpot, activeType,
   spots, onCitySelect, onSpotSelect, onOpenAuth,
 }: TopBarProps) {
   const [menuOpen,   setMenuOpen]   = useState(false);
@@ -174,46 +172,6 @@ export default function TopBar({
               count={spots.filter(s => s.type === type).length}
             />
           ))}
-        </div>
-
-        {/* Regione — select stile chip */}
-        <div style={{
-          padding: '8px 6px',
-          flexShrink: 0,
-          borderLeft: '1px solid var(--gray-700)',
-          background: 'rgba(10,10,10,0.92)',
-        }}>
-          <div style={{ position: 'relative', display: 'inline-block' }}>
-            <select
-              value={activeRegion ?? ''}
-              onChange={e => onFilterRegion(e.target.value || null)}
-              aria-label="Filtra per regione"
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 12,
-                padding: '4px 22px 4px 8px',
-                border: `1px solid ${activeRegion ? 'var(--orange)' : 'var(--gray-600)'}`,
-                borderRadius: 2,
-                background: activeRegion ? 'rgba(255,106,0,0.12)' : 'transparent',
-                color: activeRegion ? 'var(--orange)' : 'var(--bone)',
-                cursor: 'pointer',
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-                outline: 'none',
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none',
-              }}
-            >
-              <option value="">REGIONE</option>
-              {REGIONI_ITALIA.map(r => (
-                <option key={r.label} value={r.label}>{r.emoji} {r.label}</option>
-              ))}
-            </select>
-            {/* Arrow icon */}
-            <span style={{
-              position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
-              pointerEvents: 'none', fontSize: 8, color: activeRegion ? 'var(--orange)' : 'var(--gray-400)',
-            }}>▼</span>
-          </div>
         </div>
 
         {/* Preferiti — fisso a destra, stesso stile chip */}
