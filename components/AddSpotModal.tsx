@@ -232,132 +232,6 @@ function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-/* ── Google Maps con pegman integrato (Street View nativo) ── */
-function GoogleMapPicker({
-  lat, lon, onPick, height = 380,
-}: {
-  lat: number | null;
-  lon: number | null;
-  onPick: (lat: number, lon: number) => void;
-  height?: number;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef       = useRef<any>(null);
-  const markerRef    = useRef<any>(null);
-  const onPickRef    = useRef(onPick);
-  useEffect(() => { onPickRef.current = onPick; });
-
-  /* Ref per coordinate iniziali — evita stale closure in initMap */
-  const initLatRef  = useRef(lat ?? 42.5);
-  const initLonRef  = useRef(lon ?? 12.5);
-  const initZoomRef = useRef(lat != null ? 15 : 6);
-  initLatRef.current  = lat ?? 42.5;
-  initLonRef.current  = lon ?? 12.5;
-  initZoomRef.current = lat != null ? 15 : 6;
-
-  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-
-  const initMap = useCallback(() => {
-    if (!containerRef.current || !window.google?.maps) return;
-    if (mapRef.current) return; // già inizializzata
-
-    const center = { lat: initLatRef.current, lng: initLonRef.current };
-    const map = new window.google.maps.Map(containerRef.current, {
-      center,
-      zoom: initZoomRef.current,
-      streetViewControl: true,       // ← il pegman giallo
-      mapTypeControl: false,
-      fullscreenControl: false,
-      zoomControl: true,
-    });
-
-    /* Marker draggabile */
-    const marker = new window.google.maps.Marker({
-      position: center,
-      map,
-      draggable: true,
-      visible: initLatRef.current !== 42.5, // nascosto finché l'utente non clicca
-    });
-
-    marker.addListener('dragend', () => {
-      const pos = marker.getPosition();
-      if (pos) onPickRef.current(pos.lat(), pos.lng());
-    });
-
-    map.addListener('click', (e: any) => {
-      const pos = e.latLng;
-      marker.setPosition(pos);
-      marker.setVisible(true);
-      onPickRef.current(pos.lat(), pos.lng());
-    });
-
-    mapRef.current    = map;
-    markerRef.current = marker;
-    setStatus('ok');
-  }, []);
-
-  /* Carica lo script Maps JS API */
-  useEffect(() => {
-    if (!apiKey) { setStatus('error'); return; }
-
-    if (window.google?.maps?.Map) { initMap(); return; }
-
-    if (!document.querySelector('#gm-api-script')) {
-      const s = document.createElement('script');
-      s.id  = 'gm-api-script';
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-      s.setAttribute('referrerpolicy', 'no-referrer'); // bypass HTTP-referrer restrictions on the key
-      s.onload  = initMap;
-      s.onerror = () => setStatus('error');
-      document.head.appendChild(s);
-    } else {
-      const t = setInterval(() => {
-        if (window.google?.maps?.Map) { clearInterval(t); initMap(); }
-      }, 150);
-      return () => clearInterval(t);
-    }
-
-    return () => { mapRef.current = null; markerRef.current = null; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey]);
-
-  /* Fly-to quando cambiano le coordinate dall'esterno (ricerca indirizzo / paste URL) */
-  useEffect(() => {
-    if (!mapRef.current || lat == null || lon == null) return;
-    const pos = { lat, lng: lon };
-    mapRef.current.panTo(pos);
-    if (mapRef.current.getZoom() < 15) mapRef.current.setZoom(15);
-    if (markerRef.current) { markerRef.current.setPosition(pos); markerRef.current.setVisible(true); }
-  }, [lat, lon]);
-
-  /* Fallback Leaflet se l'API key manca o il caricamento fallisce */
-  if (!apiKey || status === 'error') {
-    return <LocationMapPicker lat={lat} lon={lon} onPick={onPick} height={height} />;
-  }
-
-  return (
-    <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-600)' }}>
-      <div ref={containerRef} style={{ width: '100%', height }} />
-      {status === 'loading' && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-800)' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)' }}>Caricamento mappa...</span>
-        </div>
-      )}
-      {lat != null && status === 'ok' && (
-        <div style={{
-          position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(10,10,10,0.82)', borderRadius: 4, padding: '3px 10px',
-          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)',
-          pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 1,
-        }}>
-          📍 {lat.toFixed(5)}, {lon!.toFixed(5)}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ── Select città filtrata per regione ── */
 function RegionCitySelect({ value, onChange, regionLabel }: { value: string; onChange: (v: string) => void; regionLabel: string }) {
   const regionData = REGIONI_ITALIA.find(r => r.label === regionLabel);
@@ -921,12 +795,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     )}
                   </div>
 
-                  {/* Google Maps con pegman — clicca il pin, poi trascina l'omino giallo per Street View */}
+                  {/* Mappa interattiva */}
                   <div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                      Mappa — clicca per posizionare · trascina 🟡 per Street View
+                      Mappa — clicca o trascina il pin
                     </div>
-                    <GoogleMapPicker
+                    <LocationMapPicker
                       lat={lat} lon={lon} height={380}
                       onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }}
                     />
