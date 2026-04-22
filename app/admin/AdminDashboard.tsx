@@ -7,7 +7,16 @@ import AdminImportKML from '@/components/AdminImportKML';
 import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 
-type Tab = 'pending' | 'all' | 'import' | 'stats' | 'events' | 'news';
+type Tab = 'pending' | 'all' | 'import' | 'stats' | 'events' | 'news' | 'comments';
+
+interface AdminComment {
+  id: string;
+  username: string;
+  text: string;
+  created_at: string;
+  spot_id: string;
+  spots?: { name: string; slug: string; city?: string } | null;
+}
 
 interface AdminDashboardProps {
   initialSpots: Spot[];
@@ -89,6 +98,10 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   const [editingNews, setEditingNews] = useState<(Partial<AdminNews> & { id?: string }) | null>(null);
   const [savingNews, setSavingNews]   = useState(false);
 
+  /* ── Comments state ── */
+  const [adminComments, setAdminComments] = useState<AdminComment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+
   /* ── Load all spots ── */
   useEffect(() => {
     if (tab !== 'all' && tab !== 'stats') return;
@@ -121,6 +134,32 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       .then(j => { if (j.ok) setNewsList(j.data); })
       .finally(() => setLoadingNews(false));
   }, [tab]);
+
+  /* ── Load comments ── */
+  useEffect(() => {
+    if (tab !== 'comments') return;
+    setLoadingComments(true);
+    fetch('/api/admin/comments')
+      .then(r => r.json())
+      .then(j => { if (j.ok) setAdminComments(j.data); })
+      .finally(() => setLoadingComments(false));
+  }, [tab]);
+
+  const handleDeleteComment = useCallback(async (comment: AdminComment) => {
+    if (!window.confirm(`Eliminare il commento di @${comment.username}?\n\n"${comment.text.slice(0, 80)}${comment.text.length > 80 ? '…' : ''}"`)) return;
+    const res  = await fetch('/api/admin/comments', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment_id: comment.id }),
+    });
+    const json = await res.json();
+    if (json.ok) {
+      setAdminComments(prev => prev.filter(c => c.id !== comment.id));
+      showMsg('🗑️ Commento eliminato.');
+    } else {
+      showMsg('❌ ' + json.error);
+    }
+  }, []);
 
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(null), 4000); };
 
@@ -234,12 +273,13 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   };
 
   const TABS: { key: Tab; label: string; badge?: number }[] = [
-    { key: 'pending', label: '📥 In attesa', badge: pending.length },
-    { key: 'all',     label: '🗺️ Spot' },
-    { key: 'events',  label: '📅 Eventi' },
-    { key: 'news',    label: '📰 News' },
-    { key: 'import',  label: '📂 Importa' },
-    { key: 'stats',   label: '📊 Stats' },
+    { key: 'pending',  label: '📥 In attesa', badge: pending.length },
+    { key: 'all',      label: '🗺️ Spot' },
+    { key: 'comments', label: '💬 Commenti' },
+    { key: 'events',   label: '📅 Eventi' },
+    { key: 'news',     label: '📰 News' },
+    { key: 'import',   label: '📂 Importa' },
+    { key: 'stats',    label: '📊 Stats' },
   ];
 
   return (
@@ -348,6 +388,79 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
                 ))
               )}
             </>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: COMMENTI ── */}
+      {tab === 'comments' && (
+        <div style={{ padding: '16px 20px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)' }}>
+              {adminComments.length} commenti
+            </span>
+            <button
+              onClick={() => { setAdminComments([]); setLoadingComments(true); fetch('/api/admin/comments').then(r => r.json()).then(j => { if (j.ok) setAdminComments(j.data); }).finally(() => setLoadingComments(false)); }}
+              className="btn-ghost"
+              style={{ fontSize: 12 }}
+            >
+              🔄 Aggiorna
+            </button>
+          </div>
+
+          {loadingComments ? (
+            <Loading />
+          ) : adminComments.length === 0 ? (
+            <EmptyState icon="💬" text="Nessun commento ancora." />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {adminComments.map(c => (
+                <div key={c.id} style={{
+                  background: 'var(--gray-800)',
+                  border: '1px solid var(--gray-700)',
+                  borderRadius: 6,
+                  padding: '12px 14px',
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                }}>
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)' }}>
+                        @{c.username}
+                      </span>
+                      {c.spots && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', background: 'var(--gray-700)', padding: '1px 6px', borderRadius: 2 }}>
+                          📍 {c.spots.name}{c.spots.city ? ` · ${c.spots.city}` : ''}
+                        </span>
+                      )}
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)', marginLeft: 'auto' }}>
+                        {new Date(c.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p style={{ color: 'var(--bone)', fontSize: 14, lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
+                      {c.text}
+                    </p>
+                  </div>
+                  {/* Delete button */}
+                  <button
+                    onClick={() => handleDeleteComment(c)}
+                    style={{
+                      background: 'none', border: '1px solid var(--gray-600)',
+                      borderRadius: 4, padding: '4px 10px',
+                      color: '#e05555', fontFamily: 'var(--font-mono)', fontSize: 11,
+                      cursor: 'pointer', flexShrink: 0,
+                      transition: 'border-color 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = '#e05555')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
+                  >
+                    🗑️ Elimina
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
