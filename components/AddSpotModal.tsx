@@ -100,8 +100,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     if (initialLat != null && initialLon != null) {
       setLat(initialLat); setLon(initialLon);
       setLocMode('gps'); setGpsState('ok');
+      reverseGeocode(initialLat, initialLon);
     }
-  }, [initialLat, initialLon]);
+  }, [initialLat, initialLon, reverseGeocode]);
 
   /* ── Reset ── */
   const handleClose = useCallback(() => {
@@ -121,12 +122,33 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     onClose();
   }, [initialLat, initialLon, onClose]);
 
+  /* ── Reverse geocoding: ricava città da lat/lon ── */
+  const reverseGeocode = useCallback(async (lat: number, lon: number) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=it`;
+      const res  = await fetch(url, { headers: { 'Accept-Language': 'it' } });
+      const data = await res.json();
+      const cn = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '';
+      if (cn) {
+        const match = CITTA_ITALIANE.find(c =>
+          c.label.toLowerCase().includes(cn.toLowerCase()) ||
+          cn.toLowerCase().includes(c.label.toLowerCase())
+        );
+        if (match) setCity(match.value);
+      }
+    } catch { /* silenziamo: la città resterà vuota */ }
+  }, []);
+
   /* ── GPS ── */
   const getGPS = () => {
     if (!navigator.geolocation) { setGpsState('error'); return; }
     setGpsState('loading');
     navigator.geolocation.getCurrentPosition(
-      pos => { setLat(pos.coords.latitude); setLon(pos.coords.longitude); setGpsState('ok'); },
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        setLat(latitude); setLon(longitude); setGpsState('ok');
+        reverseGeocode(latitude, longitude);
+      },
       ()  => setGpsState('error'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -632,21 +654,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               )}
 
-              {/* Città + Avanti per GPS */}
+              {/* Avanti per GPS */}
               {locMode === 'gps' && hasCoords && (
-                <>
-                  <div>
-                    <label style={lbl}>Città (opzionale)</label>
-                    <select style={{ ...inp, appearance: 'none' }} value={city} onChange={e => setCity(e.target.value)}>
-                      <option value="">Seleziona città...</option>
-                      {CITTA_ITALIANE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
-                  </div>
-                  <button onClick={() => setStep('foto')} className="btn-primary"
-                    style={{ width: '100%', justifyContent: 'center' }}>
-                    Avanti →
-                  </button>
-                </>
+                <button onClick={() => setStep('foto')} className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center' }}>
+                  Avanti →
+                </button>
               )}
             </div>
           )}
