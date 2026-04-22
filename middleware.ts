@@ -106,6 +106,17 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // ── 4. Rate limit sui commenti: 10 commenti / 5 minuti per IP ──
+  if (pathname.startsWith('/api/comments/') && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`comment:${ip}`, 10, 5 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'Troppi commenti. Riprova tra qualche minuto.' },
+        { status: 429 }
+      );
+    }
+  }
+
   return NextResponse.next();
 }
 
@@ -114,5 +125,6 @@ export const config = {
     '/api/admin/login',
     '/api/flag',
     '/api/submit-spot',
+    '/api/comments/:path*',
   ],
 };
