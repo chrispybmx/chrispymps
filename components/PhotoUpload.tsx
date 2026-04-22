@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { APP_CONFIG } from '@/lib/constants';
 
 interface PhotoUploadProps {
@@ -13,9 +13,15 @@ const MAX_SIZE_MB = 5;
 const ACCEPTED    = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 
 export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.maxPhotos }: PhotoUploadProps) {
-  const inputRef  = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef  = useRef<HTMLInputElement>(null);
+  const [error,    setError]    = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  }, []);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     setError(null);
@@ -37,101 +43,115 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
   }, [photos, onChange, maxPhotos]);
 
   const removePhoto = useCallback((idx: number) => {
-    const updated = photos.filter((_, i) => i !== idx);
-    onChange(updated);
+    onChange(photos.filter((_, i) => i !== idx));
   }, [photos, onChange]);
 
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragging(true); };
+  const onDragOver  = (e: React.DragEvent) => { e.preventDefault(); setDragging(true); };
   const onDragLeave = () => setDragging(false);
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    addFiles(e.dataTransfer.files);
-  };
+  const onDrop      = (e: React.DragEvent) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); };
 
   const remaining = maxPhotos - photos.length;
 
   return (
     <div>
-      {/* Preview foto già selezionate */}
+      {/* Preview foto selezionate */}
       {photos.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           {photos.map((file, idx) => (
-            <div
-              key={idx}
-              style={{
-                position: 'relative',
-                width: 80, height: 80,
-                borderRadius: 4,
-                overflow: 'hidden',
-                border: idx === 0
-                  ? '2px solid var(--orange)'
-                  : '1px solid var(--gray-600)',
-              }}
-            >
-              <img
-                src={URL.createObjectURL(file)}
-                alt={`Foto ${idx + 1}`}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+            <div key={idx} style={{
+              position: 'relative', width: 80, height: 80, borderRadius: 4, overflow: 'hidden',
+              border: idx === 0 ? '2px solid var(--orange)' : '1px solid var(--gray-600)',
+            }}>
+              <img src={URL.createObjectURL(file)} alt={`Foto ${idx + 1}`}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               {idx === 0 && (
                 <div style={{
                   position: 'absolute', bottom: 0, left: 0, right: 0,
-                  background: 'rgba(255,106,0,0.85)',
-                  fontFamily: 'var(--font-mono)',
+                  background: 'rgba(255,106,0,0.85)', fontFamily: 'var(--font-mono)',
                   fontSize: 10, textAlign: 'center', color: '#000', padding: '2px 0',
-                }}>
-                  COVER
-                </div>
+                }}>COVER</div>
               )}
-              <button
-                onClick={() => removePhoto(idx)}
-                style={{
-                  position: 'absolute', top: 2, right: 2,
-                  background: 'rgba(0,0,0,0.7)',
-                  border: 'none', color: '#fff',
-                  width: 20, height: 20, borderRadius: '50%',
-                  cursor: 'pointer', fontSize: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-                aria-label={`Rimuovi foto ${idx + 1}`}
-              >
-                ✕
-              </button>
+              <button onClick={() => removePhoto(idx)} style={{
+                position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)',
+                border: 'none', color: '#fff', width: 20, height: 20, borderRadius: '50%',
+                cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }} aria-label={`Rimuovi foto ${idx + 1}`}>✕</button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Drop zone (se ci sono ancora slot disponibili) */}
+      {/* Slot disponibili */}
       {remaining > 0 && (
-        <div
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onClick={() => inputRef.current?.click()}
-          style={{
-            border: `2px dashed ${dragging ? 'var(--orange)' : 'var(--gray-600)'}`,
-            borderRadius: 4,
-            padding: '20px 16px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            background: dragging ? 'rgba(255,106,0,0.05)' : 'var(--gray-800)',
-            transition: 'border-color 0.15s, background 0.15s',
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
-          aria-label="Aggiungi foto — clicca o trascina"
-        >
-          <div style={{ fontSize: 28, marginBottom: 6 }}>📷</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>
-            TAP PER SCATTARE O CARICARE
+        isMobile ? (
+          /* ── MOBILE: due bottoni separati ── */
+          <div style={{ display: 'flex', gap: 10 }}>
+            {/* Scatta foto */}
+            <button
+              onClick={() => cameraRef.current?.click()}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: 6, padding: '18px 10px',
+                background: 'var(--gray-700)', border: '2px solid var(--gray-600)',
+                borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
+              }}
+              onTouchStart={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
+              onTouchEnd={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
+            >
+              <span style={{ fontSize: 30 }}>📸</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', textAlign: 'center' }}>
+                Scatta foto
+              </span>
+            </button>
+
+            {/* Scegli dalla galleria */}
+            <button
+              onClick={() => galleryRef.current?.click()}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: 6, padding: '18px 10px',
+                background: 'var(--gray-700)', border: '2px solid var(--gray-600)',
+                borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
+              }}
+              onTouchStart={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
+              onTouchEnd={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
+            >
+              <span style={{ fontSize: 30 }}>🖼️</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', textAlign: 'center' }}>
+                Galleria
+              </span>
+            </button>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>
-            {photos.length === 0 ? 'Prima foto = cover' : `${remaining} slot rimasti`}
-            {' · '}JPG/PNG/WebP/HEIC · max {MAX_SIZE_MB}MB
+        ) : (
+          /* ── DESKTOP: drag & drop zone ── */
+          <div
+            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+            onClick={() => galleryRef.current?.click()}
+            style={{
+              border: `2px dashed ${dragging ? 'var(--orange)' : 'var(--gray-600)'}`,
+              borderRadius: 4, padding: '20px 16px', textAlign: 'center', cursor: 'pointer',
+              background: dragging ? 'rgba(255,106,0,0.05)' : 'var(--gray-800)',
+              transition: 'border-color 0.15s, background 0.15s',
+            }}
+            role="button" tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') galleryRef.current?.click(); }}
+          >
+            <div style={{ fontSize: 28, marginBottom: 6 }}>📷</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>
+              Clicca o trascina una foto
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>
+              {photos.length === 0 ? 'Prima foto = cover' : `${remaining} slot rimasti`}
+              {' · '}JPG/PNG/WebP/HEIC · max {MAX_SIZE_MB}MB
+            </div>
           </div>
+        )
+      )}
+
+      {/* Info slot rimasti su mobile (dopo la prima foto) */}
+      {isMobile && remaining > 0 && photos.length > 0 && (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textAlign: 'center', marginTop: 6 }}>
+          {remaining} slot rimasti · max {maxPhotos} foto
         </div>
       )}
 
@@ -141,19 +161,19 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
         </div>
       )}
 
-      {/* Input file nascosto — capture=environment per la fotocamera su mobile */}
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED.join(',')}
-        multiple
+      {/* Input galleria (senza capture → apre la libreria foto) */}
+      <input ref={galleryRef} type="file" accept={ACCEPTED.join(',')} multiple
+        style={{ display: 'none' }}
+        onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
+        aria-hidden="true" />
+
+      {/* Input camera (capture=environment → apre direttamente la fotocamera) */}
+      <input ref={cameraRef} type="file" accept={ACCEPTED.join(',')}
         capture="environment"
         style={{ display: 'none' }}
         onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
-        aria-hidden="true"
-      />
+        aria-hidden="true" />
 
-      {/* Errore */}
       {error && (
         <p style={{ color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 12, marginTop: 6 }}>
           ⚠ {error}
