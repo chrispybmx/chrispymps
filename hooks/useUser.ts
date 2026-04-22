@@ -16,9 +16,23 @@ export function useUser(): UserSession | null | undefined {
   useEffect(() => {
     let cancelled = false;
 
-    async function fromSession(session: { user: { id: string; email?: string }; access_token: string } | null) {
+    async function fromSession(session: { user: { id: string; email?: string; user_metadata?: Record<string, string> }; access_token: string } | null) {
       if (cancelled) return;
       if (!session?.user) { setUser(null); return; }
+
+      // Fast path: username nel JWT (nessuna richiesta DB extra)
+      const metaUsername = session.user.user_metadata?.username as string | undefined;
+      if (metaUsername) {
+        setUser({
+          id:          session.user.id,
+          email:       session.user.email ?? '',
+          username:    metaUsername,
+          accessToken: session.access_token,
+        });
+        return;
+      }
+
+      // Fallback: query profilo (utenti vecchi senza user_metadata)
       try {
         const profile = await getProfile(session.user.id);
         if (cancelled) return;
