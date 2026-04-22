@@ -6,7 +6,7 @@ import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
-import { signIn, signUp, checkUsername } from '@/lib/auth-client';
+import { signIn, signUp, checkUsername, signInWithGoogle } from '@/lib/auth-client';
 
 interface AddSpotModalProps {
   open:        boolean;
@@ -318,6 +318,21 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, marginBottom: 18 }}>
                   Accedi o crea un account — il tuo <strong style={{ color: 'var(--orange)' }}>@username</strong> apparirà sullo spot.
                 </p>
+
+                {/* ── Google ── */}
+                <div style={{ marginBottom: 16 }}>
+                  <GoogleSignInBtn onClick={async () => {
+                    setAuthLoading(true); setAuthError(null);
+                    try { await signInWithGoogle(); }
+                    catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore'); setAuthLoading(false); }
+                  }} disabled={authLoading} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>oppure</span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--gray-700)' }}>
                   {(['accedi', 'registrati'] as AuthTab[]).map(t => (
                     <button key={t} onClick={() => { setAuthTab(t); setAuthError(null); }} style={{
@@ -768,5 +783,31 @@ function ErrBox({ msg }: { msg: string }) {
     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '10px 12px' }}>
       ⚠ {msg}
     </div>
+  );
+}
+
+function GoogleSignInBtn({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+        padding: '12px 16px', background: '#fff', border: '1px solid #ddd', borderRadius: 6,
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1,
+        fontFamily: 'var(--font-mono)', fontSize: 14, color: '#333', fontWeight: 500,
+        transition: 'box-shadow 0.15s',
+      }}
+      onMouseOver={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'; }}
+      onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none'; }}
+    >
+      <svg width="16" height="16" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+        <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      </svg>
+      Continua con Google
+    </button>
   );
 }
