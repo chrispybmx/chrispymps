@@ -255,7 +255,7 @@ export default function TopBar({
             <span style={{ fontSize: 18, flexShrink: 0 }}>🔍</span>
             <input
               ref={inputRef}
-              type="search"
+              type="text"
               placeholder="Cerca città, spot, @utente..."
               value={query}
               onChange={e => setQuery(e.target.value)}
