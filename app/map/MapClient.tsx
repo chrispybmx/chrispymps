@@ -532,83 +532,97 @@ function SpotListPanel({
             {isExp && (
               <div
                 onClick={e => e.stopPropagation()}
-                style={{ padding: '0 10px 12px' }}
+                style={{ padding: '0 10px 10px' }}
               >
-                {/* Foto grande → tap porta alla scheda spot */}
-                <Link
-                  href={`/map/spot/${spot.slug}`}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: 6, overflow: 'hidden',
-                    marginBottom: 9, position: 'relative',
-                    height: 110, background: '#0a0a0a',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    textDecoration: 'none',
-                  }}
-                >
-                  {spot.cover_url ? (
-                    <img
-                      src={spot.cover_url} alt={spot.name}
-                      style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
-                    />
-                  ) : (
-                    <div style={{
-                      width: '100%', height: '100%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 40, opacity: 0.2,
-                    }}>
-                      {tipo.emoji}
-                    </div>
-                  )}
-                  {/* Overlay hint */}
+                {/* Striscia foto — scroll orizzontale, tutte stessa altezza, click → scheda */}
+                {(spot.photo_urls?.length ?? 0) > 0 ? (
                   <div style={{
-                    position: 'absolute', inset: 0,
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)',
-                    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-                    paddingBottom: 9,
-                  }}>
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10,
-                      color: '#fff', letterSpacing: '0.05em', textTransform: 'uppercase',
-                      background: 'rgba(0,0,0,0.55)', padding: '3px 12px', borderRadius: 12,
-                    }}>
-                      tocca per la scheda →
-                    </span>
+                    display: 'flex', gap: 6, overflowX: 'auto',
+                    paddingBottom: 4, marginBottom: 8,
+                    scrollbarWidth: 'none',
+                    WebkitOverflowScrolling: 'touch',
+                  } as React.CSSProperties}>
+                    {(spot.photo_urls ?? [spot.cover_url]).filter(Boolean).map((url, pi) => (
+                      <Link
+                        key={pi}
+                        href={`/map/spot/${spot.slug}`}
+                        style={{
+                          flexShrink: 0, display: 'block',
+                          width: 84, height: 80,
+                          borderRadius: 5, overflow: 'hidden',
+                          background: 'var(--gray-700)',
+                          border: pi === 0 ? '1px solid rgba(255,106,0,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                        }}
+                      >
+                        <img
+                          src={url!} alt={`${spot.name} foto ${pi + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          loading="lazy"
+                        />
+                      </Link>
+                    ))}
                   </div>
-                </Link>
-
-                {/* Bottoni: Nav + Scheda */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={() => window.open(
-                      `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`,
-                      '_blank'
-                    )}
-                    style={{
-                      flex: 1, padding: '9px 0',
-                      background: 'transparent',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 6,
-                      fontFamily: 'var(--font-mono)', fontSize: 11,
-                      color: 'var(--bone)', cursor: 'pointer',
-                    }}
-                  >
-                    🧭 Portami qui
-                  </button>
+                ) : (
+                  /* Nessuna foto: placeholder cliccabile → scheda */
                   <Link
                     href={`/map/spot/${spot.slug}`}
                     style={{
-                      flex: 1, padding: '9px 0',
-                      background: 'var(--orange)', color: '#000',
-                      borderRadius: 6, border: 'none',
-                      fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
-                      cursor: 'pointer', textDecoration: 'none',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      letterSpacing: '0.03em',
+                      height: 64, borderRadius: 5, marginBottom: 8,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      textDecoration: 'none', fontSize: 28, opacity: 0.3,
                     }}
                   >
-                    Scheda →
+                    {tipo.emoji}
                   </Link>
+                )}
+
+                {/* Description + navigazione */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {spot.description ? (
+                      <p style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 11,
+                        color: 'var(--gray-400)', lineHeight: 1.55, margin: 0,
+                        display: '-webkit-box', WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical' as const,
+                        overflow: 'hidden',
+                      }}>
+                        {spot.description}
+                      </p>
+                    ) : (
+                      <Link
+                        href={`/map/spot/${spot.slug}`}
+                        style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 11,
+                          color: 'var(--orange)', textDecoration: 'none',
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        Apri scheda →
+                      </Link>
+                    )}
+                  </div>
+                  {/* Bottone portami qui — solo icona pin */}
+                  <button
+                    onClick={() => window.open(
+                      `https://maps.apple.com/?daddr=${spot.lat},${spot.lon}&dirflg=d`,
+                      '_blank'
+                    )}
+                    title="Portami qui"
+                    style={{
+                      flexShrink: 0,
+                      width: 36, height: 36,
+                      background: 'rgba(255,106,0,0.12)',
+                      border: '1px solid rgba(255,106,0,0.35)',
+                      borderRadius: 8,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 18, cursor: 'pointer',
+                    }}
+                  >
+                    📍
+                  </button>
                 </div>
               </div>
             )}
