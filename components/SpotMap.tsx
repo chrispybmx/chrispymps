@@ -77,6 +77,7 @@ export default function SpotMap({
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
   const markersRef       = useRef<import('leaflet').LayerGroup | null>(null);
+  const hasInitialFit    = useRef(false);
   const circleRef        = useRef<import('leaflet').Circle | null>(null);
   const centerMarkerRef  = useRef<import('leaflet').Marker | null>(null);
   const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
@@ -241,6 +242,16 @@ export default function SpotMap({
 
         markersRef.current!.addLayer(marker);
       });
+    }
+    /* ── Auto-fit al primo render con spot ── */
+    if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
+      const bounds = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
+      mapInstance.current.fitBounds(bounds, {
+        padding: [32, 32, 240, 32], // bottom padding = altezza overlay panel
+        maxZoom: 15,
+        animate: false,
+      });
+      hasInitialFit.current = true;
     }
   }, [filtered, clusters, zoom, selectedPin]);
 
