@@ -413,168 +413,41 @@ function SpotListPanel({
               </div>
             )}
 
-            {/* Riga principale — layout diverso se espanso */}
-            {isExp ? (
-              /* ── EXPANDED: foto rimane a sinistra (leggermente ingrandita),
-                 foto extra appaiono accanto, testo/info sotto ── */
-              <div style={{ padding: '10px 44px 10px 10px' }}>
+            {/* ── LAYOUT 2 COLONNE — stessa struttura compact/expanded ── */}
+            <div style={{
+              display: 'flex', gap: 10, alignItems: 'flex-start',
+              padding: '10px 44px 10px 10px',
+            }}>
 
-                {/* Foto row: cover ingrandita + extra foto */}
-                <div style={{
-                  display: 'flex', gap: 5,
-                  overflowX: 'auto', marginBottom: 9,
-                  scrollbarWidth: 'none',
-                  WebkitOverflowScrolling: 'touch',
-                } as React.CSSProperties}>
-                  {/* Cover — leggermente più grande del compact (76→90px) */}
-                  <Link
-                    href={`/map/spot/${spot.slug}`}
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                      flexShrink: 0, display: 'block',
-                      width: 90, height: 90,
-                      borderRadius: 6, overflow: 'hidden',
-                      background: 'var(--gray-700)',
-                      border: '2px solid rgba(255,106,0,0.55)',
-                    }}
-                  >
-                    {spot.cover_url ? (
-                      <img src={spot.cover_url} alt={spot.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        loading="lazy" />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, opacity: 0.3 }}>
-                        {tipo.emoji}
-                      </div>
-                    )}
-                  </Link>
-
-                  {/* Foto extra (dalla 2ª in poi) */}
-                  {(spot.photo_urls ?? []).slice(1).map((url, pi) => (
-                    <Link
-                      key={pi}
-                      href={`/map/spot/${spot.slug}`}
-                      onClick={e => e.stopPropagation()}
-                      style={{
-                        flexShrink: 0, display: 'block',
-                        width: 80, height: 90,
-                        borderRadius: 6, overflow: 'hidden',
-                        background: 'var(--gray-700)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                      }}
-                    >
-                      <img src={url} alt=""
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        loading="lazy" />
-                    </Link>
-                  ))}
-                </div>
-
-                {/* Nome spot */}
-                <Link
-                  href={`/map/spot/${spot.slug}`}
-                  onClick={e => e.stopPropagation()}
-                  style={{ textDecoration: 'none', display: 'block', marginBottom: 6 }}
-                >
-                  <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-                    color: 'var(--orange)', lineHeight: 1.3,
-                  }}>
-                    {spot.name}
-                  </div>
-                </Link>
-
-                {/* Badges + description + nav */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                      {spot.condition === 'alive' ? (
-                        <span style={{
-                          display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-                          background: '#00c851', boxShadow: '0 0 5px #00c851aa', flexShrink: 0,
-                        }} />
-                      ) : (
-                        <span style={{
-                          background: cond.bg, color: cond.color,
-                          fontFamily: 'var(--font-mono)', fontSize: 9,
-                          padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase',
-                        }}>{cond.label}</span>
-                      )}
-                      <span style={{
-                        color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9,
-                        padding: '2px 5px', borderRadius: 2,
-                        border: `1px solid ${tipo.color}55`,
-                        textTransform: 'uppercase', letterSpacing: '0.03em',
-                      }}>{tipo.label}</span>
-                      {spot.city && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--gray-500)' }}>
-                          {spot.city}
-                        </span>
-                      )}
-                    </div>
-                    {spot.description && (
-                      <div style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10,
-                        color: 'var(--gray-400)', lineHeight: 1.55,
-                        display: '-webkit-box', WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
-                      }}>
-                        {spot.description}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      window.open(`https://maps.apple.com/?daddr=${spot.lat},${spot.lon}&dirflg=d`, '_blank');
-                    }}
-                    title="Portami qui"
-                    style={{
-                      flexShrink: 0, width: 34, height: 34,
-                      background: 'rgba(255,106,0,0.12)',
-                      border: '1px solid rgba(255,106,0,0.35)',
-                      borderRadius: 7,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 16, cursor: 'pointer',
-                    }}
-                  >
-                    📍
-                  </button>
-                </div>
-              </div>
-
-            ) : (
-              /* ── COMPACT: thumbnail + testo, thumbnail cliccabile → scheda ── */
-              <div style={{ display: 'flex', gap: 10, padding: '11px 44px 11px 10px' }}>
-
-                {/* Foto thumbnail → cliccabile apre la scheda */}
+              {/* ── COLONNA SINISTRA: foto principale che cresce ── */}
+              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <Link
                   href={`/map/spot/${spot.slug}`}
                   onClick={e => e.stopPropagation()}
                   style={{
-                    width: 76, height: 76, flexShrink: 0,
-                    borderRadius: 4, overflow: 'hidden',
-                    background: 'var(--gray-700)', position: 'relative', display: 'block',
-                    boxShadow: isAct ? '0 0 0 2px var(--orange), 0 0 12px rgba(255,106,0,0.3)' : 'none',
-                    transition: 'box-shadow 0.25s',
+                    display: 'block', flexShrink: 0,
+                    width:  isExp ? 110 : 76,
+                    height: isExp ? 110 : 76,
+                    borderRadius: isExp ? 8 : 4,
+                    overflow: 'hidden',
+                    background: 'var(--gray-700)',
+                    border: isExp
+                      ? '2px solid rgba(255,106,0,0.65)'
+                      : isAct ? '2px solid var(--orange)' : '1px solid rgba(255,255,255,0.07)',
+                    transition: 'width 0.2s ease, height 0.2s ease, border-radius 0.2s ease',
+                    position: 'relative',
                   }}
                 >
                   {spot.cover_url ? (
-                    <img
-                      src={spot.cover_url} alt={spot.name}
-                      style={{
-                        width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-                        filter: isAct ? 'contrast(1.08) saturate(1.15)' : 'none',
-                        transition: 'filter 0.25s',
-                      }}
-                      loading="lazy"
-                    />
+                    <img src={spot.cover_url} alt={spot.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      loading="lazy" />
                   ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, opacity: 0.4 }}>
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isExp ? 32 : 24, opacity: 0.3 }}>
                       {tipo.emoji}
                     </div>
                   )}
-                  {isAct && (
+                  {isAct && !isExp && (
                     <div style={{
                       position: 'absolute', top: 3, left: 3,
                       background: 'var(--orange)', color: '#000',
@@ -584,62 +457,107 @@ function SpotListPanel({
                   )}
                 </Link>
 
-                {/* Info testo */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3, justifyContent: 'center' }}>
-                  <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
-                    color: isAct ? 'var(--orange)' : 'var(--bone)', lineHeight: 1.3,
-                    overflow: 'hidden', textOverflow: 'ellipsis',
-                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
-                    transition: 'color 0.25s',
-                  }}>
-                    {spot.name}
+                {/* Foto extra — appaiono sotto quando espanso */}
+                {isExp && (spot.photo_urls?.length ?? 0) > 1 && (
+                  <div style={{ display: 'flex', gap: 4, overflowX: 'auto', width: 110, scrollbarWidth: 'none' } as React.CSSProperties}>
+                    {(spot.photo_urls ?? []).slice(1, 4).map((url, pi) => (
+                      <Link key={pi} href={`/map/spot/${spot.slug}`}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          flexShrink: 0, display: 'block',
+                          width: 32, height: 32,
+                          borderRadius: 4, overflow: 'hidden',
+                          background: 'var(--gray-700)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                        }}>
+                        <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                      </Link>
+                    ))}
                   </div>
-
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {spot.condition === 'alive' ? (
-                      <span style={{
-                        display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-                        background: '#00c851', boxShadow: '0 0 5px #00c851aa', flexShrink: 0,
-                      }} title="Spot attivo" />
-                    ) : (
-                      <span style={{
-                        background: cond.bg, color: cond.color,
-                        fontFamily: 'var(--font-mono)', fontSize: 9,
-                        padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase',
-                      }}>
-                        {cond.label}
-                      </span>
-                    )}
-                    <span style={{
-                      color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9,
-                      padding: '2px 5px', borderRadius: 2,
-                      border: `1px solid ${tipo.color}55`,
-                      textTransform: 'uppercase', letterSpacing: '0.03em',
-                    }}>
-                      {tipo.label}
-                    </span>
-                  </div>
-
-                  {myRate > 0 && (
-                    <div style={{ display: 'flex', gap: 1 }}>
-                      {[1,2,3,4,5].map(i => (
-                        <span key={i} style={{ fontSize: 9, color: i <= myRate ? '#fbbf24' : 'var(--gray-600)' }}>★</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {(spot.city || spot.submitted_by_username) && (
-                    <div style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
-            )}
+
+              {/* ── COLONNA DESTRA: titolo che cresce, badges, description, nav ── */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+
+                {/* Nome — più grande quando espanso */}
+                <div style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: isExp ? 15 : 13,
+                  fontWeight: 700,
+                  color: isExp ? 'var(--orange)' : isAct ? 'var(--orange)' : 'var(--bone)',
+                  lineHeight: 1.25,
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                  display: '-webkit-box', WebkitLineClamp: isExp ? 3 : 2,
+                  WebkitBoxOrient: 'vertical' as const,
+                  transition: 'font-size 0.2s ease, color 0.2s ease',
+                }}>
+                  {spot.name}
+                </div>
+
+                {/* Badges */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {spot.condition === 'alive' ? (
+                    <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa', flexShrink: 0 }} />
+                  ) : (
+                    <span style={{ background: cond.bg, color: cond.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase' }}>
+                      {cond.label}
+                    </span>
+                  )}
+                  <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    {tipo.label}
+                  </span>
+                </div>
+
+                {/* Città / username — compact */}
+                {!isExp && (spot.city || spot.submitted_by_username) && (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
+                  </div>
+                )}
+
+                {/* Rating compact */}
+                {!isExp && myRate > 0 && (
+                  <div style={{ display: 'flex', gap: 1 }}>
+                    {[1,2,3,4,5].map(i => <span key={i} style={{ fontSize: 9, color: i <= myRate ? '#fbbf24' : 'var(--gray-600)' }}>★</span>)}
+                  </div>
+                )}
+
+                {/* Description + nav — solo espanso */}
+                {isExp && (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 2 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {spot.description ? (
+                        <div style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 10,
+                          color: 'var(--gray-400)', lineHeight: 1.55,
+                          display: '-webkit-box', WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
+                        }}>
+                          {spot.description}
+                        </div>
+                      ) : (
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)' }}>
+                          {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); window.open(`https://maps.apple.com/?daddr=${spot.lat},${spot.lon}&dirflg=d`, '_blank'); }}
+                      title="Portami qui"
+                      style={{
+                        flexShrink: 0, width: 36, height: 36,
+                        background: 'rgba(255,106,0,0.12)',
+                        border: '1px solid rgba(255,106,0,0.4)',
+                        borderRadius: 7, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 18,
+                      }}
+                    >📍</button>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Preferiti */}
             <button
@@ -648,9 +566,9 @@ function SpotListPanel({
                 position: 'absolute', top: 10, right: 8,
                 background: myFav ? 'rgba(255,60,60,0.15)' : 'rgba(20,20,20,0.7)',
                 border: myFav ? '1px solid rgba(255,60,60,0.4)' : '1px solid rgba(255,255,255,0.07)',
-                borderRadius: '50%', width: 26, height: 26,
+                borderRadius: '50%', width: 32, height: 32,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: 11, padding: 0,
+                cursor: 'pointer', fontSize: 13, padding: 0,
               }}
               aria-label="Preferiti"
             >
