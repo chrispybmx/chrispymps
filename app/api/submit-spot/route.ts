@@ -99,13 +99,20 @@ export async function POST(req: NextRequest) {
     // Valida dimensione
     if (file.size > MAX_PHOTO_SIZE) continue;
 
-    // Valida MIME
+    // Valida MIME dichiarato dal client
     const mimeType = file.type.toLowerCase();
     const ext = ALLOWED_MIME[mimeType];
     if (!ext) continue;
 
-    const path   = `${spot.id}/${i}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Verifica magic bytes (il client potrebbe dichiarare MIME falso)
+    if (!isValidImageMagicBytes(buffer, mimeType)) {
+      console.warn(`[submit-spot] magic bytes non validi per ${mimeType}`);
+      continue;
+    }
+
+    const path = `${spot.id}/${i}.${ext}`;
 
     const { error: uploadErr } = await supabase.storage
       .from('spot-photos')
@@ -142,4 +149,22 @@ export async function POST(req: NextRequest) {
   sendAdminNotification(spot, contributor as any).catch(() => {});
 
   return NextResponse.json({ ok: true, data: { id: spot.id, slug: spot.slug } }, { status: 201 });
+}
+
+/** Verifica magic bytes per JPEG, PNG, WebP */
+function isValidImageMagicBytes(buf: Buffer, mimeType: string): boolean {
+  if (buf.length < 4) return false;
+  switch (mimeType) {
+    case 'image/jpeg':
+    case 'image/jpg':
+      return buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
+    case 'image/png':
+      return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+    case 'image/webp':
+      return buf.length >= 12
+        && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46
+        && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50;
+    default:
+      return false;
+  }
 }
