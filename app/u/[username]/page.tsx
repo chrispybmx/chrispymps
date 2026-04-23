@@ -50,10 +50,10 @@ async function getData(username: string) {
       .limit(50),
   ]);
 
-  /* Estrae i dati annidati da spot_riders → spots */
-  type RiddenRow = { spots: SpotCard | null };
+  /* Estrae i dati annidati da spot_riders → spots (Supabase returns array) */
+  type RiddenRow = { spots: SpotCard[] | null };
   const ridden: SpotCard[] = (riddenRaw ?? [])
-    .map((r: RiddenRow) => r.spots)
+    .flatMap((r: RiddenRow) => r.spots ?? [])
     .filter((s): s is SpotCard => !!s);
 
   return {
