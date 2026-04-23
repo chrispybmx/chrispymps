@@ -349,7 +349,17 @@ function SpotListPanel({
   }
 
   return (
-    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' as unknown as undefined }}>
+
+      {/* Mobile-friendly CSS: hover only on pointer devices, tap highlight off */}
+      <style>{`
+        .spot-card-wrap { -webkit-tap-highlight-color: transparent; }
+        @media (hover: hover) and (pointer: fine) {
+          .spot-card-wrap:not([data-exp="1"]):hover { background: rgba(255,255,255,0.025) !important; }
+        }
+        .spot-card-wrap:active { opacity: 0.88; }
+        .spot-fav-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+      `}</style>
 
       {/* Header lista */}
       <div style={{
@@ -385,6 +395,8 @@ function SpotListPanel({
             key={spot.id}
             ref={(el) => setRef(spot.id, el)}
             data-spot-id={spot.id}
+            data-exp={isExp ? '1' : undefined}
+            className="spot-card-wrap"
             onClick={() => onSpotClick(spot)}
             style={{
               position: 'relative',
@@ -394,12 +406,11 @@ function SpotListPanel({
                 featured ? 'rgba(255,106,0,0.22)' :
                 'transparent'
               }`,
-              transition: 'border-color 0.25s, background 0.15s',
+              transition: 'border-color 0.25s, background 0.15s, opacity 0.1s',
               cursor: 'pointer',
               background: isExp ? 'rgba(255,106,0,0.05)' : featured ? 'rgba(255,106,0,0.015)' : 'transparent',
+              touchAction: 'manipulation',
             }}
-            onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-            onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = featured ? 'rgba(255,106,0,0.015)' : 'transparent'; }}
           >
             {/* Featured badge */}
             {featured && (
@@ -562,13 +573,15 @@ function SpotListPanel({
             {/* Preferiti */}
             <button
               onClick={e => handleFav(e, spot.id)}
+              className="spot-fav-btn"
               style={{
                 position: 'absolute', top: 10, right: 8,
                 background: myFav ? 'rgba(255,60,60,0.15)' : 'rgba(20,20,20,0.7)',
                 border: myFav ? '1px solid rgba(255,60,60,0.4)' : '1px solid rgba(255,255,255,0.07)',
-                borderRadius: '50%', width: 32, height: 32,
+                borderRadius: '50%', width: 36, height: 36,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: 13, padding: 0,
+                cursor: 'pointer', fontSize: 14, padding: 0,
+                minWidth: 36, minHeight: 36,
               }}
               aria-label="Preferiti"
             >
@@ -579,7 +592,7 @@ function SpotListPanel({
         );
       })}
 
-      <div style={{ height: 48 }} />
+      <div style={{ height: 'calc(48px + env(safe-area-inset-bottom, 0px))' }} />
     </div>
   );
 }
