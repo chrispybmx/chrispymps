@@ -7,7 +7,7 @@ import AdminImportKML from '@/components/AdminImportKML';
 import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 
-type Tab = 'pending' | 'all' | 'import' | 'stats' | 'events' | 'news' | 'comments';
+type Tab = 'pending' | 'all' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users';
 
 interface AdminComment {
   id: string;
@@ -16,6 +16,17 @@ interface AdminComment {
   created_at: string;
   spot_id: string;
   spots?: { name: string; slug: string; city?: string } | null;
+}
+
+interface AdminUser {
+  id:               string;
+  username:         string;
+  bio?:             string | null;
+  instagram_handle?: string | null;
+  created_at:       string;
+  spot_count:       number;
+  pending_spots:    number;
+  comment_count:    number;
 }
 
 interface AdminDashboardProps {
@@ -102,6 +113,11 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   const [adminComments, setAdminComments] = useState<AdminComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
+  /* ── Users state ── */
+  const [adminUsers, setAdminUsers]       = useState<AdminUser[]>([]);
+  const [loadingUsers, setLoadingUsers]   = useState(false);
+  const [userSearch, setUserSearch]       = useState('');
+
   /* ── Load all spots ── */
   useEffect(() => {
     if (tab !== 'all' && tab !== 'stats') return;
@@ -144,6 +160,40 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       .then(j => { if (j.ok) setAdminComments(j.data); })
       .finally(() => setLoadingComments(false));
   }, [tab]);
+
+  /* ── Load users ── */
+  useEffect(() => {
+    if (tab !== 'users') return;
+    if (adminUsers.length > 0) return;
+    setLoadingUsers(true);
+    fetch('/api/admin/users')
+      .then(r => r.json())
+      .then(j => { if (j.ok) setAdminUsers(j.data); })
+      .finally(() => setLoadingUsers(false));
+  }, [tab]);
+
+  /* ── User moderation actions ── */
+  const handleDeleteUserComments = useCallback(async (username: string) => {
+    if (!window.confirm(`Eliminare tutti i commenti di @${username}?`)) return;
+    const res  = await fetch('/api/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, action: 'delete_comments' }) });
+    const json = await res.json();
+    if (json.ok) {
+      setAdminUsers(prev => prev.map(u => u.username === username ? { ...u, comment_count: 0 } : u));
+      setAdminComments(prev => prev.filter(c => c.username !== username));
+      showMsg(`🗑️ Commenti di @${username} eliminati.`);
+    } else { showMsg('❌ ' + json.error); }
+  }, []);
+
+  const handleSuspendUser = useCallback(async (username: string) => {
+    if (!window.confirm(`Sospendere @${username}?\n\nVerranno eliminati tutti i commenti e gli spot verranno rimessi in attesa di revisione.`)) return;
+    const res  = await fetch('/api/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, action: 'suspend' }) });
+    const json = await res.json();
+    if (json.ok) {
+      setAdminUsers(prev => prev.map(u => u.username === username ? { ...u, comment_count: 0, pending_spots: u.spot_count } : u));
+      setAdminComments(prev => prev.filter(c => c.username !== username));
+      showMsg(`⛔ @${username} sospeso.`);
+    } else { showMsg('❌ ' + json.error); }
+  }, []);
 
   const handleDeleteComment = useCallback(async (comment: AdminComment) => {
     if (!window.confirm(`Eliminare il commento di @${comment.username}?\n\n"${comment.text.slice(0, 80)}${comment.text.length > 80 ? '…' : ''}"`)) return;
@@ -276,6 +326,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
     { key: 'pending',  label: '📥 In attesa', badge: pending.length },
     { key: 'all',      label: '🗺️ Spot' },
     { key: 'comments', label: '💬 Commenti' },
+    { key: 'users',    label: '👤 Utenti' },
     { key: 'events',   label: '📅 Eventi' },
     { key: 'news',     label: '📰 News' },
     { key: 'import',   label: '📂 Importa' },
@@ -462,6 +513,147 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── TAB: UTENTI ── */}
+      {tab === 'users' && (
+        <div style={{ padding: '16px 20px 0' }}>
+          {/* Search + refresh bar */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+            <input
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+              placeholder="Cerca @username..."
+              className="input-vhs"
+              style={{ flex: 1 }}
+            />
+            <button
+              onClick={() => { setAdminUsers([]); setLoadingUsers(true); fetch('/api/admin/users').then(r => r.json()).then(j => { if (j.ok) setAdminUsers(j.data); }).finally(() => setLoadingUsers(false)); }}
+              className="btn-ghost"
+              style={{ fontSize: 12, flexShrink: 0 }}
+            >
+              🔄 Aggiorna
+            </button>
+          </div>
+
+          {loadingUsers ? <Loading /> : (() => {
+            const q = userSearch.toLowerCase().replace('@', '');
+            const filtered = q ? adminUsers.filter(u => u.username.toLowerCase().includes(q)) : adminUsers;
+            return filtered.length === 0 ? (
+              <EmptyState icon="👤" text="Nessun utente trovato." />
+            ) : (
+              <>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginBottom: 10 }}>
+                  {filtered.length} utenti registrati
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {filtered.map(u => (
+                    <div key={u.id} style={{
+                      background: 'var(--gray-800)',
+                      border: '1px solid var(--gray-700)',
+                      borderRadius: 8,
+                      padding: '14px 16px',
+                    }}>
+                      {/* User header */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+                        {/* Avatar */}
+                        <div style={{
+                          width: 40, height: 40, borderRadius: '50%',
+                          background: 'var(--orange)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontFamily: 'var(--font-mono)', fontSize: 16, color: '#000',
+                          fontWeight: 700, flexShrink: 0,
+                        }}>
+                          {u.username[0].toUpperCase()}
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--orange)' }}>
+                              @{u.username}
+                            </span>
+                            {u.instagram_handle && (
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
+                                IG: @{u.instagram_handle}
+                              </span>
+                            )}
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)', marginLeft: 'auto' }}>
+                              {new Date(u.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+
+                          {/* Stats row */}
+                          <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: u.spot_count > 0 ? 'var(--bone)' : 'var(--gray-600)' }}>
+                              🗺️ {u.spot_count} spot
+                            </span>
+                            {u.pending_spots > 0 && (
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ffce4d' }}>
+                                ⏳ {u.pending_spots} in attesa
+                              </span>
+                            )}
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: u.comment_count > 0 ? 'var(--bone)' : 'var(--gray-600)' }}>
+                              💬 {u.comment_count} commenti
+                            </span>
+                          </div>
+
+                          {/* Bio */}
+                          {u.bio && (
+                            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', margin: '6px 0 0', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                              {u.bio.length > 120 ? u.bio.slice(0, 120) + '…' : u.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <a
+                          href={`/u/${u.username}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 12,
+                            background: 'transparent', border: '1px solid var(--gray-600)',
+                            borderRadius: 4, color: 'var(--bone)',
+                            padding: '6px 12px', cursor: 'pointer', textDecoration: 'none',
+                            display: 'inline-flex', alignItems: 'center',
+                          }}
+                        >
+                          🔗 Vedi profilo
+                        </a>
+                        {u.comment_count > 0 && (
+                          <button
+                            onClick={() => handleDeleteUserComments(u.username)}
+                            style={{
+                              fontFamily: 'var(--font-mono)', fontSize: 12,
+                              background: 'transparent', border: '1px solid rgba(255,100,100,0.4)',
+                              borderRadius: 4, color: '#e05555',
+                              padding: '6px 12px', cursor: 'pointer',
+                            }}
+                          >
+                            🗑️ Elimina commenti ({u.comment_count})
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleSuspendUser(u.username)}
+                          style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 12,
+                            background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.5)',
+                            borderRadius: 4, color: '#ff4444',
+                            padding: '6px 12px', cursor: 'pointer',
+                          }}
+                        >
+                          ⛔ Sospendi
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
