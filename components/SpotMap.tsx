@@ -11,10 +11,10 @@ let L: typeof import('leaflet') | null = null;
 const CLUSTER_ZOOM = 10;
 
 interface SpotMapProps {
-  spots:              SpotMapPin[];
-  filterType:         SpotType | null;
-  filterRegionCities: string[] | null;
-  searchQuery:        string;
+  spots:             SpotMapPin[];
+  filterType:        SpotType | null;
+  filterRegionBbox?: [number, number, number, number] | null;
+  searchQuery:       string;
   onSpotClick:        (pin: SpotMapPin) => void;
   onAddSpotAt:        (lat: number, lon: number) => void;
   flyTarget?:         { lat: number; lon: number; zoom?: number } | null;
@@ -71,7 +71,7 @@ function computeClusters(spots: SpotMapPin[]) {
 }
 
 export default function SpotMap({
-  spots, filterType, filterRegionCities, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
+  spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   selectedPin, radiusMode, radiusCenter, radiusKm, onMapClick,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
@@ -96,13 +96,16 @@ export default function SpotMap({
 
   const filtered = useMemo(() => spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
-    if (filterRegionCities && s.city && !filterRegionCities.includes(s.city)) return false;
+    if (filterRegionBbox) {
+      const [latMin, lonMin, latMax, lonMax] = filterRegionBbox;
+      if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return s.name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
     }
     return true;
-  }), [spots, filterType, filterRegionCities, searchQuery]);
+  }), [spots, filterType, filterRegionBbox, searchQuery]);
 
   const clusters = useMemo(() => computeClusters(filtered), [filtered]);
 
