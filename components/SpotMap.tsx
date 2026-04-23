@@ -26,8 +26,8 @@ interface SpotMapProps {
   onMapClick?:   (lat: number, lon: number) => void;
 }
 
-/* ── SVG pin individuale (più piccolo rispetto a prima) ── */
-function pinSvg(type: SpotType, condition: string): string {
+/* ── SVG pin individuale ── */
+function pinSvg(type: SpotType, condition: string, isSelected = false): string {
   const info  = TIPI_SPOT[type];
   const color = condition === 'alive'   ? info.color
               : condition === 'bustato' ? '#888'
@@ -37,11 +37,15 @@ function pinSvg(type: SpotType, condition: string): string {
     <line x1="21" y1="9" x2="9" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
   ` : '';
   const glow = condition === 'alive' ? `<circle cx="15" cy="15" r="13" fill="${color}" opacity="0.12"/>` : '';
+  const strokeColor = isSelected ? '#ff6a00' : '#0a0a0a';
+  const strokeWidth = isSelected ? 2.5 : 1.5;
+  const w = isSelected ? 38 : 30;
+  const h = isSelected ? 48 : 38;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 30 38">
     ${glow}
     <path d="M15 0C6.72 0 0 6.72 0 15c0 8.28 15 23 15 23S30 23.28 30 15C30 6.72 23.28 0 15 0z"
-          fill="${color}" stroke="#0a0a0a" stroke-width="1.5"/>
+          fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
     <circle cx="15" cy="15" r="9" fill="rgba(0,0,0,0.22)"/>
     <text x="15" y="15.5" text-anchor="middle" font-size="12" dominant-baseline="middle">${info.emoji}</text>
     ${cross}
@@ -73,7 +77,6 @@ export default function SpotMap({
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
   const markersRef       = useRef<import('leaflet').LayerGroup | null>(null);
-  const selectedLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
   const circleRef        = useRef<import('leaflet').Circle | null>(null);
   const centerMarkerRef  = useRef<import('leaflet').Marker | null>(null);
   const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
@@ -122,8 +125,6 @@ export default function SpotMap({
       }).addTo(map);
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-      // selectedLayer PRIMA dei marker → rimane sotto i pin
-      selectedLayerRef.current = L.layerGroup().addTo(map);
       markersRef.current  = L.layerGroup().addTo(map);
       mapInstance.current = map;
 
@@ -210,13 +211,16 @@ export default function SpotMap({
       filtered.forEach((pin) => {
         if (!L || !markersRef.current) return;
 
-        const svg  = pinSvg(pin.type, pin.condition);
+        const isSel = selectedPin?.id === pin.id;
+        const svg  = pinSvg(pin.type, pin.condition, isSel);
+        const pw = isSel ? 38 : 30;
+        const ph = isSel ? 48 : 38;
         const icon = L!.divIcon({
           html:        svg,
           className:   'spot-pin',
-          iconSize:    [30, 38],
-          iconAnchor:  [15, 38],
-          popupAnchor: [0, -40],
+          iconSize:    [pw, ph],
+          iconAnchor:  [pw / 2, ph],
+          popupAnchor: [0, -(ph + 2)],
         });
 
         const marker = L!.marker([pin.lat, pin.lon], { icon });
@@ -238,7 +242,7 @@ export default function SpotMap({
         markersRef.current!.addLayer(marker);
       });
     }
-  }, [filtered, clusters, zoom]);
+  }, [filtered, clusters, zoom, selectedPin]);
 
   /* ── Fly-to ── */
   useEffect(() => {
@@ -249,54 +253,6 @@ export default function SpotMap({
       { duration: 1.4 }
     );
   }, [flyTarget]);
-
-  /* ── Marker selezionato — alone sotto il pin ── */
-  useEffect(() => {
-    if (!selectedLayerRef.current || !L) return;
-    selectedLayerRef.current.clearLayers();
-    if (!selectedPin) return;
-
-    if (!document.getElementById('sel-glow-style')) {
-      const style = document.createElement('style');
-      style.id = 'sel-glow-style';
-      style.textContent = `
-        @keyframes selBreathe {
-          0%,100% { opacity: 0.5; transform: scale(1); }
-          50%      { opacity: 0.8; transform: scale(1.15); }
-        }
-        .sel-glow { animation: selBreathe 2.4s ease-in-out infinite; }
-      `;
-      document.head.appendChild(style);
-    }
-
-    const html = `
-      <div class="sel-glow" style="
-        width: 44px; height: 44px;
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(255,106,0,0.35) 0%, rgba(255,106,0,0) 70%);
-        border: 1.5px solid rgba(255,106,0,0.55);
-        box-shadow: 0 0 16px rgba(255,106,0,0.3);
-        pointer-events: none;
-      "></div>
-    `;
-
-    /*
-     * Il pin ha iconSize [30,38] e iconAnchor [15,38] → la punta è sul coordinate.
-     * Il cerchio del pin è centrato a circa y=13 dall'alto → 38-13 = 25px sopra la punta.
-     * Per centrare il glow (44×44) sullo stesso punto:
-     *   centro glow = (22, 22) → voglio che (22, 22+25)=(22,47) sia sul coordinate.
-     */
-    const icon = L!.divIcon({
-      html,
-      className: '',
-      iconSize:  [44, 44],
-      iconAnchor:[22, 47],
-    });
-
-    L!.marker([selectedPin.lat, selectedPin.lon], { icon, interactive: false })
-      .addTo(selectedLayerRef.current!);
-
-  }, [selectedPin]);
 
   /* ── Radius cursor ── */
   useEffect(() => {
