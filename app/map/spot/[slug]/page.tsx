@@ -260,7 +260,6 @@ export default async function SpotPage({ params }: Props) {
               <MetaRow label="Note accesso" value={spot.guardians} />
             </div>
           )}
-          <MetaRow label="Aggiornato" value={new Date(spot.condition_updated_at).toLocaleDateString('it-IT')} />
         </div>
 
         {/* ── VIDEO YOUTUBE ── */}
@@ -298,6 +297,16 @@ export default async function SpotPage({ params }: Props) {
           >
             🧭 Portami qui
           </a>
+        {/* Data aggiornamento — discreta, in fondo a destra */}
+        <div style={{
+          textAlign: 'right',
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          color: 'var(--gray-600)',
+          letterSpacing: '0.05em',
+          marginBottom: 8,
+        }}>
+          aggiornato {new Date(spot.condition_updated_at).toLocaleDateString('it-IT')}
+        </div>
         </div>
       </div>
 
