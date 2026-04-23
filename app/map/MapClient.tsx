@@ -35,14 +35,14 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
   ),
 });
 
-interface MapClientProps { initialSpots: SpotMapPin[] }
+interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 
 const TOP_OFFSET = 100;
 
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function MapClient({ initialSpots }: MapClientProps) {
+export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [spots]              = useState<SpotMapPin[]>(initialSpots);
   const [filterType,         setFilterType]         = useState<SpotType | null>(null);
   const [filterRegionCities, setFilterRegionCities] = useState<string[] | null>(null);
@@ -53,6 +53,11 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   const [addLon,             setAddLon]             = useState<number | undefined>();
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
   const [authOpen,           setAuthOpen]           = useState(false);
+
+  /* ── Auto-open add modal se URL contiene ?add=1 ── */
+  useEffect(() => {
+    if (autoAdd) setAddOpen(true);
+  }, [autoAdd]);
 
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
