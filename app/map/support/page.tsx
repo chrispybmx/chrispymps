@@ -4,10 +4,9 @@ import { LINKS } from '@/lib/constants';
 
 export const metadata: Metadata = {
   title:       'Supporta ChrispyMPS',
-  description: 'Vuoi supportare la mappa BMX italiana? Il modo migliore è aggiungere uno spot. Oppure dona via PayPal, Revolut o Bitcoin.',
+  description: 'Vuoi supportare la mappa BMX italiana? Il modo migliore è aggiungere uno spot. Oppure dona via Revolut o Bitcoin.',
 };
 
-/* ── Aggiorna questi con i tuoi dati reali ── */
 const DONATE = {
   revolut: 'https://revolut.me/chrispybmx',
   btc:     'bc1qlcm90tma74epqsv5gleme2xw3akeunxmhgj765',
@@ -23,6 +22,13 @@ export default function SupportPage() {
       paddingTop: 'var(--topbar-height)',
       paddingBottom: 'calc(var(--strip-height) + 40px)',
     }}>
+      {/* Stili hover via CSS — server component non supporta event handlers */}
+      <style>{`
+        .donate-card { transition: border-color 0.15s, background 0.15s; }
+        .donate-card-revolut:hover { border-color: #635bff !important; background: rgba(99,91,255,0.06) !important; }
+        .donate-card-btc:hover { border-color: rgba(247,147,26,0.6) !important; background: rgba(247,147,26,0.04) !important; }
+      `}</style>
+
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '28px 20px 0' }}>
 
         {/* Back */}
@@ -56,7 +62,7 @@ export default function SupportPage() {
           </p>
         </div>
 
-        {/* ═══ CTA PRINCIPALE: Aggiungi uno spot ═══ */}
+        {/* ═══ CTA PRINCIPALE ═══ */}
         <div style={{
           background: 'rgba(255,106,0,0.06)',
           border: '1.5px solid rgba(255,106,0,0.4)',
@@ -71,12 +77,9 @@ export default function SupportPage() {
           }}>
             IL MODO MIGLIORE PER SUPPORTARMI
           </div>
-          <p style={{
-            color: 'var(--bone)', fontSize: 15, lineHeight: 1.6,
-            marginBottom: 20,
-          }}>
+          <p style={{ color: 'var(--bone)', fontSize: 15, lineHeight: 1.6, marginBottom: 20 }}>
             Aggiungi uno spot. Ogni location nuova fa crescere la community
-            e aiuta altri rider a trovare posti nuovi. È il contributo più prezioso.
+            e aiuta altri rider a trovare posti nuovi.
           </p>
           <Link
             href="/map?add=1"
@@ -95,7 +98,7 @@ export default function SupportPage() {
             fontFamily: 'var(--font-mono)', fontSize: 11,
             color: 'var(--gray-500)', marginTop: 12,
           }}>
-            Serve un account gratuito · approvazione manuale · la tua crew ti ringrazierà
+            Serve un account gratuito · approvazione manuale
           </div>
         </div>
 
@@ -124,30 +127,23 @@ export default function SupportPage() {
             href={DONATE.revolut}
             target="_blank"
             rel="noopener noreferrer"
+            className="donate-card donate-card-revolut"
             style={{
               display: 'flex', alignItems: 'center', gap: 16,
               padding: '18px 20px', marginBottom: 10,
               background: 'var(--gray-800)',
               border: '1px solid rgba(99,91,255,0.35)',
               borderRadius: 10, textDecoration: 'none',
-              transition: 'border-color 0.15s, background 0.15s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = '#635bff';
-              (e.currentTarget as HTMLElement).style.background = 'rgba(99,91,255,0.06)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,91,255,0.35)';
-              (e.currentTarget as HTMLElement).style.background = 'var(--gray-800)';
             }}
           >
             <div style={{
               width: 44, height: 44, borderRadius: 8,
               background: '#191c28', display: 'flex', alignItems: 'center',
               justifyContent: 'center', fontSize: 20, flexShrink: 0,
-              border: '1px solid #635bff55',
+              border: '1px solid #635bff55', color: '#fff',
+              fontFamily: 'var(--font-mono)', fontWeight: 700,
             }}>
-              𝐑
+              R
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)', marginBottom: 3 }}>
@@ -161,12 +157,15 @@ export default function SupportPage() {
           </a>
 
           {/* Bitcoin */}
-          <div style={{
-            background: 'var(--gray-800)',
-            border: '1px solid rgba(247,147,26,0.3)',
-            borderRadius: 10, padding: '18px 20px',
-            marginBottom: 10,
-          }}>
+          <div
+            className="donate-card donate-card-btc"
+            style={{
+              background: 'var(--gray-800)',
+              border: '1px solid rgba(247,147,26,0.3)',
+              borderRadius: 10, padding: '18px 20px',
+              marginBottom: 10,
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
               <div style={{
                 width: 44, height: 44, borderRadius: 8,
@@ -186,12 +185,10 @@ export default function SupportPage() {
               </div>
             </div>
 
-            {/* QR + indirizzo */}
             <div style={{
               display: 'flex', gap: 16, alignItems: 'flex-start',
               background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: '14px',
             }}>
-              {/* QR code */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={btcQr}
@@ -202,16 +199,15 @@ export default function SupportPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontFamily: 'var(--font-mono)', fontSize: 10,
-                  color: 'var(--gray-400)', marginBottom: 6, letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
+                  color: 'var(--gray-400)', marginBottom: 6,
+                  textTransform: 'uppercase', letterSpacing: '0.04em',
                 }}>
                   Indirizzo BTC
                 </div>
                 <div style={{
                   fontFamily: 'var(--font-mono)', fontSize: 10,
-                  color: '#f7931a',
-                  wordBreak: 'break-all', lineHeight: 1.5,
-                  userSelect: 'all',
+                  color: '#f7931a', wordBreak: 'break-all', lineHeight: 1.5,
+                  userSelect: 'all' as const,
                 }}>
                   {DONATE.btc}
                 </div>
@@ -226,11 +222,11 @@ export default function SupportPage() {
           </div>
         </div>
 
-        {/* Story block */}
+        {/* Story */}
         <div style={{
           background: 'var(--gray-800)',
           border: '1px solid var(--gray-700)',
-          borderRadius: 10, padding: '20px 20px',
+          borderRadius: 10, padding: '20px',
           marginBottom: 32,
         }}>
           <div style={{
@@ -242,8 +238,7 @@ export default function SupportPage() {
           </div>
           <p style={{ color: 'var(--gray-400)', lineHeight: 1.7, fontSize: 14, marginBottom: 12 }}>
             Ci sono mille app di mappe. Nessuna è fatta da chi fa BMX, per chi fa BMX.
-            ChrispyMPS nasce perché la scena italiana merita uno strumento suo — con la
-            condizione degli spot aggiornata, le foto reali, le info che contano davvero.
+            ChrispyMPS nasce perché la scena italiana merita uno strumento suo.
           </p>
           <div style={{ borderTop: '1px solid var(--gray-700)', paddingTop: 14 }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>
