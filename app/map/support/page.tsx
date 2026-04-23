@@ -9,7 +9,6 @@ export const metadata: Metadata = {
 
 /* ── Aggiorna questi con i tuoi dati reali ── */
 const DONATE = {
-  paypal:  'https://paypal.me/christianceresato',   // ← aggiorna con il tuo PayPal.me se diverso
   revolut: 'https://revolut.me/chrispybmx',
   btc:     'bc1qlcm90tma74epqsv5gleme2xw3akeunxmhgj765',
 };
@@ -119,56 +118,6 @@ export default function SupportPage() {
           }}>
             Non è obbligatorio. Se vuoi fare un gesto, scegli come preferisci:
           </p>
-
-          {/* PayPal — opzione consigliata */}
-          <a
-            href={DONATE.paypal}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 16,
-              padding: '18px 20px', marginBottom: 10,
-              background: 'var(--gray-800)',
-              border: '1px solid rgba(0,119,184,0.4)',
-              borderRadius: 10, textDecoration: 'none',
-              transition: 'border-color 0.15s, background 0.15s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = '#0077b8';
-              (e.currentTarget as HTMLElement).style.background = 'rgba(0,119,184,0.06)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,119,184,0.4)';
-              (e.currentTarget as HTMLElement).style.background = 'var(--gray-800)';
-            }}
-          >
-            <div style={{
-              width: 44, height: 44, borderRadius: 8,
-              background: '#003087', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontSize: 22, flexShrink: 0,
-            }}>
-              P
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 15,
-                color: 'var(--bone)', marginBottom: 3,
-              }}>
-                PayPal
-              </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>
-                paypal.me/christianceresato · universale, carta o conto
-              </div>
-            </div>
-            <div style={{
-              fontFamily: 'var(--font-mono)', fontSize: 10,
-              color: '#0077b8', textTransform: 'uppercase', letterSpacing: '0.06em',
-              background: 'rgba(0,119,184,0.12)', padding: '3px 8px', borderRadius: 4,
-              flexShrink: 0,
-            }}>
-              CONSIGLIATO
-            </div>
-          </a>
 
           {/* Revolut */}
           <a
