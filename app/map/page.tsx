@@ -51,7 +51,8 @@ async function getSpots(): Promise<SpotMapPin[]> {
     .from('spots')
     .select(`id, slug, name, type, lat, lon, city, condition, description, submitted_by_username, spot_photos (url, position)`)
     .eq('status', 'approved')
-    .order('approved_at', { ascending: false });
+    .order('approved_at', { ascending: false })
+    .order('position', { referencedTable: 'spot_photos', ascending: true });
 
   if (error) {
     console.error('[map/page] Supabase error:', error.message);
@@ -59,13 +60,13 @@ async function getSpots(): Promise<SpotMapPin[]> {
   }
 
   return (data ?? []).map((s) => {
+    // spot_photos è già ordinato per position ASC dalla query
     const photos = (s.spot_photos ?? []) as { url: string; position: number }[];
-    const sorted = [...photos].sort((a, b) => a.position - b.position);
     return {
       id: s.id, slug: s.slug, name: s.name, type: s.type,
       lat: s.lat, lon: s.lon, city: s.city, condition: s.condition,
-      cover_url:   sorted[0]?.url,
-      photo_urls:  sorted.map(p => p.url),
+      cover_url:   photos[0]?.url,
+      photo_urls:  photos.map(p => p.url),
       description: s.description ?? undefined,
       submitted_by_username: s.submitted_by_username ?? undefined,
     } as SpotMapPin;
