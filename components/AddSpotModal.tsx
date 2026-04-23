@@ -409,7 +409,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
   /* Submit */
   const handleSubmit = async () => {
-    if (!user || !name.trim() || !type || lat == null) return;
+    if (!user || !name.trim() || !type || lat == null || lon == null) return;
     setSubmitting(true); setError(null);
     try {
       const { data: { session } } = await supabaseBrowser().auth.getSession();
