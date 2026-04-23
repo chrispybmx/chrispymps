@@ -18,6 +18,7 @@ interface SpotMapProps {
   onSpotClick:        (pin: SpotMapPin) => void;
   onAddSpotAt:        (lat: number, lon: number) => void;
   flyTarget?:         { lat: number; lon: number; zoom?: number } | null;
+  selectedPin?:       SpotMapPin | null;
   // Radius search
   radiusMode?:   boolean;
   radiusCenter?: { lat: number; lon: number } | null;
@@ -67,11 +68,12 @@ function computeClusters(spots: SpotMapPin[]) {
 
 export default function SpotMap({
   spots, filterType, filterRegionCities, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
-  radiusMode, radiusCenter, radiusKm, onMapClick,
+  selectedPin, radiusMode, radiusCenter, radiusKm, onMapClick,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
   const markersRef       = useRef<import('leaflet').LayerGroup | null>(null);
+  const selectedLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
   const circleRef        = useRef<import('leaflet').Circle | null>(null);
   const centerMarkerRef  = useRef<import('leaflet').Marker | null>(null);
   const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
@@ -120,7 +122,8 @@ export default function SpotMap({
       }).addTo(map);
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-      markersRef.current = L.layerGroup().addTo(map);
+      markersRef.current  = L.layerGroup().addTo(map);
+      selectedLayerRef.current = L.layerGroup().addTo(map);
       mapInstance.current = map;
 
       /* Aggiorna stato zoom React */
@@ -245,6 +248,71 @@ export default function SpotMap({
       { duration: 1.4 }
     );
   }, [flyTarget]);
+
+  /* ── Marker selezionato (anello pulsante) ── */
+  useEffect(() => {
+    if (!selectedLayerRef.current || !L) return;
+    selectedLayerRef.current.clearLayers();
+    if (!selectedPin) return;
+
+    const tipo = TIPI_SPOT[selectedPin.type];
+
+    // Inietta CSS animazione pulse una sola volta nel documento
+    if (!document.getElementById('sel-pulse-style')) {
+      const style = document.createElement('style');
+      style.id = 'sel-pulse-style';
+      style.textContent = `
+        @keyframes selPulse {
+          0%   { transform: scale(1);   opacity: 0.8; }
+          70%  { transform: scale(2.4); opacity: 0;   }
+          100% { transform: scale(2.4); opacity: 0;   }
+        }
+        @keyframes selPulse2 {
+          0%   { transform: scale(1);   opacity: 0.5; }
+          100% { transform: scale(1.8); opacity: 0;   }
+        }
+        .sel-ring  { animation: selPulse  1.6s ease-out infinite; }
+        .sel-ring2 { animation: selPulse2 1.6s ease-out 0.5s infinite; }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const html = `
+      <div style="position:relative;width:60px;height:60px;transform:translate(-50%,-50%)">
+        <!-- Anello esterno pulsante -->
+        <div class="sel-ring" style="
+          position:absolute;inset:0;border-radius:50%;
+          border:2px solid #ff6a00;
+          transform-origin:center;
+        "></div>
+        <!-- Secondo anello sfasato -->
+        <div class="sel-ring2" style="
+          position:absolute;inset:8px;border-radius:50%;
+          border:1.5px solid #ff6a00;
+          transform-origin:center;
+        "></div>
+        <!-- Cerchio centrale -->
+        <div style="
+          position:absolute;inset:18px;border-radius:50%;
+          background:rgba(255,106,0,0.25);
+          border:2px solid #ff6a00;
+          display:flex;align-items:center;justify-content:center;
+          font-size:11px;
+        ">${tipo.emoji}</div>
+      </div>
+    `;
+
+    const icon = L!.divIcon({
+      html,
+      className: 'spot-selected-marker',
+      iconSize:  [0, 0],
+      iconAnchor:[0, 0],
+    });
+
+    L!.marker([selectedPin.lat, selectedPin.lon], { icon, zIndexOffset: 2000 })
+      .addTo(selectedLayerRef.current!);
+
+  }, [selectedPin]);
 
   /* ── Radius cursor ── */
   useEffect(() => {
