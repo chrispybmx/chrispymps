@@ -261,8 +261,8 @@ export default function SpotMap({
       style.id = 'sel-glow-style';
       style.textContent = `
         @keyframes selBreathe {
-          0%,100% { opacity: 0.55; transform: translate(-50%,-100%) scale(1); }
-          50%      { opacity: 0.85; transform: translate(-50%,-100%) scale(1.12); }
+          0%,100% { opacity: 0.5; transform: scale(1); }
+          50%      { opacity: 0.8; transform: scale(1.15); }
         }
         .sel-glow { animation: selBreathe 2.4s ease-in-out infinite; }
       `;
@@ -280,11 +280,17 @@ export default function SpotMap({
       "></div>
     `;
 
+    /*
+     * Il pin ha iconSize [30,38] e iconAnchor [15,38] → la punta è sul coordinate.
+     * Il cerchio del pin è centrato a circa y=13 dall'alto → 38-13 = 25px sopra la punta.
+     * Per centrare il glow (44×44) sullo stesso punto:
+     *   centro glow = (22, 22) → voglio che (22, 22+25)=(22,47) sia sul coordinate.
+     */
     const icon = L!.divIcon({
       html,
       className: '',
       iconSize:  [44, 44],
-      iconAnchor:[22, 44], // allineato alla punta del pin sotto
+      iconAnchor:[22, 47],
     });
 
     L!.marker([selectedPin.lat, selectedPin.lon], { icon, interactive: false })
