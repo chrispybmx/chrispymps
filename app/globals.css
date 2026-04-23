@@ -13,6 +13,7 @@
   --gray-800: #1a1a1a;
   --gray-700: #2a2a2a;
   --gray-600: #3a3a3a;
+  --gray-500: #666666;
   --gray-400: #888888;
 
   --font-mono:    'VT323', monospace;
@@ -180,6 +181,26 @@ body {
   border-radius: 2px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+/* ===== MOBILE TOUCH OPTIMIZATIONS ===== */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Prevent iOS zoom on input focus */
+input[type="text"],
+input[type="email"],
+input[type="search"],
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* Support strip respects iPhone home indicator */
+.support-strip {
+  padding-bottom: calc(0px + env(safe-area-inset-bottom, 0px));
+  height: calc(var(--strip-height) + env(safe-area-inset-bottom, 0px));
 }
 
 /* ===== BOTTONI ===== */
