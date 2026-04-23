@@ -132,8 +132,12 @@ export default function SpotMap({
       if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
     }
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return s.name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
+      const q = searchQuery.toLowerCase().replace(/^@/, '');
+      return (
+        s.name.toLowerCase().includes(q) ||
+        (s.city ?? '').toLowerCase().includes(q) ||
+        (s.submitted_by_username ?? '').toLowerCase().includes(q)
+      );
     }
     return true;
   }), [spots, filterType, filterRegionBbox, searchQuery]);
