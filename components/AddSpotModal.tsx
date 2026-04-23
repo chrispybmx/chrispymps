@@ -553,7 +553,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               )}
 
-              {/* Preview mappa quando le coordinate sono confermate */}
+              {/* Posizione confermata → avanti */}
               {hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -562,21 +562,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>{lat!.toFixed(5)}, {lon!.toFixed(5)}</div>
                     </div>
                     <button
-                      onClick={() => { setLat(null); setLon(null); setCoordInput(''); setCoordError(null); setGpsState('idle'); }}
+                      onClick={() => { setLat(null); setLon(null); setCoordInput(''); setCoordError(null); setGpsState('idle'); setLocMode(null); }}
                       style={{ background: 'none', border: 'none', color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer' }}
                     >
                       Cambia →
                     </button>
                   </div>
-
-                  <LocationMapPicker
-                    lat={lat} lon={lon} height={260}
-                    onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }}
-                  />
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textAlign: 'center' }}>
-                    Trascina il pin per regolare la posizione
-                  </div>
-
                   <button onClick={() => setStep('foto')} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
                     Avanti — Foto →
                   </button>
