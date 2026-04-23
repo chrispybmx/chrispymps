@@ -323,22 +323,18 @@ export default function SpotMap({
     const map  = mapInstance.current;
     const zoom = flyTarget.zoom ?? APP_CONFIG.mapZoomCity;
     const isMobile = window.innerWidth < 768;
+
     if (isMobile) {
       // Su mobile: niente animazione per evitare il tremore
       map.setView([flyTarget.lat, flyTarget.lon], zoom, { animate: false });
     } else {
-      // Su desktop: animazione fluida con offset per il pannello
-      const PANEL_H = 300;
-      const bounds = L.latLngBounds(
-        [flyTarget.lat, flyTarget.lon],
-        [flyTarget.lat, flyTarget.lon]
-      ).pad(0.0008);
-      map.flyToBounds(bounds, {
-        paddingBottomRight: [0, PANEL_H],
-        paddingTopLeft:     [0, 20],
-        maxZoom: zoom,
-        duration: 0.8,
-      });
+      // Su desktop: offset il centro verso l'alto per compensare il pannello in basso
+      // Proietta il punto al nuovo zoom, sposta su di ~150px, riproietta
+      const PANEL_OFFSET_PX = 150;
+      const targetPoint = map.project([flyTarget.lat, flyTarget.lon], zoom);
+      const offsetPoint = targetPoint.subtract([0, PANEL_OFFSET_PX]);
+      const offsetLatLng = map.unproject(offsetPoint, zoom);
+      map.flyTo(offsetLatLng, zoom, { duration: 0.7, easeLinearity: 0.5 });
     }
   }, [flyTarget]);
 
