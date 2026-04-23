@@ -55,6 +55,17 @@ function pinSvg(type: SpotType, condition: string, isSelected = false): string {
   </svg>`;
 }
 
+/* ── Calcola l'offset in pixel per centrare il punto nello spazio visibile ──
+   Il pannello lista occupa clamp(270px, 54dvh, 480px) in fondo.
+   Per centrare nello spazio sopra il pannello: offset = panelHeight / 2.
+   (Il topbar è già gestito da Leaflet perché il container mappa parte sotto di esso.)
+   Su mobile usiamo lo stesso valore perché la mappa copre comunque la viewport intera. */
+function getPanelOffsetPx(): number {
+  if (typeof window === 'undefined') return 160;
+  const panelH = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+  return Math.round(panelH / 2);
+}
+
 /* ── Clustering geografico a griglia adattiva allo zoom ──
    Divide la mappa in celle di dimensione diversa in base allo zoom corrente.
    Funziona anche senza il campo `city`, scala bene con 500+ spot. */
@@ -243,9 +254,10 @@ export default function SpotMap({
             onSpotClickRef.current(c.spots[0]);
           } else {
             /* Multi-spot → fitBounds sul gruppo reale, non zoom fisso.
-               Aggiunge padding per il pannello inferiore. */
-            const bounds = L!.latLngBounds(c.spots.map(s => [s.lat, s.lon] as [number, number]));
-            const padBottom = overlayOffsetPx + 20;
+               Padding inferiore = altezza pannello (calcolata live dalla viewport). */
+            const bounds    = L!.latLngBounds(c.spots.map(s => [s.lat, s.lon] as [number, number]));
+            const panelH    = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+            const padBottom = panelH + 20;
             if (isMobile) {
               mapInstance.current.fitBounds(bounds, {
                 paddingTopLeft:     [20, 20],
@@ -309,9 +321,10 @@ export default function SpotMap({
     /* ── Auto-fit al primo render con spot ── */
     if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
       const bounds = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
+      const panelH = Math.min(480, Math.max(270, window.innerHeight * 0.54));
       mapInstance.current.fitBounds(bounds, {
         paddingTopLeft:     [32, 32],
-        paddingBottomRight: [32, 310], // bottom = altezza panel overlay
+        paddingBottomRight: [32, panelH + 32],
         maxZoom: 15,
         animate: false,
       });
@@ -362,14 +375,19 @@ export default function SpotMap({
     const zoom = flyTarget.zoom ?? APP_CONFIG.mapZoomCity;
     const isMobile = window.innerWidth < 768;
 
+    // Calcola offset dinamico: panel_height / 2 centra il punto nello spazio visibile
+    const offset = getPanelOffsetPx();
+
     if (isMobile) {
-      // Su mobile: niente animazione per evitare il tremore
-      map.setView([flyTarget.lat, flyTarget.lon], zoom, { animate: false });
+      // Su mobile: offset comunque, ma senza animazione
+      const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
+      const offsetPoint  = targetPoint.subtract([0, offset]);
+      const offsetLatLng = map.unproject(offsetPoint, zoom);
+      map.setView(offsetLatLng, zoom, { animate: false });
     } else {
-      // Su desktop: offset il centro verso l'alto per compensare il pannello in basso.
-      // Proietta il punto al nuovo zoom, sposta su di overlayOffsetPx, riproietta.
-      const targetPoint = map.project([flyTarget.lat, flyTarget.lon], zoom);
-      const offsetPoint = targetPoint.subtract([0, overlayOffsetPx]);
+      // Su desktop: vola al punto con offset calcolato live
+      const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
+      const offsetPoint  = targetPoint.subtract([0, offset]);
       const offsetLatLng = map.unproject(offsetPoint, zoom);
       map.flyTo(offsetLatLng, zoom, { duration: 0.7, easeLinearity: 0.5 });
     }
@@ -380,19 +398,22 @@ export default function SpotMap({
     if (!fitAllTrigger || !hasInitialFit.current || !mapInstance.current || !L) return;
     const pins = filteredRef.current;
     if (pins.length === 0) return;
+    const offset = getPanelOffsetPx();
     if (pins.length === 1) {
-      // Singolo risultato: vola diretto
-      const p = pins[0];
-      const targetPoint = mapInstance.current.project([p.lat, p.lon], 15);
-      const offsetPoint = targetPoint.subtract([0, overlayOffsetPx]);
-      const offsetLatLng = mapInstance.current.unproject(offsetPoint, 15);
-      mapInstance.current.flyTo(offsetLatLng, 15, { duration: 0.7, easeLinearity: 0.5 });
+      // Singolo risultato: vola centrato nello spazio visibile
+      const p           = pins[0];
+      const targetZoom  = 15;
+      const targetPoint = mapInstance.current.project([p.lat, p.lon], targetZoom);
+      const offsetPoint = targetPoint.subtract([0, offset]);
+      const offsetLatLng = mapInstance.current.unproject(offsetPoint, targetZoom);
+      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 0.7, easeLinearity: 0.5 });
     } else {
-      // Molti risultati: fitBounds con padding per il pannello
-      const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
+      // Molti risultati: fitBounds con padding = altezza pannello intero
+      const panelH = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+      const bounds  = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
       mapInstance.current.fitBounds(bounds, {
         paddingTopLeft:     [32, 32],
-        paddingBottomRight: [32, overlayOffsetPx + 32],
+        paddingBottomRight: [32, panelH + 32],
         maxZoom: 14,
         animate: true,
       });
