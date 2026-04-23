@@ -131,21 +131,27 @@ export default async function SpotPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── BARRA NERA SOTTO MAPPA — copre i credits OSM ── */}
-      {spot.city && (
-        <div style={{
-          background: '#000',
-          padding: '8px 16px',
-          borderBottom: '1px solid rgba(255,106,0,0.15)',
-        }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 11,
-            color: 'var(--gray-500)',
-          }}>
-            {spot.city}
-          </div>
-        </div>
-      )}
+      {/* ── BARRA NERA SOTTO MAPPA — copre i credits OSM, contiene il CTA ── */}
+      <div style={{
+        background: '#000',
+        padding: '10px 16px',
+        borderBottom: '1px solid rgba(255,106,0,0.15)',
+      }}>
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            background: 'var(--orange)', color: '#000',
+            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+            padding: '11px 16px', borderRadius: 8,
+            textDecoration: 'none', letterSpacing: '0.04em',
+          }}
+        >
+          📍 PORTAMI QUI
+        </a>
+      </div>
 
       {/* ── FOTO CAROUSEL ── */}
       {photos.length > 0 && (
