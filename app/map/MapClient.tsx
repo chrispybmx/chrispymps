@@ -172,7 +172,8 @@ export default function MapClient({ initialSpots }: MapClientProps) {
           <SpotMap
             spots={spots} filterType={filterType} filterRegionCities={filterRegionCities}
             searchQuery={searchQuery} onSpotClick={openSheet} onAddSpotAt={handleAddSpotAt}
-            flyTarget={flyTarget} radiusMode={radiusMode} radiusCenter={radiusCenter}
+            flyTarget={flyTarget} selectedPin={sheetPin}
+            radiusMode={radiusMode} radiusCenter={radiusCenter}
             radiusKm={radiusKm} onMapClick={handleMapClick}
           />
           <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
