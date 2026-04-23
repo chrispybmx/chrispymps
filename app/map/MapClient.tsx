@@ -69,7 +69,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
   const filtered = useMemo(() => spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
-    if (filterRegionCities && s.city && !filterRegionCities.includes(s.city)) return false;
+    if (filterRegionCities && (!s.city || !filterRegionCities.includes(s.city))) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase().replace(/^@/, '');
       return (
