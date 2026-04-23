@@ -154,47 +154,47 @@ export default function MapClient({ initialSpots }: MapClientProps) {
         onOpenAuth={() => setAuthOpen(true)}
       />
 
-      {/* ── LAYOUT fisso sotto topbar+chips ── */}
+      {/* ── MAPPA — schermo intero sotto topbar ── */}
       <div style={{
         position: 'fixed',
         top: TOP_OFFSET, left: 0, right: 0, bottom: 0,
-        display: 'flex', flexDirection: 'column',
-        zIndex: 1, background: 'var(--black)',
-        overflow: 'hidden',
+        zIndex: 1,
       }}>
+        <SpotMap
+          spots={spots} filterType={filterType} filterRegionCities={filterRegionCities}
+          searchQuery={searchQuery} onSpotClick={openSheet} onAddSpotAt={handleAddSpotAt}
+          flyTarget={flyTarget} selectedPin={sheetPin}
+          radiusMode={radiusMode} radiusCenter={radiusCenter}
+          radiusKm={radiusKm} onMapClick={handleMapClick}
+        />
+        <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
+        {radiusMode && !radiusCenter && <RadiusToast />}
+      </div>
 
-        {/* ── MAPPA — più alta, con gradiente in basso ── */}
+      {/* ── OVERLAY LISTA — galleggia sulla mappa, si fonde con gradiente ── */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0, left: 0, right: 0,
+        zIndex: 10,
+        height: 'clamp(210px, 44dvh, 380px)',
+        display: 'flex', flexDirection: 'column',
+        pointerEvents: 'none',
+      }}>
+        {/* Gradiente mappa → pannello */}
         <div style={{
-          height: 'clamp(260px, 56dvh, 520px)',
-          flexShrink: 0,
-          position: 'relative',
-        }}>
-          <SpotMap
-            spots={spots} filterType={filterType} filterRegionCities={filterRegionCities}
-            searchQuery={searchQuery} onSpotClick={openSheet} onAddSpotAt={handleAddSpotAt}
-            flyTarget={flyTarget} selectedPin={sheetPin}
-            radiusMode={radiusMode} radiusCenter={radiusCenter}
-            radiusKm={radiusKm} onMapClick={handleMapClick}
-          />
-          <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
-          {radiusMode && !radiusCenter && <RadiusToast />}
+          height: 64, flexShrink: 0,
+          background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.9) 100%)',
+        }} />
 
-          {/* Gradiente di fusione mappa → lista */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            height: 72,
-            background: 'linear-gradient(to bottom, transparent 0%, var(--black) 100%)',
-            pointerEvents: 'none', zIndex: 5,
-          }} />
-        </div>
-
-        {/* ── LISTA SPOT ── */}
+        {/* Pannello semitrasparente con blur */}
         <div style={{
           flex: 1,
+          background: 'rgba(10,10,10,0.93)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           overflowY: 'auto',
           overscrollBehavior: 'contain',
-          background: 'var(--black)',
-          marginTop: -8, // sovrappone leggermente il gradiente
+          pointerEvents: 'all',
         }}>
           <SpotListPanel
             spots={filtered}
