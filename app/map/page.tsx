@@ -69,8 +69,14 @@ async function getSpots(): Promise<SpotMapPin[]> {
   });
 }
 
-export default async function MapPage() {
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const spots = await getSpots();
+  const params = await (searchParams ?? Promise.resolve({}));
+  const autoAdd = params['add'] === '1';
 
   return (
     <>
@@ -78,7 +84,7 @@ export default async function MapPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(mapJsonLd) }}
       />
-      <MapClient initialSpots={spots} />
+      <MapClient initialSpots={spots} autoAdd={autoAdd} />
     </>
   );
 }
