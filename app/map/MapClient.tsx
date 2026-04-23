@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { SpotMapPin, SpotType } from '@/lib/types';
+import type { SpotMapPin, SpotType, Spot } from '@/lib/types';
 import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
@@ -38,20 +38,13 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
 
 interface MapClientProps { initialSpots: SpotMapPin[] }
 
-/* ═══════════════════════════════════════════════════════
-   ALTEZZE
-   topbar ~56px + chips ~44px = 100px
-   mappa: clamp(200px, 40dvh, 380px) — visibile e proporzionata
-═══════════════════════════════════════════════════════ */
-const TOP_OFFSET  = 100;
-const MAP_HEIGHT  = 'clamp(200px, 40dvh, 380px)';
+const TOP_OFFSET = 100; // topbar ~56 + chips ~44
 
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
 export default function MapClient({ initialSpots }: MapClientProps) {
   const router = useRouter();
-
   const [spots]              = useState<SpotMapPin[]>(initialSpots);
   const [filterType,         setFilterType]         = useState<SpotType | null>(null);
   const [filterRegionLabel,  setFilterRegionLabel]  = useState<string | null>(null);
@@ -64,12 +57,14 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
   const [authOpen,           setAuthOpen]           = useState(false);
 
+  /* ── Mini-sheet ── */
+  const [sheetPin, setSheetPin] = useState<SpotMapPin | null>(null);
+
   /* ── Spot attivo nella lista (IntersectionObserver) ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
 
-  /* Quando la lista scorre → mappa vola allo spot visibile */
   useEffect(() => {
-    if (!activeListId) return;
+    if (!activeListId || sheetPin) return;
     const spot = filtered.find(s => s.id === activeListId);
     if (spot) setFlyTarget({ lat: spot.lat, lon: spot.lon, zoom: 14 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,10 +122,13 @@ export default function MapClient({ initialSpots }: MapClientProps) {
 
   const closeRadiusMode = useCallback(() => { setRadiusMode(false); setRadiusCenter(null); }, []);
 
-  /* Click su uno spot → vai direttamente alla pagina */
-  const goToSpot = useCallback((pin: SpotMapPin) => {
-    router.push(`/map/spot/${pin.slug}`);
-  }, [router]);
+  /* Click su spot: apri mini-sheet + vola sulla mappa */
+  const openSheet = useCallback((pin: SpotMapPin) => {
+    setSheetPin(pin);
+    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 15 });
+  }, []);
+
+  const closeSheet = useCallback(() => setSheetPin(null), []);
 
   const handleCitySelect = useCallback((city: string, lat: number, lon: number) => {
     setFlyTarget({ lat, lon, zoom: 14 });
@@ -142,9 +140,8 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   }, []);
 
   return (
-    <div style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100dvh', overflow: 'hidden' }}>
 
-      {/* TopBar */}
       <TopBar
         onSearch={setSearchQuery}
         onFilterType={setFilterType}
@@ -153,80 +150,76 @@ export default function MapClient({ initialSpots }: MapClientProps) {
         spots={spots}
         filteredCount={filtered.length}
         onCitySelect={handleCitySelect}
-        onSpotSelect={goToSpot}
+        onSpotSelect={openSheet}
         onOpenAuth={() => setAuthOpen(true)}
       />
 
-      {/* ── LAYOUT: mappa sopra fissa, lista sotto scrollabile ── */}
+      {/* ── LAYOUT fisso sotto topbar+chips ── */}
       <div style={{
         position: 'fixed',
-        top: TOP_OFFSET,
-        left: 0, right: 0, bottom: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 1,
-        background: 'var(--black)',
+        top: TOP_OFFSET, left: 0, right: 0, bottom: 0,
+        display: 'flex', flexDirection: 'column',
+        zIndex: 1, background: 'var(--black)',
         overflow: 'hidden',
       }}>
 
-        {/* ── MAPPA — altezza fissa, non scorre mai ── */}
+        {/* ── MAPPA — più alta, con gradiente in basso ── */}
         <div style={{
-          height: MAP_HEIGHT,
+          height: 'clamp(260px, 56dvh, 520px)',
           flexShrink: 0,
           position: 'relative',
-          borderBottom: '2px solid var(--orange)',
         }}>
           <SpotMap
-            spots={spots}
-            filterType={filterType}
-            filterRegionCities={filterRegionCities}
-            searchQuery={searchQuery}
-            onSpotClick={goToSpot}
-            onAddSpotAt={handleAddSpotAt}
-            flyTarget={flyTarget}
-            radiusMode={radiusMode}
-            radiusCenter={radiusCenter}
-            radiusKm={radiusKm}
-            onMapClick={handleMapClick}
+            spots={spots} filterType={filterType} filterRegionCities={filterRegionCities}
+            searchQuery={searchQuery} onSpotClick={openSheet} onAddSpotAt={handleAddSpotAt}
+            flyTarget={flyTarget} radiusMode={radiusMode} radiusCenter={radiusCenter}
+            radiusKm={radiusKm} onMapClick={handleMapClick}
           />
           <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
           {radiusMode && !radiusCenter && <RadiusToast />}
+
+          {/* Gradiente di fusione mappa → lista */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            height: 72,
+            background: 'linear-gradient(to bottom, transparent 0%, var(--black) 100%)',
+            pointerEvents: 'none', zIndex: 5,
+          }} />
         </div>
 
-        {/* ── LISTA SPOT — scorre infinita sotto la mappa ── */}
+        {/* ── LISTA SPOT ── */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
           overscrollBehavior: 'contain',
           background: 'var(--black)',
+          marginTop: -8, // sovrappone leggermente il gradiente
         }}>
           <SpotListPanel
             spots={filtered}
             activeId={activeListId}
             onActivate={setActiveListId}
+            onSpotClick={openSheet}
           />
         </div>
       </div>
 
+      {/* ── MINI-SHEET ── */}
+      <SpotMiniSheet pin={sheetPin} onClose={closeSheet} />
+
       {/* Radius sheet */}
       {radiusMode && (
         <RadiusSheet
-          radiusKm={radiusKm}
-          center={radiusCenter}
-          spots={spotsInRadius}
-          onSetRadius={setRadiusKm}
-          onUseGPS={handleUseGPS}
-          onClose={closeRadiusMode}
-          onSpotClick={goToSpot}
-          gpsLoading={gpsLoading}
+          radiusKm={radiusKm} center={radiusCenter} spots={spotsInRadius}
+          onSetRadius={setRadiusKm} onUseGPS={handleUseGPS} onClose={closeRadiusMode}
+          onSpotClick={openSheet} gpsLoading={gpsLoading}
         />
       )}
 
       <AddSpotModal
         open={addOpen}
         onClose={() => { setAddOpen(false); setAddLat(undefined); setAddLon(undefined); }}
-        initialLat={addLat}
-        initialLon={addLon}
+        initialLat={addLat} initialLon={addLon}
       />
       <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
@@ -235,10 +228,12 @@ export default function MapClient({ initialSpots }: MapClientProps) {
 }
 
 /* ════════════════════════════════════════════════════════
-   SPOT LIST PANEL — lista stile subito.it
+   SPOT LIST PANEL
 ════════════════════════════════════════════════════════ */
 
-const FAVS_KEY = 'cmaps_favs_v1';
+const FAVS_KEY   = 'cmaps_favs_v1';
+const ratingKey  = (id: string) => `cmaps_rating_${id}`;
+
 function isFav(id: string) {
   try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); }
   catch { return false; }
@@ -252,27 +247,33 @@ function toggleFav(id: string) {
     return i < 0;
   } catch { return false; }
 }
+function getMyRating(id: string): number {
+  try { return Math.min(5, Math.max(0, parseInt(localStorage.getItem(ratingKey(id)) ?? '0', 10) || 0)); }
+  catch { return 0; }
+}
 
 function SpotListPanel({
-  spots, activeId, onActivate,
+  spots, activeId, onActivate, onSpotClick,
 }: {
   spots:      SpotMapPin[];
   activeId:   string | null;
   onActivate: (id: string) => void;
+  onSpotClick:(pin: SpotMapPin) => void;
 }) {
-  const [favs, setFavs] = useState<Record<string, boolean>>({});
+  const [favs,    setFavs]    = useState<Record<string, boolean>>({});
+  const [ratings, setRatings] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const f: Record<string, boolean> = {};
-    spots.forEach(s => { f[s.id] = isFav(s.id); });
-    setFavs(f);
+    const r: Record<string, number>  = {};
+    spots.forEach(s => { f[s.id] = isFav(s.id); r[s.id] = getMyRating(s.id); });
+    setFavs(f); setRatings(r);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots.length]);
 
   const cardRefs = useRef<Map<string, Element>>(new Map());
   const ioRef    = useRef<IntersectionObserver | null>(null);
 
-  /* IntersectionObserver: aggiorna activeId mentre scorri */
   useEffect(() => {
     ioRef.current?.disconnect();
     ioRef.current = new IntersectionObserver(
@@ -285,7 +286,7 @@ function SpotListPanel({
           }
         }
       },
-      { rootMargin: '-10% 0px -60% 0px', threshold: 0 }
+      { rootMargin: '-10% 0px -55% 0px', threshold: 0 }
     );
     cardRefs.current.forEach(el => ioRef.current!.observe(el));
     return () => ioRef.current?.disconnect();
@@ -298,18 +299,20 @@ function SpotListPanel({
   }, []);
 
   const handleFav = (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
     e.stopPropagation();
     const added = toggleFav(id);
     setFavs(prev => ({ ...prev, [id]: added }));
   };
 
+  const openNavDirect = (e: React.MouseEvent, pin: SpotMapPin) => {
+    e.stopPropagation();
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${pin.lat},${pin.lon}`;
+    window.open(url, '_blank');
+  };
+
   if (spots.length === 0) {
     return (
-      <div style={{
-        padding: '48px 20px', textAlign: 'center',
-        fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14,
-      }}>
+      <div style={{ padding: '48px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14 }}>
         Nessuno spot trovato.<br />
         <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>Prova a cambiare filtro.</span>
       </div>
@@ -318,85 +321,100 @@ function SpotListPanel({
 
   return (
     <div>
-      {/* Contatore */}
       <div style={{
-        padding: '9px 14px 7px',
+        padding: '7px 14px 5px',
         fontFamily: 'var(--font-mono)', fontSize: 11,
         color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
-        borderBottom: '1px solid var(--gray-800)',
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
       }}>
         {spots.length} spot
       </div>
 
-      {/* Cards — ogni card è un link diretto alla pagina */}
       {spots.map((spot, idx) => {
         const tipo   = TIPI_SPOT[spot.type];
         const cond   = CONDIZIONI[spot.condition];
         const isAct  = activeId === spot.id;
-        const myFav  = favs[spot.id] ?? false;
+        const myFav  = favs[spot.id]    ?? false;
+        const myRate = ratings[spot.id] ?? 0;
         const isLast = idx === spots.length - 1;
 
         return (
-          <Link
+          <div
             key={spot.id}
-            href={`/map/spot/${spot.slug}`}
-            ref={(el) => setRef(spot.id, el as Element | null)}
+            ref={(el) => setRef(spot.id, el)}
             data-spot-id={spot.id}
+            onClick={() => onSpotClick(spot)}
             style={{
-              display: 'block',
-              textDecoration: 'none',
               position: 'relative',
-              borderBottom: isLast ? 'none' : '1px solid var(--gray-800)',
+              borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)',
               borderLeft: `3px solid ${isAct ? 'var(--orange)' : 'transparent'}`,
-              transition: 'border-color 0.2s, background 0.1s',
+              transition: 'border-color 0.25s, background 0.15s',
+              cursor: 'pointer',
+              background: isAct ? 'rgba(255,106,0,0.04)' : 'transparent',
             }}
+            onMouseEnter={e => { if (!isAct) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+            onMouseLeave={e => { if (!isAct) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
-            <div
-              style={{
-                display: 'flex', gap: 11,
-                padding: '12px 12px 12px 10px',
-                paddingRight: 44,
-              }}
-              onMouseEnter={e => (e.currentTarget.parentElement!.style.background = 'rgba(255,106,0,0.04)')}
-              onMouseLeave={e => (e.currentTarget.parentElement!.style.background = 'transparent')}
-            >
+            <div style={{ display: 'flex', gap: 10, padding: '11px 44px 11px 10px' }}>
 
-              {/* Foto quadrata */}
+              {/* Foto con effetto VHS se attiva */}
               <div style={{
-                width: 82, height: 82, flexShrink: 0,
-                borderRadius: 5, overflow: 'hidden',
-                background: 'var(--gray-700)',
+                width: 76, height: 76, flexShrink: 0,
+                borderRadius: 4, overflow: 'hidden',
+                background: 'var(--gray-700)', position: 'relative',
+                boxShadow: isAct ? '0 0 0 2px var(--orange), 0 0 12px rgba(255,106,0,0.3)' : 'none',
+                transition: 'box-shadow 0.25s',
               }}>
                 {spot.cover_url ? (
                   <img
                     src={spot.cover_url}
                     alt={spot.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    style={{
+                      width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                      filter: isAct ? 'contrast(1.08) saturate(1.15)' : 'none',
+                      transition: 'filter 0.25s',
+                    }}
                     loading="lazy"
                   />
                 ) : (
-                  <div style={{
-                    width: '100%', height: '100%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 28, opacity: 0.4,
-                  }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, opacity: 0.4 }}>
                     {tipo.emoji}
+                  </div>
+                )}
+
+                {/* Scanlines VHS — solo sulla card attiva */}
+                {isAct && (
+                  <div style={{
+                    position: 'absolute', inset: 0, pointerEvents: 'none',
+                    backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 4px)',
+                    mixBlendMode: 'multiply',
+                  }} />
+                )}
+
+                {/* Label VHS REC — solo attiva */}
+                {isAct && (
+                  <div style={{
+                    position: 'absolute', top: 3, left: 3,
+                    background: 'var(--orange)', color: '#000',
+                    fontFamily: 'var(--font-mono)', fontSize: 7,
+                    padding: '1px 4px', borderRadius: 1, letterSpacing: '0.06em',
+                    fontWeight: 700,
+                  }}>
+                    ● REC
                   </div>
                 )}
               </div>
 
               {/* Info */}
-              <div style={{
-                flex: 1, minWidth: 0,
-                display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center',
-              }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3, justifyContent: 'center' }}>
 
                 {/* Nome */}
                 <div style={{
                   fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
-                  color: 'var(--bone)', lineHeight: 1.3,
+                  color: isAct ? 'var(--orange)' : 'var(--bone)', lineHeight: 1.3,
                   overflow: 'hidden', textOverflow: 'ellipsis',
                   display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
+                  transition: 'color 0.25s',
                 }}>
                   {spot.name}
                 </div>
@@ -405,9 +423,8 @@ function SpotListPanel({
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                   {spot.condition === 'alive' ? (
                     <span style={{
-                      display: 'inline-block', width: 8, height: 8,
-                      borderRadius: '50%', background: '#00c851',
-                      boxShadow: '0 0 5px #00c851aa', flexShrink: 0,
+                      display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                      background: '#00c851', boxShadow: '0 0 5px #00c851aa', flexShrink: 0,
                     }} title="Spot attivo" />
                   ) : (
                     <span style={{
@@ -429,36 +446,52 @@ function SpotListPanel({
                   </span>
                 </div>
 
+                {/* Rating utente (solo se valorizzato) */}
+                {myRate > 0 && (
+                  <div style={{ display: 'flex', gap: 1 }}>
+                    {[1,2,3,4,5].map(i => (
+                      <span key={i} style={{ fontSize: 9, color: i <= myRate ? '#fbbf24' : 'var(--gray-600)' }}>★</span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Città + username */}
                 {(spot.city || spot.submitted_by_username) && (
                   <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 11,
+                    fontFamily: 'var(--font-mono)', fontSize: 10,
                     color: 'var(--gray-500)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
-                    {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null]
-                      .filter(Boolean).join(' · ')}
+                    {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Cuore preferiti */}
-            <button
-              onClick={e => handleFav(e, spot.id)}
-              style={{
-                position: 'absolute', top: 12, right: 8,
-                background: myFav ? 'rgba(255,60,60,0.15)' : 'rgba(20,20,20,0.7)',
-                border: myFav ? '1px solid rgba(255,60,60,0.4)' : '1px solid var(--gray-700)',
-                borderRadius: '50%', width: 28, height: 28,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: 13, padding: 0,
-              }}
-              aria-label={myFav ? 'Rimuovi preferiti' : 'Aggiungi preferiti'}
-            >
+            {/* Bottone preferiti */}
+            <button onClick={e => handleFav(e, spot.id)} style={{
+              position: 'absolute', top: 10, right: 8,
+              background: myFav ? 'rgba(255,60,60,0.15)' : 'rgba(20,20,20,0.7)',
+              border: myFav ? '1px solid rgba(255,60,60,0.4)' : '1px solid rgba(255,255,255,0.07)',
+              borderRadius: '50%', width: 26, height: 26,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', fontSize: 11, padding: 0,
+            }} aria-label="Preferiti">
               {myFav ? '❤️' : '🤍'}
             </button>
-          </Link>
+
+            {/* Bottone navigazione rapida */}
+            <button onClick={e => openNavDirect(e, spot)} style={{
+              position: 'absolute', bottom: 10, right: 8,
+              background: 'rgba(20,20,20,0.7)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: '50%', width: 26, height: 26,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', fontSize: 13, padding: 0,
+            }} title="Portami qui" aria-label="Portami qui">
+              📍
+            </button>
+          </div>
         );
       })}
 
@@ -467,24 +500,314 @@ function SpotListPanel({
   );
 }
 
+/* ════════════════════════════════════════════════════════
+   MINI-SHEET — slide-up con info spot + nav
+════════════════════════════════════════════════════════ */
+
+function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () => void }) {
+  const [spot,       setSpot]       = useState<Spot | null>(null);
+  const [loading,    setLoading]    = useState(false);
+  const [navOpen,    setNavOpen]    = useState(false);
+  const [myRating,   setMyRating]   = useState(0);
+  const [myFav,      setMyFav]      = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  const isOpen = !!pin;
+
+  /* Fetch spot completo quando si apre */
+  useEffect(() => {
+    if (!pin) { setSpot(null); setNavOpen(false); return; }
+    setMyRating(getMyRating(pin.id));
+    setMyFav(isFav(pin.id));
+    setLoading(true);
+    fetch(`/api/spots/${pin.slug}`)
+      .then(r => r.json())
+      .then(d => setSpot(d.data ?? null))
+      .catch(() => setSpot(null))
+      .finally(() => setLoading(false));
+  }, [pin?.slug]);
+
+  /* Swipe down to close */
+  const startY = useRef(0);
+  const handleTouchStart = (e: React.TouchEvent) => { startY.current = e.touches[0].clientY; };
+  const handleTouchEnd   = (e: React.TouchEvent) => {
+    if (e.changedTouches[0].clientY - startY.current > 60) onClose();
+  };
+
+  /* ESC to close */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const tipo = pin ? TIPI_SPOT[pin.type] : null;
+  const cond = pin ? CONDIZIONI[pin.condition] : null;
+
+  const googleUrl = pin ? `https://www.google.com/maps/dir/?api=1&destination=${pin.lat},${pin.lon}` : '';
+  const appleMaps = pin ? `http://maps.apple.com/?daddr=${pin.lat},${pin.lon}` : '';
+  const wazeUrl   = pin ? `https://waze.com/ul?ll=${pin.lat},${pin.lon}&navigate=yes` : '';
+  const openNav = (url: string) => { window.open(url, '_blank'); setNavOpen(false); };
+
+  const handleRate = (r: number) => {
+    if (!pin) return;
+    localStorage.setItem(`cmaps_rating_${pin.id}`, String(r));
+    setMyRating(r);
+  };
+  const handleFav = () => {
+    if (!pin) return;
+    const added = toggleFav(pin.id);
+    setMyFav(added);
+  };
+
+  const coverPhoto = (spot?.spot_photos ?? []).sort((a, b) => a.position - b.position)[0]?.url ?? pin?.cover_url;
+
+  return (
+    <>
+      {/* Backdrop (chiude sheet) */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 39,
+            background: 'transparent',
+          }}
+        />
+      )}
+
+      <div
+        ref={sheetRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          height: 'clamp(300px, 54dvh, 480px)',
+          transform: isOpen ? 'translateY(0)' : 'translateY(105%)',
+          transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
+          background: 'rgba(12,12,12,0.98)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderTop: '1px solid rgba(255,106,0,0.5)',
+          borderRadius: '16px 16px 0 0',
+          zIndex: 40,
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* ── Handle ── */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 0', flexShrink: 0 }}>
+          <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.15)', maxWidth: 36, margin: '0 auto' }} />
+          <button onClick={onClose} style={{
+            position: 'absolute', right: 14, top: 8,
+            background: 'none', border: 'none', color: 'var(--gray-400)',
+            fontSize: 18, cursor: 'pointer', padding: '4px 6px', lineHeight: 1,
+          }}>✕</button>
+        </div>
+
+        {/* ── Contenuto scrollabile ── */}
+        <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+
+          {/* Hero photo */}
+          {coverPhoto && (
+            <div style={{ width: '100%', height: 140, position: 'relative', overflow: 'hidden' }}>
+              <img src={coverPhoto} alt={pin?.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              {/* Scanlines VHS */}
+              <div style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.12) 3px, rgba(0,0,0,0.12) 5px)',
+              }} />
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to bottom, transparent 50%, rgba(12,12,12,0.9) 100%)',
+                pointerEvents: 'none',
+              }} />
+              {/* Badge tipo su foto */}
+              {tipo && (
+                <div style={{
+                  position: 'absolute', top: 10, left: 12,
+                  background: 'rgba(0,0,0,0.7)', color: tipo.color,
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  padding: '3px 8px', borderRadius: 2,
+                  border: `1px solid ${tipo.color}55`,
+                  textTransform: 'uppercase', letterSpacing: '0.04em',
+                }}>
+                  {tipo.emoji} {tipo.label}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Info body */}
+          <div style={{ padding: '14px 16px 20px' }}>
+
+            {/* Nome + condizione */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700,
+                color: 'var(--bone)', flex: 1, lineHeight: 1.2,
+              }}>
+                {loading ? '...' : (spot?.name ?? pin?.name)}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', paddingTop: 2 }}>
+                {pin?.condition === 'alive' ? (
+                  <span style={{
+                    display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
+                    background: '#00c851', boxShadow: '0 0 6px #00c851bb', flexShrink: 0,
+                  }} />
+                ) : (
+                  cond && (
+                    <span style={{
+                      background: cond.bg, color: cond.color,
+                      fontFamily: 'var(--font-mono)', fontSize: 10,
+                      padding: '2px 7px', borderRadius: 2, textTransform: 'uppercase',
+                    }}>
+                      {cond.label}
+                    </span>
+                  )
+                )}
+                {/* Preferiti */}
+                <button onClick={handleFav} style={{
+                  background: myFav ? 'rgba(255,60,60,0.15)' : 'rgba(255,255,255,0.06)',
+                  border: myFav ? '1px solid rgba(255,60,60,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '50%', width: 30, height: 30,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', fontSize: 14, padding: 0, flexShrink: 0,
+                }}>
+                  {myFav ? '❤️' : '🤍'}
+                </button>
+              </div>
+            </div>
+
+            {/* Città + user */}
+            {(pin?.city || pin?.submitted_by_username) && (
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                color: 'var(--gray-500)', marginBottom: 10,
+              }}>
+                {[pin.city, pin.submitted_by_username ? `@${pin.submitted_by_username}` : null].filter(Boolean).join(' · ')}
+              </div>
+            )}
+
+            {/* Rating stelline */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Il tuo voto
+              </span>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {[1,2,3,4,5].map(i => (
+                  <button key={i} onClick={() => handleRate(i)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 18, padding: 0,
+                    color: i <= myRating ? '#fbbf24' : 'var(--gray-600)',
+                    transition: 'color 0.1s',
+                  }}>★</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Descrizione */}
+            {spot?.description && (
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                color: 'var(--gray-400)', lineHeight: 1.6,
+                marginBottom: 14,
+                display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden',
+              }}>
+                {spot.description}
+              </div>
+            )}
+
+            {/* Separator */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '12px 0' }} />
+
+            {/* Azioni */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+
+              {/* Portami lì */}
+              <div style={{ position: 'relative', flex: 1 }}>
+                <button
+                  onClick={() => setNavOpen(o => !o)}
+                  style={{
+                    width: '100%',
+                    background: 'var(--orange)', color: '#000',
+                    border: 'none', borderRadius: 6,
+                    fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+                    padding: '10px 0', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  📍 Portami lì
+                </button>
+
+                {/* Nav picker */}
+                {navOpen && (
+                  <div style={{
+                    position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, right: 0,
+                    background: 'var(--gray-800)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 8, overflow: 'hidden', zIndex: 10,
+                    boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
+                  }}>
+                    {[
+                      { label: 'Google Maps', url: googleUrl },
+                      { label: 'Apple Maps',  url: appleMaps },
+                      { label: 'Waze',        url: wazeUrl   },
+                    ].map(({ label, url }) => (
+                      <button key={label} onClick={() => openNav(url)} style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '12px 16px',
+                        fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)',
+                        background: 'none', border: 'none',
+                        borderBottom: label !== 'Waze' ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.1)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Vedi pagina completa */}
+              {pin && (
+                <Link href={`/map/spot/${pin.slug}`} style={{
+                  padding: '10px 14px',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 6,
+                  fontFamily: 'var(--font-mono)', fontSize: 12,
+                  color: 'var(--bone)', textDecoration: 'none',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  whiteSpace: 'nowrap',
+                }}>
+                  Tutto lo spot →
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ── Bottone raggio ── */
 function RadiusBtn({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      title="Ricerca per raggio"
-      style={{
-        position: 'absolute', bottom: 'calc(12px + env(safe-area-inset-bottom))', left: 12,
-        width: 40, height: 40,
-        background: active ? 'var(--orange)' : 'var(--gray-800)',
-        border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
-        borderRadius: 4,
-        color: active ? '#000' : 'var(--bone)',
-        fontSize: 20, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.5)', zIndex: 10,
-      }}
-    >
+    <button onClick={onClick} title="Ricerca per raggio" style={{
+      position: 'absolute', bottom: 'calc(80px + env(safe-area-inset-bottom))', left: 12,
+      width: 40, height: 40,
+      background: active ? 'var(--orange)' : 'var(--gray-800)',
+      border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
+      borderRadius: 4, color: active ? '#000' : 'var(--bone)',
+      fontSize: 20, cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.5)', zIndex: 10,
+    }}>
       🎯
     </button>
   );
