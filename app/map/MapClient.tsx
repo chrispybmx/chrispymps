@@ -349,7 +349,7 @@ function SpotListPanel({
   }
 
   return (
-    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' as unknown as undefined }}>
+    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' } as React.CSSProperties}>
 
       {/* Mobile-friendly CSS: hover only on pointer devices, tap highlight off */}
       <style>{`
@@ -471,8 +471,8 @@ function SpotListPanel({
                 {/* Foto extra — appaiono sotto quando espanso */}
                 {isExp && (spot.photo_urls?.length ?? 0) > 1 && (
                   <div style={{ display: 'flex', gap: 4, overflowX: 'auto', width: 110, scrollbarWidth: 'none' } as React.CSSProperties}>
-                    {(spot.photo_urls ?? []).slice(1, 4).map((url, pi) => (
-                      <Link key={pi} href={`/map/spot/${spot.slug}`}
+                    {(spot.photo_urls ?? []).slice(1, 4).map((url) => (
+                      <Link key={url} href={`/map/spot/${spot.slug}`}
                         onClick={e => e.stopPropagation()}
                         style={{
                           flexShrink: 0, display: 'block',
@@ -554,7 +554,7 @@ function SpotListPanel({
                       )}
                     </div>
                     <button
-                      onClick={e => { e.stopPropagation(); window.open(`https://maps.apple.com/?daddr=${spot.lat},${spot.lon}&dirflg=d`, '_blank'); }}
+                      onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
                       title="Portami qui"
                       style={{
                         flexShrink: 0, width: 36, height: 36,
