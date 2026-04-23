@@ -5,6 +5,8 @@ import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import type { Spot } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
+import PhotoCarousel from '@/components/PhotoCarousel';
+import StatusUpdateBtn from '@/components/StatusUpdateBtn';
 
 export const revalidate = 300;
 
@@ -126,25 +128,9 @@ export default async function SpotPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── FOTO HERO ── */}
+      {/* ── FOTO CAROUSEL ── */}
       {photos.length > 0 && (
-        <div style={{ position: 'relative' }}>
-          <img
-            src={photos[0].url}
-            alt={spot.name}
-            style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }}
-          />
-          {photos.length > 1 && (
-            <div style={{
-              position: 'absolute', bottom: 10, right: 10,
-              background: 'rgba(0,0,0,0.65)', borderRadius: 12,
-              padding: '4px 10px', fontSize: 11, color: '#fff',
-              fontFamily: 'var(--font-mono)',
-            }}>
-              📷 {photos.length} foto
-            </div>
-          )}
-        </div>
+        <PhotoCarousel photos={photos.map(p => ({ url: p.url, credit_name: p.credit_name ?? undefined }))} />
       )}
 
       <div style={{ padding: '20px 20px 0' }}>
@@ -232,9 +218,8 @@ export default async function SpotPage({ params }: Props) {
           padding: '16px', background: 'var(--gray-800)',
           borderRadius: 8, border: '1px solid var(--gray-700)',
         }}>
-          {spot.surface   && <MetaRow label="Superficie" value={spot.surface} />}
+          {spot.surface    && <MetaRow label="Superficie" value={spot.surface} />}
           {spot.difficulty && <MetaRow label="Livello"   value={spot.difficulty} />}
-          <MetaRow label="Cera" value={spot.wax_needed ? '🕯️ Necessaria' : 'Non necessaria'} />
           {spot.guardians && (
             <div style={{ gridColumn: '1/-1' }}>
               <MetaRow label="Note accesso" value={spot.guardians} />
@@ -242,24 +227,6 @@ export default async function SpotPage({ params }: Props) {
           )}
           <MetaRow label="Aggiornato" value={new Date(spot.condition_updated_at).toLocaleDateString('it-IT')} />
         </div>
-
-        {/* ── GALLERIA FOTO AGGIUNTIVE ── */}
-        {photos.length > 1 && (
-          <div style={{ marginBottom: 24 }}>
-            <SectionTitle>FOTO ({photos.length})</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 6 }}>
-              {photos.map((photo, i) => (
-                <img
-                  key={photo.id}
-                  src={photo.url}
-                  alt={`Foto ${i + 1} di ${spot.name}`}
-                  style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, display: 'block' }}
-                  loading="lazy"
-                />
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── VIDEO YOUTUBE ── */}
         {embedUrl && (
@@ -301,6 +268,9 @@ export default async function SpotPage({ params }: Props) {
 
       {/* ── SPOT INTERACTIONS: stelle, cuore, commenti ── */}
       <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
+
+      {/* ── AGGIORNA STATO ── */}
+      <StatusUpdateBtn spotId={spot.id} spotName={spot.name} currentCondition={spot.condition} />
 
       <div style={{ padding: '0 20px' }}>
         {/* JSON-LD: BreadcrumbList */}
