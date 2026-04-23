@@ -167,7 +167,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-            padding: 0,
+            padding: 0, marginLeft: 'auto',
           }}
         >
           <div style={{ fontSize: 26, lineHeight: 1, transition: 'transform 0.2s', transform: isFaved ? 'scale(1.15)' : 'scale(1)' }}>
