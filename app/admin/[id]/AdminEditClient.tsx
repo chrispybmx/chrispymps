@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { TIPI_SPOT, CITTA_ITALIANE, CONDIZIONI } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CONDIZIONI, DIFFICOLTA, SUPERFICI } from '@/lib/constants';
 import type { Spot, SpotType, SpotCondition, SpotPhoto } from '@/lib/types';
 
 interface Props { spot: Spot }
@@ -33,6 +33,8 @@ export default function AdminEditClient({ spot: initial }: Props) {
           name: spot.name, type: spot.type, city: spot.city,
           description: spot.description, guardians: spot.guardians,
           youtube_url: spot.youtube_url, lat: spot.lat, lon: spot.lon,
+          difficulty: spot.difficulty || null,
+          surface: spot.surface || null,
           tags: tags || null,
         }),
       });
@@ -197,6 +199,42 @@ export default function AdminEditClient({ spot: initial }: Props) {
 
             <Field label="Note accesso (guardiani, orari)">
               <input type="text" className="input-vhs" value={spot.guardians ?? ''} onChange={e => update('guardians', e.target.value)} placeholder='es. "Libero di notte"' />
+            </Field>
+
+            <Field label="Livello difficoltà">
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => update('difficulty', null)}
+                  style={{
+                    padding: '5px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
+                    border: `1px solid ${!spot.difficulty ? 'var(--orange)' : 'var(--gray-600)'}`,
+                    borderRadius: 2,
+                    background: !spot.difficulty ? 'rgba(255,106,0,0.15)' : 'transparent',
+                    color: !spot.difficulty ? 'var(--orange)' : 'var(--gray-400)',
+                  }}
+                >
+                  —
+                </button>
+                {DIFFICOLTA.map(d => (
+                  <button key={d.value} onClick={() => update('difficulty', d.value)} style={{
+                    padding: '5px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
+                    border: `1px solid ${spot.difficulty === d.value ? 'var(--orange)' : 'var(--gray-600)'}`,
+                    borderRadius: 2,
+                    background: spot.difficulty === d.value ? 'rgba(255,106,0,0.15)' : 'transparent',
+                    color: spot.difficulty === d.value ? 'var(--orange)' : 'var(--bone)',
+                    textTransform: 'uppercase',
+                  }}>
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="Superficie">
+              <select className="input-vhs" value={spot.surface ?? ''} onChange={e => update('surface', e.target.value || null)}>
+                <option value="">—</option>
+                {SUPERFICI.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </Field>
 
             <Field label="YouTube URL (video dello spot)">
