@@ -67,7 +67,9 @@ export interface SpotMapPin {
   lon:       number;
   city?:     string;
   condition: SpotCondition;
-  cover_url?: string; // prima foto
+  cover_url?:   string;    // prima foto
+  photo_urls?:  string[];  // tutte le foto ordinate
+  description?: string;
   submitted_by_username?: string;
 }
 
