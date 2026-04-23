@@ -83,20 +83,16 @@ export default function SpotMap({
   const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
   const onMapClickRef    = useRef(onMapClick);
   const onSpotClickRef   = useRef(onSpotClick);
-  /* Memoization: marker individuali per aggiornamenti icona senza full-rebuild */
+  /* Memoization: refs dichiarati qui ma inizializzati dopo filtered/clusters */
   const pinMarkersRef    = useRef<Map<string, import('leaflet').Marker>>(new Map());
   const prevSelIdRef     = useRef<string | null>(null);
-  const filteredRef      = useRef(filtered);
+  const filteredRef      = useRef<SpotMapPin[]>([]);
   const selPinRef        = useRef<SpotMapPin | null>(null);
   const [locating, setLocating] = useState(false);
   const [zoom, setZoom]         = useState(APP_CONFIG.mapZoom ?? 6);
 
   useEffect(() => { onMapClickRef.current  = onMapClick; });
   useEffect(() => { onSpotClickRef.current = onSpotClick; });
-
-  // Sincronizza ref mutabili col valore corrente (prima degli effect)
-  filteredRef.current = filtered;
-  selPinRef.current   = selectedPin ?? null;
 
   const filtered = useMemo(() => spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
@@ -109,6 +105,10 @@ export default function SpotMap({
   }), [spots, filterType, filterRegionCities, searchQuery]);
 
   const clusters = useMemo(() => computeClusters(filtered), [filtered]);
+
+  // Sincronizza ref mutabili col valore corrente del render (dopo filtered/clusters)
+  filteredRef.current = filtered;
+  selPinRef.current   = selectedPin ?? null;
 
   /* ── Init mappa ── */
   useEffect(() => {
