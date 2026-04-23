@@ -97,6 +97,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     if (!label) { setFilterRegionCities(null); return; }
     const region = REGIONI_ITALIA.find(r => r.label === label);
     setFilterRegionCities(region?.cities ?? null);
+    if (region) setFlyTarget({ lat: region.center[0], lon: region.center[1], zoom: region.zoom });
   }, []);
 
   const spotsInRadius = useMemo(() => {
