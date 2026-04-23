@@ -11,6 +11,7 @@ interface TopBarProps {
   onAddSpot:       () => void;
   activeType:      SpotType | null;
   spots:           SpotMapPin[];
+  filteredCount?:  number;
   onCitySelect:    (city: string, lat: number, lon: number) => void;
   onSpotSelect:    (pin: SpotMapPin) => void;
   onOpenAuth?:     () => void;
@@ -26,7 +27,7 @@ interface NominatimPlace {
 
 export default function TopBar({
   onSearch, onFilterType, onAddSpot, activeType,
-  spots, onCitySelect, onSpotSelect, onOpenAuth,
+  spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
 }: TopBarProps) {
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -183,7 +184,7 @@ export default function TopBar({
           }}
           ref={(el) => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
         >
-          <FilterChip label="TUTTI" active={activeType === null} color="var(--orange)" onClick={() => onFilterType(null)} />
+          <FilterChip label="TUTTI" active={activeType === null} color="var(--orange)" onClick={() => onFilterType(null)} count={filteredCount ?? spots.length} />
           {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([type, info]) => (
             <FilterChip
               key={type}
