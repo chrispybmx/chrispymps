@@ -55,6 +55,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [addLon,             setAddLon]             = useState<number | undefined>();
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
   const [authOpen,           setAuthOpen]           = useState(false);
+  const [fitAllTrigger,      setFitAllTrigger]      = useState(0);
 
   /* ── Auto-open add modal se URL contiene ?add=1 ── */
   useEffect(() => {
@@ -91,6 +92,16 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const selectedPin = useMemo(() =>
     filtered.find(s => s.id === activeListId) ?? null,
   [filtered, activeListId]);
+
+  /* Auto-refit mappa quando cambiano i filtri principali.
+     Usiamo un ref per saltare il primo render (mount). */
+  const filterInitRef = useRef(false);
+  useEffect(() => {
+    if (!filterInitRef.current) { filterInitRef.current = true; return; }
+    // Incrementa il trigger → SpotMap farà fitBounds sui filtered
+    setFitAllTrigger(n => n + 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, filterRegion, filterCondition, filterDifficulty, searchQuery]);
 
   /* ── Radius search ── */
   const [radiusMode,   setRadiusMode]   = useState(false);
@@ -196,6 +207,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onAddSpotAt={handleAddSpotAt}
           flyTarget={flyTarget}
           selectedPin={selectedPin}
+          overlayOffsetPx={160}
+          fitAllTrigger={fitAllTrigger}
           radiusMode={radiusMode}
           radiusCenter={radiusCenter}
           radiusKm={radiusKm}
