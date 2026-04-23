@@ -375,19 +375,23 @@ export default function SpotMap({
     const zoom = flyTarget.zoom ?? APP_CONFIG.mapZoomCity;
     const isMobile = window.innerWidth < 768;
 
-    // Calcola offset dinamico: panel_height / 2 centra il punto nello spazio visibile
+    /* Calcola offset dinamico: panel_height / 2
+       Logica: proiettiamo il pin in pixel, poi AGGIUNGIAMO l'offset a Y (spostiamo
+       il "centro virtuale" più a sud). Leaflet centra la mappa su quel punto sud,
+       quindi il pin appare panel_height/2 px SOPRA il centro → al centro dello
+       spazio visibile sopra il pannello. Sottrarre (vecchio codice) faceva l'opposto. */
     const offset = getPanelOffsetPx();
 
     if (isMobile) {
-      // Su mobile: offset comunque, ma senza animazione
+      // Su mobile: stesso offset, senza animazione
       const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
-      const offsetPoint  = targetPoint.subtract([0, offset]);
+      const offsetPoint  = targetPoint.add(L!.point(0, offset));
       const offsetLatLng = map.unproject(offsetPoint, zoom);
       map.setView(offsetLatLng, zoom, { animate: false });
     } else {
-      // Su desktop: vola al punto con offset calcolato live
+      // Su desktop: flyTo con centro spostato a sud del pin
       const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
-      const offsetPoint  = targetPoint.subtract([0, offset]);
+      const offsetPoint  = targetPoint.add(L!.point(0, offset));
       const offsetLatLng = map.unproject(offsetPoint, zoom);
       map.flyTo(offsetLatLng, zoom, { duration: 0.7, easeLinearity: 0.5 });
     }
@@ -400,11 +404,11 @@ export default function SpotMap({
     if (pins.length === 0) return;
     const offset = getPanelOffsetPx();
     if (pins.length === 1) {
-      // Singolo risultato: vola centrato nello spazio visibile
-      const p           = pins[0];
-      const targetZoom  = 15;
-      const targetPoint = mapInstance.current.project([p.lat, p.lon], targetZoom);
-      const offsetPoint = targetPoint.subtract([0, offset]);
+      // Singolo risultato: vola centrato nello spazio visibile (centro spostato a sud)
+      const p            = pins[0];
+      const targetZoom   = 15;
+      const targetPoint  = mapInstance.current.project([p.lat, p.lon], targetZoom);
+      const offsetPoint  = targetPoint.add(L!.point(0, offset));
       const offsetLatLng = mapInstance.current.unproject(offsetPoint, targetZoom);
       mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 0.7, easeLinearity: 0.5 });
     } else {
