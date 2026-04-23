@@ -3,10 +3,10 @@
 import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import type { SpotMapPin, SpotType, Spot } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import type { SpotMapPin, SpotType } from '@/lib/types';
 import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
-import SpotSheet from '@/components/SpotSheet';
 import AddSpotModal from '@/components/AddSpotModal';
 import SupportModal from '@/components/SupportModal';
 import AuthModal from '@/components/AuthModal';
@@ -38,40 +38,38 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
 
 interface MapClientProps { initialSpots: SpotMapPin[] }
 
+/* ═══════════════════════════════════════════════════════
+   ALTEZZE
+   topbar ~56px + chips ~44px = 100px
+   mappa: clamp(200px, 40dvh, 380px) — visibile e proporzionata
+═══════════════════════════════════════════════════════ */
+const TOP_OFFSET  = 100;
+const MAP_HEIGHT  = 'clamp(200px, 40dvh, 380px)';
+
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
 export default function MapClient({ initialSpots }: MapClientProps) {
+  const router = useRouter();
+
   const [spots]              = useState<SpotMapPin[]>(initialSpots);
   const [filterType,         setFilterType]         = useState<SpotType | null>(null);
   const [filterRegionLabel,  setFilterRegionLabel]  = useState<string | null>(null);
   const [filterRegionCities, setFilterRegionCities] = useState<string[] | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
-  const [selectedSpot,       setSelectedSpot]       = useState<Spot | null>(null);
-  const [selectedIdx,        setSelectedIdx]        = useState<number>(-1);
   const [addOpen,            setAddOpen]            = useState(false);
   const [supportOpen,        setSupportOpen]        = useState(false);
   const [addLat,             setAddLat]             = useState<number | undefined>();
   const [addLon,             setAddLon]             = useState<number | undefined>();
-  const [loadingSpot,        setLoadingSpot]        = useState(false);
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
   const [authOpen,           setAuthOpen]           = useState(false);
-
-  /* ── Layout ── */
-  const [isWide, setIsWide] = useState(false);
-  useEffect(() => {
-    const check = () => setIsWide(window.innerWidth >= 720);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
 
   /* ── Spot attivo nella lista (IntersectionObserver) ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
 
   /* Quando la lista scorre → mappa vola allo spot visibile */
   useEffect(() => {
-    if (!activeListId || selectedSpot) return;
+    if (!activeListId) return;
     const spot = filtered.find(s => s.id === activeListId);
     if (spot) setFlyTarget({ lat: spot.lat, lon: spot.lon, zoom: 14 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,23 +127,10 @@ export default function MapClient({ initialSpots }: MapClientProps) {
 
   const closeRadiusMode = useCallback(() => { setRadiusMode(false); setRadiusCenter(null); }, []);
 
-  const openSpot = useCallback(async (pin: SpotMapPin) => {
-    setLoadingSpot(true);
-    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 16 });
-    const idx = filtered.findIndex(s => s.id === pin.id);
-    setSelectedIdx(idx);
-    try {
-      const res = await fetch(`/api/spots/${pin.slug}`);
-      if (res.ok) { setSelectedSpot((await res.json()).data); }
-      else        { setSelectedSpot(pin as unknown as Spot); }
-    } catch { setSelectedSpot(pin as unknown as Spot); }
-    finally { setLoadingSpot(false); }
-  }, [filtered]);
-
-  const handleNavigate = useCallback(async (idx: number) => {
-    if (idx < 0 || idx >= filtered.length) return;
-    await openSpot(filtered[idx]);
-  }, [filtered, openSpot]);
+  /* Click su uno spot → vai direttamente alla pagina */
+  const goToSpot = useCallback((pin: SpotMapPin) => {
+    router.push(`/map/spot/${pin.slug}`);
+  }, [router]);
 
   const handleCitySelect = useCallback((city: string, lat: number, lon: number) => {
     setFlyTarget({ lat, lon, zoom: 14 });
@@ -156,27 +141,8 @@ export default function MapClient({ initialSpots }: MapClientProps) {
     setAddLat(lat); setAddLon(lon); setAddOpen(true);
   }, []);
 
-  const handleFlag = useCallback(async (spotId: string) => {
-    const reason = window.prompt('Perché segnali questo spot?');
-    if (!reason) return;
-    await fetch('/api/flag', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spot_id: spotId, reason }),
-    });
-    alert('Segnalazione inviata. Grazie!');
-  }, []);
-
-  /* Altezza contenuto fisso sotto topbar+chips */
-  const TOP_OFFSET = 100; // px — topbar ~56 + filter chips ~44
-
-  /* Altezza mappa mobile */
-  const MAP_H_MOBILE = 240;
-
-  /* Larghezza mappa desktop */
-  const MAP_W_DESKTOP = '46%';
-
   return (
-    <div style={{ height: '100dvh', overflow: 'hidden' }}>
+    <div style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
       {/* TopBar */}
       <TopBar
@@ -187,40 +153,49 @@ export default function MapClient({ initialSpots }: MapClientProps) {
         spots={spots}
         filteredCount={filtered.length}
         onCitySelect={handleCitySelect}
-        onSpotSelect={openSpot}
+        onSpotSelect={goToSpot}
         onOpenAuth={() => setAuthOpen(true)}
       />
 
-      {/* ── LAYOUT PRINCIPALE ── */}
+      {/* ── LAYOUT: mappa sopra fissa, lista sotto scrollabile ── */}
       <div style={{
         position: 'fixed',
         top: TOP_OFFSET,
         left: 0, right: 0, bottom: 0,
         display: 'flex',
-        flexDirection: isWide ? 'row' : 'column',
+        flexDirection: 'column',
         zIndex: 1,
         background: 'var(--black)',
+        overflow: 'hidden',
       }}>
 
-        {/* ── MAPPA (mobile: top, desktop: right) ── */}
-        {!isWide ? (
-          /* Mobile: mappa in cima, altezza fissa */
-          <div style={{ height: MAP_H_MOBILE, flexShrink: 0, position: 'relative', borderBottom: '2px solid var(--orange)' }}>
-            <SpotMap
-              spots={spots} filterType={filterType} filterRegionCities={filterRegionCities}
-              searchQuery={searchQuery} onSpotClick={openSpot} onAddSpotAt={handleAddSpotAt}
-              flyTarget={flyTarget} radiusMode={radiusMode} radiusCenter={radiusCenter}
-              radiusKm={radiusKm} onMapClick={handleMapClick}
-            />
-            <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
-            {radiusMode && !radiusCenter && <RadiusToast />}
-          </div>
-        ) : null}
-
-        {/* ── LISTA SPOT (scrollabile) ── */}
+        {/* ── MAPPA — altezza fissa, non scorre mai ── */}
         <div style={{
-          flex: isWide ? 1 : undefined,
-          width: isWide ? undefined : '100%',
+          height: MAP_HEIGHT,
+          flexShrink: 0,
+          position: 'relative',
+          borderBottom: '2px solid var(--orange)',
+        }}>
+          <SpotMap
+            spots={spots}
+            filterType={filterType}
+            filterRegionCities={filterRegionCities}
+            searchQuery={searchQuery}
+            onSpotClick={goToSpot}
+            onAddSpotAt={handleAddSpotAt}
+            flyTarget={flyTarget}
+            radiusMode={radiusMode}
+            radiusCenter={radiusCenter}
+            radiusKm={radiusKm}
+            onMapClick={handleMapClick}
+          />
+          <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
+          {radiusMode && !radiusCenter && <RadiusToast />}
+        </div>
+
+        {/* ── LISTA SPOT — scorre infinita sotto la mappa ── */}
+        <div style={{
+          flex: 1,
           overflowY: 'auto',
           overscrollBehavior: 'contain',
           background: 'var(--black)',
@@ -229,60 +204,29 @@ export default function MapClient({ initialSpots }: MapClientProps) {
             spots={filtered}
             activeId={activeListId}
             onActivate={setActiveListId}
-            onSpotClick={openSpot}
           />
         </div>
-
-        {/* ── MAPPA desktop (destra, occupa altezza piena) ── */}
-        {isWide && (
-          <div style={{ width: MAP_W_DESKTOP, flexShrink: 0, position: 'relative', borderLeft: '2px solid var(--orange)' }}>
-            <SpotMap
-              spots={spots} filterType={filterType} filterRegionCities={filterRegionCities}
-              searchQuery={searchQuery} onSpotClick={openSpot} onAddSpotAt={handleAddSpotAt}
-              flyTarget={flyTarget} radiusMode={radiusMode} radiusCenter={radiusCenter}
-              radiusKm={radiusKm} onMapClick={handleMapClick}
-            />
-            <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
-            {radiusMode && !radiusCenter && <RadiusToast />}
-          </div>
-        )}
       </div>
-
-      {/* Loading */}
-      {loadingSpot && (
-        <div style={{
-          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(10,10,10,0.9)', color: 'var(--orange)',
-          fontFamily: 'var(--font-mono)', fontSize: 13, padding: '7px 16px',
-          borderRadius: 4, zIndex: 50, border: '1px solid var(--gray-600)',
-        }}>
-          CARICAMENTO...
-        </div>
-      )}
 
       {/* Radius sheet */}
       {radiusMode && (
         <RadiusSheet
-          radiusKm={radiusKm} center={radiusCenter} spots={spotsInRadius}
-          onSetRadius={setRadiusKm} onUseGPS={handleUseGPS} onClose={closeRadiusMode}
-          onSpotClick={openSpot} gpsLoading={gpsLoading}
+          radiusKm={radiusKm}
+          center={radiusCenter}
+          spots={spotsInRadius}
+          onSetRadius={setRadiusKm}
+          onUseGPS={handleUseGPS}
+          onClose={closeRadiusMode}
+          onSpotClick={goToSpot}
+          gpsLoading={gpsLoading}
         />
       )}
-
-      {/* SpotSheet */}
-      <SpotSheet
-        spot={selectedSpot}
-        onClose={() => { setSelectedSpot(null); setSelectedIdx(-1); }}
-        onFlag={handleFlag}
-        allSpots={filtered}
-        currentIdx={selectedIdx >= 0 ? selectedIdx : undefined}
-        onNavigate={handleNavigate}
-      />
 
       <AddSpotModal
         open={addOpen}
         onClose={() => { setAddOpen(false); setAddLat(undefined); setAddLon(undefined); }}
-        initialLat={addLat} initialLon={addLon}
+        initialLat={addLat}
+        initialLon={addLon}
       />
       <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
@@ -295,7 +239,10 @@ export default function MapClient({ initialSpots }: MapClientProps) {
 ════════════════════════════════════════════════════════ */
 
 const FAVS_KEY = 'cmaps_favs_v1';
-function isFav(id: string) { try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); } catch { return false; } }
+function isFav(id: string) {
+  try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); }
+  catch { return false; }
+}
 function toggleFav(id: string) {
   try {
     const favs: string[] = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]');
@@ -307,16 +254,14 @@ function toggleFav(id: string) {
 }
 
 function SpotListPanel({
-  spots, activeId, onActivate, onSpotClick,
+  spots, activeId, onActivate,
 }: {
   spots:      SpotMapPin[];
   activeId:   string | null;
   onActivate: (id: string) => void;
-  onSpotClick:(pin: SpotMapPin) => void;
 }) {
   const [favs, setFavs] = useState<Record<string, boolean>>({});
 
-  /* Carica preferiti */
   useEffect(() => {
     const f: Record<string, boolean> = {};
     spots.forEach(s => { f[s.id] = isFav(s.id); });
@@ -340,7 +285,7 @@ function SpotListPanel({
           }
         }
       },
-      { rootMargin: '-25% 0px -50% 0px', threshold: 0 }
+      { rootMargin: '-10% 0px -60% 0px', threshold: 0 }
     );
     cardRefs.current.forEach(el => ioRef.current!.observe(el));
     return () => ioRef.current?.disconnect();
@@ -353,6 +298,7 @@ function SpotListPanel({
   }, []);
 
   const handleFav = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
     e.stopPropagation();
     const added = toggleFav(id);
     setFavs(prev => ({ ...prev, [id]: added }));
@@ -360,7 +306,10 @@ function SpotListPanel({
 
   if (spots.length === 0) {
     return (
-      <div style={{ padding: '40px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14 }}>
+      <div style={{
+        padding: '48px 20px', textAlign: 'center',
+        fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14,
+      }}>
         Nessuno spot trovato.<br />
         <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>Prova a cambiare filtro.</span>
       </div>
@@ -371,7 +320,7 @@ function SpotListPanel({
     <div>
       {/* Contatore */}
       <div style={{
-        padding: '10px 14px 6px',
+        padding: '9px 14px 7px',
         fontFamily: 'var(--font-mono)', fontSize: 11,
         color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
         borderBottom: '1px solid var(--gray-800)',
@@ -379,7 +328,7 @@ function SpotListPanel({
         {spots.length} spot
       </div>
 
-      {/* Cards */}
+      {/* Cards — ogni card è un link diretto alla pagina */}
       {spots.map((spot, idx) => {
         const tipo   = TIPI_SPOT[spot.type];
         const cond   = CONDIZIONI[spot.condition];
@@ -388,33 +337,35 @@ function SpotListPanel({
         const isLast = idx === spots.length - 1;
 
         return (
-          <div
+          <Link
             key={spot.id}
-            ref={(el) => setRef(spot.id, el)}
+            href={`/map/spot/${spot.slug}`}
+            ref={(el) => setRef(spot.id, el as Element | null)}
             data-spot-id={spot.id}
             style={{
+              display: 'block',
+              textDecoration: 'none',
               position: 'relative',
               borderBottom: isLast ? 'none' : '1px solid var(--gray-800)',
               borderLeft: `3px solid ${isAct ? 'var(--orange)' : 'transparent'}`,
-              transition: 'border-color 0.2s',
-              cursor: 'pointer',
+              transition: 'border-color 0.2s, background 0.1s',
             }}
-            onClick={() => onSpotClick(spot)}
           >
-            <div style={{
-              display: 'flex', gap: 11, padding: '12px 12px 12px 10px',
-              paddingRight: 42, // spazio per il cuore
-              transition: 'opacity 0.1s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            <div
+              style={{
+                display: 'flex', gap: 11,
+                padding: '12px 12px 12px 10px',
+                paddingRight: 44,
+              }}
+              onMouseEnter={e => (e.currentTarget.parentElement!.style.background = 'rgba(255,106,0,0.04)')}
+              onMouseLeave={e => (e.currentTarget.parentElement!.style.background = 'transparent')}
             >
 
               {/* Foto quadrata */}
               <div style={{
                 width: 82, height: 82, flexShrink: 0,
                 borderRadius: 5, overflow: 'hidden',
-                background: 'var(--gray-700)', position: 'relative',
+                background: 'var(--gray-700)',
               }}>
                 {spot.cover_url ? (
                   <img
@@ -424,14 +375,21 @@ function SpotListPanel({
                     loading="lazy"
                   />
                 ) : (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, opacity: 0.4 }}>
+                  <div style={{
+                    width: '100%', height: '100%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 28, opacity: 0.4,
+                  }}>
                     {tipo.emoji}
                   </div>
                 )}
               </div>
 
               {/* Info */}
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+              <div style={{
+                flex: 1, minWidth: 0,
+                display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center',
+              }}>
 
                 {/* Nome */}
                 <div style={{
@@ -474,19 +432,6 @@ function SpotListPanel({
                       .filter(Boolean).join(' · ')}
                   </div>
                 )}
-
-                {/* Link pagina completa */}
-                <Link
-                  href={`/map/spot/${spot.slug}`}
-                  onClick={e => e.stopPropagation()}
-                  style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10,
-                    color: 'var(--orange)', letterSpacing: '0.04em',
-                    textDecoration: 'none', alignSelf: 'flex-start',
-                  }}
-                >
-                  Vedi pagina →
-                </Link>
               </div>
             </div>
 
@@ -505,11 +450,11 @@ function SpotListPanel({
             >
               {myFav ? '❤️' : '🤍'}
             </button>
-          </div>
+          </Link>
         );
       })}
 
-      <div style={{ height: 40 }} />
+      <div style={{ height: 48 }} />
     </div>
   );
 }
