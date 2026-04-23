@@ -64,8 +64,12 @@ export default function MapClient({ initialSpots }: MapClientProps) {
     if (filterType && s.type !== filterType) return false;
     if (filterRegionCities && s.city && !filterRegionCities.includes(s.city)) return false;
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return s.name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
+      const q = searchQuery.toLowerCase().replace(/^@/, '');
+      return (
+        s.name.toLowerCase().includes(q) ||
+        (s.city ?? '').toLowerCase().includes(q) ||
+        (s.submitted_by_username ?? '').toLowerCase().includes(q)
+      );
     }
     return true;
   }), [spots, filterType, filterRegionCities, searchQuery]);
