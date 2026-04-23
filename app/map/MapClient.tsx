@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import type { SpotMapPin, SpotType } from '@/lib/types';
+import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
 import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
@@ -44,8 +44,10 @@ const TOP_OFFSET = 100;
 ════════════════════════════════════════════════════════ */
 export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [spots]              = useState<SpotMapPin[]>(initialSpots);
-  const [filterType,   setFilterType]   = useState<SpotType | null>(null);
-  const [filterRegion, setFilterRegion] = useState<typeof REGIONI_ITALIA[0] | null>(null);
+  const [filterType,      setFilterType]      = useState<SpotType | null>(null);
+  const [filterRegion,    setFilterRegion]    = useState<typeof REGIONI_ITALIA[0] | null>(null);
+  const [filterCondition, setFilterCondition] = useState<SpotCondition | null>(null);
+  const [filterDifficulty,setFilterDifficulty]= useState<string | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [addOpen,            setAddOpen]            = useState(false);
   const [supportOpen,        setSupportOpen]        = useState(false);
@@ -72,6 +74,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       const [latMin, lonMin, latMax, lonMax] = filterRegion.bbox;
       if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
     }
+    if (filterCondition && s.condition !== filterCondition) return false;
+    if (filterDifficulty && s.difficulty !== filterDifficulty) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase().replace(/^@/, '');
       return (
@@ -81,7 +85,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       );
     }
     return true;
-  }), [spots, filterType, filterRegion, searchQuery]);
+  }), [spots, filterType, filterRegion, filterCondition, filterDifficulty, searchQuery]);
 
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
@@ -163,9 +167,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         onSearch={setSearchQuery}
         onFilterType={setFilterType}
         onFilterRegion={handleFilterRegion}
+        onFilterCondition={setFilterCondition}
+        onFilterDifficulty={setFilterDifficulty}
         onAddSpot={() => setAddOpen(true)}
         activeType={filterType}
         activeRegion={filterRegion?.label ?? null}
+        activeCondition={filterCondition}
+        activeDifficulty={filterDifficulty}
         spots={spots}
         filteredCount={filtered.length}
         onCitySelect={handleCitySelect}
