@@ -80,23 +80,38 @@ export default function TopBar({
     return () => clearTimeout(t);
   }, [query]);
 
-  /* ── Spot locali che matchano (nome o username) ── */
+  /* ── Query normalizzata ── */
   const q = query.trim().toLowerCase();
-  const isAtSearch = q.startsWith('@'); // es. "@chrispy"
+  const isAtSearch = q.startsWith('@');
+  const needle     = isAtSearch ? q.slice(1) : q;
 
-  const spotMatches = q.length >= 1
-    ? spots.filter(s => {
-        if (isAtSearch) return s.submitted_by_username?.toLowerCase().includes(q.slice(1)) ?? false;
-        return s.name.toLowerCase().includes(q);
-      }).slice(0, 6)
+  /* ── Tag matches: tipo + difficoltà ── */
+  interface TagMatch {
+    kind:   'type' | 'difficulty';
+    value:  string;
+    label:  string;
+    emoji:  string;
+    color:  string;
+  }
+  const tagMatches: TagMatch[] = q.length >= 2 ? [
+    ...(Object.entries(TIPI_SPOT) as [SpotType, { label: string; emoji: string; color: string }][])
+      .filter(([, info]) => info.label.toLowerCase().includes(needle))
+      .map(([key, info]) => ({ kind: 'type' as const, value: key, label: info.label, emoji: info.emoji, color: info.color })),
+    ...DIFFICOLTA
+      .filter(d => d.label.toLowerCase().includes(needle))
+      .map(d => ({ kind: 'difficulty' as const, value: d.value, label: d.label, emoji: '⚡', color: '#ffce4d' })),
+  ] : [];
+
+  /* ── Spot locali che matchano per nome ── */
+  const spotMatches = q.length >= 1 && !isAtSearch
+    ? spots.filter(s => s.name.toLowerCase().includes(q)).slice(0, 5)
     : [];
 
-  /* ── Utenti unici che matchano ── */
-  const userMatches: { username: string; count: number }[] = q.length >= 2
+  /* ── Utenti unici che matchano (con o senza @) ── */
+  const userMatches: { username: string; count: number }[] = needle.length >= 2
     ? Object.entries(
         spots.reduce((acc, s) => {
           const un = s.submitted_by_username?.toLowerCase() ?? '';
-          const needle = isAtSearch ? q.slice(1) : q;
           if (un && un.includes(needle)) {
             acc[s.submitted_by_username!] = (acc[s.submitted_by_username!] ?? 0) + 1;
           }
@@ -161,7 +176,13 @@ export default function TopBar({
     return () => window.removeEventListener('keydown', onKey);
   }, [searchOpen]);
 
-  const hasResults = places.length > 0 || spotMatches.length > 0 || userMatches.length > 0;
+  const hasResults = places.length > 0 || spotMatches.length > 0 || userMatches.length > 0 || tagMatches.length > 0;
+
+  const pickTag = (tag: TagMatch) => {
+    if (tag.kind === 'type')       { onFilterType(tag.value as SpotType); }
+    if (tag.kind === 'difficulty') { onFilterDifficulty(tag.value); }
+    closeSearch();
+  };
 
   return (
     <>
@@ -377,7 +398,7 @@ export default function TopBar({
             <input
               ref={inputRef}
               type="text"
-              placeholder="Cerca città, spot, @utente..."
+              placeholder="Cerca spot, utente, #rail, #street, #beginner..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               style={{
@@ -402,6 +423,43 @@ export default function TopBar({
             {/* ── Risultati con query ── */}
             {query.trim().length >= 1 && (
               <>
+                {/* Tag: tipo spot + livello — filtri rapidi */}
+                {tagMatches.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <SectionLabel>🏷️ Tag / Filtri rapidi</SectionLabel>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {tagMatches.map(tag => (
+                        <button
+                          key={tag.kind + tag.value}
+                          onClick={() => pickTag(tag)}
+                          style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 14,
+                            padding: '8px 14px',
+                            border: `1px solid ${tag.color}55`,
+                            borderRadius: 20,
+                            background: `${tag.color}15`,
+                            color: 'var(--bone)',
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 7,
+                            touchAction: 'manipulation',
+                            transition: 'background 0.15s',
+                          }}
+                        >
+                          <span>{tag.emoji}</span>
+                          <span>{tag.label}</span>
+                          <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 10,
+                            color: tag.color, letterSpacing: '0.05em',
+                          }}>
+                            {tag.kind === 'type' ? `${spots.filter(s => s.type === tag.value).length} spot` : ''}
+                          </span>
+                          <span style={{ color: tag.color, fontSize: 13 }}>→</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Luoghi via Nominatim */}
                 {places.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
@@ -527,10 +585,14 @@ export default function TopBar({
                     </div>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 12,
-                      color: 'var(--gray-400)', lineHeight: 1.5,
+                      color: 'var(--gray-400)', lineHeight: 1.6,
                     }}>
-                      Digita il nome di una città, quartiere o zona.<br />
-                      Es: &quot;Merano&quot;, &quot;Pigneto Roma&quot;, &quot;Navigli&quot;...
+                      Digita il nome di uno spot, città o utente.<br />
+                      <span style={{ color: 'var(--gray-500)' }}>
+                        Tipi: &quot;rail&quot;, &quot;park&quot;, &quot;street&quot;, &quot;gap&quot;...<br />
+                        Livelli: &quot;beginner&quot;, &quot;pro&quot;...<br />
+                        Utenti: &quot;@chrispy&quot; o solo &quot;chrispy&quot;
+                      </span>
                     </div>
                   </div>
                 </div>
