@@ -571,7 +571,7 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
       style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         /* altezza compatta: vedi gli altri spot sopra */
-        maxHeight: 'min(320px, 46dvh)',
+        maxHeight: 'min(460px, 60dvh)',
         transform: isOpen ? 'translateY(0)' : 'translateY(110%)',
         transition: 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
         background: '#0e0e0e',
@@ -695,31 +695,49 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
             ))}
           </div>
 
-          {/* Azioni — solo link pagina completa, sottile */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {/* Nav rapida — non invasiva */}
+          {/* Due bottoni piccoli uguali — allineati a destra */}
+          <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
+
+            {/* Scheda tecnica — outline, stesso size del Nav */}
+            {pin && (
+              <Link href={`/map/spot/${pin.slug}`} style={{
+                padding: '7px 14px',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.18)',
+                borderRadius: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                color: 'var(--bone)', textDecoration: 'none',
+                display: 'flex', alignItems: 'center', gap: 4,
+                whiteSpace: 'nowrap', letterSpacing: '0.03em',
+              }}>
+                Scheda →
+              </Link>
+            )}
+
+            {/* Nav — arancione, stesso size */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => setNavOpen(o => !o)} style={{
-                padding: '8px 12px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 6, cursor: 'pointer',
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+                padding: '7px 14px',
+                background: 'var(--orange)', color: '#000',
+                border: 'none', borderRadius: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                cursor: 'pointer', letterSpacing: '0.03em',
                 display: 'flex', alignItems: 'center', gap: 4,
+                whiteSpace: 'nowrap',
               }}>
                 📍 Nav
               </button>
               {navOpen && (
                 <div style={{
-                  position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
+                  position: 'absolute', bottom: 'calc(100% + 6px)', right: 0,
                   background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 8, overflow: 'hidden', zIndex: 10,
-                  boxShadow: '0 -6px 20px rgba(0,0,0,0.6)', whiteSpace: 'nowrap',
+                  boxShadow: '0 -6px 24px rgba(0,0,0,0.7)', whiteSpace: 'nowrap',
                 }}>
                   {[['Google Maps', googleUrl], ['Apple Maps', appleMaps], ['Waze', wazeUrl]].map(([label, url], i) => (
                     <button key={label} onClick={() => openNav(url)} style={{
                       display: 'block', width: '100%', textAlign: 'left',
-                      padding: '10px 14px',
+                      padding: '11px 16px',
                       fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
                       background: 'none', border: 'none',
                       borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none',
@@ -732,20 +750,6 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
                 </div>
               )}
             </div>
-
-            {/* Vedi pagina — link principale */}
-            {pin && (
-              <Link href={`/map/spot/${pin.slug}`} style={{
-                flex: 1, padding: '8px 0',
-                background: 'var(--orange)', color: '#000',
-                border: 'none', borderRadius: 6,
-                fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-                textDecoration: 'none', letterSpacing: '0.04em',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              }}>
-                Vedi spot completo →
-              </Link>
-            )}
           </div>
         </div>
       </div>
