@@ -638,42 +638,9 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
       {/* ── BODY scrollabile ── */}
       <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
 
-        {/* Foto — riga orizzontale scrollabile se più foto */}
+        {/* Foto — swipeable con frecce */}
         {photos.length > 0 && (
-          <div style={{
-            display: 'flex', gap: 4,
-            overflowX: 'auto', padding: '8px 12px',
-            scrollSnapType: 'x mandatory',
-            WebkitOverflowScrolling: 'touch',
-          }}
-          ref={el => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
-          >
-            {photos.map((url, i) => (
-              <div
-                key={i}
-                onClick={() => setSelPhoto(i)}
-                style={{
-                  flexShrink: 0,
-                  /* Prima foto più larga se unica, poi quadrate */
-                  width: photos.length === 1 ? '100%' : 108,
-                  height: 108,
-                  borderRadius: 6, overflow: 'hidden',
-                  border: selPhoto === i ? '2px solid var(--orange)' : '2px solid transparent',
-                  transition: 'border-color 0.15s',
-                  scrollSnapAlign: 'start',
-                  cursor: 'pointer',
-                  position: 'relative',
-                }}
-              >
-                <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                {/* Scanlines */}
-                <div style={{
-                  position: 'absolute', inset: 0, pointerEvents: 'none',
-                  backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.1) 3px,rgba(0,0,0,0.1) 5px)',
-                }} />
-              </div>
-            ))}
-          </div>
+          <SheetPhotoViewer photos={photos} idx={selPhoto} onIdx={setSelPhoto} />
         )}
 
         {/* Meta + info */}
@@ -728,33 +695,31 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
             ))}
           </div>
 
-          {/* Azioni */}
-          <div style={{ display: 'flex', gap: 8 }}>
-
-            {/* Portami lì */}
-            <div style={{ position: 'relative', flex: 1 }}>
+          {/* Azioni — solo link pagina completa, sottile */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Nav rapida — non invasiva */}
+            <div style={{ position: 'relative' }}>
               <button onClick={() => setNavOpen(o => !o)} style={{
-                width: '100%',
-                background: 'var(--orange)', color: '#000',
-                border: 'none', borderRadius: 6,
-                fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-                padding: '9px 0', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                letterSpacing: '0.04em',
+                padding: '8px 12px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 6, cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+                display: 'flex', alignItems: 'center', gap: 4,
               }}>
-                📍 Portami lì
+                📍 Nav
               </button>
               {navOpen && (
                 <div style={{
-                  position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
+                  position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
                   background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 8, overflow: 'hidden', zIndex: 10,
-                  boxShadow: '0 -6px 20px rgba(0,0,0,0.6)',
+                  boxShadow: '0 -6px 20px rgba(0,0,0,0.6)', whiteSpace: 'nowrap',
                 }}>
                   {[['Google Maps', googleUrl], ['Apple Maps', appleMaps], ['Waze', wazeUrl]].map(([label, url], i) => (
                     <button key={label} onClick={() => openNav(url)} style={{
                       display: 'block', width: '100%', textAlign: 'left',
-                      padding: '11px 14px',
+                      padding: '10px 14px',
                       fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
                       background: 'none', border: 'none',
                       borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none',
@@ -768,18 +733,17 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
               )}
             </div>
 
-            {/* Vedi pagina */}
+            {/* Vedi pagina — link principale */}
             {pin && (
               <Link href={`/map/spot/${pin.slug}`} style={{
-                padding: '9px 14px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 6,
-                fontFamily: 'var(--font-mono)', fontSize: 11,
-                color: 'var(--bone)', textDecoration: 'none',
-                display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+                flex: 1, padding: '8px 0',
+                background: 'var(--orange)', color: '#000',
+                border: 'none', borderRadius: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+                textDecoration: 'none', letterSpacing: '0.04em',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
               }}>
-                Tutto →
+                Vedi spot completo →
               </Link>
             )}
           </div>
@@ -787,6 +751,67 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
       </div>
     </div>
   );
+}
+
+/* ════════════════════════════════════════════════════════
+   SHEET PHOTO VIEWER — foto swipeable con frecce nel mini-sheet
+════════════════════════════════════════════════════════ */
+function SheetPhotoViewer({
+  photos, idx, onIdx,
+}: { photos: string[]; idx: number; onIdx: (i: number) => void }) {
+  const startX = useRef(0);
+  const prev = () => onIdx((idx - 1 + photos.length) % photos.length);
+  const next = () => onIdx((idx + 1) % photos.length);
+
+  return (
+    <div
+      style={{ position: 'relative', background: '#111' }}
+      onTouchStart={e => { startX.current = e.touches[0].clientX; }}
+      onTouchEnd={e => {
+        const dx = e.changedTouches[0].clientX - startX.current;
+        if (Math.abs(dx) > 36) dx < 0 ? next() : prev();
+      }}
+    >
+      <img
+        key={idx}
+        src={photos[idx]}
+        alt=""
+        style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
+      />
+      {/* Scanlines */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.1) 3px,rgba(0,0,0,0.1) 5px)',
+      }} />
+      {/* Frecce — solo se più di una foto */}
+      {photos.length > 1 && (
+        <>
+          <button onClick={prev} style={miniArrow('left')}>‹</button>
+          <button onClick={next} style={miniArrow('right')}>›</button>
+          {/* Counter */}
+          <div style={{
+            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.6)', borderRadius: 10,
+            padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#fff',
+          }}>
+            {idx + 1}/{photos.length}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function miniArrow(side: 'left' | 'right'): React.CSSProperties {
+  return {
+    position: 'absolute', top: '50%', [side]: 6,
+    transform: 'translateY(-50%)',
+    background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '50%', width: 28, height: 28,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0,
+    fontFamily: 'serif', lineHeight: 1,
+  };
 }
 
 /* ── Bottone raggio ── */
