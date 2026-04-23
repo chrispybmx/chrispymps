@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, APP_CONFIG } from '@/lib/constants';
 import type { SpotType, SpotMapPin } from '@/lib/types';
 import SideMenu from './SideMenu';
 
 interface TopBarProps {
   onSearch:        (query: string) => void;
   onFilterType:    (type: SpotType | null) => void;
+  onFilterRegion:  (region: string | null) => void;
   onAddSpot:       () => void;
   activeType:      SpotType | null;
+  activeRegion:    string | null;
   spots:           SpotMapPin[];
   filteredCount?:  number;
   onCitySelect:    (city: string, lat: number, lon: number) => void;
@@ -26,7 +28,8 @@ interface NominatimPlace {
 }
 
 export default function TopBar({
-  onSearch, onFilterType, onAddSpot, activeType,
+  onSearch, onFilterType, onFilterRegion, onAddSpot,
+  activeType, activeRegion,
   spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
 }: TopBarProps) {
   const [menuOpen,   setMenuOpen]   = useState(false);
@@ -173,13 +176,51 @@ export default function TopBar({
         zIndex: 38,
         display: 'flex', alignItems: 'center',
       }}>
+        {/* Dropdown Regione — fisso a sinistra */}
+        <div style={{ padding: '8px 0 8px 10px', flexShrink: 0, borderRight: '1px solid var(--gray-700)' }}>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={activeRegion ?? ''}
+              onChange={e => onFilterRegion(e.target.value || null)}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                padding: '5px 22px 5px 8px',
+                border: `1px solid ${activeRegion ? 'var(--orange)' : 'var(--gray-600)'}`,
+                borderRadius: 2,
+                background: activeRegion ? 'rgba(255,106,0,0.15)' : 'transparent',
+                color: activeRegion ? 'var(--orange)' : 'var(--bone)',
+                cursor: 'pointer',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                minHeight: 34,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                outline: 'none',
+              } as React.CSSProperties}
+            >
+              <option value="">🗺️ REGIONE</option>
+              {REGIONI_ITALIA.map(r => (
+                <option key={r.label} value={r.label} style={{ background: 'var(--gray-800)', color: 'var(--bone)' }}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            {/* freccia custom */}
+            <span style={{
+              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 10, color: activeRegion ? 'var(--orange)' : 'var(--gray-400)',
+              pointerEvents: 'none',
+            }}>▾</span>
+          </div>
+        </div>
+
         {/* Chips scrollabili */}
         <div
           style={{
             flex: 1,
             overflowX: 'auto',
             WebkitOverflowScrolling: 'touch',
-            padding: '8px 0 8px 16px',
+            padding: '8px 0 8px 10px',
             display: 'flex', gap: 8,
           }}
           ref={(el) => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
