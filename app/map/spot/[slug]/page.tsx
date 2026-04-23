@@ -191,38 +191,35 @@ export default async function SpotPage({ params }: Props) {
             </div>
           )}
 
-          {/* Publisher — più visibile */}
+          {/* Publisher — cliccabile → profilo */}
           {spot.submitted_by_username && (
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: 'var(--gray-800)',
-              border: '1px solid var(--gray-700)',
-              borderRadius: 20, padding: '6px 14px',
-            }}>
+            <Link href={`/u/${spot.submitted_by_username}`} style={{ textDecoration: 'none', display: 'inline-flex' }}>
               <div style={{
-                width: 28, height: 28, borderRadius: '50%',
-                background: 'var(--orange)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--font-mono)', fontSize: 13,
-                color: '#000', fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: 'var(--gray-800)',
+                border: '1px solid var(--gray-700)',
+                borderRadius: 20, padding: '6px 14px',
+                transition: 'border-color 0.15s',
               }}>
-                {spot.submitted_by_username[0].toUpperCase()}
-              </div>
-              <div>
                 <div style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: 'var(--orange)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: 'var(--font-mono)', fontSize: 13,
-                  color: 'var(--bone)', lineHeight: 1.2,
+                  color: '#000', fontWeight: 700,
                 }}>
-                  @{spot.submitted_by_username}
+                  {spot.submitted_by_username[0].toUpperCase()}
                 </div>
-                <div style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 10,
-                  color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em',
-                }}>
-                  ha pubblicato questo spot
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', lineHeight: 1.2 }}>
+                    @{spot.submitted_by_username}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    ha pubblicato questo spot →
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
           )}
         </div>
 
