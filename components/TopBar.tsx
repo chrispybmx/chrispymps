@@ -1,22 +1,26 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, APP_CONFIG } from '@/lib/constants';
-import type { SpotType, SpotMapPin } from '@/lib/types';
+import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG } from '@/lib/constants';
+import type { SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
 import SideMenu from './SideMenu';
 
 interface TopBarProps {
-  onSearch:        (query: string) => void;
-  onFilterType:    (type: SpotType | null) => void;
-  onFilterRegion:  (region: string | null) => void;
-  onAddSpot:       () => void;
-  activeType:      SpotType | null;
-  activeRegion:    string | null;
-  spots:           SpotMapPin[];
-  filteredCount?:  number;
-  onCitySelect:    (city: string, lat: number, lon: number) => void;
-  onSpotSelect:    (pin: SpotMapPin) => void;
-  onOpenAuth?:     () => void;
+  onSearch:          (query: string) => void;
+  onFilterType:      (type: SpotType | null) => void;
+  onFilterRegion:    (region: string | null) => void;
+  onFilterCondition: (condition: SpotCondition | null) => void;
+  onFilterDifficulty:(difficulty: string | null) => void;
+  onAddSpot:         () => void;
+  activeType:        SpotType | null;
+  activeRegion:      string | null;
+  activeCondition:   SpotCondition | null;
+  activeDifficulty:  string | null;
+  spots:             SpotMapPin[];
+  filteredCount?:    number;
+  onCitySelect:      (city: string, lat: number, lon: number) => void;
+  onSpotSelect:      (pin: SpotMapPin) => void;
+  onOpenAuth?:       () => void;
 }
 
 interface NominatimPlace {
@@ -28,8 +32,8 @@ interface NominatimPlace {
 }
 
 export default function TopBar({
-  onSearch, onFilterType, onFilterRegion, onAddSpot,
-  activeType, activeRegion,
+  onSearch, onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onAddSpot,
+  activeType, activeRegion, activeCondition, activeDifficulty,
   spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
 }: TopBarProps) {
   const [menuOpen,   setMenuOpen]   = useState(false);
@@ -99,6 +103,8 @@ export default function TopBar({
     onFilterType(activeType === type ? null : type);
   }, [activeType, onFilterType]);
 
+  const anyFilter = !!(activeType || activeRegion || activeCondition || activeDifficulty);
+
   const openSearch = () => {
     setSearchOpen(true);
     setTimeout(() => inputRef.current?.focus(), 60);
@@ -166,7 +172,7 @@ export default function TopBar({
         </button>
       </header>
 
-      {/* Filter chips + preferiti */}
+      {/* Filter bar — dropdown + preferiti */}
       <div style={{
         position: 'fixed',
         top: 'var(--topbar-height)',
@@ -175,85 +181,109 @@ export default function TopBar({
         borderBottom: '1px solid var(--gray-700)',
         zIndex: 38,
         display: 'flex', alignItems: 'center',
+        gap: 0,
       }}>
-        {/* Dropdown Regione — fisso a sinistra */}
-        <div style={{ padding: '8px 0 8px 10px', flexShrink: 0, borderRight: '1px solid var(--gray-700)' }}>
-          <div style={{ position: 'relative' }}>
-            <select
-              value={activeRegion ?? ''}
-              onChange={e => onFilterRegion(e.target.value || null)}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 12,
-                padding: '5px 22px 5px 8px',
-                border: `1px solid ${activeRegion ? 'var(--orange)' : 'var(--gray-600)'}`,
-                borderRadius: 2,
-                background: activeRegion ? 'rgba(255,106,0,0.15)' : 'transparent',
-                color: activeRegion ? 'var(--orange)' : 'var(--bone)',
-                cursor: 'pointer',
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                minHeight: 34,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                outline: 'none',
-              } as React.CSSProperties}
-            >
-              <option value="">🗺️ REGIONE</option>
-              {REGIONI_ITALIA.map(r => (
-                <option key={r.label} value={r.label} style={{ background: 'var(--gray-800)', color: 'var(--bone)' }}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-            {/* freccia custom */}
-            <span style={{
-              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-              fontSize: 10, color: activeRegion ? 'var(--orange)' : 'var(--gray-400)',
-              pointerEvents: 'none',
-            }}>▾</span>
-          </div>
-        </div>
-
-        {/* Chips scrollabili */}
-        <div
-          style={{
-            flex: 1,
-            overflowX: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            padding: '8px 0 8px 10px',
-            display: 'flex', gap: 8,
-          }}
-          ref={(el) => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
-        >
-          <FilterChip label="TUTTI" active={activeType === null} color="var(--orange)" onClick={() => onFilterType(null)} count={filteredCount ?? spots.length} />
-          {(['street', 'park', 'bowl', 'trail', 'diy', 'rail', 'ledge', 'plaza', 'gap'] as SpotType[]).map((type) => {
-            const info = TIPI_SPOT[type];
-            return (
-              <FilterChip
-                key={type}
-                label={`${info.emoji} ${info.label.toUpperCase()}`}
-                active={activeType === type}
-                color={info.color}
-                onClick={() => handleTypeToggle(type)}
-                count={spots.filter(s => s.type === type).length}
-              />
-            );
-          })}
-        </div>
-
-        {/* Preferiti — fisso a destra, stesso stile chip */}
+        {/* Scrollabile: tutti i dropdown + contatore */}
         <div style={{
-          padding: '8px 12px 8px 8px',
+          flex: 1,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          display: 'flex', alignItems: 'center',
+          padding: '7px 8px',
+          gap: 6,
+          scrollbarWidth: 'none',
+        } as React.CSSProperties}>
+
+          <FilterDropdown
+            value={activeRegion ?? ''}
+            onChange={v => onFilterRegion(v || null)}
+            active={!!activeRegion}
+            placeholder="🗺️ REGIONE"
+          >
+            <option value="">🗺️ REGIONE</option>
+            {REGIONI_ITALIA.map(r => (
+              <option key={r.label} value={r.label}>{r.label}</option>
+            ))}
+          </FilterDropdown>
+
+          <FilterDropdown
+            value={activeType ?? ''}
+            onChange={v => onFilterType((v as SpotType) || null)}
+            active={!!activeType}
+            placeholder="🎯 TIPO"
+          >
+            <option value="">🎯 TIPO</option>
+            {(Object.entries(TIPI_SPOT) as [SpotType, { label: string; emoji: string }][]).map(([key, info]) => (
+              <option key={key} value={key}>{info.emoji} {info.label.toUpperCase()}</option>
+            ))}
+          </FilterDropdown>
+
+          <FilterDropdown
+            value={activeCondition ?? ''}
+            onChange={v => onFilterCondition((v as SpotCondition) || null)}
+            active={!!activeCondition}
+            placeholder="🟢 STATO"
+          >
+            <option value="">🟢 STATO</option>
+            {(Object.entries(CONDIZIONI) as [SpotCondition, { label: string }][]).map(([key, info]) => (
+              <option key={key} value={key}>{info.label.toUpperCase()}</option>
+            ))}
+          </FilterDropdown>
+
+          <FilterDropdown
+            value={activeDifficulty ?? ''}
+            onChange={v => onFilterDifficulty(v || null)}
+            active={!!activeDifficulty}
+            placeholder="⚡ LEVEL"
+          >
+            <option value="">⚡ LEVEL</option>
+            {DIFFICOLTA.map(d => (
+              <option key={d.value} value={d.value}>{d.label.toUpperCase()}</option>
+            ))}
+          </FilterDropdown>
+
+          {/* Reset tutto */}
+          {anyFilter && (
+            <button
+              onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); }}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                padding: '5px 10px',
+                border: '1px solid var(--gray-600)',
+                borderRadius: 2,
+                background: 'transparent',
+                color: 'var(--gray-400)',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                letterSpacing: '0.05em',
+                flexShrink: 0,
+              }}
+            >
+              ✕ RESET
+            </button>
+          )}
+
+          {/* Contatore spot */}
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11,
+            color: anyFilter ? 'var(--orange)' : 'var(--gray-500)',
+            whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 2,
+          }}>
+            {filteredCount ?? spots.length} spot
+          </span>
+        </div>
+
+        {/* Preferiti — fisso a destra */}
+        <div style={{
+          padding: '7px 10px 7px 6px',
           flexShrink: 0,
           borderLeft: '1px solid var(--gray-700)',
-          background: 'rgba(10,10,10,0.92)',
         }}>
           <a
             href="/preferiti"
             className="favs-chip"
             style={{
               fontFamily: 'var(--font-mono)', fontSize: 13,
-              padding: '4px 12px',
+              padding: '5px 12px',
               border: '1px solid var(--gray-600)',
               borderRadius: 2,
               background: 'transparent',
@@ -267,7 +297,7 @@ export default function TopBar({
               WebkitTapHighlightColor: 'transparent',
             } as React.CSSProperties}
           >
-            ❤️ <span>I MIEI SPOT</span>
+            ❤️
           </a>
         </div>
       </div>
@@ -554,30 +584,43 @@ function SpotRow({ pin, onPick }: { pin: SpotMapPin; onPick: () => void }) {
   );
 }
 
-function FilterChip({ label, active, color, onClick, count }: {
-  label: string; active: boolean; color: string; onClick: () => void; count?: number;
+function FilterDropdown({ value, onChange, active, placeholder, children }: {
+  value: string;
+  onChange: (v: string) => void;
+  active: boolean;
+  placeholder: string;
+  children: React.ReactNode;
 }) {
   return (
-    <button onClick={onClick} style={{
-      fontFamily: 'var(--font-mono)', fontSize: 13, padding: '6px 12px',
-      border: `1px solid ${active ? color : 'var(--gray-600)'}`,
-      borderRadius: 2,
-      background: active ? color : 'transparent',
-      color: active ? 'var(--black)' : 'var(--bone)',
-      cursor: 'pointer', whiteSpace: 'nowrap',
-      textTransform: 'uppercase', letterSpacing: '0.06em',
-      transition: 'all 0.15s',
-      display: 'flex', alignItems: 'center', gap: 4,
-      minHeight: 34, touchAction: 'manipulation',
-      WebkitTapHighlightColor: 'transparent',
-    } as React.CSSProperties}>
-      {label}
-      {count !== undefined && count > 0 && (
-        <span style={{ background: active ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '0 5px', fontSize: 11 }}>
-          {count}
-        </span>
-      )}
-    </button>
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          fontFamily: 'var(--font-mono)', fontSize: 12,
+          padding: '5px 22px 5px 8px',
+          border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
+          borderRadius: 2,
+          background: active ? 'rgba(255,106,0,0.15)' : 'transparent',
+          color: active ? 'var(--orange)' : 'var(--bone)',
+          cursor: 'pointer',
+          appearance: 'none',
+          WebkitAppearance: 'none',
+          minHeight: 34,
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          outline: 'none',
+          minWidth: 90,
+        } as React.CSSProperties}
+      >
+        {children}
+      </select>
+      <span style={{
+        position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+        fontSize: 9, color: active ? 'var(--orange)' : 'var(--gray-500)',
+        pointerEvents: 'none',
+      }}>▾</span>
+    </div>
   );
 }
 
