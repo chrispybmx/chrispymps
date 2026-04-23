@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
@@ -440,10 +439,9 @@ function SpotListPanel({
                   }}
                 >
                   {spot.cover_url ? (
-                    <Image src={spot.cover_url} alt={spot.name}
-                      fill sizes="110px"
-                      style={{ objectFit: 'cover' }}
-                    />
+                    <img src={spot.cover_url} alt={spot.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      loading="lazy" />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isExp ? 32 : 24, opacity: 0.3 }}>
                       {tipo.emoji}
@@ -472,7 +470,7 @@ function SpotListPanel({
                           background: 'var(--gray-700)',
                           border: '1px solid rgba(255,255,255,0.1)',
                         }}>
-                        <Image src={url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} />
+                        <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                       </Link>
                     ))}
                   </div>
