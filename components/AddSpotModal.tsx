@@ -165,6 +165,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [lon,  setLon]  = useState<number | null>(initialLon ?? null);
 
   /* Step 1 */
+  const [locMode,     setLocMode]     = useState<'gps' | 'coords' | null>(null);
   const [coordInput,  setCoordInput]  = useState('');
   const [coordError,  setCoordError]  = useState<string | null>(null);
   const [gpsState,    setGpsState]    = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
@@ -218,6 +219,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const handleClose = useCallback(() => {
     setStep('posizione');
     setLat(initialLat ?? null); setLon(initialLon ?? null); setCity('');
+    setLocMode(null);
     setCoordInput(''); setCoordError(null);
     setGpsState('idle');
     setPhotos([]);
@@ -465,8 +467,63 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>@{user.username}</span>
               </div>
 
-              {/* Input principale */}
-              {!hasCoords && (
+              {/* ── Scelta metodo ── */}
+              {!locMode && !hasCoords && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Come vuoi indicare la posizione?
+                  </p>
+                  <button
+                    onClick={() => { setLocMode('gps'); getGPS(); }}
+                    style={methodBtn}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
+                  >
+                    <span style={{ fontSize: 28 }}>📍</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Sono nello spot</div>
+                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Usa il GPS del telefono</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setLocMode('coords')}
+                    style={methodBtn}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
+                  >
+                    <span style={{ fontSize: 28 }}>🗺️</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Conosco la posizione</div>
+                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Incolla il link Google Maps o le coordinate</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* ── GPS path ── */}
+              {locMode === 'gps' && !hasCoords && (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {gpsState === 'loading' && (
+                    <div style={{ textAlign: 'center', padding: '24px 0', fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14 }}>
+                      ⏳ Rilevamento GPS in corso...
+                    </div>
+                  )}
+                  {gpsState === 'error' && (
+                    <>
+                      <ErrBox msg="GPS non disponibile. Usa il link Google Maps." />
+                      <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                        🗺️ Inserisci posizione manualmente
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => { setLocMode(null); setGpsState('idle'); }} style={backLink}>
+                    ← Cambia metodo
+                  </button>
+                </div>
+              )}
+
+              {/* ── Coordinate / Google Maps ── */}
+              {locMode === 'coords' && !hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div>
                     <label style={lbl}>Link Google Maps o coordinate</label>
@@ -480,7 +537,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     />
                     {coordError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6a00', marginTop: 4 }}>⚠ {coordError}</div>}
                   </div>
-
                   <button
                     onClick={handleConfirmCoords}
                     disabled={!coordInput.trim()}
@@ -489,28 +545,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   >
                     📍 Conferma posizione
                   </button>
-
-                  {/* Separatore */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>oppure</span>
-                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-                  </div>
-
-                  {/* GPS */}
-                  <button
-                    onClick={getGPS}
-                    disabled={gpsState === 'loading'}
-                    className="btn-secondary"
-                    style={{ width: '100%', justifyContent: 'center', opacity: gpsState === 'loading' ? 0.6 : 1 }}
-                  >
-                    {gpsState === 'loading' ? '⏳ Rilevamento GPS...' : '📍 Sono nello spot — Usa GPS'}
+                  <button onClick={() => { setLocMode(null); setCoordInput(''); setCoordError(null); }} style={backLink}>
+                    ← Cambia metodo
                   </button>
-                  {gpsState === 'error' && (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6a00', textAlign: 'center' }}>
-                      GPS non disponibile. Usa il link Google Maps.
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -651,6 +688,19 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     </>
   );
 }
+
+const methodBtn: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 14,
+  width: '100%', padding: '16px', textAlign: 'left',
+  background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
+  borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
+};
+
+const backLink: React.CSSProperties = {
+  background: 'none', border: 'none', color: 'var(--gray-400)',
+  fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
+  padding: '4px 0', textAlign: 'left' as const,
+};
 
 function ErrBox({ msg }: { msg: string }) {
   return (
