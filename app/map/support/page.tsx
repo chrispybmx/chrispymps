@@ -12,8 +12,17 @@ const DONATE = {
   btc:     'bc1qlcm90tma74epqsv5gleme2xw3akeunxmhgj765',
 };
 
-export default function SupportPage() {
-  const btcQr = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=ff6a00&bgcolor=0a0a0a&data=bitcoin:${DONATE.btc}`;
+export default async function SupportPage() {
+  // Fetch QR code at build/request time → embed as base64 to avoid CSP issues
+  let btcQr = '';
+  try {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=ff6a00&bgcolor=0a0a0a&data=bitcoin:${DONATE.btc}`;
+    const res = await fetch(qrUrl, { next: { revalidate: 86400 } });
+    if (res.ok) {
+      const buf = await res.arrayBuffer();
+      btcQr = `data:image/png;base64,${Buffer.from(buf).toString('base64')}`;
+    }
+  } catch { /* fallback: no image shown */ }
 
   return (
     <main style={{
