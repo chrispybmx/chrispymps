@@ -1,15 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, REGIONI_ITALIA, CITTA_COORDS } from '@/lib/constants';
+import { TIPI_SPOT } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
-import { signIn, signUp, checkUsername, signInWithGoogle } from '@/lib/auth-client';
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-declare global { interface Window { google: any } }
+import { signIn, signUp, checkUsername } from '@/lib/auth-client';
 
 interface AddSpotModalProps {
   open:        boolean;
@@ -40,20 +37,28 @@ const lbl: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6,
 };
 
-/* ── Estrai coordinate da URL Google Maps ── */
-function parseGoogleMapsUrl(url: string): { lat: number; lon: number } | null {
-  const m1 = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+/* ── Estrai coordinate da URL Google Maps o da stringa "lat, lon" ── */
+function parseCoordInput(raw: string): { lat: number; lon: number } | null {
+  const s = raw.trim();
+
+  // Google Maps URL
+  const m1 = s.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (m1) return { lat: parseFloat(m1[1]), lon: parseFloat(m1[2]) };
-  const m2 = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  const m2 = s.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (m2) return { lat: parseFloat(m2[1]), lon: parseFloat(m2[2]) };
-  const m3 = url.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  const m3 = s.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (m3) return { lat: parseFloat(m3[1]), lon: parseFloat(m3[2]) };
+
+  // "lat, lon" oppure "lat lon"
+  const m4 = s.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  if (m4) return { lat: parseFloat(m4[1]), lon: parseFloat(m4[2]) };
+
   return null;
 }
 
-/* ── Mappa interattiva con pin draggabile (Leaflet) ── */
+/* ── Mappa preview con pin draggabile (Leaflet) ── */
 function LocationMapPicker({
-  lat, lon, onPick, height = 280,
+  lat, lon, onPick, height = 240,
 }: {
   lat: number | null;
   lon: number | null;
@@ -66,7 +71,6 @@ function LocationMapPicker({
   const onPickRef    = useRef(onPick);
   useEffect(() => { onPickRef.current = onPick; });
 
-  /* Init mappa */
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     let cancelled = false;
@@ -90,7 +94,6 @@ function LocationMapPicker({
       }).addTo(map);
       mapRef.current = map;
 
-      /* Marker iniziale se abbiamo già le coordinate */
       const addMarker = (eLat: number, eLon: number) => {
         if (markerRef.current) {
           markerRef.current.setLatLng([eLat, eLon]);
@@ -106,8 +109,6 @@ function LocationMapPicker({
       };
 
       if (lat != null && lon != null) addMarker(lat, lon);
-
-      /* Click sulla mappa → posiziona/sposta pin */
       map.on('click', (e) => addMarker(e.latlng.lat, e.latlng.lng));
     });
 
@@ -118,7 +119,6 @@ function LocationMapPicker({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Fly-to quando arrivano coordinate esterne (es. ricerca indirizzo o paste URL) */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || lat == null || lon == null) return;
@@ -153,106 +153,6 @@ function LocationMapPicker({
   );
 }
 
-/* ── Selettore città con ricerca testuale ── */
-function RegionCityPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [search, setSearch] = useState('');
-  const [open,   setOpen]   = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const pool = CITTA_ITALIANE.filter(c => c.value !== 'altro');
-
-  const filtered = search.trim().length >= 1
-    ? pool.filter(c => c.label.toLowerCase().includes(search.toLowerCase())).slice(0, 30)
-    : [];
-
-  const selectedLabel = CITTA_ITALIANE.find(c => c.value === value)?.label ?? '';
-
-  const pickCity = (v: string, label: string) => {
-    onChange(v);
-    setSearch(label);
-    setOpen(false);
-  };
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder='Es. "Bologna", "Milano", "Trento"...'
-        value={search || selectedLabel}
-        onChange={e => { setSearch(e.target.value); setOpen(true); onChange(''); }}
-        onFocus={() => { if (!value) setOpen(true); }}
-        style={{ ...inp, paddingRight: value ? 30 : 12 }}
-        autoComplete="off"
-      />
-      {value && (
-        <button
-          onClick={() => { onChange(''); setSearch(''); inputRef.current?.focus(); }}
-          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-            background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
-          ✕
-        </button>
-      )}
-
-      {/* Dropdown risultati */}
-      {open && filtered.length > 0 && (
-        <div style={{
-          position: 'absolute', left: 0, right: 0, top: '100%',
-          background: 'var(--gray-700)', border: '1px solid var(--gray-500)',
-          borderTop: 'none', borderRadius: '0 0 6px 6px',
-          maxHeight: 180, overflowY: 'auto', zIndex: 100,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        }}>
-          {filtered.map(c => (
-            <button
-              key={c.value}
-              onMouseDown={e => { e.preventDefault(); pickCity(c.value, c.label); }}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: 14,
-                background: c.value === value ? 'rgba(255,106,0,0.12)' : 'none',
-                border: 'none', borderBottom: '1px solid var(--gray-600)',
-                color: c.value === value ? 'var(--orange)' : 'var(--bone)',
-                cursor: 'pointer',
-              }}
-            >
-              {c.label}
-              {c.value === value && <span style={{ marginLeft: 8, color: 'var(--orange)', fontSize: 12 }}>✓</span>}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Chiudi dropdown cliccando fuori */}
-      {open && filtered.length > 0 && (
-        <div onClick={() => setOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 99 }} aria-hidden />
-      )}
-    </div>
-  );
-}
-
-/* ── Select città filtrata per regione ── */
-function RegionCitySelect({ value, onChange, regionLabel }: { value: string; onChange: (v: string) => void; regionLabel: string }) {
-  const regionData = REGIONI_ITALIA.find(r => r.label === regionLabel);
-  const cities = (regionData?.cities ?? [])
-    .map(c => CITTA_ITALIANE.find(ci => ci.value === c))
-    .filter(Boolean) as { value: string; label: string }[];
-
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{ ...inp, cursor: 'pointer' }}
-    >
-      <option value="">— Seleziona città —</option>
-      {cities.map(c => (
-        <option key={c.value} value={c.value}>{c.label}</option>
-      ))}
-    </select>
-  );
-}
-
 /* ══════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════ */
@@ -263,31 +163,16 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [step, setStep] = useState<Step>('posizione');
   const [lat,  setLat]  = useState<number | null>(initialLat ?? null);
   const [lon,  setLon]  = useState<number | null>(initialLon ?? null);
-  const [city, setCity] = useState('');
-  const [locMode, setLocMode] = useState<'gps' | 'map' | null>(initialLat != null ? 'map' : null);
-  const [mapSubStep, setMapSubStep] = useState<'area' | 'via'>('area');
-  const [regione,   setRegione]   = useState('');
-  const [cap,       setCap]       = useState('');
 
-  /* GPS */
-  const [gpsState, setGpsState] = useState<'idle' | 'loading' | 'ok' | 'error'>(
-    initialLat != null ? 'ok' : 'idle'
-  );
+  /* Step 1 */
+  const [coordInput,  setCoordInput]  = useState('');
+  const [coordError,  setCoordError]  = useState<string | null>(null);
+  const [gpsState,    setGpsState]    = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
 
-  /* Ricerca indirizzo (per centrare la mappa) */
-  const [addrQuery,    setAddrQuery]    = useState('');
-  const [addrLoading,  setAddrLoading]  = useState(false);
-  const [addrError,    setAddrError]    = useState<string | null>(null);
-
-  /* Incolla URL Google Maps */
-  const [gmapsUrl,    setGmapsUrl]    = useState('');
-  const [gmapsError,  setGmapsError]  = useState<string | null>(null);
-  const [gmapsOpen,   setGmapsOpen]   = useState(false);
-
-  /* Foto */
+  /* Step 2 */
   const [photos, setPhotos] = useState<File[]>([]);
 
-  /* Dettagli */
+  /* Step 3 */
   const [name,        setName]        = useState('');
   const [type,        setType]        = useState<SpotType | ''>('');
   const [description, setDescription] = useState('');
@@ -311,26 +196,20 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [loginPassword, setLoginPassword] = useState('');
 
   /* Reverse geocode → auto-popola città */
+  const [city, setCity] = useState('');
   const reverseGeocode = useCallback(async (eLat: number, eLon: number) => {
     try {
-      const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${eLat}&lon=${eLon}&format=json&addressdetails=1&accept-language=it`, { headers: { 'Accept-Language': 'it' } });
+      const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${eLat}&lon=${eLon}&format=json&addressdetails=1&accept-language=it`);
       const data = await res.json();
       const cn = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '';
-      if (cn) {
-        const match = CITTA_ITALIANE.find(c =>
-          c.label.toLowerCase().includes(cn.toLowerCase()) ||
-          cn.toLowerCase().includes(c.label.toLowerCase())
-        );
-        if (match) setCity(match.value);
-      }
+      if (cn) setCity(cn);
     } catch { /* silent */ }
   }, []);
 
   /* Sync initialLat/Lon */
   useEffect(() => {
     if (initialLat != null && initialLon != null) {
-      setLat(initialLat); setLon(initialLon);
-      setLocMode('map'); setGpsState('ok');
+      setLat(initialLat); setLon(initialLon); setGpsState('ok');
       reverseGeocode(initialLat, initialLon);
     }
   }, [initialLat, initialLon, reverseGeocode]);
@@ -339,11 +218,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const handleClose = useCallback(() => {
     setStep('posizione');
     setLat(initialLat ?? null); setLon(initialLon ?? null); setCity('');
-    setLocMode(initialLat != null ? 'map' : null);
-    setMapSubStep('area'); setRegione(''); setCap('');
-    setGpsState(initialLat != null ? 'ok' : 'idle');
-    setAddrQuery(''); setAddrError(null);
-    setGmapsUrl(''); setGmapsError(null); setGmapsOpen(false);
+    setCoordInput(''); setCoordError(null);
+    setGpsState('idle');
     setPhotos([]);
     setName(''); setType(''); setDescription(''); setNotes('');
     setError(null); setSubmitting(false);
@@ -352,6 +228,23 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setLoginEmail(''); setLoginPassword('');
     onClose();
   }, [initialLat, initialLon, onClose]);
+
+  /* Parse input (URL o coordinate) */
+  const handleConfirmCoords = () => {
+    setCoordError(null);
+    const parsed = parseCoordInput(coordInput);
+    if (!parsed) {
+      setCoordError('Formato non riconosciuto. Usa "lat, lon" o incolla il link di Google Maps.');
+      return;
+    }
+    const { lat: pLat, lon: pLon } = parsed;
+    if (pLat < 35 || pLat > 48 || pLon < 6 || pLon > 20) {
+      setCoordError('Coordinate fuori dall\'Italia. Controlla il link o le coordinate.');
+      return;
+    }
+    setLat(pLat); setLon(pLon);
+    reverseGeocode(pLat, pLon);
+  };
 
   /* GPS */
   const getGPS = () => {
@@ -368,45 +261,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     );
   };
 
-  /* Ricerca indirizzo → centra mappa (vincolata alla città selezionata) */
-  const handleAddrSearch = async () => {
-    if (!addrQuery.trim()) return;
-    setAddrLoading(true); setAddrError(null);
-    try {
-      const cityLabel = CITTA_ITALIANE.find(c => c.value === city)?.label ?? '';
-      const capPart   = cap ? `, ${cap}` : '';
-      const q = cityLabel
-        ? `${addrQuery.trim()}${capPart}, ${cityLabel}, Italia`
-        : `${addrQuery.trim()}, Italia`;
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1&accept-language=it`,
-        { headers: { 'Accept-Language': 'it' } }
-      );
-      const data = await res.json();
-      if (!data.length) {
-        setAddrError(cityLabel
-          ? `Indirizzo non trovato a ${cityLabel}. Controlla il nome della via.`
-          : 'Indirizzo non trovato.');
-        return;
-      }
-      setLat(parseFloat(data[0].lat));
-      setLon(parseFloat(data[0].lon));
-    } catch { setAddrError('Errore di rete.'); }
-    finally { setAddrLoading(false); }
-  };
-
-  /* Paste URL Google Maps */
-  const handleGmapsPaste = () => {
-    const parsed = parseGoogleMapsUrl(gmapsUrl);
-    if (!parsed) {
-      setGmapsError('URL non riconosciuto. Copia il link direttamente da Google Maps.');
-      return;
-    }
-    setLat(parsed.lat); setLon(parsed.lon);
-    setGmapsUrl(''); setGmapsError(null); setGmapsOpen(false);
-    reverseGeocode(parsed.lat, parsed.lon);
-  };
-
   /* Submit */
   const handleSubmit = async () => {
     if (!user || !name.trim() || !type || lat == null || lon == null) return;
@@ -419,7 +273,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       }
       const fd = new FormData();
       fd.append('data', JSON.stringify({
-        name: name.trim(), type, lat, lon: lon!,
+        name: name.trim(), type, lat, lon,
         city: city || undefined,
         description: description || undefined,
         guardians: notes || undefined,
@@ -471,7 +325,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
   const hasCoords  = lat != null && lon != null;
   const stepIndex  = STEPS.indexOf(step as Step);
-  const progressPct = step === 'successo' ? 100 : (stepIndex / (STEPS.length - 1)) * 100;
+  const progressPct = step === 'successo' ? 100 : ((stepIndex + 1) / STEPS.length) * 100;
 
   return (
     <>
@@ -537,19 +391,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, marginBottom: 18 }}>
                   Accedi o crea un account — il tuo <strong style={{ color: 'var(--orange)' }}>@username</strong> apparirà sullo spot.
                 </p>
-
-                <div style={{ marginBottom: 16 }}>
-                  <GoogleSignInBtn onClick={async () => {
-                    setAuthLoading(true); setAuthError(null);
-                    try { await signInWithGoogle(); }
-                    catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore'); setAuthLoading(false); }
-                  }} disabled={authLoading} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>oppure</span>
-                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-                  </div>
-                </div>
 
                 <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--gray-700)' }}>
                   {(['accedi', 'registrati'] as AuthTab[]).map(t => (
@@ -624,225 +465,83 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>@{user.username}</span>
               </div>
 
-              {/* ── Scelta metodo (prima schermata) ── */}
-              {!locMode && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Come vuoi indicare la posizione?
-                  </p>
-                  <button onClick={() => { setLocMode('gps'); getGPS(); }} style={methodBtn}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}>
-                    <span style={{ fontSize: 28 }}>📍</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Sono nello spot</div>
-                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Usa il GPS del telefono</div>
-                    </div>
-                  </button>
-                  <button onClick={() => setLocMode('map')} style={methodBtn}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}>
-                    <span style={{ fontSize: 28 }}>🗺️</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Cerca sulla mappa</div>
-                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Cerca l'indirizzo o clicca sulla mappa</div>
-                    </div>
-                  </button>
-                </div>
-              )}
-
-              {/* ── GPS path ── */}
-              {locMode === 'gps' && (
+              {/* Input principale */}
+              {!hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
-                  {gpsState === 'loading' && (
-                    <div style={{ textAlign: 'center', padding: '20px 0', fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14 }}>
-                      ⏳ Rilevamento GPS in corso...
-                    </div>
-                  )}
-                  {gpsState === 'ok' && hasCoords && (
-                    <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '12px 14px' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#00c851', marginBottom: 4 }}>✅ Posizione rilevata</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>{lat!.toFixed(6)}, {lon!.toFixed(6)}</div>
-                    </div>
-                  )}
-                  {gpsState === 'error' && <ErrBox msg="GPS non disponibile. Usa la mappa." />}
-                  {gpsState !== 'loading' && !hasCoords && gpsState !== 'error' && (
-                    <button onClick={getGPS} className="btn-primary" style={{ justifyContent: 'center' }}>
-                      📍 Usa la mia posizione GPS
-                    </button>
-                  )}
-                  {gpsState === 'error' && (
-                    <button onClick={() => { setLocMode('map'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
-                      🗺️ Cerca sulla mappa
-                    </button>
-                  )}
-
-
-                  <button onClick={() => { setLocMode(null); setLat(null); setLon(null); setGpsState('idle'); }} style={backLink}>
-                    ← Cambia metodo
-                  </button>
-                </div>
-              )}
-
-              {/* ── MAPPA — SUB-STEP 1: Seleziona area ── */}
-              {locMode === 'map' && mapSubStep === 'area' && (
-                <div style={{ display: 'grid', gap: 16 }}>
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Dove si trova lo spot?
-                  </p>
-
-                  {/* Regione */}
                   <div>
-                    <label style={lbl}>Regione *</label>
-                    <select
-                      value={regione}
-                      onChange={e => { setRegione(e.target.value); setCity(''); setCap(''); }}
-                      style={{ ...inp, cursor: 'pointer' }}
-                    >
-                      <option value="">— Seleziona regione —</option>
-                      {REGIONI_ITALIA.map(r => (
-                        <option key={r.label} value={r.label}>{r.label}</option>
-                      ))}
-                    </select>
+                    <label style={lbl}>Link Google Maps o coordinate</label>
+                    <textarea
+                      style={{ ...inp, resize: 'none', fontSize: 14, lineHeight: 1.5 }}
+                      rows={3}
+                      value={coordInput}
+                      onChange={e => { setCoordInput(e.target.value); setCoordError(null); }}
+                      placeholder={'https://maps.google.com/?q=...\noppure\n45.4384, 10.9916'}
+                      autoFocus
+                    />
+                    {coordError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6a00', marginTop: 4 }}>⚠ {coordError}</div>}
                   </div>
 
-                  {/* Città filtrata per regione */}
-                  {regione && (
-                    <div>
-                      <label style={lbl}>Città *</label>
-                      <RegionCitySelect value={city} onChange={setCity} regionLabel={regione} />
-                    </div>
-                  )}
+                  <button
+                    onClick={handleConfirmCoords}
+                    disabled={!coordInput.trim()}
+                    className="btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', opacity: !coordInput.trim() ? 0.4 : 1 }}
+                  >
+                    📍 Conferma posizione
+                  </button>
 
-                  {/* CAP opzionale */}
-                  {city && (
-                    <div>
-                      <label style={lbl}>CAP <span style={{ color: 'var(--gray-500)', textTransform: 'none' }}>(opzionale — aiuta a trovare l&apos;indirizzo)</span></label>
-                      <input
-                        type="text" inputMode="numeric" maxLength={5}
-                        style={inp}
-                        value={cap}
-                        onChange={e => setCap(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                        placeholder="Es. 20121"
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button onClick={() => { setLocMode(null); setRegione(''); setCity(''); setCap(''); }} style={backLink}>
-                      ← Cambia metodo
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (!city) return;
-                        const coords = CITTA_COORDS[city];
-                        if (coords) { setLat(coords[0]); setLon(coords[1]); }
-                        setMapSubStep('via');
-                      }}
-                      disabled={!city}
-                      className="btn-primary"
-                      style={{ flex: 1, justifyContent: 'center', opacity: !city ? 0.4 : 1 }}
-                    >
-                      Continua →
-                    </button>
+                  {/* Separatore */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>oppure</span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
                   </div>
+
+                  {/* GPS */}
+                  <button
+                    onClick={getGPS}
+                    disabled={gpsState === 'loading'}
+                    className="btn-secondary"
+                    style={{ width: '100%', justifyContent: 'center', opacity: gpsState === 'loading' ? 0.6 : 1 }}
+                  >
+                    {gpsState === 'loading' ? '⏳ Rilevamento GPS...' : '📍 Sono nello spot — Usa GPS'}
+                  </button>
+                  {gpsState === 'error' && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6a00', textAlign: 'center' }}>
+                      GPS non disponibile. Usa il link Google Maps.
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* ── MAPPA — SUB-STEP 2: Via + Mappa + Street View ── */}
-              {locMode === 'map' && mapSubStep === 'via' && (
+              {/* Preview mappa quando le coordinate sono confermate */}
+              {hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
-
-                  {/* Pill area selezionata */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.2)', borderRadius: 6 }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>
-                      📍 {CITTA_ITALIANE.find(c => c.value === city)?.label}{cap ? ` · ${cap}` : ''} · {regione}
-                    </span>
+                  <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#00c851', marginBottom: 2 }}>✅ Posizione confermata</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>{lat!.toFixed(5)}, {lon!.toFixed(5)}</div>
+                    </div>
                     <button
-                      onClick={() => { setMapSubStep('area'); setLat(null); setLon(null); setAddrQuery(''); setAddrError(null); }}
-                      style={{ background: 'none', border: 'none', color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}
+                      onClick={() => { setLat(null); setLon(null); setCoordInput(''); setCoordError(null); setGpsState('idle'); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer' }}
                     >
                       Cambia →
                     </button>
                   </div>
 
-                  {/* Input via */}
-                  <div>
-                    <label style={lbl}>Via / Indirizzo</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input
-                        type="text" style={{ ...inp, flex: 1 }}
-                        value={addrQuery}
-                        onChange={e => setAddrQuery(e.target.value)}
-                        placeholder='Es. "Via Petrarca 12" o "Piazza della Repubblica"'
-                        onKeyDown={e => e.key === 'Enter' && handleAddrSearch()}
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleAddrSearch}
-                        disabled={addrLoading || !addrQuery.trim()}
-                        className="btn-secondary"
-                        style={{ padding: '10px 14px', fontSize: 14, flexShrink: 0, opacity: addrLoading ? 0.6 : 1 }}
-                      >
-                        {addrLoading ? '⏳' : '🔍'}
-                      </button>
-                    </div>
-                    {addrError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff6a00', marginTop: 4 }}>{addrError}</div>}
-                    {!hasCoords && !addrError && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
-                        Oppure clicca direttamente sulla mappa per posizionare il pin
-                      </div>
-                    )}
+                  <LocationMapPicker
+                    lat={lat} lon={lon} height={260}
+                    onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }}
+                  />
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textAlign: 'center' }}>
+                    Trascina il pin per regolare la posizione
                   </div>
 
-                  {/* Mappa interattiva */}
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                      Mappa — clicca o trascina il pin
-                    </div>
-                    <LocationMapPicker
-                      lat={lat} lon={lon} height={380}
-                      onPick={(eLat, eLon) => { setLat(eLat); setLon(eLon); }}
-                    />
-                  </div>
-
-                  {/* Incolla URL Google Maps come alternativa */}
-                  <div>
-                    <button
-                      onClick={() => { setGmapsOpen(o => !o); setGmapsError(null); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: gmapsOpen ? 'var(--orange)' : 'var(--gray-500)', cursor: 'pointer', padding: 0, textDecoration: 'underline', textUnderlineOffset: 3 }}
-                    >
-                      Hai il link di Google Maps? Incollalo qui →
-                    </button>
-                    {gmapsOpen && (
-                      <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <input
-                            type="text" style={{ ...inp, flex: 1, fontSize: 13 }}
-                            value={gmapsUrl}
-                            onChange={e => { setGmapsUrl(e.target.value); setGmapsError(null); }}
-                            placeholder="https://maps.google.com/... o 45.4384, 10.9916"
-                            onKeyDown={e => e.key === 'Enter' && handleGmapsPaste()}
-                          />
-                          <button onClick={handleGmapsPaste} disabled={!gmapsUrl.trim()} className="btn-primary" style={{ padding: '10px 14px', fontSize: 13, flexShrink: 0 }}>OK</button>
-                        </div>
-                        {gmapsError && <ErrBox msg={gmapsError} />}
-                      </div>
-                    )}
-                  </div>
-
-                  <button onClick={() => { setMapSubStep('area'); setLat(null); setLon(null); setAddrQuery(''); setAddrError(null); }} style={backLink}>
-                    ← Indietro
+                  <button onClick={() => setStep('foto')} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                    Avanti — Foto →
                   </button>
                 </div>
-              )}
-
-              {/* Avanti */}
-              {hasCoords && (
-                <button onClick={() => setStep('foto')} className="btn-primary"
-                  style={{ width: '100%', justifyContent: 'center' }}>
-                  ✅ Posizione confermata — Avanti →
-                </button>
               )}
             </div>
           )}
@@ -867,7 +566,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   className="btn-primary"
                   style={{ flex: 2, justifyContent: 'center', opacity: photos.length === 0 ? 0.4 : 1 }}
                 >
-                  Avanti →
+                  Avanti — Dettagli →
                 </button>
               </div>
             </div>
@@ -906,7 +605,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   maxLength={500} />
               </div>
               <div>
-                <label style={lbl}>Note accesso / guardiani (opzionale)</label>
+                <label style={lbl}>Note accesso (opzionale)</label>
                 <input type="text" style={inp} value={notes} onChange={e => setNotes(e.target.value)}
                   placeholder='Es. "Security alle 18" / "Sempre libero"' maxLength={200} />
               </div>
@@ -953,50 +652,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   );
 }
 
-/* ─── Componenti condivisi ─── */
-const methodBtn: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 14,
-  width: '100%', padding: '16px', textAlign: 'left',
-  background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
-  borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
-};
-
-const backLink: React.CSSProperties = {
-  background: 'none', border: 'none', color: 'var(--gray-400)',
-  fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
-  padding: '4px 0', textAlign: 'left' as const,
-};
-
 function ErrBox({ msg }: { msg: string }) {
   return (
     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '10px 12px' }}>
       ⚠ {msg}
     </div>
-  );
-}
-
-function GoogleSignInBtn({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-        padding: '12px 16px', background: '#fff', border: '1px solid #ddd', borderRadius: 6,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1,
-        fontFamily: 'var(--font-mono)', fontSize: 14, color: '#333', fontWeight: 500,
-        transition: 'box-shadow 0.15s',
-      }}
-      onMouseOver={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'; }}
-      onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none'; }}
-    >
-      <svg width="16" height="16" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
-        <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-      </svg>
-      Continua con Google
-    </button>
   );
 }
