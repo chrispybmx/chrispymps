@@ -163,30 +163,30 @@ export const CITTA_ITALIANE = [
 export const REGIONI_ITALIA: Array<{
   label: string;
   emoji: string;
-  cities: string[];
   center: [number, number]; // [lat, lon] centro regione
   zoom: number;
+  bbox: [number, number, number, number]; // [latMin, lonMin, latMax, lonMax]
 }> = [
-  { label: 'Veneto',          emoji: '🦁',  cities: ['verona', 'venezia', 'padova', 'vicenza', 'treviso', 'rovigo', 'belluno'],                                            center: [45.67, 11.93], zoom: 8  },
-  { label: 'Lombardia',       emoji: '🏙️', cities: ['milano', 'bergamo', 'brescia', 'como', 'monza', 'varese', 'lecco', 'cremona', 'mantova', 'pavia', 'lodi', 'sondrio'], center: [45.47, 9.19],  zoom: 8  },
-  { label: 'Piemonte',        emoji: '🏔️', cities: ['torino', 'alessandria', 'asti', 'cuneo', 'novara', 'vercelli', 'biella'],                                             center: [44.90, 7.86],  zoom: 8  },
-  { label: 'Emilia-Romagna',  emoji: '🏎️', cities: ['bologna', 'modena', 'parma', 'reggio-emilia', 'ferrara', 'rimini', 'ravenna', 'forli', 'piacenza'],                   center: [44.50, 11.34], zoom: 8  },
-  { label: 'Toscana',         emoji: '🌻',  cities: ['firenze', 'pisa', 'siena', 'livorno', 'arezzo', 'prato', 'lucca', 'grosseto'],                                        center: [43.46, 11.15], zoom: 8  },
-  { label: 'Lazio',           emoji: '🏛️', cities: ['roma', 'latina', 'frosinone', 'viterbo', 'rieti'],                                                                     center: [41.90, 12.65], zoom: 8  },
-  { label: 'Campania',        emoji: '🌋',  cities: ['napoli', 'salerno', 'caserta', 'avellino', 'benevento'],                                                              center: [40.90, 14.77], zoom: 8  },
-  { label: 'Puglia',          emoji: '☀️',  cities: ['bari', 'lecce', 'taranto', 'brindisi', 'foggia'],                                                                     center: [40.93, 16.55], zoom: 8  },
-  { label: 'Sicilia',         emoji: '🌊',  cities: ['palermo', 'catania', 'messina', 'siracusa', 'trapani', 'agrigento'],                                                  center: [37.60, 14.01], zoom: 8  },
-  { label: 'Sardegna',        emoji: '🏝️', cities: ['cagliari', 'sassari', 'nuoro', 'oristano'],                                                                           center: [39.90, 9.01],  zoom: 8  },
-  { label: 'Liguria',         emoji: '⚓',  cities: ['genova', 'la-spezia', 'savona', 'imperia'],                                                                           center: [44.33, 8.80],  zoom: 9  },
-  { label: 'Trentino-A.A.',   emoji: '⛷️', cities: ['trento', 'bolzano'],                                                                                                  center: [46.50, 11.10], zoom: 9  },
-  { label: 'Friuli-V.G.',     emoji: '🦅',  cities: ['trieste', 'udine', 'gorizia', 'pordenone'],                                                                           center: [46.07, 13.23], zoom: 9  },
-  { label: 'Umbria',          emoji: '🌿',  cities: ['perugia', 'terni'],                                                                                                   center: [42.95, 12.70], zoom: 9  },
-  { label: 'Marche',          emoji: '🌾',  cities: ['ancona', 'pesaro', 'macerata', 'ascoli-piceno'],                                                                      center: [43.35, 13.40], zoom: 9  },
-  { label: 'Abruzzo',         emoji: '🦌',  cities: ['pescara', 'laquila', 'chieti', 'teramo'],                                                                             center: [42.15, 13.73], zoom: 9  },
-  { label: 'Calabria',        emoji: '🌶️', cities: ['reggio-calabria', 'catanzaro', 'cosenza'],                                                                            center: [38.90, 16.60], zoom: 9  },
-  { label: "Valle d'Aosta",   emoji: '🏔️', cities: ['aosta'],                                                                                                              center: [45.74, 7.43],  zoom: 10 },
-  { label: 'Basilicata',      emoji: '🪨',  cities: ['potenza', 'matera'],                                                                                                  center: [40.50, 15.99], zoom: 9  },
-  { label: 'Molise',          emoji: '🌄',  cities: ['campobasso'],                                                                                                         center: [41.56, 14.66], zoom: 9  },
+  { label: 'Veneto',          emoji: '🦁',  center: [45.67, 11.93], zoom: 8,  bbox: [44.79, 10.63, 46.68, 13.09] },
+  { label: 'Lombardia',       emoji: '🏙️', center: [45.47,  9.19], zoom: 8,  bbox: [44.68,  8.50, 46.63, 11.35] },
+  { label: 'Piemonte',        emoji: '🏔️', center: [44.90,  7.86], zoom: 8,  bbox: [43.80,  6.62, 46.47,  9.22] },
+  { label: 'Emilia-Romagna',  emoji: '🏎️', center: [44.50, 11.34], zoom: 8,  bbox: [43.75,  9.19, 45.14, 12.77] },
+  { label: 'Toscana',         emoji: '🌻',  center: [43.46, 11.15], zoom: 8,  bbox: [42.37,  9.68, 44.47, 12.37] },
+  { label: 'Lazio',           emoji: '🏛️', center: [41.90, 12.65], zoom: 8,  bbox: [40.78, 11.44, 42.84, 14.03] },
+  { label: 'Campania',        emoji: '🌋',  center: [40.90, 14.77], zoom: 8,  bbox: [39.97, 13.73, 41.50, 16.07] },
+  { label: 'Puglia',          emoji: '☀️',  center: [40.93, 16.55], zoom: 8,  bbox: [39.78, 14.95, 41.90, 18.52] },
+  { label: 'Sicilia',         emoji: '🌊',  center: [37.60, 14.01], zoom: 8,  bbox: [35.48, 11.92, 38.32, 15.67] },
+  { label: 'Sardegna',        emoji: '🏝️', center: [39.90,  9.01], zoom: 8,  bbox: [38.85,  8.13, 41.31,  9.82] },
+  { label: 'Liguria',         emoji: '⚓',  center: [44.33,  8.80], zoom: 9,  bbox: [43.77,  7.49, 44.67, 10.07] },
+  { label: 'Trentino-A.A.',   emoji: '⛷️', center: [46.50, 11.10], zoom: 9,  bbox: [45.67, 10.38, 47.09, 12.48] },
+  { label: 'Friuli-V.G.',     emoji: '🦅',  center: [46.07, 13.23], zoom: 9,  bbox: [45.58, 12.33, 46.66, 13.91] },
+  { label: 'Umbria',          emoji: '🌿',  center: [42.95, 12.70], zoom: 9,  bbox: [42.36, 11.88, 43.62, 13.26] },
+  { label: 'Marche',          emoji: '🌾',  center: [43.35, 13.40], zoom: 9,  bbox: [42.67, 12.18, 43.99, 13.93] },
+  { label: 'Abruzzo',         emoji: '🦌',  center: [42.15, 13.73], zoom: 9,  bbox: [41.73, 13.03, 42.90, 14.78] },
+  { label: 'Calabria',        emoji: '🌶️', center: [38.90, 16.60], zoom: 9,  bbox: [37.92, 15.62, 40.15, 16.60] },
+  { label: "Valle d'Aosta",   emoji: '🏔️', center: [45.74,  7.43], zoom: 10, bbox: [45.46,  6.80, 45.98,  7.95] },
+  { label: 'Basilicata',      emoji: '🪨',  center: [40.50, 15.99], zoom: 9,  bbox: [39.98, 15.33, 41.15, 16.89] },
+  { label: 'Molise',          emoji: '🌄',  center: [41.56, 14.66], zoom: 9,  bbox: [41.34, 13.92, 41.93, 15.16] },
 ];
 
 // ===== PALETTE (costanti JS) =====
