@@ -103,7 +103,7 @@ export default function TopBar({
     onFilterType(activeType === type ? null : type);
   }, [activeType, onFilterType]);
 
-  const anyFilter = !!(activeType || activeRegion || activeCondition || activeDifficulty);
+  const anyFilter = !!(activeType || activeRegion || activeDifficulty);
 
   const openSearch = () => {
     setSearchOpen(true);
@@ -219,18 +219,6 @@ export default function TopBar({
           </FilterDropdown>
 
           <FilterDropdown
-            value={activeCondition ?? ''}
-            onChange={v => onFilterCondition((v as SpotCondition) || null)}
-            active={!!activeCondition}
-            placeholder="🟢 STATO"
-          >
-            <option value="">🟢 STATO</option>
-            {(Object.entries(CONDIZIONI) as [SpotCondition, { label: string }][]).map(([key, info]) => (
-              <option key={key} value={key}>{info.label.toUpperCase()}</option>
-            ))}
-          </FilterDropdown>
-
-          <FilterDropdown
             value={activeDifficulty ?? ''}
             onChange={v => onFilterDifficulty(v || null)}
             active={!!activeDifficulty}
@@ -245,7 +233,7 @@ export default function TopBar({
           {/* Reset tutto */}
           {anyFilter && (
             <button
-              onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); }}
+              onClick={() => { onFilterType(null); onFilterRegion(null); onFilterDifficulty(null); }}
               style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11,
                 padding: '5px 10px',
