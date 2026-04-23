@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG } from '@/lib/constants';
 import type { SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
 import SideMenu from './SideMenu';
+import Link from 'next/link';
 
 interface TopBarProps {
   onSearch:          (query: string) => void;
@@ -36,10 +37,23 @@ export default function TopBar({
   activeType, activeRegion, activeCondition, activeDifficulty,
   spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
 }: TopBarProps) {
-  const [menuOpen,   setMenuOpen]   = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query,      setQuery]      = useState('');
+  const [menuOpen,        setMenuOpen]        = useState(false);
+  const [searchOpen,      setSearchOpen]      = useState(false);
+  const [query,           setQuery]           = useState('');
+  const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /* ── Load current user session for profile button ── */
+  useEffect(() => {
+    import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
+      supabaseBrowser().auth.getSession().then(({ data }) => {
+        const un = data.session?.user?.user_metadata?.username
+          ?? data.session?.user?.email?.split('@')[0]
+          ?? null;
+        setProfileUsername(un);
+      });
+    }).catch(() => {});
+  }, []);
 
   /* ── Nominatim live geocoding ── */
   const [places,        setPlaces]        = useState<NominatimPlace[]>([]);
@@ -260,11 +274,12 @@ export default function TopBar({
           </span>
         </div>
 
-        {/* Preferiti — fisso a destra */}
+        {/* Preferiti + Profilo — fisso a destra */}
         <div style={{
           padding: '7px 10px 7px 6px',
           flexShrink: 0,
           borderLeft: '1px solid var(--gray-700)',
+          display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <a
             href="/preferiti"
@@ -287,6 +302,49 @@ export default function TopBar({
           >
             ❤️
           </a>
+
+          {/* Profilo — visibile solo se loggato */}
+          {profileUsername ? (
+            <Link
+              href={`/u/${profileUsername}`}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 13,
+                padding: '5px 10px',
+                border: '1px solid var(--gray-600)',
+                borderRadius: 2,
+                background: 'transparent',
+                color: 'var(--bone)',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                textDecoration: 'none',
+                display: 'flex', alignItems: 'center', gap: 5,
+                transition: 'all 0.15s',
+                minHeight: 32, touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              } as React.CSSProperties}
+              title={`Il mio profilo (@${profileUsername})`}
+            >
+              👤
+            </Link>
+          ) : (
+            <button
+              onClick={onOpenAuth}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 13,
+                padding: '5px 10px',
+                border: '1px solid var(--gray-600)',
+                borderRadius: 2,
+                background: 'transparent',
+                color: 'var(--gray-500)',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center',
+                minHeight: 32, touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              } as React.CSSProperties}
+              title="Accedi per vedere il tuo profilo"
+            >
+              👤
+            </button>
+          )}
         </div>
       </div>
 
