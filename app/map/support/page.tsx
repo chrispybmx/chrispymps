@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 
 /* ── Aggiorna questi con i tuoi dati reali ── */
 const DONATE = {
-  paypal:  'https://paypal.me/christianceresato',   // ← sostituisci con il tuo PayPal.me
-  revolut: 'https://revolut.me/chrispy',            // ← sostituisci con il tuo Revolut.me tag
-  btc:     'bc1qplaceholderaddressXXXXXXXXXXXXXXXX', // ← sostituisci con il tuo indirizzo BTC
+  paypal:  'https://paypal.me/christianceresato',   // ← aggiorna con il tuo PayPal.me se diverso
+  revolut: 'https://revolut.me/chrispybmx',
+  btc:     'bc1qlcm90tma74epqsv5gleme2xw3akeunxmhgj765',
 };
 
 export default function SupportPage() {
@@ -205,7 +205,7 @@ export default function SupportPage() {
                 Revolut
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>
-                @chrispy · zero commissioni tra utenti Revolut
+                @chrispybmx · zero commissioni tra utenti Revolut
               </div>
             </div>
             <span style={{ color: 'var(--gray-500)', fontSize: 18, flexShrink: 0 }}>→</span>
