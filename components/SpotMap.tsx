@@ -83,11 +83,20 @@ export default function SpotMap({
   const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
   const onMapClickRef    = useRef(onMapClick);
   const onSpotClickRef   = useRef(onSpotClick);
+  /* Memoization: marker individuali per aggiornamenti icona senza full-rebuild */
+  const pinMarkersRef    = useRef<Map<string, import('leaflet').Marker>>(new Map());
+  const prevSelIdRef     = useRef<string | null>(null);
+  const filteredRef      = useRef(filtered);
+  const selPinRef        = useRef<SpotMapPin | null>(null);
   const [locating, setLocating] = useState(false);
   const [zoom, setZoom]         = useState(APP_CONFIG.mapZoom ?? 6);
 
   useEffect(() => { onMapClickRef.current  = onMapClick; });
   useEffect(() => { onSpotClickRef.current = onSpotClick; });
+
+  // Sincronizza ref mutabili col valore corrente (prima degli effect)
+  filteredRef.current = filtered;
+  selPinRef.current   = selectedPin ?? null;
 
   const filtered = useMemo(() => spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
@@ -149,10 +158,13 @@ export default function SpotMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Render marker (cluster o pin) al cambio di zoom / filtri ── */
+  /* ── Render marker al cambio di zoom / filtri ── */
+  /* selectedPin NON è nelle deps: gestito separatamente in Effect 2 per evitare
+     il full-rebuild ad ogni click su uno spot (potenzialmente centinaia di marker) */
   useEffect(() => {
     if (!mapInstance.current || !markersRef.current || !L) return;
     markersRef.current.clearLayers();
+    pinMarkersRef.current.clear();
 
     if (zoom < CLUSTER_ZOOM) {
       /* ── CLUSTER VIEW: un cerchio per città ── */
@@ -212,11 +224,12 @@ export default function SpotMap({
       filtered.forEach((pin) => {
         if (!L || !markersRef.current) return;
 
-        const isSel = selectedPin?.id === pin.id;
-        const svg  = pinSvg(pin.type, pin.condition, isSel);
-        const pw = isSel ? 38 : 30;
-        const ph = isSel ? 48 : 38;
-        const icon = L!.divIcon({
+        // Usa selPinRef (sempre aggiornato) per rendere l'icona corretta
+        const isSel = selPinRef.current?.id === pin.id;
+        const svg   = pinSvg(pin.type, pin.condition, isSel);
+        const pw    = isSel ? 38 : 30;
+        const ph    = isSel ? 48 : 38;
+        const icon  = L!.divIcon({
           html:        svg,
           className:   'spot-pin',
           iconSize:    [pw, ph],
@@ -241,8 +254,12 @@ export default function SpotMap({
         marker.on('mouseout',  () => marker.closePopup());
 
         markersRef.current!.addLayer(marker);
+        pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2
       });
     }
+
+    prevSelIdRef.current = selPinRef.current?.id ?? null;
+
     /* ── Auto-fit al primo render con spot ── */
     if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
       const bounds = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
@@ -254,7 +271,43 @@ export default function SpotMap({
       });
       hasInitialFit.current = true;
     }
-  }, [filtered, clusters, zoom, selectedPin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, clusters, zoom]); // selectedPin gestito in Effect 2
+
+  /* ── Effect 2: aggiorna SOLO l'icona del pin selezionato/deselezionato ── */
+  /* Evita di ricreare tutti i marker ad ogni click: O(1) invece di O(n) */
+  useEffect(() => {
+    if (!L || !mapInstance.current || zoom < CLUSTER_ZOOM) return;
+
+    const newSelId  = selectedPin?.id ?? null;
+    const prevSelId = prevSelIdRef.current;
+
+    // Ripristina icona precedente
+    if (prevSelId && prevSelId !== newSelId) {
+      const marker = pinMarkersRef.current.get(prevSelId);
+      if (marker) {
+        const pin = filteredRef.current.find(s => s.id === prevSelId);
+        if (pin) {
+          const svg  = pinSvg(pin.type, pin.condition, false);
+          const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [30, 38], iconAnchor: [15, 38], popupAnchor: [0, -40] });
+          marker.setIcon(icon);
+        }
+      }
+    }
+
+    // Applica icona selezionata al nuovo pin
+    if (selectedPin) {
+      const marker = pinMarkersRef.current.get(selectedPin.id);
+      if (marker) {
+        const svg  = pinSvg(selectedPin.type, selectedPin.condition, true);
+        const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
+        marker.setIcon(icon);
+      }
+    }
+
+    prevSelIdRef.current = newSelId;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPin, zoom]);
 
   /* ── Fly-to: centrato nello spazio visibile sopra il pannello ── */
   useEffect(() => {
