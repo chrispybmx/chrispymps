@@ -533,12 +533,12 @@ function SpotListPanel({
                 <Link
                   href={`/map/spot/${spot.slug}`}
                   style={{
-                    display: 'block', borderRadius: 6, overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: 6, overflow: 'hidden',
                     marginBottom: 9, position: 'relative',
                     height: 110, background: '#0a0a0a',
                     border: '1px solid rgba(255,255,255,0.06)',
                     textDecoration: 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
                   {spot.cover_url ? (
