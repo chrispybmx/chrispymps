@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (photoUrls.length > 0) {
-    await supabase.from('spot_photos').insert(
+    const { error: photosErr } = await supabase.from('spot_photos').insert(
       photoUrls.map((url, position) => ({
         spot_id:     spot.id,
         url,
@@ -128,6 +128,7 @@ export async function POST(req: NextRequest) {
         credit_name: profile.username,
       }))
     );
+    if (photosErr) console.error('[submit-spot] spot_photos insert error:', photosErr.message);
   }
 
   // 5. Notifica admin (fire-and-forget)
