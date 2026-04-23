@@ -765,7 +765,12 @@ function SheetPhotoViewer({
 
   return (
     <div
-      style={{ position: 'relative', background: '#111' }}
+      style={{
+        position: 'relative', background: '#0a0a0a',
+        width: '100%', height: 130,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+      }}
       onTouchStart={e => { startX.current = e.touches[0].clientX; }}
       onTouchEnd={e => {
         const dx = e.changedTouches[0].clientX - startX.current;
@@ -776,21 +781,24 @@ function SheetPhotoViewer({
         key={idx}
         src={photos[idx]}
         alt=""
-        style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
+        style={{
+          maxWidth: '100%', maxHeight: '100%',
+          width: 'auto', height: 'auto',
+          objectFit: 'contain', display: 'block',
+        }}
       />
       {/* Scanlines */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.1) 3px,rgba(0,0,0,0.1) 5px)',
       }} />
-      {/* Frecce — solo se più di una foto */}
+      {/* Frecce + counter */}
       {photos.length > 1 && (
         <>
           <button onClick={prev} style={miniArrow('left')}>‹</button>
           <button onClick={next} style={miniArrow('right')}>›</button>
-          {/* Counter */}
           <div style={{
-            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
+            position: 'absolute', bottom: 5, left: '50%', transform: 'translateX(-50%)',
             background: 'rgba(0,0,0,0.6)', borderRadius: 10,
             padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#fff',
           }}>
