@@ -416,7 +416,7 @@ function SpotListPanel({
             {/* ── LAYOUT 2 COLONNE — stessa struttura compact/expanded ── */}
             <div style={{
               display: 'flex', gap: 10, alignItems: 'flex-start',
-              padding: '10px 44px 10px 10px',
+              padding: '10px 10px 10px 10px',
             }}>
 
               {/* ── COLONNA SINISTRA: foto principale che cresce ── */}
@@ -480,19 +480,39 @@ function SpotListPanel({
               {/* ── COLONNA DESTRA: titolo che cresce, badges, description, nav ── */}
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
 
-                {/* Nome — più grande quando espanso */}
-                <div style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: isExp ? 15 : 13,
-                  fontWeight: 700,
-                  color: isExp ? 'var(--orange)' : isAct ? 'var(--orange)' : 'var(--bone)',
-                  lineHeight: 1.25,
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                  display: '-webkit-box', WebkitLineClamp: isExp ? 3 : 2,
-                  WebkitBoxOrient: 'vertical' as const,
-                  transition: 'font-size 0.2s ease, color 0.2s ease',
-                }}>
-                  {spot.name}
+                {/* Nome + cuore sulla stessa riga */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                  <div style={{
+                    flex: 1, minWidth: 0,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: isExp ? 15 : 13,
+                    fontWeight: 700,
+                    color: isExp ? 'var(--orange)' : isAct ? 'var(--orange)' : 'var(--bone)',
+                    lineHeight: 1.25,
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                    display: '-webkit-box', WebkitLineClamp: isExp ? 3 : 2,
+                    WebkitBoxOrient: 'vertical' as const,
+                    transition: 'font-size 0.2s ease, color 0.2s ease',
+                  }}>
+                    {spot.name}
+                  </div>
+                  <button
+                    onClick={e => handleFav(e, spot.id)}
+                    className="spot-fav-btn"
+                    style={{
+                      flexShrink: 0,
+                      background: 'none', border: 'none',
+                      padding: 0, margin: 0,
+                      cursor: 'pointer',
+                      fontSize: myFav ? 16 : 14,
+                      lineHeight: 1,
+                      opacity: myFav ? 1 : 0.45,
+                      transition: 'opacity 0.15s, font-size 0.15s',
+                    }}
+                    aria-label="Preferiti"
+                  >
+                    {myFav ? '❤️' : '🤍'}
+                  </button>
                 </div>
 
                 {/* Badges */}
@@ -558,24 +578,6 @@ function SpotListPanel({
                 )}
               </div>
             </div>
-
-            {/* Preferiti */}
-            <button
-              onClick={e => handleFav(e, spot.id)}
-              className="spot-fav-btn"
-              style={{
-                position: 'absolute', top: 10, right: 8,
-                background: myFav ? 'rgba(255,60,60,0.15)' : 'rgba(20,20,20,0.7)',
-                border: myFav ? '1px solid rgba(255,60,60,0.4)' : '1px solid rgba(255,255,255,0.07)',
-                borderRadius: '50%', width: 36, height: 36,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: 14, padding: 0,
-                minWidth: 36, minHeight: 36,
-              }}
-              aria-label="Preferiti"
-            >
-              {myFav ? '❤️' : '🤍'}
-            </button>
 
           </div>
         );
