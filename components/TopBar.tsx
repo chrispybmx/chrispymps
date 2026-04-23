@@ -209,6 +209,7 @@ export default function TopBar({
         }}>
           <a
             href="/preferiti"
+            className="favs-chip"
             style={{
               fontFamily: 'var(--font-mono)', fontSize: 13,
               padding: '4px 12px',
@@ -221,15 +222,9 @@ export default function TopBar({
               textDecoration: 'none',
               display: 'flex', alignItems: 'center', gap: 5,
               transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,60,60,0.7)';
-              (e.currentTarget as HTMLElement).style.color = '#ff4d4d';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = 'var(--gray-600)';
-              (e.currentTarget as HTMLElement).style.color = 'var(--bone)';
-            }}
+              minHeight: 32, touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            } as React.CSSProperties}
           >
             ❤️ <span>I MIEI SPOT</span>
           </a>
@@ -245,6 +240,15 @@ export default function TopBar({
           display: 'flex', flexDirection: 'column',
           animation: 'fadeIn 0.15s ease-out',
         }}>
+          <style>{`
+            @media (hover: hover) and (pointer: fine) {
+              .search-row-btn:hover { background: rgba(255,106,0,0.08) !important; }
+              .search-user-row:hover { background: rgba(255,106,0,0.08) !important; }
+              .favs-chip:hover { border-color: rgba(255,60,60,0.7) !important; color: #ff4d4d !important; }
+            }
+            .search-row-btn:active { background: rgba(255,106,0,0.12) !important; }
+            .search-user-row:active { background: rgba(255,106,0,0.12) !important; }
+          `}</style>
           {/* Input */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
@@ -300,14 +304,15 @@ export default function TopBar({
                         key={username}
                         href={`/u/${username}`}
                         onClick={() => setSearchOpen(false)}
+                        className="search-user-row"
                         style={{
                           display: 'flex', alignItems: 'center', gap: 12,
                           padding: '10px 14px', marginBottom: 4, textDecoration: 'none',
                           background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
                           borderRadius: 8, transition: 'background 0.1s',
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.08)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--gray-700)')}
+                          minHeight: 44, touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
+                        } as React.CSSProperties}
                       >
                         <div style={{
                           width: 32, height: 32, borderRadius: '50%', background: 'var(--orange)',
@@ -428,8 +433,6 @@ export default function TopBar({
 ═══════════════════════════════════════ */
 
 function PlaceRow({ place, onPick }: { place: NominatimPlace; onPick: () => void }) {
-  const [hover, setHover] = useState(false);
-
   const placeEmoji = place.type === 'city' || place.type === 'town' || place.type === 'village'
     ? '🏙️'
     : place.type === 'administrative'
@@ -439,16 +442,17 @@ function PlaceRow({ place, onPick }: { place: NominatimPlace; onPick: () => void
   return (
     <button
       onClick={onPick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="search-row-btn"
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         width: '100%', padding: '11px 14px', marginBottom: 4,
-        background: hover ? 'rgba(255,106,0,0.08)' : 'var(--gray-700)',
+        background: 'var(--gray-700)',
         border: '1px solid var(--gray-600)',
         borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-        transition: 'background 0.1s',
-      }}
+        transition: 'background 0.1s', touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+        minHeight: 44,
+      } as React.CSSProperties}
     >
       <span style={{ fontSize: 20, flexShrink: 0 }}>{placeEmoji}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -473,22 +477,22 @@ function PlaceRow({ place, onPick }: { place: NominatimPlace; onPick: () => void
 }
 
 function SpotRow({ pin, onPick }: { pin: SpotMapPin; onPick: () => void }) {
-  const [hover, setHover] = useState(false);
   const tipo = TIPI_SPOT[pin.type];
 
   return (
     <button
       onClick={onPick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="search-row-btn"
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         width: '100%', padding: '11px 14px', marginBottom: 4,
-        background: hover ? 'rgba(255,106,0,0.08)' : 'var(--gray-700)',
+        background: 'var(--gray-700)',
         border: '1px solid var(--gray-600)',
         borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-        transition: 'background 0.1s',
-      }}
+        transition: 'background 0.1s', touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+        minHeight: 44,
+      } as React.CSSProperties}
     >
       <span style={{ fontSize: 22, flexShrink: 0 }}>{tipo.emoji}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -514,7 +518,7 @@ function FilterChip({ label, active, color, onClick, count }: {
 }) {
   return (
     <button onClick={onClick} style={{
-      fontFamily: 'var(--font-mono)', fontSize: 13, padding: '4px 12px',
+      fontFamily: 'var(--font-mono)', fontSize: 13, padding: '6px 12px',
       border: `1px solid ${active ? color : 'var(--gray-600)'}`,
       borderRadius: 2,
       background: active ? color : 'transparent',
@@ -523,7 +527,9 @@ function FilterChip({ label, active, color, onClick, count }: {
       textTransform: 'uppercase', letterSpacing: '0.06em',
       transition: 'all 0.15s',
       display: 'flex', alignItems: 'center', gap: 4,
-    }}>
+      minHeight: 34, touchAction: 'manipulation',
+      WebkitTapHighlightColor: 'transparent',
+    } as React.CSSProperties}>
       {label}
       {count !== undefined && count > 0 && (
         <span style={{ background: active ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '0 5px', fontSize: 11 }}>
