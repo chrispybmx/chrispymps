@@ -19,40 +19,49 @@ interface FavSpot {
 
 interface Props {
   profileUsername: string;
+  profileId:       string; // auth user UUID — per ownership check affidabile
 }
 
-export default function FavoritesSection({ profileUsername }: Props) {
-  const [isOwn,  setIsOwn]  = useState(false);
-  const [spots,  setSpots]  = useState<FavSpot[]>([]);
+export default function FavoritesSection({ profileUsername, profileId }: Props) {
+  const [isOwn,   setIsOwn]   = useState(false);
+  const [spots,   setSpots]   = useState<FavSpot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [empty,   setEmpty]   = useState(false);
 
   useEffect(() => {
     import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
       supabaseBrowser().auth.getSession().then(async ({ data }) => {
         const u = data.session?.user;
         if (!u) { setLoading(false); return; }
-        const uname = u.user_metadata?.username ?? u.email?.split('@')[0];
-        const own = uname === profileUsername;
+
+        /* Ownership: confronta per UUID (sicuro) oppure per username come fallback
+           (user_metadata.username potrebbe non essere settato su alcuni auth flow) */
+        const uname = u.user_metadata?.username ?? u.email?.split('@')[0] ?? '';
+        const own   = u.id === profileId || uname === profileUsername;
         setIsOwn(own);
         if (!own) { setLoading(false); return; }
 
-        // Load favorites from localStorage
-        try {
-          const ids: string[] = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]');
-          if (ids.length === 0) { setLoading(false); return; }
+        // Leggi preferiti da localStorage
+        let ids: string[] = [];
+        try { ids = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
 
+        if (ids.length === 0) { setEmpty(true); setLoading(false); return; }
+
+        try {
           const res = await fetch(`/api/favorites?ids=${ids.join(',')}`);
           const j   = await res.json();
-          if (j.ok) setSpots(j.data);
-        } catch { /* noop */ }
+          if (j.ok) {
+            setSpots(j.data);
+            if (j.data.length === 0) setEmpty(true);
+          }
+        } catch { setEmpty(true); }
         setLoading(false);
       });
     }).catch(() => setLoading(false));
-  }, [profileUsername]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, profileUsername]);
 
-  // Not own profile or not logged in → don't render
   if (!isOwn || loading) return null;
-  if (spots.length === 0) return null;
 
   return (
     <div style={{ marginTop: 32 }}>
@@ -60,21 +69,28 @@ export default function FavoritesSection({ profileUsername }: Props) {
         fontFamily: 'var(--font-mono)', fontSize: 12,
         color: 'var(--gray-400)', textTransform: 'uppercase',
         letterSpacing: '0.08em', marginBottom: 14,
+        borderTop: '1px solid var(--gray-700)', paddingTop: 24,
       }}>
-        ❤️ I MIEI PREFERITI ({spots.length})
+        ❤️ I MIEI PREFERITI{spots.length > 0 ? ` (${spots.length})` : ''}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {spots.map(spot => <FavTile key={spot.id} spot={spot} />)}
-      </div>
+      {empty || spots.length === 0 ? (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-500)', padding: '12px 0' }}>
+          Nessun preferito ancora — premi ❤️ su uno spot per salvarlo.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {spots.map(spot => <SpotTile key={spot.id} spot={spot} />)}
+        </div>
+      )}
     </div>
   );
 }
 
-function FavTile({ spot }: { spot: FavSpot }) {
-  const tipo  = TIPI_SPOT[spot.type];
-  const cond  = CONDIZIONI[spot.condition as keyof typeof CONDIZIONI];
-  const cover = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
+function SpotTile({ spot }: { spot: FavSpot }) {
+  const tipo   = TIPI_SPOT[spot.type];
+  const cond   = CONDIZIONI[spot.condition as keyof typeof CONDIZIONI];
+  const cover  = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
   const isDead = spot.condition !== 'alive';
 
   return (
@@ -85,7 +101,6 @@ function FavTile({ spot }: { spot: FavSpot }) {
         borderRadius: 8, overflow: 'hidden',
         opacity: isDead ? 0.65 : 1,
       }}>
-        {/* Cover */}
         <div style={{
           height: 110, background: 'var(--gray-700)',
           overflow: 'hidden', position: 'relative',
@@ -94,8 +109,6 @@ function FavTile({ spot }: { spot: FavSpot }) {
           {cover
             ? <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: isDead ? 'grayscale(0.5)' : 'none' }} loading="lazy" />
             : <span style={{ fontSize: 36 }}>{tipo.emoji}</span>}
-
-          {/* Condition badge */}
           <div style={{
             position: 'absolute', top: 6, right: 6,
             background: cond?.bg ?? 'rgba(0,0,0,0.6)',
@@ -106,8 +119,6 @@ function FavTile({ spot }: { spot: FavSpot }) {
             {cond?.label ?? spot.condition}
           </div>
         </div>
-
-        {/* Info */}
         <div style={{ padding: '8px 10px' }}>
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: 13,
