@@ -2,16 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendAdminNotification } from '@/lib/email';
+import { subscribeToNewsletter } from '@/lib/mailerlite';
 
 const SpotSchema = z.object({
   name:         z.string().min(2).max(100),
   type:         z.enum(['street','park','diy','rail','ledge','trail','plaza','gap','bowl']),
   lat:          z.number().min(-90).max(90),
   lon:          z.number().min(-180).max(180),
-  city:         z.string().max(60).optional(),
-  description:  z.string().max(500).optional(),
-  guardians:    z.string().max(200).optional(),
-  access_token: z.string().min(1).max(2048),
+  city:                 z.string().max(60).optional(),
+  description:          z.string().max(500).optional(),
+  guardians:            z.string().max(200).optional(),
+  subscribe_newsletter: z.boolean().optional(),
+  access_token:         z.string().min(1).max(2048),
 });
 
 // Tipi MIME accettati
@@ -131,7 +133,12 @@ export async function POST(req: NextRequest) {
     if (photosErr) console.error('[submit-spot] spot_photos insert error:', photosErr.message);
   }
 
-  // 5. Notifica admin (fire-and-forget)
+  // 5. Newsletter MailerLite (fire-and-forget, solo se opt-in)
+  if (parsed.subscribe_newsletter && user.email) {
+    subscribeToNewsletter(user.email, profile.username).catch(() => {});
+  }
+
+  // 6. Notifica admin (fire-and-forget)
   const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
   sendAdminNotification(spot, contributor as any).catch(() => {});
 
