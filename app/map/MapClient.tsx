@@ -412,17 +412,6 @@ function SpotListPanel({
               touchAction: 'manipulation',
             }}
           >
-            {/* Featured badge */}
-            {featured && (
-              <div style={{
-                position: 'absolute', top: 6, right: 8,
-                fontFamily: 'var(--font-mono)', fontSize: 8,
-                color: 'var(--orange)', opacity: 0.55,
-                letterSpacing: '0.06em', textTransform: 'uppercase',
-              }}>
-                ★ IN EVIDENZA
-              </div>
-            )}
 
             {/* ── LAYOUT 2 COLONNE — stessa struttura compact/expanded ── */}
             <div style={{
