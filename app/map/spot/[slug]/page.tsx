@@ -247,20 +247,22 @@ export default async function SpotPage({ params }: Props) {
         )}
 
         {/* ── META INFO ── */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr',
-          gap: '12px 20px', marginBottom: 24,
-          padding: '16px', background: 'var(--gray-800)',
-          borderRadius: 8, border: '1px solid var(--gray-700)',
-        }}>
-          {spot.surface    && <MetaRow label="Superficie" value={spot.surface} />}
-          {spot.difficulty && <MetaRow label="Livello"   value={spot.difficulty} />}
-          {spot.guardians && (
-            <div style={{ gridColumn: '1/-1' }}>
-              <MetaRow label="Note accesso" value={spot.guardians} />
-            </div>
-          )}
-        </div>
+        {(spot.surface || spot.difficulty || spot.guardians) && (
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr',
+            gap: '12px 20px', marginBottom: 24,
+            padding: '16px', background: 'var(--gray-800)',
+            borderRadius: 8, border: '1px solid var(--gray-700)',
+          }}>
+            {spot.surface    && <MetaRow label="Superficie" value={spot.surface} />}
+            {spot.difficulty && <MetaRow label="Livello"   value={spot.difficulty} />}
+            {spot.guardians && (
+              <div style={{ gridColumn: '1/-1' }}>
+                <MetaRow label="Note accesso" value={spot.guardians} />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── VIDEO YOUTUBE ── */}
         {embedUrl && (
