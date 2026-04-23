@@ -120,7 +120,7 @@ export default function SpotMap({
   const filteredRef      = useRef<SpotMapPin[]>([]);
   const selPinRef        = useRef<SpotMapPin | null>(null);
   const [locating, setLocating] = useState(false);
-  const [zoom, setZoom]         = useState(APP_CONFIG.mapZoom ?? 6);
+  const [zoom, setZoom]         = useState<number>(APP_CONFIG.mapZoom ?? 6);
 
   useEffect(() => { onMapClickRef.current  = onMapClick; });
   useEffect(() => { onSpotClickRef.current = onSpotClick; });
