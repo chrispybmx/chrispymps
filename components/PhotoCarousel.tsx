@@ -21,67 +21,94 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
   };
 
   if (photos.length === 0) return null;
-  if (photos.length === 1) return (
-    <div style={{ position: 'relative', width: '100%', background: '#111' }}>
-      <img src={photos[0].url} alt="" style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
-      {photos[0].credit_name && <Credit name={photos[0].credit_name} />}
-    </div>
-  );
 
   return (
-    <div style={{ position: 'relative', userSelect: 'none' }}>
-      {/* Foto principale */}
+    <div style={{ position: 'relative', userSelect: 'none', background: '#0a0a0a' }}>
+
+      {/* Foto principale — altezza fissa, contain per non tagliare */}
       <div
-        style={{ position: 'relative', overflow: 'hidden', background: '#111', cursor: 'grab' }}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: 'clamp(220px, 55vw, 420px)',
+          background: '#0a0a0a',
+          cursor: photos.length > 1 ? 'grab' : 'default',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
         <img
+          key={idx}
           src={photos[idx].url}
           alt=""
-          style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block', transition: 'opacity 0.2s' }}
-          key={idx}
+          style={{
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: 'auto',
+            height: 'auto',
+            objectFit: 'contain',
+            display: 'block',
+          }}
         />
+
         {/* Scanlines leggere */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
           backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.06) 3px,rgba(0,0,0,0.06) 5px)',
         }} />
-        {/* Freccia sinistra */}
-        <button onClick={prev} style={arrowStyle('left')} aria-label="Foto precedente">‹</button>
-        {/* Freccia destra */}
-        <button onClick={next} style={arrowStyle('right')} aria-label="Foto successiva">›</button>
+
+        {/* Frecce — solo se più foto */}
+        {photos.length > 1 && (
+          <>
+            <button onClick={prev} style={arrowStyle('left')} aria-label="Precedente">‹</button>
+            <button onClick={next} style={arrowStyle('right')} aria-label="Successiva">›</button>
+          </>
+        )}
+
         {/* Counter */}
-        <div style={{
-          position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(0,0,0,0.6)', borderRadius: 12,
-          padding: '3px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff',
-          letterSpacing: '0.04em',
-        }}>
-          {idx + 1} / {photos.length}
-        </div>
+        {photos.length > 1 && (
+          <div style={{
+            position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.65)', borderRadius: 12,
+            padding: '3px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff',
+            letterSpacing: '0.04em',
+          }}>
+            {idx + 1} / {photos.length}
+          </div>
+        )}
+
+        {/* Credit */}
         {photos[idx].credit_name && <Credit name={photos[idx].credit_name!} />}
       </div>
 
-      {/* Thumbnail strip */}
-      <div style={{
-        display: 'flex', gap: 4, padding: '6px 0',
-        overflowX: 'auto', background: '#0a0a0a',
-      }}
-      ref={el => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
-      >
-        {photos.map((p, i) => (
-          <button key={i} onClick={() => setIdx(i)} style={{
-            flexShrink: 0, width: 56, height: 40,
-            border: i === idx ? '2px solid var(--orange)' : '2px solid transparent',
-            borderRadius: 3, padding: 0, cursor: 'pointer',
-            background: 'none', transition: 'border-color 0.15s',
-            overflow: 'hidden',
-          }}>
-            <img src={p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          </button>
-        ))}
-      </div>
+      {/* Thumbnail strip — solo se più foto */}
+      {photos.length > 1 && (
+        <div
+          style={{
+            display: 'flex', gap: 3, padding: '4px 6px',
+            overflowX: 'auto', background: '#080808',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+          }}
+          ref={el => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
+        >
+          {photos.map((p, i) => (
+            <button key={i} onClick={() => setIdx(i)} style={{
+              flexShrink: 0, width: 52, height: 36,
+              border: i === idx ? '2px solid var(--orange)' : '2px solid transparent',
+              borderRadius: 3, padding: 0, cursor: 'pointer',
+              background: '#111', transition: 'border-color 0.15s',
+              overflow: 'hidden',
+            }}>
+              <img
+                src={p.url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#111' }}
+              />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -90,14 +117,14 @@ function arrowStyle(side: 'left' | 'right'): React.CSSProperties {
   return {
     position: 'absolute', top: '50%', [side]: 10,
     transform: 'translateY(-50%)',
-    background: 'rgba(0,0,0,0.55)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '50%', width: 36, height: 36,
+    background: 'rgba(0,0,0,0.6)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    borderRadius: '50%', width: 38, height: 38,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#fff', fontSize: 22, cursor: 'pointer',
+    color: '#fff', fontSize: 24, cursor: 'pointer',
     fontFamily: 'serif', lineHeight: 1, padding: 0,
-    backdropFilter: 'blur(4px)',
-    transition: 'background 0.15s',
+    backdropFilter: 'blur(6px)',
+    zIndex: 2,
   };
 }
 
@@ -105,8 +132,9 @@ function Credit({ name }: { name: string }) {
   return (
     <div style={{
       position: 'absolute', bottom: 10, right: 10,
-      background: 'rgba(0,0,0,0.55)', borderRadius: 4,
+      background: 'rgba(0,0,0,0.6)', borderRadius: 4,
       padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa',
+      zIndex: 2,
     }}>
       📷 {name}
     </div>
