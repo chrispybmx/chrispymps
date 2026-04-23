@@ -7,6 +7,7 @@ import type { Spot } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
 import PhotoCarousel from '@/components/PhotoCarousel';
 import StatusUpdateBtn from '@/components/StatusUpdateBtn';
+import SupportStrip from '@/components/SupportStrip';
 
 export const revalidate = 300;
 
@@ -314,6 +315,9 @@ export default async function SpotPage({ params }: Props) {
 
       {/* ── SPOT INTERACTIONS: stelle, cuore, commenti ── */}
       <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
+
+      {/* ── SUPPORT STRIP ── */}
+      <SupportStrip />
 
       {/* ── AGGIORNA STATO ── */}
       <StatusUpdateBtn spotId={spot.id} spotName={spot.name} currentCondition={spot.condition} />
