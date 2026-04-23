@@ -93,7 +93,7 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
           ref={el => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
         >
           {photos.map((p, i) => (
-            <button key={i} onClick={() => setIdx(i)} style={{
+            <button key={p.url} onClick={() => setIdx(i)} style={{
               flexShrink: 0, width: 52, height: 36,
               border: i === idx ? '2px solid var(--orange)' : '2px solid transparent',
               borderRadius: 3, padding: 0, cursor: 'pointer',
