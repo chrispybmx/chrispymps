@@ -294,7 +294,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [notes,       setNotes]       = useState('');
 
   /* Submit */
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting,          setSubmitting]          = useState(false);
+  const [subscribeNewsletter, setSubscribeNewsletter] = useState(true);
   const [error,      setError]      = useState<string | null>(null);
 
   /* Auth */
@@ -423,6 +424,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         city: city || undefined,
         description: description || undefined,
         guardians: notes || undefined,
+        subscribe_newsletter: subscribeNewsletter,
         access_token: session.access_token,
       }));
       photos.forEach((p, i) => fd.append(`photo_${i}`, p));
@@ -910,6 +912,31 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <input type="text" style={inp} value={notes} onChange={e => setNotes(e.target.value)}
                   placeholder='Es. "Security alle 18" / "Sempre libero"' maxLength={200} />
               </div>
+
+              {/* Newsletter opt-in */}
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '12px 14px',
+                background: 'var(--gray-800)',
+                border: `1px solid ${subscribeNewsletter ? 'rgba(255,106,0,0.4)' : 'var(--gray-700)'}`,
+                borderRadius: 6, cursor: 'pointer',
+                transition: 'border-color 0.15s',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={subscribeNewsletter}
+                  onChange={e => setSubscribeNewsletter(e.target.checked)}
+                  style={{ marginTop: 2, accentColor: 'var(--orange)', width: 16, height: 16, flexShrink: 0 }}
+                />
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.3 }}>
+                    Ricevi aggiornamenti dalla scena 🏴
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 3 }}>
+                    Nuovi spot, eventi e contenuti BMX. Niente spam.
+                  </div>
+                </div>
+              </label>
 
               {error && <ErrBox msg={error} />}
 
