@@ -247,7 +247,8 @@ export default function SpotMap({
     if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
       const bounds = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
       mapInstance.current.fitBounds(bounds, {
-        padding: [32, 32, 240, 32], // bottom padding = altezza overlay panel
+        paddingTopLeft:     [32, 32],
+        paddingBottomRight: [32, 310], // bottom = altezza panel overlay
         maxZoom: 15,
         animate: false,
       });
@@ -255,14 +256,23 @@ export default function SpotMap({
     }
   }, [filtered, clusters, zoom, selectedPin]);
 
-  /* ── Fly-to ── */
+  /* ── Fly-to: centrato nello spazio visibile sopra il pannello ── */
   useEffect(() => {
-    if (!mapInstance.current || !flyTarget) return;
-    mapInstance.current.flyTo(
+    if (!mapInstance.current || !flyTarget || !L) return;
+    const map  = mapInstance.current;
+    const zoom = flyTarget.zoom ?? APP_CONFIG.mapZoomCity;
+    // Il pannello occupa il fondo: offset bottom = ~300px → spot centrato nell'area visibile
+    const PANEL_H = 300;
+    const bounds = L.latLngBounds(
       [flyTarget.lat, flyTarget.lon],
-      flyTarget.zoom ?? APP_CONFIG.mapZoomCity,
-      { duration: 1.4 }
-    );
+      [flyTarget.lat, flyTarget.lon]
+    ).pad(0.0008);
+    map.flyToBounds(bounds, {
+      paddingBottomRight: [0, PANEL_H],
+      paddingTopLeft:     [0, 20],
+      maxZoom: zoom,
+      duration: 1.2,
+    });
   }, [flyTarget]);
 
   /* ── Radius cursor ── */
