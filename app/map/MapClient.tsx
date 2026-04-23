@@ -447,14 +447,6 @@ function SpotListPanel({
                       {tipo.emoji}
                     </div>
                   )}
-                  {isAct && !isExp && (
-                    <div style={{
-                      position: 'absolute', top: 3, left: 3,
-                      background: 'var(--orange)', color: '#000',
-                      fontFamily: 'var(--font-mono)', fontSize: 7,
-                      padding: '1px 4px', borderRadius: 1, fontWeight: 700,
-                    }}>● REC</div>
-                  )}
                 </Link>
 
                 {/* Foto extra — appaiono sotto quando espanso */}
@@ -578,6 +570,17 @@ function SpotListPanel({
                 )}
               </div>
             </div>
+
+            {/* ● REC — sottile, in fondo a destra, solo quando attivo e non espanso */}
+            {isAct && !isExp && (
+              <div style={{
+                textAlign: 'right',
+                padding: '0 10px 5px',
+                fontFamily: 'var(--font-mono)', fontSize: 8,
+                color: 'var(--gray-600)',
+                letterSpacing: '0.1em',
+              }}>● REC</div>
+            )}
 
           </div>
         );
