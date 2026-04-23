@@ -59,25 +59,43 @@ export default function TopBar({
   const [places,        setPlaces]        = useState<NominatimPlace[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
 
+  /* ── Ricerca utenti via API (include utenti senza spot) ── */
+  interface ApiUser { id: string; username: string; bio?: string | null; spotCount: number }
+  const [apiUsers,       setApiUsers]       = useState<ApiUser[]>([]);
+  const [usersLoading,   setUsersLoading]   = useState(false);
+
   useEffect(() => {
-    if (query.trim().length < 2) { setPlaces([]); return; }
+    if (query.trim().length < 2) { setPlaces([]); setApiUsers([]); return; }
     const t = setTimeout(async () => {
-      setPlacesLoading(true);
+      /* Nominatim — solo se non sembra una ricerca utente pura */
+      if (!isAtSearch) {
+        setPlacesLoading(true);
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=it&accept-language=it`;
+          const res  = await fetch(url, { headers: { 'User-Agent': 'ChrispyMaps/1.0' } });
+          const data = await res.json() as Array<{ name: string; lat: string; lon: string; type: string; display_name: string }>;
+          setPlaces(data.map(r => ({
+            name:        r.name || r.display_name.split(',')[0],
+            lat:         parseFloat(r.lat),
+            lon:         parseFloat(r.lon),
+            type:        r.type,
+            displayExtra: r.display_name.split(',').slice(1, 3).join(',').trim(),
+          })));
+        } catch { setPlaces([]); }
+        setPlacesLoading(false);
+      }
+
+      /* Ricerca utenti via API — sempre, per trovare anche chi non ha spot */
+      setUsersLoading(true);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=it&accept-language=it`;
-        const res  = await fetch(url, { headers: { 'User-Agent': 'ChrispyMaps/1.0' } });
-        const data = await res.json() as Array<{ name: string; lat: string; lon: string; type: string; display_name: string }>;
-        setPlaces(data.map(r => ({
-          name:        r.name || r.display_name.split(',')[0],
-          lat:         parseFloat(r.lat),
-          lon:         parseFloat(r.lon),
-          type:        r.type,
-          displayExtra: r.display_name.split(',').slice(1, 3).join(',').trim(),
-        })));
-      } catch { setPlaces([]); }
-      setPlacesLoading(false);
+        const res = await fetch(`/api/users?q=${encodeURIComponent(needle)}`);
+        const j   = await res.json();
+        if (j.ok) setApiUsers(j.data ?? []);
+      } catch { setApiUsers([]); }
+      setUsersLoading(false);
     }, 380);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
   /* ── Query normalizzata ── */
@@ -107,20 +125,8 @@ export default function TopBar({
     ? spots.filter(s => s.name.toLowerCase().includes(q)).slice(0, 5)
     : [];
 
-  /* ── Utenti unici che matchano (con o senza @) ── */
-  const userMatches: { username: string; count: number }[] = needle.length >= 2
-    ? Object.entries(
-        spots.reduce((acc, s) => {
-          const un = s.submitted_by_username?.toLowerCase() ?? '';
-          if (un && un.includes(needle)) {
-            acc[s.submitted_by_username!] = (acc[s.submitted_by_username!] ?? 0) + 1;
-          }
-          return acc;
-        }, {} as Record<string, number>)
-      )
-        .map(([username, count]) => ({ username, count }))
-        .slice(0, 4)
-    : [];
+  /* ── Utenti: risultati API (include utenti senza spot) ── */
+  const userMatches = apiUsers;
 
   /* ── Città con spot count ── */
   const cityCount: Record<string, number> = {};
@@ -176,7 +182,7 @@ export default function TopBar({
     return () => window.removeEventListener('keydown', onKey);
   }, [searchOpen]);
 
-  const hasResults = places.length > 0 || spotMatches.length > 0 || userMatches.length > 0 || tagMatches.length > 0;
+  const hasResults = places.length > 0 || spotMatches.length > 0 || userMatches.length > 0 || tagMatches.length > 0 || usersLoading;
 
   const pickTag = (tag: TagMatch) => {
     if (tag.kind === 'type')       { onFilterType(tag.value as SpotType); }
@@ -471,13 +477,13 @@ export default function TopBar({
                 )}
 
                 {/* Utenti */}
-                {userMatches.length > 0 && (
+                {(userMatches.length > 0 || usersLoading) && (
                   <div style={{ marginBottom: 16 }}>
-                    <SectionLabel>👤 Utenti</SectionLabel>
-                    {userMatches.map(({ username, count }) => (
+                    <SectionLabel>👤 Utenti{usersLoading ? ' …' : ''}</SectionLabel>
+                    {userMatches.map((u) => (
                       <a
-                        key={username}
-                        href={`/u/${username}`}
+                        key={u.username}
+                        href={`/u/${u.username}`}
                         onClick={() => setSearchOpen(false)}
                         className="search-user-row"
                         style={{
@@ -494,14 +500,15 @@ export default function TopBar({
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontFamily: 'var(--font-mono)', fontSize: 13, color: '#000', flexShrink: 0,
                         }}>
-                          {username[0].toUpperCase()}
+                          {u.username[0].toUpperCase()}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)' }}>
-                            @{username}
+                            @{u.username}
                           </div>
                           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
-                            {count} spot
+                            {u.spotCount === 0 ? 'nessuno spot' : `${u.spotCount} spot pubblicati`}
+                            {u.bio ? ` · ${u.bio.slice(0, 40)}` : ''}
                           </div>
                         </div>
                         <span style={{ color: 'var(--orange)', fontSize: 16, flexShrink: 0 }}>→</span>
