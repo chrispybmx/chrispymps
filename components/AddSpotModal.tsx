@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT } from '@/lib/constants';
+import { TIPI_SPOT, DIFFICOLTA } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
@@ -178,6 +178,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [type,        setType]        = useState<SpotType | ''>('');
   const [description, setDescription] = useState('');
   const [notes,       setNotes]       = useState('');
+  const [difficulty,  setDifficulty]  = useState<string>('');
 
   /* Submit */
   const [submitting, setSubmitting] = useState(false);
@@ -279,6 +280,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         city: city || undefined,
         description: description || undefined,
         guardians: notes || undefined,
+        difficulty: difficulty || undefined,
         access_token: session.access_token,
       }));
       photos.forEach((p, i) => fd.append(`photo_${i}`, p));
@@ -645,6 +647,30 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <label style={lbl}>Note accesso (opzionale)</label>
                 <input type="text" style={inp} value={notes} onChange={e => setNotes(e.target.value)}
                   placeholder='Es. "Security alle 18" / "Sempre libero"' maxLength={200} />
+              </div>
+
+              <div>
+                <label style={lbl}>Livello difficoltà (opzionale)</label>
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  {DIFFICOLTA.map(d => (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => setDifficulty(difficulty === d.value ? '' : d.value)}
+                      style={{
+                        flex: 1, padding: '8px 4px',
+                        border: `1px solid ${difficulty === d.value ? 'var(--orange)' : 'var(--gray-600)'}`,
+                        borderRadius: 2,
+                        background: difficulty === d.value ? 'rgba(255,106,0,0.15)' : 'transparent',
+                        color: difficulty === d.value ? 'var(--orange)' : 'var(--bone)',
+                        fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
+                        textTransform: 'uppercase', letterSpacing: '0.05em',
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {error && <ErrBox msg={error} />}
