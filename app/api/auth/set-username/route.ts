@@ -22,8 +22,25 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const { username } = body;
-  if (!username || typeof username !== 'string' || username.length < 3) {
-    return NextResponse.json({ error: 'Username non valido' }, { status: 400 });
+
+  // Validazione formato: 3-30 caratteri, solo lettere/numeri/underscore/trattino
+  // Blocca path traversal, HTML injection, spazi e caratteri speciali
+  const USERNAME_RE = /^[a-zA-Z0-9_\-]{3,30}$/;
+  if (!username || typeof username !== 'string' || !USERNAME_RE.test(username)) {
+    return NextResponse.json({
+      error: 'Username non valido. Usa 3-30 caratteri: lettere, numeri, _ o -',
+    }, { status: 400 });
+  }
+
+  // Controlla unicità nella tabella profiles
+  const { data: existing } = await adminClient
+    .from('profiles')
+    .select('id')
+    .ilike('username', username)
+    .maybeSingle();
+
+  if (existing && existing.id !== user.id) {
+    return NextResponse.json({ error: 'Username già in uso' }, { status: 409 });
   }
 
   // Aggiorna user_metadata
@@ -33,7 +50,7 @@ export async function POST(request: NextRequest) {
 
   if (updateErr) {
     console.error('[set-username] updateUserById error:', updateErr);
-    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ error: 'Errore interno' }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
