@@ -122,8 +122,9 @@ export default function SpotMap({
       }).addTo(map);
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-      markersRef.current  = L.layerGroup().addTo(map);
+      // selectedLayer PRIMA dei marker → rimane sotto i pin
       selectedLayerRef.current = L.layerGroup().addTo(map);
+      markersRef.current  = L.layerGroup().addTo(map);
       mapInstance.current = map;
 
       /* Aggiorna stato zoom React */
@@ -249,67 +250,44 @@ export default function SpotMap({
     );
   }, [flyTarget]);
 
-  /* ── Marker selezionato (anello pulsante) ── */
+  /* ── Marker selezionato — alone sotto il pin ── */
   useEffect(() => {
     if (!selectedLayerRef.current || !L) return;
     selectedLayerRef.current.clearLayers();
     if (!selectedPin) return;
 
-    const tipo = TIPI_SPOT[selectedPin.type];
-
-    // Inietta CSS animazione pulse una sola volta nel documento
-    if (!document.getElementById('sel-pulse-style')) {
+    if (!document.getElementById('sel-glow-style')) {
       const style = document.createElement('style');
-      style.id = 'sel-pulse-style';
+      style.id = 'sel-glow-style';
       style.textContent = `
-        @keyframes selPulse {
-          0%   { transform: scale(1);   opacity: 0.8; }
-          70%  { transform: scale(2.4); opacity: 0;   }
-          100% { transform: scale(2.4); opacity: 0;   }
+        @keyframes selBreathe {
+          0%,100% { opacity: 0.55; transform: translate(-50%,-100%) scale(1); }
+          50%      { opacity: 0.85; transform: translate(-50%,-100%) scale(1.12); }
         }
-        @keyframes selPulse2 {
-          0%   { transform: scale(1);   opacity: 0.5; }
-          100% { transform: scale(1.8); opacity: 0;   }
-        }
-        .sel-ring  { animation: selPulse  1.6s ease-out infinite; }
-        .sel-ring2 { animation: selPulse2 1.6s ease-out 0.5s infinite; }
+        .sel-glow { animation: selBreathe 2.4s ease-in-out infinite; }
       `;
       document.head.appendChild(style);
     }
 
     const html = `
-      <div style="position:relative;width:60px;height:60px;transform:translate(-50%,-50%)">
-        <!-- Anello esterno pulsante -->
-        <div class="sel-ring" style="
-          position:absolute;inset:0;border-radius:50%;
-          border:2px solid #ff6a00;
-          transform-origin:center;
-        "></div>
-        <!-- Secondo anello sfasato -->
-        <div class="sel-ring2" style="
-          position:absolute;inset:8px;border-radius:50%;
-          border:1.5px solid #ff6a00;
-          transform-origin:center;
-        "></div>
-        <!-- Cerchio centrale -->
-        <div style="
-          position:absolute;inset:18px;border-radius:50%;
-          background:rgba(255,106,0,0.25);
-          border:2px solid #ff6a00;
-          display:flex;align-items:center;justify-content:center;
-          font-size:11px;
-        ">${tipo.emoji}</div>
-      </div>
+      <div class="sel-glow" style="
+        width: 44px; height: 44px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255,106,0,0.35) 0%, rgba(255,106,0,0) 70%);
+        border: 1.5px solid rgba(255,106,0,0.55);
+        box-shadow: 0 0 16px rgba(255,106,0,0.3);
+        pointer-events: none;
+      "></div>
     `;
 
     const icon = L!.divIcon({
       html,
-      className: 'spot-selected-marker',
-      iconSize:  [0, 0],
-      iconAnchor:[0, 0],
+      className: '',
+      iconSize:  [44, 44],
+      iconAnchor:[22, 44], // allineato alla punta del pin sotto
     });
 
-    L!.marker([selectedPin.lat, selectedPin.lon], { icon, zIndexOffset: 2000 })
+    L!.marker([selectedPin.lat, selectedPin.lon], { icon, interactive: false })
       .addTo(selectedLayerRef.current!);
 
   }, [selectedPin]);
