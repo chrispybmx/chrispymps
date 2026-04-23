@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { TIPI_SPOT } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import ProfileClient from './ProfileClient';
+import FavoritesSection from './FavoritesSection';
 
 interface Profile {
   id:               string;
@@ -34,20 +35,30 @@ async function getData(username: string) {
     .maybeSingle();
   if (!profile) return null;
 
-  const { data: spots } = await sb
-    .from('spots')
-    .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
-    .eq('submitted_by_username', username)
-    .eq('status', 'approved')
-    .order('approved_at', { ascending: false });
+  const [{ data: spots }, { count: riderCount }] = await Promise.all([
+    sb
+      .from('spots')
+      .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
+      .eq('submitted_by_username', username)
+      .eq('status', 'approved')
+      .order('approved_at', { ascending: false }),
+    sb
+      .from('spot_riders')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', profile.id),
+  ]);
 
-  return { profile: profile as Profile, spots: (spots ?? []) as SpotCard[] };
+  return {
+    profile:     profile as Profile,
+    spots:       (spots ?? []) as SpotCard[],
+    riderCount:  riderCount ?? 0,
+  };
 }
 
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
   return {
     title: `@${params.username} — Chrispy Maps`,
-    description: `Spot BMX aggiunti da @${params.username} su Chrispy Maps`,
+    description: `Profilo di @${params.username} su Chrispy Maps`,
   };
 }
 
@@ -56,7 +67,7 @@ export const dynamic = 'force-dynamic';
 export default async function UserProfilePage({ params }: { params: { username: string } }) {
   const data = await getData(params.username);
   if (!data) notFound();
-  const { profile, spots } = data;
+  const { profile, spots, riderCount } = data;
   const joinDate = new Date(profile.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   return (
@@ -77,13 +88,13 @@ export default async function UserProfilePage({ params }: { params: { username: 
         {/* Profile hero — client component gestisce edit */}
         <ProfileClient profile={profile} joinDate={joinDate} />
 
-        {/* Stats strip */}
+        {/* Stats strip — solo le due cose che contano */}
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--gray-700)', marginBottom: 24 }}>
-          <StatPill value={spots.length} label="spot" />
-          <StatPill value={spots.filter(s => s.condition === 'alive').length} label="alive" />
-          <StatPill value={spots.filter(s => s.condition !== 'alive').length} label="bustati" />
+          <StatPill value={spots.length}  label="📍 spot pubblicati" />
+          <StatPill value={riderCount}    label="🛹 spot ridden" last />
         </div>
 
+        {/* Spot grid */}
         {spots.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: 48 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🏴</div>
@@ -99,6 +110,10 @@ export default async function UserProfilePage({ params }: { params: { username: 
             </div>
           </>
         )}
+
+        {/* Preferiti — visibili solo al proprietario del profilo (client-side) */}
+        <FavoritesSection profileUsername={profile.username} />
+
       </div>
     </div>
   );
@@ -133,11 +148,18 @@ function SpotTile({ spot }: { spot: SpotCard }) {
   );
 }
 
-function StatPill({ value, label }: { value: number; label: string }) {
+function StatPill({ value, label, last }: { value: number; label: string; last?: boolean }) {
   return (
-    <div style={{ flex: 1, textAlign: 'center', padding: '16px 0', borderRight: '1px solid var(--gray-700)' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--orange)', lineHeight: 1 }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 3, textTransform: 'uppercase' }}>{label}</div>
+    <div style={{
+      flex: 1, textAlign: 'center', padding: '18px 0',
+      borderRight: last ? 'none' : '1px solid var(--gray-700)',
+    }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, color: 'var(--orange)', lineHeight: 1 }}>
+        {value}
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 4 }}>
+        {label}
+      </div>
     </div>
   );
 }
