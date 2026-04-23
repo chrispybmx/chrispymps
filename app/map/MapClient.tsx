@@ -502,53 +502,56 @@ function SpotListPanel({
 }
 
 /* ════════════════════════════════════════════════════════
-   MINI-SHEET — slide-up con info spot + nav
+   MINI-SHEET — pannello compatto, sempre visibili gli altri spot
+   Struttura:
+     [header: nome + ❤ + ✕]
+     [foto scroll orizzontale]
+     [meta: dot + badge + città]
+     [descrizione]
+     [stelline voto]
+     [azioni: portami lì + vedi pagina]
 ════════════════════════════════════════════════════════ */
 
 function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () => void }) {
-  const [spot,       setSpot]       = useState<Spot | null>(null);
-  const [loading,    setLoading]    = useState(false);
-  const [navOpen,    setNavOpen]    = useState(false);
-  const [myRating,   setMyRating]   = useState(0);
-  const [myFav,      setMyFav]      = useState(false);
-  const sheetRef = useRef<HTMLDivElement>(null);
+  const [spot,     setSpot]     = useState<Spot | null>(null);
+  const [navOpen,  setNavOpen]  = useState(false);
+  const [myRating, setMyRating] = useState(0);
+  const [myFav,    setMyFav]    = useState(false);
+  const [selPhoto, setSelPhoto] = useState(0);
 
   const isOpen = !!pin;
 
-  /* Fetch spot completo quando si apre */
   useEffect(() => {
-    if (!pin) { setSpot(null); setNavOpen(false); return; }
+    if (!pin) { setSpot(null); setNavOpen(false); setSelPhoto(0); return; }
     setMyRating(getMyRating(pin.id));
     setMyFav(isFav(pin.id));
-    setLoading(true);
+    setSelPhoto(0);
     fetch(`/api/spots/${pin.slug}`)
       .then(r => r.json())
       .then(d => setSpot(d.data ?? null))
-      .catch(() => setSpot(null))
-      .finally(() => setLoading(false));
+      .catch(() => setSpot(null));
   }, [pin?.slug]);
 
-  /* Swipe down to close */
-  const startY = useRef(0);
-  const handleTouchStart = (e: React.TouchEvent) => { startY.current = e.touches[0].clientY; };
-  const handleTouchEnd   = (e: React.TouchEvent) => {
-    if (e.changedTouches[0].clientY - startY.current > 60) onClose();
-  };
-
-  /* ESC to close */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  /* Swipe-down to close */
+  const startY = useRef(0);
+
   const tipo = pin ? TIPI_SPOT[pin.type] : null;
   const cond = pin ? CONDIZIONI[pin.condition] : null;
+
+  const photos: string[] = spot
+    ? [...(spot.spot_photos ?? [])].sort((a, b) => a.position - b.position).map(p => p.url)
+    : (pin?.cover_url ? [pin.cover_url] : []);
 
   const googleUrl = pin ? `https://www.google.com/maps/dir/?api=1&destination=${pin.lat},${pin.lon}` : '';
   const appleMaps = pin ? `http://maps.apple.com/?daddr=${pin.lat},${pin.lon}` : '';
   const wazeUrl   = pin ? `https://waze.com/ul?ll=${pin.lat},${pin.lon}&navigate=yes` : '';
-  const openNav = (url: string) => { window.open(url, '_blank'); setNavOpen(false); };
+  const openNav   = (url: string) => { window.open(url, '_blank'); setNavOpen(false); };
 
   const handleRate = (r: number) => {
     if (!pin) return;
@@ -561,238 +564,228 @@ function SpotMiniSheet({ pin, onClose }: { pin: SpotMapPin | null; onClose: () =
     setMyFav(added);
   };
 
-  const coverPhoto = (spot?.spot_photos ?? []).sort((a, b) => a.position - b.position)[0]?.url ?? pin?.cover_url;
-
   return (
-    <>
-      {/* Backdrop (chiude sheet) */}
-      {isOpen && (
-        <div
-          onClick={onClose}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 39,
-            background: 'transparent',
-          }}
-        />
-      )}
+    <div
+      onTouchStart={e => { startY.current = e.touches[0].clientY; }}
+      onTouchEnd={e => { if (e.changedTouches[0].clientY - startY.current > 55) onClose(); }}
+      style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        /* altezza compatta: vedi gli altri spot sopra */
+        maxHeight: 'min(320px, 46dvh)',
+        transform: isOpen ? 'translateY(0)' : 'translateY(110%)',
+        transition: 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
+        background: '#0e0e0e',
+        borderTop: '2px solid var(--orange)',
+        borderRadius: '14px 14px 0 0',
+        zIndex: 45,
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 -12px 48px rgba(0,0,0,0.7)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── HEADER ── sempre visibile, X sempre accessibile */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '10px 12px 8px',
+        flexShrink: 0,
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        {/* Drag handle */}
+        <div style={{ width: 32, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
 
-      <div
-        ref={sheetRef}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          height: 'clamp(300px, 54dvh, 480px)',
-          transform: isOpen ? 'translateY(0)' : 'translateY(105%)',
-          transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
-          background: 'rgba(12,12,12,0.98)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderTop: '1px solid rgba(255,106,0,0.5)',
-          borderRadius: '16px 16px 0 0',
-          zIndex: 40,
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
-        {/* ── Handle ── */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 0', flexShrink: 0 }}>
-          <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.15)', maxWidth: 36, margin: '0 auto' }} />
-          <button onClick={onClose} style={{
-            position: 'absolute', right: 14, top: 8,
-            background: 'none', border: 'none', color: 'var(--gray-400)',
-            fontSize: 18, cursor: 'pointer', padding: '4px 6px', lineHeight: 1,
-          }}>✕</button>
+        {/* Tipo badge */}
+        {tipo && (
+          <span style={{
+            color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 10,
+            padding: '2px 6px', borderRadius: 2,
+            border: `1px solid ${tipo.color}55`,
+            textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0,
+          }}>
+            {tipo.emoji} {tipo.label}
+          </span>
+        )}
+
+        {/* Nome */}
+        <div style={{
+          flex: 1, minWidth: 0,
+          fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+          color: 'var(--bone)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {pin?.name}
         </div>
 
-        {/* ── Contenuto scrollabile ── */}
-        <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+        {/* Preferiti */}
+        <button onClick={handleFav} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: 16, padding: '2px 4px', flexShrink: 0,
+          color: myFav ? '#ff4d4d' : 'var(--gray-500)',
+        }} aria-label="Preferiti">
+          {myFav ? '❤️' : '🤍'}
+        </button>
 
-          {/* Hero photo */}
-          {coverPhoto && (
-            <div style={{ width: '100%', height: 140, position: 'relative', overflow: 'hidden' }}>
-              <img src={coverPhoto} alt={pin?.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              {/* Scanlines VHS */}
-              <div style={{
-                position: 'absolute', inset: 0, pointerEvents: 'none',
-                backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.12) 3px, rgba(0,0,0,0.12) 5px)',
-              }} />
-              <div style={{
-                position: 'absolute', inset: 0,
-                background: 'linear-gradient(to bottom, transparent 50%, rgba(12,12,12,0.9) 100%)',
-                pointerEvents: 'none',
-              }} />
-              {/* Badge tipo su foto */}
-              {tipo && (
+        {/* CHIUDI — sempre visibile */}
+        <button onClick={onClose} style={{
+          background: 'rgba(255,255,255,0.07)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '50%', width: 28, height: 28,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', fontSize: 13, color: 'var(--bone)',
+          flexShrink: 0, padding: 0,
+        }} aria-label="Chiudi">✕</button>
+      </div>
+
+      {/* ── BODY scrollabile ── */}
+      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+
+        {/* Foto — riga orizzontale scrollabile se più foto */}
+        {photos.length > 0 && (
+          <div style={{
+            display: 'flex', gap: 4,
+            overflowX: 'auto', padding: '8px 12px',
+            scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch',
+          }}
+          ref={el => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
+          >
+            {photos.map((url, i) => (
+              <div
+                key={i}
+                onClick={() => setSelPhoto(i)}
+                style={{
+                  flexShrink: 0,
+                  /* Prima foto più larga se unica, poi quadrate */
+                  width: photos.length === 1 ? '100%' : 108,
+                  height: 108,
+                  borderRadius: 6, overflow: 'hidden',
+                  border: selPhoto === i ? '2px solid var(--orange)' : '2px solid transparent',
+                  transition: 'border-color 0.15s',
+                  scrollSnapAlign: 'start',
+                  cursor: 'pointer',
+                  position: 'relative',
+                }}
+              >
+                <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                {/* Scanlines */}
                 <div style={{
-                  position: 'absolute', top: 10, left: 12,
-                  background: 'rgba(0,0,0,0.7)', color: tipo.color,
-                  fontFamily: 'var(--font-mono)', fontSize: 10,
-                  padding: '3px 8px', borderRadius: 2,
-                  border: `1px solid ${tipo.color}55`,
-                  textTransform: 'uppercase', letterSpacing: '0.04em',
-                }}>
-                  {tipo.emoji} {tipo.label}
-                </div>
-              )}
+                  position: 'absolute', inset: 0, pointerEvents: 'none',
+                  backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.1) 3px,rgba(0,0,0,0.1) 5px)',
+                }} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Meta + info */}
+        <div style={{ padding: '4px 12px 16px' }}>
+
+          {/* Condizione + città + user */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+            {pin?.condition === 'alive' ? (
+              <span style={{
+                display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                background: '#00c851', boxShadow: '0 0 5px #00c851aa', flexShrink: 0,
+              }} />
+            ) : cond ? (
+              <span style={{
+                background: cond.bg, color: cond.color,
+                fontFamily: 'var(--font-mono)', fontSize: 9,
+                padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase',
+              }}>{cond.label}</span>
+            ) : null}
+
+            {(pin?.city || pin?.submitted_by_username) && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>
+                {[pin.city, pin.submitted_by_username ? `@${pin.submitted_by_username}` : null].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+
+          {/* Descrizione */}
+          {spot?.description && (
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)',
+              lineHeight: 1.55, marginBottom: 8,
+              display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
+              overflow: 'hidden',
+            }}>
+              {spot.description}
             </div>
           )}
 
-          {/* Info body */}
-          <div style={{ padding: '14px 16px 20px' }}>
+          {/* Stelline */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Voto
+            </span>
+            {[1,2,3,4,5].map(i => (
+              <button key={i} onClick={() => handleRate(i)} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 16, padding: 0, lineHeight: 1,
+                color: i <= myRating ? '#fbbf24' : 'var(--gray-700)',
+                transition: 'color 0.1s',
+              }}>★</button>
+            ))}
+          </div>
 
-            {/* Nome + condizione */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700,
-                color: 'var(--bone)', flex: 1, lineHeight: 1.2,
+          {/* Azioni */}
+          <div style={{ display: 'flex', gap: 8 }}>
+
+            {/* Portami lì */}
+            <div style={{ position: 'relative', flex: 1 }}>
+              <button onClick={() => setNavOpen(o => !o)} style={{
+                width: '100%',
+                background: 'var(--orange)', color: '#000',
+                border: 'none', borderRadius: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+                padding: '9px 0', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                letterSpacing: '0.04em',
               }}>
-                {loading ? '...' : (spot?.name ?? pin?.name)}
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', paddingTop: 2 }}>
-                {pin?.condition === 'alive' ? (
-                  <span style={{
-                    display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
-                    background: '#00c851', boxShadow: '0 0 6px #00c851bb', flexShrink: 0,
-                  }} />
-                ) : (
-                  cond && (
-                    <span style={{
-                      background: cond.bg, color: cond.color,
-                      fontFamily: 'var(--font-mono)', fontSize: 10,
-                      padding: '2px 7px', borderRadius: 2, textTransform: 'uppercase',
-                    }}>
-                      {cond.label}
-                    </span>
-                  )
-                )}
-                {/* Preferiti */}
-                <button onClick={handleFav} style={{
-                  background: myFav ? 'rgba(255,60,60,0.15)' : 'rgba(255,255,255,0.06)',
-                  border: myFav ? '1px solid rgba(255,60,60,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '50%', width: 30, height: 30,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', fontSize: 14, padding: 0, flexShrink: 0,
+                📍 Portami lì
+              </button>
+              {navOpen && (
+                <div style={{
+                  position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
+                  background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8, overflow: 'hidden', zIndex: 10,
+                  boxShadow: '0 -6px 20px rgba(0,0,0,0.6)',
                 }}>
-                  {myFav ? '❤️' : '🤍'}
-                </button>
-              </div>
-            </div>
-
-            {/* Città + user */}
-            {(pin?.city || pin?.submitted_by_username) && (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 12,
-                color: 'var(--gray-500)', marginBottom: 10,
-              }}>
-                {[pin.city, pin.submitted_by_username ? `@${pin.submitted_by_username}` : null].filter(Boolean).join(' · ')}
-              </div>
-            )}
-
-            {/* Rating stelline */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Il tuo voto
-              </span>
-              <div style={{ display: 'flex', gap: 3 }}>
-                {[1,2,3,4,5].map(i => (
-                  <button key={i} onClick={() => handleRate(i)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 18, padding: 0,
-                    color: i <= myRating ? '#fbbf24' : 'var(--gray-600)',
-                    transition: 'color 0.1s',
-                  }}>★</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Descrizione */}
-            {spot?.description && (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 12,
-                color: 'var(--gray-400)', lineHeight: 1.6,
-                marginBottom: 14,
-                display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
-                overflow: 'hidden',
-              }}>
-                {spot.description}
-              </div>
-            )}
-
-            {/* Separator */}
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '12px 0' }} />
-
-            {/* Azioni */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-
-              {/* Portami lì */}
-              <div style={{ position: 'relative', flex: 1 }}>
-                <button
-                  onClick={() => setNavOpen(o => !o)}
-                  style={{
-                    width: '100%',
-                    background: 'var(--orange)', color: '#000',
-                    border: 'none', borderRadius: 6,
-                    fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-                    padding: '10px 0', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  📍 Portami lì
-                </button>
-
-                {/* Nav picker */}
-                {navOpen && (
-                  <div style={{
-                    position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, right: 0,
-                    background: 'var(--gray-800)', border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8, overflow: 'hidden', zIndex: 10,
-                    boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
-                  }}>
-                    {[
-                      { label: 'Google Maps', url: googleUrl },
-                      { label: 'Apple Maps',  url: appleMaps },
-                      { label: 'Waze',        url: wazeUrl   },
-                    ].map(({ label, url }) => (
-                      <button key={label} onClick={() => openNav(url)} style={{
-                        display: 'block', width: '100%', textAlign: 'left',
-                        padding: '12px 16px',
-                        fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)',
-                        background: 'none', border: 'none',
-                        borderBottom: label !== 'Waze' ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.1)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Vedi pagina completa */}
-              {pin && (
-                <Link href={`/map/spot/${pin.slug}`} style={{
-                  padding: '10px 14px',
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 6,
-                  fontFamily: 'var(--font-mono)', fontSize: 12,
-                  color: 'var(--bone)', textDecoration: 'none',
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  whiteSpace: 'nowrap',
-                }}>
-                  Tutto lo spot →
-                </Link>
+                  {[['Google Maps', googleUrl], ['Apple Maps', appleMaps], ['Waze', wazeUrl]].map(([label, url], i) => (
+                    <button key={label} onClick={() => openNav(url)} style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '11px 14px',
+                      fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
+                      background: 'none', border: 'none',
+                      borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,106,0,0.1)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >{label}</button>
+                  ))}
+                </div>
               )}
             </div>
+
+            {/* Vedi pagina */}
+            {pin && (
+              <Link href={`/map/spot/${pin.slug}`} style={{
+                padding: '9px 14px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                color: 'var(--bone)', textDecoration: 'none',
+                display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+              }}>
+                Tutto →
+              </Link>
+            )}
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
