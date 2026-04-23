@@ -402,15 +402,23 @@ function SpotListPanel({
                 </div>
 
                 {/* Badges */}
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  <span style={{
-                    background: cond.bg, color: cond.color,
-                    fontFamily: 'var(--font-mono)', fontSize: 9,
-                    padding: '2px 5px', borderRadius: 2,
-                    textTransform: 'uppercase', letterSpacing: '0.04em',
-                  }}>
-                    {cond.label}
-                  </span>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {spot.condition === 'alive' ? (
+                    <span style={{
+                      display: 'inline-block', width: 8, height: 8,
+                      borderRadius: '50%', background: '#00c851',
+                      boxShadow: '0 0 5px #00c851aa', flexShrink: 0,
+                    }} title="Spot attivo" />
+                  ) : (
+                    <span style={{
+                      background: cond.bg, color: cond.color,
+                      fontFamily: 'var(--font-mono)', fontSize: 9,
+                      padding: '2px 5px', borderRadius: 2,
+                      textTransform: 'uppercase', letterSpacing: '0.04em',
+                    }}>
+                      {cond.label}
+                    </span>
+                  )}
                   <span style={{
                     color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9,
                     padding: '2px 5px', borderRadius: 2,
