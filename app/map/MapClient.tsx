@@ -54,9 +54,10 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
   const [authOpen,           setAuthOpen]           = useState(false);
 
-  /* ── Spot attivo — unica sorgente di verità ── */
+  /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
-  const [scrollToId,   setScrollToId]  = useState<string | null>(null);
+  const [expandedId,   setExpandedId]   = useState<string | null>(null);
+  const [scrollToId,   setScrollToId]   = useState<string | null>(null);
   /* flag: cambiamento viene dallo scroll (IO) → non ri-flyare */
   const fromScrollRef = useRef(false);
 
@@ -123,11 +124,12 @@ export default function MapClient({ initialSpots }: MapClientProps) {
   /* Click su uno spot (da mappa o da lista) → espandi card + vola mappa */
   const handleSpotClick = useCallback((pin: SpotMapPin) => {
     setActiveListId(pin.id);
+    setExpandedId(prev => prev === pin.id ? null : pin.id); // toggle
     setScrollToId(pin.id);
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 15 });
   }, []);
 
-  /* Scroll sync: IO ha visto una card → aggiorna mappa senza rifare scroll */
+  /* Scroll sync: IO ha visto una card → aggiorna solo mappa, NON espande */
   const handleActivateFromScroll = useCallback((id: string) => {
     fromScrollRef.current = true;
     setActiveListId(id);
@@ -189,7 +191,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
         position: 'fixed',
         bottom: 0, left: 0, right: 0,
         zIndex: 10,
-        height: 'clamp(220px, 46dvh, 400px)',
+        height: 'clamp(270px, 54dvh, 480px)',
         display: 'flex', flexDirection: 'column',
         pointerEvents: 'none',
       }}>
@@ -211,6 +213,7 @@ export default function MapClient({ initialSpots }: MapClientProps) {
           <SpotListPanel
             spots={filtered}
             activeId={activeListId}
+            expandedId={expandedId}
             onActivate={handleActivateFromScroll}
             onSpotClick={handleSpotClick}
             scrollToId={scrollToId}
@@ -265,10 +268,11 @@ function getMyRating(id: string): number {
 }
 
 function SpotListPanel({
-  spots, activeId, onActivate, onSpotClick, scrollToId, onScrolled,
+  spots, activeId, expandedId, onActivate, onSpotClick, scrollToId, onScrolled,
 }: {
   spots:       SpotMapPin[];
   activeId:    string | null;
+  expandedId:  string | null;
   onActivate:  (id: string) => void;
   onSpotClick: (pin: SpotMapPin) => void;
   scrollToId:  string | null;
@@ -363,12 +367,13 @@ function SpotListPanel({
       {spots.map((spot, idx) => {
         const tipo      = TIPI_SPOT[spot.type];
         const cond      = CONDIZIONI[spot.condition];
-        const isAct     = activeId === spot.id;
+        const isAct     = activeId   === spot.id;   // bordo arancione + REC + pin ingrandito
+        const isExp     = expandedId === spot.id;   // contenuto espanso (solo click)
         const myFav     = favs[spot.id]    ?? false;
         const myRate    = ratings[spot.id] ?? 0;
         const isLast    = idx === spots.length - 1;
-        /* In evidenza: i primi 3 quando nessuno è selezionato */
-        const featured  = !activeId && idx < 3;
+        /* In evidenza: i primi 3 quando nessuno è espanso */
+        const featured  = !expandedId && idx < 3;
 
         return (
           <div
@@ -386,10 +391,10 @@ function SpotListPanel({
               }`,
               transition: 'border-color 0.25s, background 0.15s',
               cursor: 'pointer',
-              background: isAct ? 'rgba(255,106,0,0.05)' : featured ? 'rgba(255,106,0,0.015)' : 'transparent',
+              background: isExp ? 'rgba(255,106,0,0.05)' : featured ? 'rgba(255,106,0,0.015)' : 'transparent',
             }}
-            onMouseEnter={e => { if (!isAct) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-            onMouseLeave={e => { if (!isAct) (e.currentTarget as HTMLElement).style.background = isAct ? 'rgba(255,106,0,0.05)' : featured ? 'rgba(255,106,0,0.015)' : 'transparent'; }}
+            onMouseEnter={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+            onMouseLeave={e => { if (!isExp) (e.currentTarget as HTMLElement).style.background = featured ? 'rgba(255,106,0,0.015)' : 'transparent'; }}
           >
             {/* Featured badge */}
             {featured && (
@@ -518,8 +523,8 @@ function SpotListPanel({
               {myFav ? '❤️' : '🤍'}
             </button>
 
-            {/* ── ESPANSIONE INLINE — visibile solo se attivo ── */}
-            {isAct && (
+            {/* ── ESPANSIONE INLINE — visibile solo al click esplicito ── */}
+            {isExp && (
               <div
                 onClick={e => e.stopPropagation()}
                 style={{ padding: '0 10px 12px' }}
@@ -530,15 +535,16 @@ function SpotListPanel({
                   style={{
                     display: 'block', borderRadius: 6, overflow: 'hidden',
                     marginBottom: 9, position: 'relative',
-                    height: 140, background: '#0a0a0a',
+                    height: 110, background: '#0a0a0a',
                     border: '1px solid rgba(255,255,255,0.06)',
                     textDecoration: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
                   {spot.cover_url ? (
                     <img
                       src={spot.cover_url} alt={spot.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
                     />
                   ) : (
                     <div style={{
