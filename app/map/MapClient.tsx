@@ -45,6 +45,7 @@ const TOP_OFFSET = 100;
 export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [spots]              = useState<SpotMapPin[]>(initialSpots);
   const [filterType,         setFilterType]         = useState<SpotType | null>(null);
+  const [filterRegion,       setFilterRegion]       = useState<string | null>(null);
   const [filterRegionCities, setFilterRegionCities] = useState<string[] | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [addOpen,            setAddOpen]            = useState(false);
@@ -92,6 +93,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [gpsLoading,   setGpsLoading]   = useState(false);
 
   const handleFilterRegion = useCallback((label: string | null) => {
+    setFilterRegion(label);
     if (!label) { setFilterRegionCities(null); return; }
     const region = REGIONI_ITALIA.find(r => r.label === label);
     setFilterRegionCities(region?.cities ?? null);
@@ -158,8 +160,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       <TopBar
         onSearch={setSearchQuery}
         onFilterType={setFilterType}
+        onFilterRegion={handleFilterRegion}
         onAddSpot={() => setAddOpen(true)}
         activeType={filterType}
+        activeRegion={filterRegion}
         spots={spots}
         filteredCount={filtered.length}
         onCitySelect={handleCitySelect}
