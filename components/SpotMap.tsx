@@ -214,7 +214,12 @@ export default function SpotMap({
           if (!mapInstance.current) return;
           // Zoom diretto a livello street — senza secondo click
           const targetZoom = c.count === 1 ? 17 : 15;
-          mapInstance.current.flyTo([c.lat, c.lon], targetZoom, { duration: 1.0 });
+          const isMobile = window.innerWidth < 768;
+          if (isMobile) {
+            mapInstance.current.setView([c.lat, c.lon], targetZoom, { animate: false });
+          } else {
+            mapInstance.current.flyTo([c.lat, c.lon], targetZoom, { duration: 0.6 });
+          }
           // Se singolo spot → aprilo subito
           if (c.count === 1) onSpotClickRef.current(c.spots[0]);
         });
@@ -317,18 +322,24 @@ export default function SpotMap({
     if (!mapInstance.current || !flyTarget || !L) return;
     const map  = mapInstance.current;
     const zoom = flyTarget.zoom ?? APP_CONFIG.mapZoomCity;
-    // Il pannello occupa il fondo: offset bottom = ~300px → spot centrato nell'area visibile
-    const PANEL_H = 300;
-    const bounds = L.latLngBounds(
-      [flyTarget.lat, flyTarget.lon],
-      [flyTarget.lat, flyTarget.lon]
-    ).pad(0.0008);
-    map.flyToBounds(bounds, {
-      paddingBottomRight: [0, PANEL_H],
-      paddingTopLeft:     [0, 20],
-      maxZoom: zoom,
-      duration: 1.2,
-    });
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      // Su mobile: niente animazione per evitare il tremore
+      map.setView([flyTarget.lat, flyTarget.lon], zoom, { animate: false });
+    } else {
+      // Su desktop: animazione fluida con offset per il pannello
+      const PANEL_H = 300;
+      const bounds = L.latLngBounds(
+        [flyTarget.lat, flyTarget.lon],
+        [flyTarget.lat, flyTarget.lon]
+      ).pad(0.0008);
+      map.flyToBounds(bounds, {
+        paddingBottomRight: [0, PANEL_H],
+        paddingTopLeft:     [0, 20],
+        maxZoom: zoom,
+        duration: 0.8,
+      });
+    }
   }, [flyTarget]);
 
   /* ── Radius cursor ── */
@@ -370,7 +381,12 @@ export default function SpotMap({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.2 });
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          mapInstance.current!.setView([latitude, longitude], APP_CONFIG.mapZoomCity, { animate: false });
+        } else {
+          mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 0.8 });
+        }
 
         if (L) {
           const dotSvg = `<div style="
