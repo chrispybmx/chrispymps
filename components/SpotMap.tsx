@@ -7,8 +7,9 @@ import 'leaflet/dist/leaflet.css';
 
 let L: typeof import('leaflet') | null = null;
 
-/* Zoom sotto il quale mostriamo i cluster città invece dei pin individuali */
-const CLUSTER_ZOOM = 10;
+/* Zoom sotto il quale mostriamo i cluster invece dei pin individuali.
+   Con 500+ spot usare un threshold più alto per tenere i cluster più a lungo. */
+const CLUSTER_ZOOM = 12;
 
 interface SpotMapProps {
   spots:             SpotMapPin[];
@@ -19,6 +20,8 @@ interface SpotMapProps {
   onAddSpotAt:        (lat: number, lon: number) => void;
   flyTarget?:         { lat: number; lon: number; zoom?: number } | null;
   selectedPin?:       SpotMapPin | null;
+  overlayOffsetPx?:   number; // px da sottrarre al centro Y per compensare il pannello in basso
+  fitAllTrigger?:     number; // ogni volta che cambia → fitBounds su tutti i filtered
   // Radius search
   radiusMode?:   boolean;
   radiusCenter?: { lat: number; lon: number } | null;
@@ -52,27 +55,44 @@ function pinSvg(type: SpotType, condition: string, isSelected = false): string {
   </svg>`;
 }
 
-/* ── Computa cluster per città ── */
-function computeClusters(spots: SpotMapPin[]) {
-  const cityMap = new Map<string, SpotMapPin[]>();
+/* ── Clustering geografico a griglia adattiva allo zoom ──
+   Divide la mappa in celle di dimensione diversa in base allo zoom corrente.
+   Funziona anche senza il campo `city`, scala bene con 500+ spot. */
+function computeGridClusters(spots: SpotMapPin[], zoom: number) {
+  /* Dimensione cella in gradi geografici — più zoom alto = celle più piccole */
+  const cellDeg =
+    zoom < 6  ? 3    :   // zoom Italia intera: ~330 km per cella
+    zoom < 7  ? 1.5  :   // ~165 km
+    zoom < 8  ? 0.8  :   // ~90 km
+    zoom < 9  ? 0.4  :   // ~45 km
+    zoom < 10 ? 0.2  :   // ~22 km — città grande
+    zoom < 11 ? 0.08 :   // ~9 km  — quartiere
+                0.03;    // ~3 km  — sotto questa soglia usiamo i pin individuali
+
+  const cellMap = new Map<string, SpotMapPin[]>();
   for (const s of spots) {
-    const key = s.city ?? `__${s.lat.toFixed(1)}_${s.lon.toFixed(1)}`;
-    if (!cityMap.has(key)) cityMap.set(key, []);
-    cityMap.get(key)!.push(s);
+    const key = `${Math.floor(s.lat / cellDeg)}_${Math.floor(s.lon / cellDeg)}`;
+    if (!cellMap.has(key)) cellMap.set(key, []);
+    cellMap.get(key)!.push(s);
   }
-  return Array.from(cityMap.entries()).map(([key, pins]) => ({
-    key,
-    city: pins[0].city ?? null,
-    lat:  pins.reduce((s, p) => s + p.lat, 0) / pins.length,
-    lon:  pins.reduce((s, p) => s + p.lon, 0) / pins.length,
-    count: pins.length,
-    spots: pins,
-  }));
+
+  return Array.from(cellMap.values()).map((pins) => {
+    /* Usa la città del primo spot come label (se disponibile) */
+    const city = pins.find(p => p.city)?.city ?? null;
+    return {
+      key:   `${pins[0].lat.toFixed(4)}_${pins[0].lon.toFixed(4)}`,
+      city,
+      lat:   pins.reduce((s, p) => s + p.lat, 0) / pins.length,
+      lon:   pins.reduce((s, p) => s + p.lon, 0) / pins.length,
+      count: pins.length,
+      spots: pins,
+    };
+  });
 }
 
 export default function SpotMap({
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
-  selectedPin, radiusMode, radiusCenter, radiusKm, onMapClick,
+  selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
@@ -107,7 +127,8 @@ export default function SpotMap({
     return true;
   }), [spots, filterType, filterRegionBbox, searchQuery]);
 
-  const clusters = useMemo(() => computeClusters(filtered), [filtered]);
+  /* Clusters calcolati in base al zoom corrente — la griglia adattiva gestisce 500+ spot */
+  const clusters = useMemo(() => computeGridClusters(filtered, zoom), [filtered, zoom]);
 
   // Sincronizza ref mutabili col valore corrente del render (dopo filtered/clusters)
   filteredRef.current = filtered;
@@ -211,17 +232,34 @@ export default function SpotMap({
         );
 
         marker.on('click', () => {
-          if (!mapInstance.current) return;
-          // Zoom diretto a livello street — senza secondo click
-          const targetZoom = c.count === 1 ? 17 : 15;
+          if (!mapInstance.current || !L) return;
           const isMobile = window.innerWidth < 768;
-          if (isMobile) {
-            mapInstance.current.setView([c.lat, c.lon], targetZoom, { animate: false });
+
+          if (c.count === 1) {
+            /* Spot singolo → vola diretto + apri la card */
+            const targetZoom = 17;
+            if (isMobile) mapInstance.current.setView([c.lat, c.lon], targetZoom, { animate: false });
+            else mapInstance.current.flyTo([c.lat, c.lon], targetZoom, { duration: 0.6 });
+            onSpotClickRef.current(c.spots[0]);
           } else {
-            mapInstance.current.flyTo([c.lat, c.lon], targetZoom, { duration: 0.6 });
+            /* Multi-spot → fitBounds sul gruppo reale, non zoom fisso.
+               Aggiunge padding per il pannello inferiore. */
+            const bounds = L!.latLngBounds(c.spots.map(s => [s.lat, s.lon] as [number, number]));
+            const padBottom = overlayOffsetPx + 20;
+            if (isMobile) {
+              mapInstance.current.fitBounds(bounds, {
+                paddingTopLeft:     [20, 20],
+                paddingBottomRight: [20, padBottom],
+                maxZoom: 16, animate: false,
+              });
+            } else {
+              mapInstance.current.fitBounds(bounds, {
+                paddingTopLeft:     [40, 40],
+                paddingBottomRight: [40, padBottom],
+                maxZoom: 16,
+              });
+            }
           }
-          // Se singolo spot → aprilo subito
-          if (c.count === 1) onSpotClickRef.current(c.spots[0]);
         });
 
         markersRef.current!.addLayer(marker);
@@ -328,15 +366,39 @@ export default function SpotMap({
       // Su mobile: niente animazione per evitare il tremore
       map.setView([flyTarget.lat, flyTarget.lon], zoom, { animate: false });
     } else {
-      // Su desktop: offset il centro verso l'alto per compensare il pannello in basso
-      // Proietta il punto al nuovo zoom, sposta su di ~150px, riproietta
-      const PANEL_OFFSET_PX = 150;
+      // Su desktop: offset il centro verso l'alto per compensare il pannello in basso.
+      // Proietta il punto al nuovo zoom, sposta su di overlayOffsetPx, riproietta.
       const targetPoint = map.project([flyTarget.lat, flyTarget.lon], zoom);
-      const offsetPoint = targetPoint.subtract([0, PANEL_OFFSET_PX]);
+      const offsetPoint = targetPoint.subtract([0, overlayOffsetPx]);
       const offsetLatLng = map.unproject(offsetPoint, zoom);
       map.flyTo(offsetLatLng, zoom, { duration: 0.7, easeLinearity: 0.5 });
     }
   }, [flyTarget]);
+
+  /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */
+  useEffect(() => {
+    if (!fitAllTrigger || !hasInitialFit.current || !mapInstance.current || !L) return;
+    const pins = filteredRef.current;
+    if (pins.length === 0) return;
+    if (pins.length === 1) {
+      // Singolo risultato: vola diretto
+      const p = pins[0];
+      const targetPoint = mapInstance.current.project([p.lat, p.lon], 15);
+      const offsetPoint = targetPoint.subtract([0, overlayOffsetPx]);
+      const offsetLatLng = mapInstance.current.unproject(offsetPoint, 15);
+      mapInstance.current.flyTo(offsetLatLng, 15, { duration: 0.7, easeLinearity: 0.5 });
+    } else {
+      // Molti risultati: fitBounds con padding per il pannello
+      const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
+      mapInstance.current.fitBounds(bounds, {
+        paddingTopLeft:     [32, 32],
+        paddingBottomRight: [32, overlayOffsetPx + 32],
+        maxZoom: 14,
+        animate: true,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitAllTrigger]);
 
   /* ── Radius cursor ── */
   useEffect(() => {
