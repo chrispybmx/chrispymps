@@ -1,0 +1,133 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import type { SpotType } from '@/lib/types';
+
+const FAVS_KEY = 'cmaps_favs_v1';
+
+interface FavSpot {
+  id:          string;
+  slug:        string;
+  name:        string;
+  type:        SpotType;
+  city?:       string;
+  condition:   string;
+  spot_photos?: { url: string; position: number }[];
+}
+
+interface Props {
+  profileUsername: string;
+}
+
+export default function FavoritesSection({ profileUsername }: Props) {
+  const [isOwn,  setIsOwn]  = useState(false);
+  const [spots,  setSpots]  = useState<FavSpot[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
+      supabaseBrowser().auth.getSession().then(async ({ data }) => {
+        const u = data.session?.user;
+        if (!u) { setLoading(false); return; }
+        const uname = u.user_metadata?.username ?? u.email?.split('@')[0];
+        const own = uname === profileUsername;
+        setIsOwn(own);
+        if (!own) { setLoading(false); return; }
+
+        // Load favorites from localStorage
+        try {
+          const ids: string[] = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]');
+          if (ids.length === 0) { setLoading(false); return; }
+
+          const res = await fetch(`/api/favorites?ids=${ids.join(',')}`);
+          const j   = await res.json();
+          if (j.ok) setSpots(j.data);
+        } catch { /* noop */ }
+        setLoading(false);
+      });
+    }).catch(() => setLoading(false));
+  }, [profileUsername]);
+
+  // Not own profile or not logged in → don't render
+  if (!isOwn || loading) return null;
+  if (spots.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 12,
+        color: 'var(--gray-400)', textTransform: 'uppercase',
+        letterSpacing: '0.08em', marginBottom: 14,
+      }}>
+        ❤️ I MIEI PREFERITI ({spots.length})
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {spots.map(spot => <FavTile key={spot.id} spot={spot} />)}
+      </div>
+    </div>
+  );
+}
+
+function FavTile({ spot }: { spot: FavSpot }) {
+  const tipo  = TIPI_SPOT[spot.type];
+  const cond  = CONDIZIONI[spot.condition as keyof typeof CONDIZIONI];
+  const cover = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
+  const isDead = spot.condition !== 'alive';
+
+  return (
+    <Link href={`/map/spot/${spot.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
+      <div style={{
+        background: 'var(--gray-800)',
+        border: '1px solid var(--gray-700)',
+        borderRadius: 8, overflow: 'hidden',
+        opacity: isDead ? 0.65 : 1,
+      }}>
+        {/* Cover */}
+        <div style={{
+          height: 110, background: 'var(--gray-700)',
+          overflow: 'hidden', position: 'relative',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {cover
+            ? <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: isDead ? 'grayscale(0.5)' : 'none' }} loading="lazy" />
+            : <span style={{ fontSize: 36 }}>{tipo.emoji}</span>}
+
+          {/* Condition badge */}
+          <div style={{
+            position: 'absolute', top: 6, right: 6,
+            background: cond?.bg ?? 'rgba(0,0,0,0.6)',
+            color: cond?.color ?? '#fff',
+            fontFamily: 'var(--font-mono)', fontSize: 9,
+            padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase',
+          }}>
+            {cond?.label ?? spot.condition}
+          </div>
+        </div>
+
+        {/* Info */}
+        <div style={{ padding: '8px 10px' }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 13,
+            color: 'var(--bone)', overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3,
+          }}>
+            {spot.name}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color }}>
+              {tipo.emoji} {tipo.label}
+            </span>
+            {spot.city && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
+                · {spot.city}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
