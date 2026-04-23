@@ -232,17 +232,45 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     onClose();
   }, [initialLat, initialLon, onClose]);
 
-  /* Parse input (URL o coordinate) */
-  const handleConfirmCoords = () => {
+  /* Parse input (URL o coordinate) — supporta anche link corti maps.app.goo.gl */
+  const handleConfirmCoords = async () => {
     setCoordError(null);
-    const parsed = parseCoordInput(coordInput);
+
+    const trimmed = coordInput.trim();
+
+    // Link corto Google Maps → risolvi server-side
+    const isShortLink =
+      trimmed.startsWith('https://maps.app.goo.gl/') ||
+      trimmed.startsWith('https://goo.gl/maps/');
+
+    if (isShortLink) {
+      setCoordError('⏳ Risolvo il link…');
+      try {
+        const res = await fetch(`/api/resolve-gmaps?url=${encodeURIComponent(trimmed)}`);
+        const json = await res.json();
+        if (!json.ok) {
+          setCoordError(json.error ?? 'Impossibile risolvere il link. Prova con le coordinate dirette.');
+          return;
+        }
+        setCoordError(null);
+        setLat(json.lat); setLon(json.lon);
+        reverseGeocode(json.lat, json.lon);
+        return;
+      } catch {
+        setCoordError('Errore di rete. Prova con le coordinate dirette.');
+        return;
+      }
+    }
+
+    // URL lungo o coordinate testuali
+    const parsed = parseCoordInput(trimmed);
     if (!parsed) {
-      setCoordError('Formato non riconosciuto. Usa "lat, lon" o incolla il link di Google Maps.');
+      setCoordError('Formato non riconosciuto. Incolla il link di Google Maps o scrivi "lat, lon".');
       return;
     }
     const { lat: pLat, lon: pLon } = parsed;
-    if (pLat < 35 || pLat > 48 || pLon < 6 || pLon > 20) {
-      setCoordError('Coordinate fuori dall\'Italia. Controlla il link o le coordinate.');
+    if (pLat < -90 || pLat > 90 || pLon < -180 || pLon > 180) {
+      setCoordError('Coordinate non valide.');
       return;
     }
     setLat(pLat); setLon(pLon);
