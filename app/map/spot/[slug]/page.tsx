@@ -247,6 +247,13 @@ export default async function SpotPage({ params }: Props) {
 
         {/* ── CTA BUTTONS ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 32, flexWrap: 'wrap' }}>
+          <Link
+            href="/map"
+            className="btn-secondary"
+            style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', minWidth: 140 }}
+          >
+            ← Torna alla mappa
+          </Link>
           <a
             href={mapsUrl}
             target="_blank"
@@ -255,13 +262,6 @@ export default async function SpotPage({ params }: Props) {
             style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', minWidth: 140 }}
           >
             🧭 Portami qui
-          </a>
-          <a
-            href={`/map${spot.city ? `/${spot.city}` : ''}`}
-            className="btn-secondary"
-            style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', minWidth: 140 }}
-          >
-            📍 Altri spot{spot.city ? ` a ${spot.city}` : ''}
           </a>
         </div>
       </div>
