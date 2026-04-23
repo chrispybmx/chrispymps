@@ -72,8 +72,10 @@ export default async function SpotPage({ params }: Props) {
   const photos = spot.spot_photos ?? [];
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
 
-  const embedUrl = spot.youtube_url
-    ? spot.youtube_url.replace(
+  const isYouTube = spot.youtube_url &&
+    /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(spot.youtube_url);
+  const embedUrl = isYouTube
+    ? spot.youtube_url!.replace(
         /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/\s]+)/,
         'https://www.youtube.com/embed/$1?rel=0'
       )
