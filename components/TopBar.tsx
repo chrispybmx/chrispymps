@@ -185,16 +185,19 @@ export default function TopBar({
           ref={(el) => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
         >
           <FilterChip label="TUTTI" active={activeType === null} color="var(--orange)" onClick={() => onFilterType(null)} count={filteredCount ?? spots.length} />
-          {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([type, info]) => (
-            <FilterChip
-              key={type}
-              label={`${info.emoji} ${info.label.toUpperCase()}`}
-              active={activeType === type}
-              color={info.color}
-              onClick={() => handleTypeToggle(type)}
-              count={spots.filter(s => s.type === type).length}
-            />
-          ))}
+          {(['street', 'park', 'bowl', 'trail', 'diy', 'rail', 'ledge', 'plaza', 'gap'] as SpotType[]).map((type) => {
+            const info = TIPI_SPOT[type];
+            return (
+              <FilterChip
+                key={type}
+                label={`${info.emoji} ${info.label.toUpperCase()}`}
+                active={activeType === type}
+                color={info.color}
+                onClick={() => handleTypeToggle(type)}
+                count={spots.filter(s => s.type === type).length}
+              />
+            );
+          })}
         </div>
 
         {/* Preferiti — fisso a destra, stesso stile chip */}
