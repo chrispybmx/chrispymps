@@ -70,6 +70,7 @@ export interface SpotMapPin {
   cover_url?:   string;    // prima foto
   photo_urls?:  string[];  // tutte le foto ordinate
   description?: string;
+  difficulty?:  string;
   submitted_by_username?: string;
 }
 
