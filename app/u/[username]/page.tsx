@@ -35,23 +35,31 @@ async function getData(username: string) {
     .maybeSingle();
   if (!profile) return null;
 
-  const [{ data: spots }, { count: riderCount }] = await Promise.all([
+  const [{ data: spots }, { data: riddenRaw }] = await Promise.all([
     sb
       .from('spots')
       .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
       .eq('submitted_by_username', username)
       .eq('status', 'approved')
       .order('approved_at', { ascending: false }),
+    /* Spot girati: join spot_riders → spots */
     sb
       .from('spot_riders')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', profile.id),
+      .select('spots(id, slug, name, type, city, condition, spot_photos(url, position))')
+      .eq('user_id', profile.id)
+      .limit(50),
   ]);
 
+  /* Estrae i dati annidati da spot_riders → spots */
+  type RiddenRow = { spots: SpotCard | null };
+  const ridden: SpotCard[] = (riddenRaw ?? [])
+    .map((r: RiddenRow) => r.spots)
+    .filter((s): s is SpotCard => !!s);
+
   return {
-    profile:     profile as Profile,
-    spots:       (spots ?? []) as SpotCard[],
-    riderCount:  riderCount ?? 0,
+    profile:    profile as Profile,
+    spots:      (spots ?? []) as SpotCard[],
+    ridden,
   };
 }
 
@@ -67,7 +75,7 @@ export const dynamic = 'force-dynamic';
 export default async function UserProfilePage({ params }: { params: { username: string } }) {
   const data = await getData(params.username);
   if (!data) notFound();
-  const { profile, spots, riderCount } = data;
+  const { profile, spots, ridden } = data;
   const joinDate = new Date(profile.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   return (
@@ -85,16 +93,16 @@ export default async function UserProfilePage({ params }: { params: { username: 
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 16px 60px' }}>
 
-        {/* Profile hero — client component gestisce edit */}
+        {/* Profile hero */}
         <ProfileClient profile={profile} joinDate={joinDate} />
 
-        {/* Stats strip — solo le due cose che contano */}
+        {/* Stats strip */}
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--gray-700)', marginBottom: 24 }}>
           <StatPill value={spots.length}  label="📍 spot pubblicati" />
-          <StatPill value={riderCount}    label="🛹 spot ridden" last />
+          <StatPill value={ridden.length} label="🛹 spot girati" last />
         </div>
 
-        {/* Spot grid */}
+        {/* Spot pubblicati */}
         {spots.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: 48 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🏴</div>
@@ -111,8 +119,28 @@ export default async function UserProfilePage({ params }: { params: { username: 
           </>
         )}
 
-        {/* Preferiti — visibili solo al proprietario del profilo (client-side) */}
-        <FavoritesSection profileUsername={profile.username} />
+        {/* Spot girati — visibili a tutti, sezione pubblica */}
+        {ridden.length > 0 && (
+          <div style={{ marginTop: 32 }}>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 12,
+              color: 'var(--gray-400)', textTransform: 'uppercase',
+              letterSpacing: '0.08em', marginBottom: 14,
+              borderTop: '1px solid var(--gray-700)', paddingTop: 24,
+            }}>
+              🛹 SPOT GIRATI ({ridden.length})
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {ridden.map(spot => <SpotTile key={spot.id} spot={spot} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Preferiti — visibili solo al proprietario del profilo */}
+        <FavoritesSection
+          profileUsername={profile.username}
+          profileId={profile.id}
+        />
 
       </div>
     </div>
@@ -120,8 +148,8 @@ export default async function UserProfilePage({ params }: { params: { username: 
 }
 
 function SpotTile({ spot }: { spot: SpotCard }) {
-  const tipo  = TIPI_SPOT[spot.type];
-  const cover = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
+  const tipo   = TIPI_SPOT[spot.type];
+  const cover  = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
   const isDead = spot.condition !== 'alive';
   return (
     <Link href={`/map/spot/${spot.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
