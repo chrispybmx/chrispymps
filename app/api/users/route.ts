@@ -28,7 +28,13 @@ export async function GET(req: NextRequest) {
         .select('*', { count: 'exact', head: true })
         .eq('submitted_by_username', p.username)
         .eq('status', 'approved');
-      return { ...p, spotCount: count ?? 0 };
+      // Non esponiamo l'id (UUID) in risposta pubblica — solo username e dati pubblici
+      return {
+        username:          p.username,
+        bio:               p.bio,
+        instagram_handle:  p.instagram_handle,
+        spotCount:         count ?? 0,
+      };
     })
   );
 
