@@ -17,57 +17,67 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
   const waUrl = `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`;
 
   const handleShare = async () => {
-    // Web Share API — funziona su mobile (iOS/Android)
     if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({ title: spotName, text, url });
-        return;
-      } catch {
-        // utente ha annullato — non fare nulla
-        return;
-      }
+      try { await navigator.share({ title: spotName, text, url }); return; } catch { return; }
     }
-    // Fallback desktop: copia link
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard non disponibile — mostriamo comunque l'url
-    }
+      setTimeout(() => setCopied(false), 2200);
+    } catch {}
   };
 
   return (
-    <div style={{ padding: '0 20px', marginBottom: 24 }}>
-      {/* Titolo sezione */}
+    <div style={{ padding: '0 20px 28px' }}>
+
+      {/* Label */}
       <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 11,
-        color: 'var(--gray-400)', textTransform: 'uppercase',
-        letterSpacing: '0.08em', marginBottom: 10,
+        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
       }}>
-        📤 Condividi questo spot
+        <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.1em',
+        }}>condividi</span>
+        <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
       </div>
 
+      {/* Buttons */}
       <div style={{ display: 'flex', gap: 10 }}>
 
-        {/* Bottone principale Share / Copia link */}
+        {/* Share / Copia link */}
         <button
           onClick={handleShare}
           style={{
             flex: 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            background: copied ? 'rgba(0,200,81,0.12)' : 'var(--gray-800)',
-            border: `1px solid ${copied ? '#00c851' : 'var(--gray-600)'}`,
-            borderRadius: 8,
-            color: copied ? '#00c851' : 'var(--bone)',
-            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
-            padding: '12px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            background: copied
+              ? 'linear-gradient(135deg, rgba(0,200,81,0.15), rgba(0,200,81,0.05))'
+              : 'linear-gradient(135deg, rgba(255,106,0,0.12), rgba(255,106,0,0.04))',
+            border: `1px solid ${copied ? 'rgba(0,200,81,0.4)' : 'rgba(255,106,0,0.3)'}`,
+            borderRadius: 12,
+            color: copied ? '#00c851' : 'var(--orange)',
+            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+            padding: '14px 16px',
             cursor: 'pointer',
-            transition: 'all 0.15s',
-            letterSpacing: '0.04em',
+            transition: 'all 0.2s',
+            letterSpacing: '0.05em',
           }}
         >
-          {copied ? '✓ LINK COPIATO!' : '🔗 CONDIVIDI'}
+          {copied ? (
+            <>
+              <span style={{ fontSize: 18 }}>✓</span>
+              COPIATO
+            </>
+          ) : (
+            <>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+              CONDIVIDI
+            </>
+          )}
         </button>
 
         {/* WhatsApp */}
@@ -77,15 +87,16 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
           rel="noopener noreferrer"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            background: 'rgba(37,211,102,0.10)',
+            background: 'linear-gradient(135deg, rgba(37,211,102,0.12), rgba(37,211,102,0.04))',
             border: '1px solid rgba(37,211,102,0.3)',
-            borderRadius: 8,
+            borderRadius: 12,
             color: '#25D366',
-            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
-            padding: '12px 16px',
+            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+            padding: '14px 18px',
             textDecoration: 'none',
-            letterSpacing: '0.04em',
+            letterSpacing: '0.05em',
             whiteSpace: 'nowrap',
+            transition: 'all 0.2s',
           }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -93,16 +104,7 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
           </svg>
           WA
         </a>
-      </div>
 
-      {/* URL visibile su desktop come fallback */}
-      <div style={{
-        marginTop: 10,
-        fontFamily: 'var(--font-mono)', fontSize: 11,
-        color: 'var(--gray-500)',
-        wordBreak: 'break-all',
-      }}>
-        {url}
       </div>
     </div>
   );
