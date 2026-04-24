@@ -173,7 +173,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [locMode,     setLocMode]     = useState<'gps' | 'coords' | null>(null);
   const [coordInput,  setCoordInput]  = useState('');
   const [coordError,  setCoordError]  = useState<string | null>(null);
-  const [gpsState,    setGpsState]    = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [gpsState,    setGpsState]    = useState<'idle' | 'loading' | 'ok' | 'error' | 'denied' | 'timeout'>('idle');
 
   /* Step 2 */
   const [photos, setPhotos] = useState<File[]>([]);
@@ -294,7 +294,11 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         setLat(latitude); setLon(longitude); setGpsState('ok');
         reverseGeocode(latitude, longitude);
       },
-      () => setGpsState('error'),
+      (err) => {
+        if (err.code === 1) setGpsState('denied');       // utente ha negato
+        else if (err.code === 3) setGpsState('timeout'); // timeout
+        else setGpsState('error');                        // non disponibile
+      },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -564,9 +568,28 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       ⏳ Rilevamento GPS in corso...
                     </div>
                   )}
+                  {gpsState === 'denied' && (
+                    <>
+                      <ErrBox msg="Hai negato il permesso GPS. Vai nelle impostazioni del browser, consenti la posizione per questo sito, poi riprova." />
+                      <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                        🗺️ Inserisci posizione manualmente
+                      </button>
+                    </>
+                  )}
+                  {gpsState === 'timeout' && (
+                    <>
+                      <ErrBox msg="GPS troppo lento. Spostati all'aperto o in un posto con segnale migliore e riprova." />
+                      <button onClick={() => { getGPS(); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                        🔄 Riprova GPS
+                      </button>
+                      <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                        🗺️ Inserisci posizione manualmente
+                      </button>
+                    </>
+                  )}
                   {gpsState === 'error' && (
                     <>
-                      <ErrBox msg="GPS non disponibile. Usa il link Google Maps." />
+                      <ErrBox msg="GPS non disponibile su questo dispositivo. Usa il link Google Maps." />
                       <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
                         🗺️ Inserisci posizione manualmente
                       </button>
