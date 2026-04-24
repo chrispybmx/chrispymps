@@ -78,6 +78,21 @@ export async function setupGoogleUsername(userId: string, username: string, acce
   }
 }
 
+/** Reset password — invia email con link (scade in 1 ora) */
+export async function resetPassword(email: string): Promise<void> {
+  const sb = supabaseBrowser();
+  const redirectTo = `${window.location.origin}/auth/reset-password`;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw new Error(translateAuthError(error.message));
+}
+
+/** Imposta nuova password (da usare nella pagina reset dopo click sul link) */
+export async function updatePassword(newPassword: string): Promise<void> {
+  const sb = supabaseBrowser();
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(translateAuthError(error.message));
+}
+
 /** Logout */
 export async function signOut(): Promise<void> {
   await supabaseBrowser().auth.signOut();
