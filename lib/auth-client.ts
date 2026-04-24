@@ -83,12 +83,15 @@ export async function setupGoogleUsername(userId: string, username: string, acce
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error ?? 'Errore aggiornamento username');
   }
+
 }
 
 /** Reset password — invia email con link (scade in 1 ora) */
 export async function resetPassword(email: string): Promise<void> {
   const sb = supabaseBrowser();
-  const redirectTo = `${window.location.origin}/auth/reset-password`;
+  // Usa sempre il dominio di produzione — non window.location.origin che potrebbe essere localhost
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+  const redirectTo = `${origin}/auth/reset-password`;
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) throw new Error(translateAuthError(error.message));
 }
