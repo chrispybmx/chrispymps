@@ -21,37 +21,43 @@ export default function SetupUsernamePage() {
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState<string | null>(null);
 
-  // Leggi la sessione Supabase direttamente — non usare useUser() perché
-  // ritorna null quando non c'è ancora un profilo (esattamente il caso di nuovi utenti Google)
   useEffect(() => {
     const sb = supabaseBrowser();
-    sb.auth.getSession().then(({ data }) => {
-      if (!data.session?.user) {
-        setSession(null);
-        return;
-      }
-      // Controlla se ha già un profilo (utente esistente che è arrivato qui per errore)
-      sb.from('profiles').select('username').eq('id', data.session.user.id).maybeSingle()
-        .then(({ data: profile }) => {
-          if (profile?.username) {
-            router.replace('/map');
-          } else {
-            setSession({
-              id: data.session!.user.id,
-              email: data.session!.user.email ?? '',
-              accessToken: data.session!.access_token,
-            });
-          }
-        });
-    });
+    let settled = false;
 
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_, s) => {
-      if (!s?.user) setSession(null);
-    });
-    return () => subscription.unsubscribe();
+    const resolve = async (s: import('@supabase/supabase-js').Session | null) => {
+      if (settled) return;
+      if (!s?.user) return; // aspetta — potrebbe arrivare la sessione tra poco
+      settled = true;
+
+      // Ha già un profilo? (utente esistente che arriva qui per errore)
+      const { data: profile } = await sb
+        .from('profiles').select('username').eq('id', s.user.id).maybeSingle();
+      if (profile?.username) {
+        router.replace('/map');
+      } else {
+        setSession({ id: s.user.id, email: s.user.email ?? '', accessToken: s.access_token });
+      }
+    };
+
+    // 1. Prova subito con la sessione corrente
+    sb.auth.getSession().then(({ data }) => resolve(data.session));
+
+    // 2. Ascolta i cambiamenti (SIGNED_IN arriva dopo l'OAuth callback)
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_, s) => resolve(s));
+
+    // 3. Timeout: se dopo 6 secondi non c'è sessione → non loggato → /map
+    const timeout = setTimeout(() => {
+      if (!settled) { settled = true; setSession(null); }
+    }, 6000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [router]);
 
-  // Se non loggato, manda alla mappa
+  // Se non loggato (dopo timeout), manda alla mappa
   useEffect(() => {
     if (session === null) router.replace('/map');
   }, [session, router]);
