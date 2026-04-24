@@ -155,6 +155,11 @@ export default async function SpotPage({ params }: Props) {
         </a>
       </div>
 
+      {/* ── STELLE · HO GIRATO · SALVA ── */}
+      <div style={{ padding: '12px 16px 0' }}>
+        <SpotHeaderActions spotId={spot.id} />
+      </div>
+
       {/* ── FOTO CAROUSEL ── */}
       {photos.length > 0 && (
         <PhotoCarousel photos={photos.map(p => ({ url: p.url, credit_name: p.credit_name ?? undefined }))} />
@@ -192,9 +197,6 @@ export default async function SpotPage({ params }: Props) {
               📍 {spot.city}{spot.region ? `, ${spot.region}` : ''}
             </div>
           )}
-
-          {/* ── AZIONI: stelle · ho girato · salva ── */}
-          <SpotHeaderActions spotId={spot.id} />
 
           {/* Publisher — cliccabile → profilo */}
           {spot.submitted_by_username && (
