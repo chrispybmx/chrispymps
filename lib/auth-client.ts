@@ -33,6 +33,13 @@ export async function signUp(email: string, password: string, username: string):
     .insert({ id: data.user.id, username });
   if (profileErr) throw new Error(profileErr.message);
 
+  // 4. Iscrive alla newsletter (fire-and-forget — non blocca la registrazione)
+  fetch('/api/newsletter/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, username }),
+  }).catch(() => {});
+
   // Se l'email è già confermata (email confirmation disabled in Supabase) → ok
   // Altrimenti → conferma email necessaria
   return data.session ? 'ok' : 'confirm_email';
