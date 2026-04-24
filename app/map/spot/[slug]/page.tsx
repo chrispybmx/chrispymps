@@ -8,6 +8,7 @@ import SpotInteractions from '@/components/SpotInteractions';
 import PhotoCarousel from '@/components/PhotoCarousel';
 import StatusUpdateBtn from '@/components/StatusUpdateBtn';
 import SupportStrip from '@/components/SupportStrip';
+import ShareSpotBtn from '@/components/ShareSpotBtn';
 
 export const revalidate = 300;
 
@@ -298,6 +299,9 @@ export default async function SpotPage({ params }: Props) {
         </div>
         </div>
       </div>
+
+      {/* ── CONDIVIDI ── */}
+      <ShareSpotBtn spotName={spot.name} spotSlug={spot.slug} city={spot.city} />
 
       {/* ── SPOT INTERACTIONS: stelle, cuore, commenti ── */}
       <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
