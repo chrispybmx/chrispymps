@@ -2,12 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/hooks/useUser';
+import { supabaseBrowser } from '@/lib/supabase-browser';
 import { checkUsername, setupGoogleUsername } from '@/lib/auth-client';
+
+interface SessionInfo {
+  id: string;
+  email: string;
+  accessToken: string;
+}
 
 export default function SetupUsernamePage() {
   const router  = useRouter();
-  const user    = useUser();
+  const [session,     setSession]     = useState<SessionInfo | null | undefined>(undefined);
 
   const [username,    setUsername]    = useState('');
   const [usernameOk,  setUsernameOk]  = useState<boolean | null>(null);
@@ -15,15 +21,40 @@ export default function SetupUsernamePage() {
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState<string | null>(null);
 
-  // Se non loggato, manda al login
+  // Leggi la sessione Supabase direttamente — non usare useUser() perché
+  // ritorna null quando non c'è ancora un profilo (esattamente il caso di nuovi utenti Google)
   useEffect(() => {
-    if (user === null) router.replace('/map');
-  }, [user, router]);
+    const sb = supabaseBrowser();
+    sb.auth.getSession().then(({ data }) => {
+      if (!data.session?.user) {
+        setSession(null);
+        return;
+      }
+      // Controlla se ha già un profilo (utente esistente che è arrivato qui per errore)
+      sb.from('profiles').select('username').eq('id', data.session.user.id).maybeSingle()
+        .then(({ data: profile }) => {
+          if (profile?.username) {
+            router.replace('/map');
+          } else {
+            setSession({
+              id: data.session!.user.id,
+              email: data.session!.user.email ?? '',
+              accessToken: data.session!.access_token,
+            });
+          }
+        });
+    });
 
-  // Se ha già uno username, manda alla mappa
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_, s) => {
+      if (!s?.user) setSession(null);
+    });
+    return () => subscription.unsubscribe();
+  }, [router]);
+
+  // Se non loggato, manda alla mappa
   useEffect(() => {
-    if (user && user.username) router.replace('/map');
-  }, [user, router]);
+    if (session === null) router.replace('/map');
+  }, [session, router]);
 
   let unDebounce: ReturnType<typeof setTimeout>;
   const onUsernameChange = (val: string) => {
@@ -41,13 +72,13 @@ export default function SetupUsernamePage() {
   };
 
   const handleSubmit = async () => {
-    if (!user || user === undefined) return;
+    if (!session) return;
     if (!username || username.length < 3) { setError('Username troppo corto (min 3 caratteri).'); return; }
     if (usernameOk === false) { setError('Username già in uso.'); return; }
     setLoading(true);
     setError(null);
     try {
-      await setupGoogleUsername(user.id, username, user.accessToken);
+      await setupGoogleUsername(session.id, username, session.accessToken);
       router.replace('/map');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore sconosciuto');
@@ -63,7 +94,7 @@ export default function SetupUsernamePage() {
     fontSize: 16, padding: '12px 12px 12px 32px', outline: 'none',
   };
 
-  if (user === undefined) {
+  if (session === undefined) {
     return (
       <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a' }}>
         <div style={{ fontFamily: 'var(--font-mono)', color: '#888', fontSize: 14 }}>Caricamento...</div>
