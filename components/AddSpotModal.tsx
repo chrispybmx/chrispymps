@@ -39,18 +39,23 @@ const lbl: React.CSSProperties = {
 
 /* ── Estrai coordinate da URL Google Maps o da stringa "lat, lon" ── */
 function parseCoordInput(raw: string): { lat: number; lon: number } | null {
-  const s = raw.trim();
+  // Rimuovi parentesi, virgolette e spazi extra — gestisce "(lat, lon)", "[lat, lon]" ecc.
+  const s = raw.trim().replace(/^[\s([\]"']+|[\s)\]"']+$/g, '').trim();
 
-  // Google Maps URL
+  // Google Maps URL con @lat,lon
   const m1 = s.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (m1) return { lat: parseFloat(m1[1]), lon: parseFloat(m1[2]) };
-  const m2 = s.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+
+  // ?q=lat,lon (solo numeri)
+  const m2 = s.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (m2) return { lat: parseFloat(m2[1]), lon: parseFloat(m2[2]) };
+
+  // ?ll=lat,lon
   const m3 = s.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (m3) return { lat: parseFloat(m3[1]), lon: parseFloat(m3[2]) };
 
-  // "lat, lon" oppure "lat lon"
-  const m4 = s.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  // "lat, lon" | "lat lon" | "lat;lon" — con o senza parentesi/spazi
+  const m4 = s.match(/^(-?\d+\.?\d*)[,;\s]+(-?\d+\.?\d*)$/);
   if (m4) return { lat: parseFloat(m4[1]), lon: parseFloat(m4[2]) };
 
   return null;
