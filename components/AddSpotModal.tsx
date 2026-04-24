@@ -6,7 +6,7 @@ import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
-import { signIn, signUp, checkUsername } from '@/lib/auth-client';
+import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
 
 interface AddSpotModalProps {
   open:        boolean;
@@ -201,6 +201,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [checkingUn,   setCheckingUn]   = useState(false);
   const [loginEmail,    setLoginEmail]    = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [resetSent,     setResetSent]     = useState(false);
+  const [resetLoading,  setResetLoading]  = useState(false);
 
   /* Reverse geocode → auto-popola città */
   const [city, setCity] = useState('');
@@ -448,16 +450,35 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     <div><label style={lbl}>Email</label><input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="la-tua@email.com" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
                     <div><label style={lbl}>Password</label><input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
                     {authError && <ErrBox msg={authError} />}
+                    {resetSent && (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#00c851', background: 'rgba(0,200,81,0.08)', border: '1px solid rgba(0,200,81,0.2)', borderRadius: 6, padding: '10px 14px' }}>
+                        ✅ Email inviata! Controlla la casella e clicca il link per reimpostare la password. Scade in 1 ora.
+                      </div>
+                    )}
                     <button onClick={handleSignIn} disabled={authLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: authLoading ? 0.6 : 1 }}>
                       {authLoading ? '⏳ Accesso...' : '🔑 ENTRA'}
                     </button>
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
-                      Non hai un account?{' '}
-                      <button onClick={() => { setAuthTab('registrati'); setAuthError(null); }}
-                        style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                        Registrati →
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0 }}>
+                        Non hai un account?{' '}
+                        <button onClick={() => { setAuthTab('registrati'); setAuthError(null); }}
+                          style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                          Registrati →
+                        </button>
+                      </p>
+                      <button
+                        disabled={resetLoading}
+                        onClick={async () => {
+                          if (!loginEmail) { setAuthError('Inserisci la tua email per reimpostare la password.'); return; }
+                          setResetLoading(true); setAuthError(null);
+                          try { await resetPassword(loginEmail); setResetSent(true); }
+                          catch (e: any) { setAuthError(e.message); }
+                          finally { setResetLoading(false); }
+                        }}
+                        style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, textDecoration: 'underline', opacity: resetLoading ? 0.5 : 1 }}>
+                        {resetLoading ? '⏳...' : 'Password dimenticata?'}
                       </button>
-                    </p>
+                    </div>
                   </div>
                 )}
 
