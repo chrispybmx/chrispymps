@@ -475,8 +475,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                           catch (e: any) { setAuthError(e.message); }
                           finally { setResetLoading(false); }
                         }}
-                        style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, textDecoration: 'underline', opacity: resetLoading ? 0.5 : 1 }}>
-                        {resetLoading ? '⏳...' : 'Password dimenticata?'}
+                        style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13, textDecoration: 'underline', opacity: resetLoading ? 0.5 : 1 }}>
+                        {resetLoading ? '⏳...' : '🔑 Password dimenticata?'}
                       </button>
                     </div>
                   </div>
