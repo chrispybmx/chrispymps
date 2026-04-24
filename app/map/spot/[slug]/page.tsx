@@ -5,6 +5,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import type { Spot } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
+import SpotHeaderActions from '@/components/SpotHeaderActions';
 import PhotoCarousel from '@/components/PhotoCarousel';
 import StatusUpdateBtn from '@/components/StatusUpdateBtn';
 import SupportStrip from '@/components/SupportStrip';
@@ -132,7 +133,7 @@ export default async function SpotPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── BARRA NERA SOTTO MAPPA — copre i credits OSM, contiene il CTA ── */}
+      {/* ── BARRA NERA SOTTO MAPPA — CTA portami qui ── */}
       <div style={{
         background: '#000',
         padding: '10px 16px',
@@ -186,11 +187,14 @@ export default async function SpotPage({ params }: Props) {
           {spot.city && (
             <div style={{
               fontFamily: 'var(--font-mono)', fontSize: 14,
-              color: 'var(--gray-400)', marginBottom: 10,
+              color: 'var(--gray-400)', marginBottom: 16,
             }}>
               📍 {spot.city}{spot.region ? `, ${spot.region}` : ''}
             </div>
           )}
+
+          {/* ── AZIONI: stelle · ho girato · salva ── */}
+          <SpotHeaderActions spotId={spot.id} />
 
           {/* Publisher — cliccabile → profilo */}
           {spot.submitted_by_username && (
@@ -200,7 +204,6 @@ export default async function SpotPage({ params }: Props) {
                 background: 'var(--gray-800)',
                 border: '1px solid var(--gray-700)',
                 borderRadius: 20, padding: '6px 14px',
-                transition: 'border-color 0.15s',
               }}>
                 <div style={{
                   width: 28, height: 28, borderRadius: '50%',
@@ -226,10 +229,7 @@ export default async function SpotPage({ params }: Props) {
 
         {/* ── DESCRIZIONE ── */}
         {spot.description && (
-          <p style={{
-            color: 'var(--bone)', lineHeight: 1.7,
-            marginBottom: 24, fontSize: 15,
-          }}>
+          <p style={{ color: 'var(--bone)', lineHeight: 1.7, marginBottom: 24, fontSize: 15 }}>
             {spot.description}
           </p>
         )}
@@ -243,7 +243,7 @@ export default async function SpotPage({ params }: Props) {
             borderRadius: 8, border: '1px solid var(--gray-700)',
           }}>
             {spot.surface    && <MetaRow label="Superficie" value={spot.surface} />}
-            {spot.difficulty && <MetaRow label="Livello"   value={spot.difficulty} />}
+            {spot.difficulty && <MetaRow label="Livello"    value={spot.difficulty} />}
             {spot.guardians && (
               <div style={{ gridColumn: '1/-1' }}>
                 <MetaRow label="Note accesso" value={spot.guardians} />
@@ -269,7 +269,7 @@ export default async function SpotPage({ params }: Props) {
           </div>
         )}
 
-        {/* ── CTA BUTTONS ── */}
+        {/* ── CTA BOTTOM ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link
             href="/map"
@@ -287,33 +287,34 @@ export default async function SpotPage({ params }: Props) {
           >
             🧭 Portami qui
           </a>
-        {/* Data aggiornamento — discreta, in fondo a destra */}
-        <div style={{
-          textAlign: 'right',
-          fontFamily: 'var(--font-mono)', fontSize: 10,
-          color: 'var(--gray-600)',
-          letterSpacing: '0.05em',
-          marginBottom: 8,
-        }}>
-          aggiornato {new Date(spot.condition_updated_at).toLocaleDateString('it-IT')}
-        </div>
         </div>
       </div>
 
       {/* ── CONDIVIDI ── */}
       <ShareSpotBtn spotName={spot.name} spotSlug={spot.slug} city={spot.city} />
 
-      {/* ── SPOT INTERACTIONS: stelle, cuore, commenti ── */}
+      {/* ── COMMENTI ── */}
       <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
-
-      {/* ── SUPPORT STRIP ── */}
-      <SupportStrip />
 
       {/* ── AGGIORNA STATO ── */}
       <StatusUpdateBtn spotId={spot.id} spotName={spot.name} currentCondition={spot.condition} />
 
+      {/* ── SUPPORT STRIP ── */}
+      <SupportStrip />
+
+      {/* ── DATA AGGIORNAMENTO — discreta, in fondo ── */}
+      <div style={{
+        textAlign: 'center',
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        color: 'var(--gray-700)',
+        letterSpacing: '0.05em',
+        padding: '12px 20px 4px',
+      }}>
+        aggiornato {new Date(spot.condition_updated_at).toLocaleDateString('it-IT')}
+      </div>
+
+      {/* ── JSON-LD ── */}
       <div style={{ padding: '0 20px' }}>
-        {/* JSON-LD: BreadcrumbList */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify({
