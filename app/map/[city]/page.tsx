@@ -127,7 +127,7 @@ export default async function CityPage({ params }: Props) {
       {/* Header */}
       <div style={{ padding: '24px 20px 16px', borderBottom: '1px solid var(--gray-700)' }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginBottom: 4 }}>
-          <Link href="/map" style={{ color: 'var(--orange)', textDecoration: 'none' }}>← MAPPA</Link>
+          <Link href="/" style={{ color: 'var(--orange)', textDecoration: 'none' }}>← MAPPA</Link>
           {' / '}
           {cityLabel.toUpperCase()}
         </div>
