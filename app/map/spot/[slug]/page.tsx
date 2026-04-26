@@ -114,7 +114,7 @@ export default async function SpotPage({ params }: Props) {
           background: 'rgba(10,10,10,0.82)', borderRadius: 6,
           backdropFilter: 'blur(8px)',
         }}>
-          <Link href="/map" style={{
+          <Link href="/" style={{
             color: 'var(--orange)', fontFamily: 'var(--font-mono)',
             fontSize: 13, textDecoration: 'none',
             padding: '6px 12px', display: 'block',
@@ -273,7 +273,7 @@ export default async function SpotPage({ params }: Props) {
         {/* ── CTA BOTTOM ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link
-            href="/map"
+            href="/"
             className="btn-secondary"
             style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', minWidth: 140 }}
           >
