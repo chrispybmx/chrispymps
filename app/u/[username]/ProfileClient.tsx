@@ -94,14 +94,22 @@ export default function ProfileClient({ profile, joinDate }: Props) {
             </a>
           )}
 
-          {/* Edit button */}
+          {/* Edit button + Preferiti (solo owner) */}
           {isOwn && !editing && (
-            <button
-              onClick={() => setEditing(true)}
-              style={{ display: 'block', marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', background: 'none', border: '1px solid var(--gray-600)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-            >
-              ✏️ Modifica profilo
-            </button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              <button
+                onClick={() => setEditing(true)}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', background: 'none', border: '1px solid var(--gray-600)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+              >
+                ✏️ Modifica profilo
+              </button>
+              <a
+                href="/preferiti"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff4d6d', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.4)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              >
+                ❤️ Spot salvati
+              </a>
+            </div>
           )}
         </div>
       </div>
