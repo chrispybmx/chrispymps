@@ -98,7 +98,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             ← News
           </Link>
           <div style={{ flex: 1 }} />
-          <Link href="/map" style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+          <Link href="/" style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
             🗺️ Mappa
           </Link>
         </div>
@@ -174,7 +174,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
           <Link href="/news" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', textDecoration: 'none' }}>
             ← Tutte le news
           </Link>
-          <Link href="/map" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', textDecoration: 'none', border: '1px solid var(--gray-700)', padding: '8px 16px', borderRadius: 4 }}>
+          <Link href="/" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', textDecoration: 'none', border: '1px solid var(--gray-700)', padding: '8px 16px', borderRadius: 4 }}>
             🗺️ Vai alla mappa
           </Link>
         </div>
