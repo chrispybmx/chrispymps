@@ -35,7 +35,7 @@ export default async function EventsPage() {
           padding: '14px 20px',
           display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <Link href="/map" style={{
+          <Link href="/" style={{
             color: 'var(--gray-400)', textDecoration: 'none',
             fontFamily: 'var(--font-mono)', fontSize: 13,
           }}>
