@@ -16,7 +16,7 @@ export default function AboutPage() {
       paddingBottom: 'calc(var(--strip-height) + 40px)',
     }}>
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 0' }}>
-        <Link href="/map" style={{ color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 14, textDecoration: 'none' }}>
+        <Link href="/" style={{ color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 14, textDecoration: 'none' }}>
           ← TORNA ALLA MAPPA
         </Link>
 
