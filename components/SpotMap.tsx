@@ -186,6 +186,47 @@ export default function SpotMap({
       /* Aggiorna stato zoom React */
       map.on('zoomend', () => setZoom(map.getZoom()));
 
+      /* ── Geolocalizzazione automatica all'avvio ──
+         Se il browser conosce la posizione dell'utente, partiamo da lì.
+         Se non risponde prima che gli spot facciano il loro auto-fit, aggiungiamo
+         solo il dot blu senza spostare la mappa. */
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!mapInstance.current || !L) return;
+            const { latitude, longitude } = pos.coords;
+
+            /* Solo se gli spot non hanno già fatto il loro auto-fit iniziale */
+            if (!hasInitialFit.current) {
+              mapInstance.current.setView(
+                [latitude, longitude],
+                APP_CONFIG.mapZoomCity,
+                { animate: false }
+              );
+              hasInitialFit.current = true;
+            }
+
+            /* Dot blu "Sei qui" (riuso lo stesso stile del pulsante 📍) */
+            const dotSvg = `<div style="
+              width:14px;height:14px;
+              background:#4285f4;border:3px solid #fff;border-radius:50%;
+              box-shadow:0 0 0 2px #4285f4,0 2px 8px rgba(0,0,0,0.55);
+            "></div>`;
+            const icon = L!.divIcon({
+              html: dotSvg, className: '',
+              iconSize: [14, 14], iconAnchor: [7, 7],
+            });
+            if (!userMarkerRef.current) {
+              userMarkerRef.current = L!.marker([latitude, longitude], { icon, zIndexOffset: 2000 })
+                .addTo(mapInstance.current!)
+                .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
+            }
+          },
+          () => { /* permesso negato o posizione non disponibile → nessuna azione */ },
+          { timeout: 6000, maximumAge: 300_000 }
+        );
+      }
+
       /* Click sulla mappa → radius mode */
       map.on('click', (e) => {
         onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
