@@ -72,8 +72,8 @@ export const viewport: Viewport = {
   themeColor:    '#ff6a00',
   width:         'device-width',
   initialScale:  1,
-  maximumScale:  1,
-  userScalable:  false,
+  // SEO-FIX: rimosso userScalable:false e maximumScale:1 — violano WCAG 1.4.4
+  // e Google penalizza le pagine che bloccano lo zoom su mobile
   viewportFit:   'cover',
 };
 
