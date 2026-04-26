@@ -50,8 +50,21 @@ async function rejectSpot(spotId: string, req: NextRequest, reason?: string): Pr
     return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
   }
 
+  // Email al contributor (fire-and-forget)
   if (spot.contributors) {
     sendRejectionEmail(spot.contributors, spot, reason).catch(console.error);
+  }
+
+  // Notifica in-app all'utente autenticato che ha inviato lo spot (fire-and-forget)
+  if (spot.submitted_by_user_id) {
+    const reasonNote = reason ? ` Motivo: ${reason.slice(0, 100)}` : '';
+    supabase.from('notifications').insert({
+      user_id:   spot.submitted_by_user_id,
+      type:      'spot_rejected',
+      title:     `"${spot.name}" non è stato approvato`,
+      body:      `Il tuo spot non soddisfa i requisiti della mappa.${reasonNote}`,
+      spot_slug: spot.slug,
+    }).then().catch(console.error);
   }
 
   if (req.method === 'GET') {
