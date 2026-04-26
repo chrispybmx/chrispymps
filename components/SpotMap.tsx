@@ -7,8 +7,7 @@ import 'leaflet/dist/leaflet.css';
 
 let L: typeof import('leaflet') | null = null;
 
-/* Zoom sotto il quale mostriamo i cluster invece dei pin individuali.
-   Con 500+ spot usare un threshold più alto per tenere i cluster più a lungo. */
+/* Zoom sotto il quale mostriamo i cluster invece dei pin individuali. */
 const CLUSTER_ZOOM = 12;
 
 interface SpotMapProps {
@@ -67,18 +66,19 @@ function getPanelOffsetPx(): number {
 }
 
 /* ── Clustering geografico a griglia adattiva allo zoom ──
-   Divide la mappa in celle di dimensione diversa in base allo zoom corrente.
-   Funziona anche senza il campo `city`, scala bene con 500+ spot. */
+   Celle più piccole = cluster più granulari e precisi. */
 function computeGridClusters(spots: SpotMapPin[], zoom: number) {
-  /* Dimensione cella in gradi geografici — più zoom alto = celle più piccole */
+  /* Dimensione cella in gradi geografici — ottimizzata per distribuzione mondiale */
   const cellDeg =
-    zoom < 6  ? 3    :   // zoom Italia intera: ~330 km per cella
-    zoom < 7  ? 1.5  :   // ~165 km
-    zoom < 8  ? 0.8  :   // ~90 km
-    zoom < 9  ? 0.4  :   // ~45 km
-    zoom < 10 ? 0.2  :   // ~22 km — città grande
-    zoom < 11 ? 0.08 :   // ~9 km  — quartiere
-                0.03;    // ~3 km  — sotto questa soglia usiamo i pin individuali
+    zoom < 4  ? 5    :   // vista mondo: ~550 km per cella
+    zoom < 5  ? 2.5  :   // ~280 km
+    zoom < 6  ? 1.2  :   // ~130 km — continente (Europa intera)
+    zoom < 7  ? 0.6  :   // ~65 km  — paese (Italia = ~18 cluster)
+    zoom < 8  ? 0.3  :   // ~33 km  — regione
+    zoom < 9  ? 0.15 :   // ~17 km  — area metropolitana
+    zoom < 10 ? 0.07 :   // ~8 km   — città grande
+    zoom < 11 ? 0.03 :   // ~3 km   — quartiere
+                0.01;    // ~1 km   — pin quasi individuali
 
   const cellMap = new Map<string, SpotMapPin[]>();
   for (const s of spots) {
@@ -186,39 +186,7 @@ export default function SpotMap({
       /* Aggiorna stato zoom React */
       map.on('zoomend', () => setZoom(map.getZoom()));
 
-      /* ── CSS animazione pin selezionato (iniettato una sola volta) ── */
-      if (!document.getElementById('spot-pin-styles')) {
-        const style = document.createElement('style');
-        style.id = 'spot-pin-styles';
-        style.textContent = `
-          @keyframes spot-pulse {
-            0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0.9; }
-            70%  { opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
-          }
-          .spot-pin-ring {
-            position: absolute;
-            left: 19px; top: 15px;
-            width: 2px; height: 2px;
-            pointer-events: none;
-          }
-          .spot-pin-ring::before,
-          .spot-pin-ring::after {
-            content: '';
-            position: absolute;
-            width: 34px; height: 34px;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 106, 0, 0.7);
-            background: rgba(255, 106, 0, 0.18);
-            transform: translate(-50%, -50%);
-            animation: spot-pulse 1.6s ease-out infinite;
-          }
-          .spot-pin-ring::after {
-            animation-delay: 0.55s;
-          }
-        `;
-        document.head.appendChild(style);
-      }
+      /* nessun CSS extra necessario: il pin selezionato usa già il bordo arancione in pinSvg */
 
       /* ── Geolocalizzazione automatica all'avvio ──
          Se il browser conosce la posizione dell'utente, partiamo da lì.
@@ -230,17 +198,17 @@ export default function SpotMap({
             if (!mapInstance.current || !L) return;
             const { latitude, longitude } = pos.coords;
 
-            /* Solo se gli spot non hanno già fatto il loro auto-fit iniziale */
-            if (!hasInitialFit.current) {
-              mapInstance.current.setView(
-                [latitude, longitude],
-                APP_CONFIG.mapZoomCity,
-                { animate: false }
-              );
-              hasInitialFit.current = true;
+            /* Vola sempre alla posizione utente quando la geo risponde —
+               dà un'apertura della mappa centrata su dove ti trovi */
+            const isMobile = window.innerWidth < 768;
+            if (isMobile) {
+              mapInstance.current.setView([latitude, longitude], APP_CONFIG.mapZoomCity, { animate: false });
+            } else {
+              mapInstance.current.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.0, easeLinearity: 0.4 });
             }
+            hasInitialFit.current = true;
 
-            /* Dot blu "Sei qui" (riuso lo stesso stile del pulsante 📍) */
+            /* Dot blu "Sei qui" */
             const dotSvg = `<div style="
               width:14px;height:14px;
               background:#4285f4;border:3px solid #fff;border-radius:50%;
@@ -254,9 +222,11 @@ export default function SpotMap({
               userMarkerRef.current = L!.marker([latitude, longitude], { icon, zIndexOffset: 2000 })
                 .addTo(mapInstance.current!)
                 .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
+            } else {
+              userMarkerRef.current.setLatLng([latitude, longitude]);
             }
           },
-          () => { /* permesso negato o posizione non disponibile → nessuna azione */ },
+          () => { /* permesso negato → nessuna azione */ },
           { timeout: 6000, maximumAge: 300_000 }
         );
       }
@@ -439,17 +409,12 @@ export default function SpotMap({
       }
     }
 
-    // Applica icona selezionata al nuovo pin (con anello pulsante doppio)
+    // Applica icona selezionata al nuovo pin (bordo arancione, più grande)
     if (selectedPin) {
       const marker = pinMarkersRef.current.get(selectedPin.id);
       if (marker) {
         const svg  = pinSvg(selectedPin.type, selectedPin.condition, true);
-        // Wrapper con due anelli pulsanti arancioni centrati sul cerchio del pin
-        const html = `<div style="position:relative;width:38px;height:48px;overflow:visible">
-          <div class="spot-pin-ring"></div>
-          ${svg}
-        </div>`;
-        const icon = L!.divIcon({ html, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
+        const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
         marker.setIcon(icon);
       }
     }
