@@ -335,7 +335,7 @@ export const APP_CONFIG = {
   tagline:     'Mappa Spot BMX, Skate & Scooter Italia',
   description: 'La mappa community-driven per trovare spot BMX, skatepark, spot scooter e street spot in tutta Italia. Oltre 100 città, aggiornata dalla community.',
   url:         'https://maps.chrispybmx.com',
-  mapUrl:      'https://maps.chrispybmx.com/map',
+  mapUrl:      'https://maps.chrispybmx.com', // home = mappa, /map reindirizza qui
   mapCenter:   [42.5, 12.5] as [number, number], // Centro Italia
   mapZoom:     6,
   mapZoomCity: 13,
