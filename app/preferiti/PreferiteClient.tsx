@@ -57,7 +57,7 @@ export default function PreferiteClient() {
     }}>
       {/* Header */}
       <div style={{ padding: '20px 20px 0' }}>
-        <Link href="/map" style={{
+        <Link href="/" style={{
           color: 'var(--orange)', fontFamily: 'var(--font-mono)',
           fontSize: 13, textDecoration: 'none',
         }}>
@@ -105,7 +105,7 @@ export default function PreferiteClient() {
           }}>
             Premi il cuore 🤍 su uno spot<br />per salvarlo qui.
           </div>
-          <Link href="/map" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-flex' }}>
+          <Link href="/" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-flex' }}>
             Esplora la mappa
           </Link>
         </div>
