@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { APP_CONFIG } from '@/lib/constants';
 
 interface PhotoUploadProps {
@@ -18,6 +18,19 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
   const [error,    setError]    = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // BUG-FIX: cache degli object URL per evitare memory leak.
+  // URL.createObjectURL inline nel JSX crea un nuovo blob URL ad ogni render
+  // e quei blob non vengono mai revocati. Con questo ref li creiamo una volta
+  // sola per File e li revochiamo quando la foto viene rimossa.
+  const objectUrlsRef = useRef<Map<File, string>>(new Map());
+
+  const getObjectUrl = useCallback((file: File): string => {
+    if (!objectUrlsRef.current.has(file)) {
+      objectUrlsRef.current.set(file, URL.createObjectURL(file));
+    }
+    return objectUrlsRef.current.get(file)!;
+  }, []);
 
   useEffect(() => {
     setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -43,6 +56,14 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
   }, [photos, onChange, maxPhotos]);
 
   const removePhoto = useCallback((idx: number) => {
+    const removed = photos[idx];
+    if (removed) {
+      const url = objectUrlsRef.current.get(removed);
+      if (url) {
+        URL.revokeObjectURL(url);
+        objectUrlsRef.current.delete(removed);
+      }
+    }
     onChange(photos.filter((_, i) => i !== idx));
   }, [photos, onChange]);
 
@@ -62,7 +83,7 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
               position: 'relative', width: 80, height: 80, borderRadius: 4, overflow: 'hidden',
               border: idx === 0 ? '2px solid var(--orange)' : '1px solid var(--gray-600)',
             }}>
-              <img src={URL.createObjectURL(file)} alt={`Foto ${idx + 1}`}
+              <img src={getObjectUrl(file)} alt={`Foto ${idx + 1}`}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               {idx === 0 && (
                 <div style={{
