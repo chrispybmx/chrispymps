@@ -186,6 +186,40 @@ export default function SpotMap({
       /* Aggiorna stato zoom React */
       map.on('zoomend', () => setZoom(map.getZoom()));
 
+      /* ── CSS animazione pin selezionato (iniettato una sola volta) ── */
+      if (!document.getElementById('spot-pin-styles')) {
+        const style = document.createElement('style');
+        style.id = 'spot-pin-styles';
+        style.textContent = `
+          @keyframes spot-pulse {
+            0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0.9; }
+            70%  { opacity: 0.3; }
+            100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+          }
+          .spot-pin-ring {
+            position: absolute;
+            left: 19px; top: 15px;
+            width: 2px; height: 2px;
+            pointer-events: none;
+          }
+          .spot-pin-ring::before,
+          .spot-pin-ring::after {
+            content: '';
+            position: absolute;
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 106, 0, 0.7);
+            background: rgba(255, 106, 0, 0.18);
+            transform: translate(-50%, -50%);
+            animation: spot-pulse 1.6s ease-out infinite;
+          }
+          .spot-pin-ring::after {
+            animation-delay: 0.55s;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
       /* ── Geolocalizzazione automatica all'avvio ──
          Se il browser conosce la posizione dell'utente, partiamo da lì.
          Se non risponde prima che gli spot facciano il loro auto-fit, aggiungiamo
@@ -405,12 +439,17 @@ export default function SpotMap({
       }
     }
 
-    // Applica icona selezionata al nuovo pin
+    // Applica icona selezionata al nuovo pin (con anello pulsante doppio)
     if (selectedPin) {
       const marker = pinMarkersRef.current.get(selectedPin.id);
       if (marker) {
         const svg  = pinSvg(selectedPin.type, selectedPin.condition, true);
-        const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
+        // Wrapper con due anelli pulsanti arancioni centrati sul cerchio del pin
+        const html = `<div style="position:relative;width:38px;height:48px;overflow:visible">
+          <div class="spot-pin-ring"></div>
+          ${svg}
+        </div>`;
+        const icon = L!.divIcon({ html, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
         marker.setIcon(icon);
       }
     }
