@@ -20,7 +20,7 @@ export default function MapLoading() {
           letterSpacing: '0.05em',
         }}
       >
-        CHRISPYMPS
+        CHRISPY MAPS
       </div>
       <div
         style={{
