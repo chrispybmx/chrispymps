@@ -446,8 +446,8 @@ function SpotListPanel({
     if (!lightbox) return;
     const fn = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setLightbox(null);
-      if (e.key === 'ArrowRight') setLightbox(l => l && l.idx < l.urls.length - 1 ? { ...l, idx: l.idx + 1 } : l);
-      if (e.key === 'ArrowLeft')  setLightbox(l => l && l.idx > 0 ? { ...l, idx: l.idx - 1 } : l);
+      if (e.key === 'ArrowRight') setLightbox(l => l ? { ...l, idx: l.idx === l.urls.length - 1 ? 0 : l.idx + 1 } : l);
+      if (e.key === 'ArrowLeft')  setLightbox(l => l ? { ...l, idx: l.idx === 0 ? l.urls.length - 1 : l.idx - 1 } : l);
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
@@ -555,11 +555,17 @@ function SpotListPanel({
 
         const goPrev = (e: React.MouseEvent) => {
           e.stopPropagation();
-          setPhotoIdx(p => ({ ...p, [spot.id]: Math.max(0, (p[spot.id] ?? 0) - 1) }));
+          setPhotoIdx(p => {
+            const cur = p[spot.id] ?? 0;
+            return { ...p, [spot.id]: cur === 0 ? allPhotos.length - 1 : cur - 1 };
+          });
         };
         const goNext = (e: React.MouseEvent) => {
           e.stopPropagation();
-          setPhotoIdx(p => ({ ...p, [spot.id]: Math.min(allPhotos.length - 1, (p[spot.id] ?? 0) + 1) }));
+          setPhotoIdx(p => {
+            const cur = p[spot.id] ?? 0;
+            return { ...p, [spot.id]: cur === allPhotos.length - 1 ? 0 : cur + 1 };
+          });
         };
 
         return (
@@ -602,11 +608,11 @@ function SpotListPanel({
                       <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '3px 6px', fontSize: 13, pointerEvents: 'none' }}>🔍</div>
                     </div>
 
-                    {/* Frecce prev/next */}
-                    {allPhotos.length > 1 && curPhotoIdx > 0 && (
+                    {/* Frecce prev/next — sempre visibili con loop */}
+                    {allPhotos.length > 1 && (
                       <button onClick={goPrev} className="photo-nav-btn" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 44, background: 'linear-gradient(to right,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
                     )}
-                    {allPhotos.length > 1 && curPhotoIdx < allPhotos.length - 1 && (
+                    {allPhotos.length > 1 && (
                       <button onClick={goNext} className="photo-nav-btn" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 44, background: 'linear-gradient(to left,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
                     )}
 
@@ -705,7 +711,7 @@ function SpotListPanel({
               /* ══ COMPACT LAYOUT ══ */
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px' }}>
                 {/* Thumbnail più grande */}
-                <div style={{ flexShrink: 0, width: 96, height: 96, borderRadius: 6, overflow: 'hidden', background: 'var(--gray-700)', border: isAct ? '2px solid var(--orange)' : '1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ flexShrink: 0, width: 116, height: 116, borderRadius: 6, overflow: 'hidden', background: 'var(--gray-700)', border: isAct ? '2px solid var(--orange)' : '1px solid rgba(255,255,255,0.07)' }}>
                   {spot.cover_url ? (
                     <img src={spot.cover_url} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                   ) : (
@@ -740,9 +746,17 @@ function SpotListPanel({
               </div>
             )}
 
-            {/* ● REC */}
+            {/* 📍 Directions — appare quando lo spot è attivo e non espanso */}
             {isAct && !isExp && (
-              <div style={{ textAlign: 'right', padding: '0 10px 5px', fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)', letterSpacing: '0.1em' }}>● REC</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 10px 8px' }}>
+                <button
+                  onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
+                  title="Portami qui"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)', background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, padding: '4px 9px', cursor: 'pointer', letterSpacing: '0.04em', textTransform: 'uppercase' }}
+                >
+                  <span style={{ fontSize: 13 }}>📍</span> Portami qui
+                </button>
+              </div>
             )}
           </div>
         );
