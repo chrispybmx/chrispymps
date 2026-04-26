@@ -119,11 +119,17 @@ export default function SpotMap({
   const prevSelIdRef     = useRef<string | null>(null);
   const filteredRef      = useRef<SpotMapPin[]>([]);
   const selPinRef        = useRef<SpotMapPin | null>(null);
+  /* Refs per il fitAllTrigger effect — evita di aggiungere filterRegionBbox/searchQuery
+     come dependency (causerebbero re-run ad ogni render) */
+  const filterRegionBboxRef = useRef(filterRegionBbox);
+  const searchQueryRef      = useRef(searchQuery);
   const [locating, setLocating] = useState(false);
   const [zoom, setZoom]         = useState<number>(APP_CONFIG.mapZoom ?? 6);
 
-  useEffect(() => { onMapClickRef.current  = onMapClick; });
-  useEffect(() => { onSpotClickRef.current = onSpotClick; });
+  useEffect(() => { onMapClickRef.current       = onMapClick; });
+  useEffect(() => { onSpotClickRef.current      = onSpotClick; });
+  useEffect(() => { filterRegionBboxRef.current = filterRegionBbox; });
+  useEffect(() => { searchQueryRef.current      = searchQuery; });
 
   const filtered = useMemo(() => spots.filter((s) => {
     if (filterType && s.type !== filterType) return false;
@@ -404,28 +410,72 @@ export default function SpotMap({
   /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */
   useEffect(() => {
     if (!fitAllTrigger || !hasInitialFit.current || !mapInstance.current || !L) return;
-    const pins = filteredRef.current;
-    if (pins.length === 0) return;
-    const offset = getPanelOffsetPx();
+    const pins    = filteredRef.current;
+    const hasRegion = !!filterRegionBboxRef.current;
+    const hasSearch = !!searchQueryRef.current;
+    const panelH  = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+
+    /* Caso 0: nessun risultato */
+    if (pins.length === 0) {
+      if (hasRegion) {
+        // Mostra comunque la regione selezionata
+        const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
+        mapInstance.current.fitBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), {
+          paddingTopLeft: [32, 32], paddingBottomRight: [32, panelH + 32], animate: true,
+        });
+      } else {
+        // Nessun filtro + nessun risultato → Italia intera
+        mapInstance.current.fitBounds(L.latLngBounds([[36.5, 6.5], [47.1, 18.5]]), {
+          paddingTopLeft: [16, 16], paddingBottomRight: [16, panelH + 16], animate: true,
+        });
+      }
+      return;
+    }
+
+    /* Caso 1: singolo risultato → zoom ravvicinato centrato sopra il pannello */
     if (pins.length === 1) {
-      // Singolo risultato: vola centrato nello spazio visibile (centro spostato a sud)
+      const offset       = getPanelOffsetPx();
       const p            = pins[0];
       const targetZoom   = 15;
       const targetPoint  = mapInstance.current.project([p.lat, p.lon], targetZoom);
       const offsetPoint  = targetPoint.add(L!.point(0, offset));
       const offsetLatLng = mapInstance.current.unproject(offsetPoint, targetZoom);
       mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 0.7, easeLinearity: 0.5 });
-    } else {
-      // Molti risultati: fitBounds con padding = altezza pannello intero
-      const panelH = Math.min(480, Math.max(270, window.innerHeight * 0.54));
-      const bounds  = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
+      return;
+    }
+
+    /* Caso 2: filtro regione attivo → mostra sempre l'intera bbox della regione,
+       così la distribuzione degli spot nella regione è chiara anche se sono
+       concentrati in una città sola */
+    if (hasRegion) {
+      const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
+      mapInstance.current.fitBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), {
+        paddingTopLeft:     [32, 32],
+        paddingBottomRight: [32, panelH + 32],
+        animate: true,
+      });
+      return;
+    }
+
+    /* Caso 3: ricerca testuale → fitBounds sui risultati effettivi */
+    if (hasSearch) {
+      const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
       mapInstance.current.fitBounds(bounds, {
         paddingTopLeft:     [32, 32],
         paddingBottomRight: [32, panelH + 32],
         maxZoom: 14,
         animate: true,
       });
+      return;
     }
+
+    /* Caso 4: solo filtro categoria (no regione, no ricerca) → vista Italia intera
+       così si vedono tutti i cluster distribuiti sulla penisola */
+    mapInstance.current.fitBounds(L.latLngBounds([[36.5, 6.5], [47.1, 18.5]]), {
+      paddingTopLeft:     [16, 16],
+      paddingBottomRight: [16, panelH + 16],
+      animate: true,
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitAllTrigger]);
 
