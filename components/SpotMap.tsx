@@ -262,21 +262,23 @@ export default function SpotMap({
         if (!L || !markersRef.current) return;
 
         const isOne = c.count === 1;
-        const radius = isOne ? 9 : Math.min(9 + Math.sqrt(c.count) * 3, 26);
+        /* Dimensioni ridotte: i cerchi non coprono i nomi delle città sulla tile */
+        const radius = isOne ? 6 : Math.min(6 + Math.sqrt(c.count) * 1.6, 15);
         const label  = isOne
           ? TIPI_SPOT[c.spots[0].type].emoji
           : String(c.count);
 
+        const fontSize = isOne ? 11 : Math.max(9, 13 - String(c.count).length);
         const html = `<div style="
           width:${radius * 2}px; height:${radius * 2}px;
-          background: rgba(255,106,0,0.85);
-          border: 2px solid #fff;
+          background: rgba(255,106,0,0.9);
+          border: 1.5px solid rgba(255,255,255,0.9);
           border-radius: 50%;
           display:flex; align-items:center; justify-content:center;
           font-family:'VT323',monospace;
-          font-size:${isOne ? 14 : Math.max(11, 16 - String(c.count).length * 1.5)}px;
+          font-size:${fontSize}px;
           color:#000; font-weight:700;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.55);
+          box-shadow: 0 1px 5px rgba(0,0,0,0.5);
           cursor: pointer;
         ">${label}</div>`;
 
