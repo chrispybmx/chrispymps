@@ -113,7 +113,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     if (!label) { setFilterRegion(null); return; }
     const region = REGIONI_ITALIA.find(r => r.label === label) ?? null;
     setFilterRegion(region);
-    if (region) setFlyTarget({ lat: region.center[0], lon: region.center[1], zoom: region.zoom });
+    // NON setFlyTarget: il fitAllTrigger (useEffect su filterRegion) farà fitBounds
+    // sugli spot reali della regione → zoom calibrato sui dati, non sul centro bbox
   }, []);
 
   const spotsInRadius = useMemo(() => {
