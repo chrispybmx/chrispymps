@@ -36,7 +36,7 @@ export default async function NewsPage() {
       {/* Header */}
       <div style={{ borderBottom: '1px solid var(--gray-700)', background: 'rgba(10,10,10,0.98)' }}>
         <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link href="/map" style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+          <Link href="/" style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
             ← Mappa
           </Link>
           <div style={{ flex: 1 }} />
@@ -52,7 +52,7 @@ export default async function NewsPage() {
             <div style={{ fontSize: 56, marginBottom: 16 }}>📰</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--bone)', marginBottom: 8 }}>Nessuna news ancora</div>
             <div style={{ color: 'var(--gray-400)', fontSize: 14 }}>Torna presto per aggiornamenti!</div>
-            <Link href="/map" style={{ display: 'inline-block', marginTop: 24, fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', textDecoration: 'none', border: '1px solid var(--orange)', padding: '10px 20px', borderRadius: 4 }}>
+            <Link href="/" style={{ display: 'inline-block', marginTop: 24, fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', textDecoration: 'none', border: '1px solid var(--orange)', padding: '10px 20px', borderRadius: 4 }}>
               ← Torna alla mappa
             </Link>
           </div>
