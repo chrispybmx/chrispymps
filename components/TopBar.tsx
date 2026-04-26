@@ -316,28 +316,6 @@ export default function TopBar({
             <NotificationBell token={sessionToken} />
           )}
 
-          <a
-            href="/preferiti"
-            className="favs-chip"
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: 13,
-              padding: '5px 12px',
-              border: '1px solid var(--gray-600)',
-              borderRadius: 2,
-              background: 'transparent',
-              color: 'var(--bone)',
-              cursor: 'pointer', whiteSpace: 'nowrap',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              textDecoration: 'none',
-              display: 'flex', alignItems: 'center', gap: 5,
-              transition: 'all 0.15s',
-              minHeight: 32, touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-            } as React.CSSProperties}
-          >
-            ❤️
-          </a>
-
           {/* Profilo — visibile solo se loggato */}
           {profileUsername ? (
             <Link
