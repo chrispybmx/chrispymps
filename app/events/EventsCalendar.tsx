@@ -308,7 +308,7 @@ export default function EventsCalendar({ events }: { events: CalendarEvent[] }) 
           <div style={{ color: 'var(--gray-400)', fontSize: 14, marginBottom: 24 }}>
             Seguici su Instagram per non perdere nulla!
           </div>
-          <Link href="/map" style={{
+          <Link href="/" style={{
             fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)',
             textDecoration: 'none', border: '1px solid var(--orange)',
             padding: '10px 22px', borderRadius: 6,
