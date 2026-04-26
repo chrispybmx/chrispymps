@@ -8,13 +8,16 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get('q') ?? '').trim().replace(/^@/, '');
   if (q.length < 2) return NextResponse.json({ ok: true, data: [] });
 
+  // SEC-FIX: escapa i metacaratteri ILIKE (% e _) per evitare pattern injection
+  const qSafe = q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+
   const sb = supabaseAdmin();
 
   /* Cerca profili il cui username contiene la query */
   const { data: profiles, error } = await sb
     .from('profiles')
     .select('id, username, bio, instagram_handle')
-    .ilike('username', `%${q}%`)
+    .ilike('username', `%${qSafe}%`)
     .limit(6);
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
