@@ -534,7 +534,11 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     Come vuoi indicare la posizione?
                   </p>
                   <button
-                    onClick={() => { setLocMode('gps'); getGPS(); }}
+                    onClick={() => {
+                      setLocMode('gps');
+                      // Piccolo delay per mostrare il pre-prompt prima del dialog del browser
+                      setTimeout(() => getGPS(), 50);
+                    }}
                     style={methodBtn}
                     onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
                     onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
@@ -563,6 +567,20 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               {/* ── GPS path ── */}
               {locMode === 'gps' && !hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
+                  {gpsState === 'idle' && (
+                    <div style={{
+                      background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)',
+                      borderRadius: 8, padding: '16px 14px', textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 6 }}>
+                        Il browser chiederà il permesso per la tua posizione
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.6 }}>
+                        Tocca <strong style={{ color: 'var(--orange)' }}>&quot;Consenti&quot;</strong> quando appare il dialog — serve solo per piazzare il pin sullo spot, non ti tracciamo.
+                      </div>
+                    </div>
+                  )}
                   {gpsState === 'loading' && (
                     <div style={{ textAlign: 'center', padding: '24px 0', fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14 }}>
                       ⏳ Rilevamento GPS in corso...
