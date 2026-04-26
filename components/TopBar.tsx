@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG } from '@/lib/constants';
 import type { SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
 import SideMenu from './SideMenu';
+import NotificationBell from './NotificationBell';
 import Link from 'next/link';
 
 interface TopBarProps {
@@ -41,9 +42,10 @@ export default function TopBar({
   const [searchOpen,      setSearchOpen]      = useState(false);
   const [query,           setQuery]           = useState('');
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
+  const [sessionToken,    setSessionToken]    = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* ── Load current user session for profile button ── */
+  /* ── Load current user session for profile button + notification bell ── */
   useEffect(() => {
     import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
       supabaseBrowser().auth.getSession().then(({ data }) => {
@@ -51,6 +53,7 @@ export default function TopBar({
           ?? data.session?.user?.email?.split('@')[0]
           ?? null;
         setProfileUsername(un);
+        setSessionToken(data.session?.access_token ?? null);
       });
     }).catch(() => {});
   }, []);
@@ -308,6 +311,11 @@ export default function TopBar({
           borderLeft: '1px solid var(--gray-700)',
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
+          {/* Campanella notifiche — solo se loggato */}
+          {sessionToken && (
+            <NotificationBell token={sessionToken} />
+          )}
+
           <a
             href="/preferiti"
             className="favs-chip"
