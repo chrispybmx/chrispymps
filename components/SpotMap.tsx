@@ -424,10 +424,7 @@ export default function SpotMap({
           paddingTopLeft: [32, 32], paddingBottomRight: [32, panelH + 32], animate: true,
         });
       } else {
-        // Nessun filtro + nessun risultato → Italia intera
-        mapInstance.current.fitBounds(L.latLngBounds([[36.5, 6.5], [47.1, 18.5]]), {
-          paddingTopLeft: [16, 16], paddingBottomRight: [16, panelH + 16], animate: true,
-        });
+        // Nessun risultato → lascia la mappa dove si trova (nessun refit)
       }
       return;
     }
@@ -469,13 +466,17 @@ export default function SpotMap({
       return;
     }
 
-    /* Caso 4: solo filtro categoria (no regione, no ricerca) → vista Italia intera
-       così si vedono tutti i cluster distribuiti sulla penisola */
-    mapInstance.current.fitBounds(L.latLngBounds([[36.5, 6.5], [47.1, 18.5]]), {
-      paddingTopLeft:     [16, 16],
-      paddingBottomRight: [16, panelH + 16],
-      animate: true,
-    });
+    /* Caso 4: solo filtro categoria (no regione, no ricerca) → fitBounds sugli spot
+       reali, ovunque si trovino nel mondo — zoom calibrato sulla distribuzione effettiva */
+    {
+      const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
+      mapInstance.current.fitBounds(bounds, {
+        paddingTopLeft:     [32, 32],
+        paddingBottomRight: [32, panelH + 32],
+        maxZoom: 12,
+        animate: true,
+      });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitAllTrigger]);
 
