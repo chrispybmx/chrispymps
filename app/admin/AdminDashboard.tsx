@@ -92,6 +92,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   const [pending,   setPending] = useState<Spot[]>(initialSpots);
   const [allSpots,  setAllSpots] = useState<Spot[]>([]);
   const [loadingAll, setLoadingAll] = useState(false);
+  const [loadingPending, setLoadingPending] = useState(false);
   const [loading,   setLoading] = useState<string | null>(null);
   const [msg,       setMsg]     = useState<string | null>(null);
   const [filterType, setFilterType] = useState<SpotType | 'all'>('all');
@@ -212,6 +213,17 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   }, []);
 
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(null), 4000); };
+
+  /* ── Refresh pending ── */
+  const refreshPending = useCallback(() => {
+    setLoadingPending(true);
+    fetch('/api/admin/all-spots')
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok) setPending((j.data as Spot[]).filter(s => s.status === 'pending'));
+      })
+      .finally(() => setLoadingPending(false));
+  }, []);
 
   /* ── Spot actions ── */
   const handleApprove = useCallback(async (id: string) => {
@@ -391,7 +403,22 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       {/* ── TAB: IN ATTESA ── */}
       {tab === 'pending' && (
         <div style={{ padding: '16px 20px 0' }}>
-          {pending.length === 0 ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)' }}>
+              {pending.length} spot in attesa
+            </span>
+            <button
+              onClick={refreshPending}
+              disabled={loadingPending}
+              className="btn-ghost"
+              style={{ fontSize: 12, opacity: loadingPending ? 0.5 : 1 }}
+            >
+              {loadingPending ? '...' : '🔄 Aggiorna'}
+            </button>
+          </div>
+          {loadingPending ? (
+            <Loading />
+          ) : pending.length === 0 ? (
             <EmptyState icon="✅" text="Coda vuota. Nessuno spot da moderare." />
           ) : (
             pending.map(spot => (
