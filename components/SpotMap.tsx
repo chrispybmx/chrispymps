@@ -261,14 +261,10 @@ export default function SpotMap({
       clusters.forEach((c) => {
         if (!L || !markersRef.current) return;
 
-        const isOne = c.count === 1;
-        /* Dimensioni ridotte: i cerchi non coprono i nomi delle città sulla tile */
-        const radius = isOne ? 6 : Math.min(6 + Math.sqrt(c.count) * 1.6, 15);
-        const label  = isOne
-          ? TIPI_SPOT[c.spots[0].type].emoji
-          : String(c.count);
-
-        const fontSize = isOne ? 11 : Math.max(9, 13 - String(c.count).length);
+        /* Pallino arancione uniforme — sempre, anche per singoli spot */
+        const radius = Math.min(6 + Math.sqrt(c.count) * 1.6, 15);
+        const label  = c.count === 1 ? '' : String(c.count);
+        const fontSize = Math.max(9, 13 - String(c.count).length);
         const html = `<div style="
           width:${radius * 2}px; height:${radius * 2}px;
           background: rgba(255,106,0,0.9);
