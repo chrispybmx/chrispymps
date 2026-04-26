@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { verifyApproveToken, isAdminAuthenticated } from '@/lib/auth';
+import { verifyRejectToken, isAdminAuthenticated } from '@/lib/auth';
 import { sendRejectionEmail } from '@/lib/email';
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
   if (!token) return NextResponse.redirect(new URL('/admin?error=token_missing', req.url));
 
-  // Il token di reject è firmato con prefix "reject:"
-  const payload = verifyApproveToken(token);
-  if (!payload || !payload.startsWith('reject:')) {
+  // BUG-FIX: usa verifyRejectToken dedicato (separatore '|') invece di verifyApproveToken
+  const spotId = verifyRejectToken(token);
+  if (!spotId) {
     return NextResponse.redirect(new URL('/admin?error=token_invalid', req.url));
   }
-  const spotId = payload.replace('reject:', '');
 
   return rejectSpot(spotId, req, undefined);
 }
