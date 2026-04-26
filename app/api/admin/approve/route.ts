@@ -67,7 +67,8 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
   }
 
   if (req.method === 'GET') {
-    return NextResponse.redirect(new URL(`/admin?msg=approved&spot=${spot.name}`, req.url));
+    // SEC-FIX: encodeURIComponent per evitare che caratteri speciali rompano la URL
+    return NextResponse.redirect(new URL(`/admin?msg=approved&spot=${encodeURIComponent(spot.name)}`, req.url));
   }
   return NextResponse.json({ ok: true, data: { id: spotId, slug: spot.slug } });
 }
