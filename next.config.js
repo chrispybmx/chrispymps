@@ -63,11 +63,19 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      // La home "/" serve il contenuto di "/map" senza redirect visibile —
+      // così l'URL in barra rimane maps.chrispybmx.com (niente /map superfluo)
+      { source: '/', destination: '/map' },
+    ];
+  },
   async redirects() {
     return [
-      // SEO-FIX: permanent:true emette 308 (invece di 307) — Google trasferisce
-      // il link equity dalla home alla mappa e non re-indicizza / ogni volta
-      { source: '/', destination: '/map', permanent: true },
+      // Normalizza /map → / con 308 permanente, così i vecchi link
+      // (share, email, backlink) arrivano comunque alla home pulita.
+      // ATTENZIONE: source '/map' matcha solo il path esatto, NON /map/spot ecc.
+      { source: '/map', destination: '/', permanent: true },
     ];
   },
 };
