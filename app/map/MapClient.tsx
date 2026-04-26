@@ -146,22 +146,24 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
   const closeRadiusMode = useCallback(() => { setRadiusMode(false); setRadiusCenter(null); }, []);
 
-  /* Click su uno spot (da mappa o da lista) → espandi card + vola mappa */
+  /* Click su uno spot (da mappa o da lista) → espandi card + vola mappa
+     Zoom 13: mostra il quartiere/zona, non solo il singolo marciapiede,
+     così l'utente capisce subito dove si trova lo spot nel contesto urbano. */
   const handleSpotClick = useCallback((pin: SpotMapPin) => {
     setActiveListId(pin.id);
     setExpandedId(prev => prev === pin.id ? null : pin.id); // toggle
     setScrollToId(pin.id);
-    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 15 });
+    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 13 });
   }, []);
 
-  /* Scroll sync: IO ha visto una card → aggiorna solo mappa, NON espande */
+  /* Scroll sync: IO ha visto una card → aggiorna SOLO il pin attivo (bordo arancione)
+     ma NON muove la mappa. La mappa si muove solo su click esplicito. */
   const handleActivateFromScroll = useCallback((id: string) => {
     fromScrollRef.current = true;
     setActiveListId(id);
-    const spot = filtered.find(s => s.id === id);
-    if (spot) setFlyTarget({ lat: spot.lat, lon: spot.lon, zoom: 15 });
+    // ← nessun setFlyTarget: la mappa resta ferma durante lo scroll
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered]);
+  }, []);
 
   const handleCitySelect = useCallback((city: string, lat: number, lon: number) => {
     setFlyTarget({ lat, lon, zoom: 14 });
