@@ -197,7 +197,7 @@ export default function TopBar({
         <button onClick={() => setMenuOpen(true)} className="btn-ghost" aria-label="Apri menu" style={{ marginRight: 8, fontSize: 22 }}>
           ☰
         </button>
-        <a href="/map" style={{
+        <a href="/" style={{
           fontFamily: 'var(--font-mono)', fontSize: 22,
           color: 'var(--orange)', textDecoration: 'none',
           letterSpacing: '0.05em', flex: 1,
