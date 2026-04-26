@@ -570,7 +570,24 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   )}
                   {gpsState === 'denied' && (
                     <>
-                      <ErrBox msg="Hai negato il permesso GPS. Vai nelle impostazioni del browser, consenti la posizione per questo sito, poi riprova." />
+                      <div style={{
+                        background: 'rgba(255,80,50,0.08)', border: '1px solid rgba(255,80,50,0.25)',
+                        borderRadius: 8, padding: '12px 14px',
+                        fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6b6b', lineHeight: 1.7,
+                      }}>
+                        <div style={{ marginBottom: 6 }}>⚠ Permesso posizione bloccato.</div>
+                        <div style={{ color: 'var(--gray-300)', fontSize: 11 }}>
+                          <strong style={{ color: 'var(--bone)' }}>📱 iPhone/Safari:</strong><br />
+                          Impostazioni → Privacy → Servizi di localizzazione → Safari → <em>Mentre si usa l&apos;app</em>
+                        </div>
+                        <div style={{ color: 'var(--gray-300)', fontSize: 11, marginTop: 6 }}>
+                          <strong style={{ color: 'var(--bone)' }}>🤖 Android/Chrome:</strong><br />
+                          Tocca il lucchetto nella barra URL → Autorizzazioni → Posizione → Consenti
+                        </div>
+                      </div>
+                      <button onClick={() => { setGpsState('idle'); getGPS(); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                        🔄 Riprova GPS
+                      </button>
                       <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
                         🗺️ Inserisci posizione manualmente
                       </button>
