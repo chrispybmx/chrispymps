@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { signIn, signUp, checkUsername } from '@/lib/auth-client';
 
 interface AuthModalProps {
@@ -29,6 +29,10 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [loginEmail,    setLoginEmail]    = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
+  // BUG-FIX: useRef per il timer debounce — una variabile locale viene ricreata
+  // a ogni render e clearTimeout non annulla mai il timer precedente
+  const unDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const resetAll = () => {
     setError(null); setDone(null); setLoading(false);
     setRegUsername(''); setRegEmail(''); setRegPassword('');
@@ -39,15 +43,14 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const handleClose = () => { resetAll(); onClose(); };
 
   // Controlla username mentre l'utente scrive
-  let unDebounce: ReturnType<typeof setTimeout>;
   const onUsernameChange = (val: string) => {
     const clean = val.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
     setRegUsername(clean);
     setUsernameOk(null);
-    clearTimeout(unDebounce);
+    if (unDebounceRef.current) clearTimeout(unDebounceRef.current);
     if (clean.length < 3) return;
     setCheckingUn(true);
-    unDebounce = setTimeout(async () => {
+    unDebounceRef.current = setTimeout(async () => {
       const free = await checkUsername(clean);
       setUsernameOk(free);
       setCheckingUn(false);
