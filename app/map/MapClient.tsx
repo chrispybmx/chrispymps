@@ -625,6 +625,13 @@ function SpotListPanel({
                       style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 4, width: 34, height: 34, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {myFav ? '❤️' : '🤍'}
                     </button>
+
+                    {/* X chiudi — in alto a destra */}
+                    <button
+                      onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
+                      style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: 16, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, zIndex: 2 }}
+                      aria-label="Chiudi"
+                    >✕</button>
                   </div>
                 ) : (
                   /* Nessuna foto */
@@ -695,14 +702,14 @@ function SpotListPanel({
               </div>
 
             ) : (
-              /* ══ COMPACT LAYOUT (invariato) ══ */
+              /* ══ COMPACT LAYOUT ══ */
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px' }}>
-                {/* Thumbnail */}
-                <div style={{ flexShrink: 0, width: 76, height: 76, borderRadius: 4, overflow: 'hidden', background: 'var(--gray-700)', border: isAct ? '2px solid var(--orange)' : '1px solid rgba(255,255,255,0.07)' }}>
+                {/* Thumbnail più grande */}
+                <div style={{ flexShrink: 0, width: 96, height: 96, borderRadius: 6, overflow: 'hidden', background: 'var(--gray-700)', border: isAct ? '2px solid var(--orange)' : '1px solid rgba(255,255,255,0.07)' }}>
                   {spot.cover_url ? (
                     <img src={spot.cover_url} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                   ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, opacity: 0.3 }}>{tipo.emoji}</div>
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, opacity: 0.3 }}>{tipo.emoji}</div>
                   )}
                 </div>
 
