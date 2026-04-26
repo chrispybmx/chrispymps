@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { LINKS } from '@/lib/constants';
 
 export const metadata: Metadata = {
-  title:       'Supporta ChrispyMPS',
+  title:       'Supporta Chrispy Maps',
   description: 'Vuoi supportare la mappa BMX italiana? Il modo migliore è aggiungere uno spot. Oppure dona via Revolut o Bitcoin.',
 };
 
@@ -75,7 +75,7 @@ export default async function SupportPage() {
             color: 'var(--gray-400)', fontSize: 15,
             lineHeight: 1.7, margin: 0, maxWidth: 440,
           }}>
-            ChrispyMPS è gratuito, senza pubblicità, costruito nel tempo
+            Chrispy Maps è gratuito, senza pubblicità, costruito nel tempo
             libero tra una session e l&apos;altra. Funziona quanto le persone
             che lo alimentano.
           </p>
@@ -300,7 +300,7 @@ export default async function SupportPage() {
             margin: '0 0 16px', fontStyle: 'italic',
           }}>
             &ldquo;Ci sono mille app di mappe. Nessuna è fatta da chi fa BMX,
-            per chi fa BMX. ChrispyMPS esiste perché la scena italiana
+            per chi fa BMX. Chrispy Maps esiste perché la scena italiana
             merita uno strumento suo.&rdquo;
           </p>
           <div style={{
