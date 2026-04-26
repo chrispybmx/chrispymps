@@ -1,7 +1,18 @@
 import { Resend } from 'resend';
-import { generateApproveToken } from './auth';
+import { generateApproveToken, generateRejectToken } from './auth';
 import { APP_CONFIG } from './constants';
 import type { Spot, Contributor } from './types';
+
+/** Escapa i caratteri HTML speciali per prevenire XSS nelle email HTML */
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 let _resend: Resend | null = null;
 function resend(): Resend {
@@ -18,17 +29,29 @@ const FROM_EMAIL = 'ChrispyMPS <noreply@chrispybmx.com>';
 // ===== EMAIL ALL'ADMIN: nuovo spot da moderare =====
 export async function sendAdminNotification(spot: Spot, contributor: Contributor): Promise<void> {
   const approveToken  = generateApproveToken(spot.id);
-  const rejectToken   = generateApproveToken(`reject:${spot.id}`);
+  const rejectToken   = generateRejectToken(spot.id);   // BUG-FIX: token dedicato con separatore '|'
   const baseUrl       = APP_CONFIG.url;
 
   const approveUrl = `${baseUrl}/api/admin/approve?token=${approveToken}`;
   const rejectUrl  = `${baseUrl}/api/admin/reject?token=${rejectToken}`;
   const adminUrl   = `${baseUrl}/admin`;
 
+  // SEC-FIX: escape tutti i campi user-controlled per prevenire XSS in webmail
+  const eName = escapeHtml(spot.name);
+  const eType = escapeHtml(spot.type);
+  const eCity = escapeHtml(spot.city ?? '—');
+  const eCondition = escapeHtml(spot.condition);
+  const eSurface = escapeHtml(spot.surface ?? '—');
+  const eDescription = escapeHtml(spot.description);
+  const eGuardians = escapeHtml(spot.guardians);
+  const eContribName = escapeHtml(contributor.name);
+  const eContribEmail = escapeHtml(contributor.email);
+  const eInstagram = escapeHtml(contributor.instagram_handle);
+
   await resend().emails.send({
     from:    FROM_EMAIL,
     to:      APP_CONFIG.adminEmail,
-    subject: `🏴 Nuovo spot: ${spot.name} (${spot.city ?? 'Italia'})`,
+    subject: `🏴 Nuovo spot: ${eName} (${eCity})`,
     html: `
 <!DOCTYPE html>
 <html lang="it">
@@ -47,18 +70,18 @@ export async function sendAdminNotification(spot: Spot, contributor: Contributor
 </style></head>
 <body><div class="card">
   <h1>🏴 NUOVO SPOT DA MODERARE</h1>
-  <div class="row"><span class="label">Nome:</span>      <span class="val">${spot.name}</span></div>
-  <div class="row"><span class="label">Tipo:</span>      <span class="val">${spot.type}</span></div>
-  <div class="row"><span class="label">Città:</span>     <span class="val">${spot.city ?? '—'}</span></div>
-  <div class="row"><span class="label">Condizione:</span><span class="val">${spot.condition}</span></div>
-  <div class="row"><span class="label">Superficie:</span><span class="val">${spot.surface ?? '—'}</span></div>
+  <div class="row"><span class="label">Nome:</span>      <span class="val">${eName}</span></div>
+  <div class="row"><span class="label">Tipo:</span>      <span class="val">${eType}</span></div>
+  <div class="row"><span class="label">Città:</span>     <span class="val">${eCity}</span></div>
+  <div class="row"><span class="label">Condizione:</span><span class="val">${eCondition}</span></div>
+  <div class="row"><span class="label">Superficie:</span><span class="val">${eSurface}</span></div>
   <div class="row"><span class="label">Cera:</span>      <span class="val">${spot.wax_needed ? 'Sì' : 'No'}</span></div>
-  ${spot.description ? `<div class="row"><span class="label">Descrizione:</span><span class="val">${spot.description}</span></div>` : ''}
-  ${spot.guardians ? `<div class="row"><span class="label">Note accesso:</span><span class="val">${spot.guardians}</span></div>` : ''}
+  ${eDescription ? `<div class="row"><span class="label">Descrizione:</span><span class="val">${eDescription}</span></div>` : ''}
+  ${eGuardians ? `<div class="row"><span class="label">Note accesso:</span><span class="val">${eGuardians}</span></div>` : ''}
   <div class="row"><span class="label">GPS:</span>       <span class="val">${spot.lat.toFixed(6)}, ${spot.lon.toFixed(6)}</span></div>
   <hr class="sep">
-  <div class="row"><span class="label">Da:</span>        <span class="val">${contributor.name} (${contributor.email})</span></div>
-  ${contributor.instagram_handle ? `<div class="row"><span class="label">Instagram:</span><span class="val">@${contributor.instagram_handle}</span></div>` : ''}
+  <div class="row"><span class="label">Da:</span>        <span class="val">${eContribName} (${eContribEmail})</span></div>
+  ${eInstagram ? `<div class="row"><span class="label">Instagram:</span><span class="val">@${eInstagram}</span></div>` : ''}
   <hr class="sep">
   <a href="${approveUrl}" class="btn btn-approve">✅ APPROVA</a>
   <a href="${rejectUrl}"  class="btn btn-reject">❌ RIFIUTA</a>
@@ -76,10 +99,14 @@ export async function sendContributorConfirmation(
   contributor: Contributor,
   spot: Spot
 ): Promise<void> {
+  const eName = escapeHtml(spot.name);
+  const eCity = escapeHtml(spot.city);
+  const eContribName = escapeHtml(contributor.name);
+
   await resend().emails.send({
     from:    FROM_EMAIL,
     to:      contributor.email,
-    subject: `Spot ricevuto: ${spot.name} 🏴`,
+    subject: `Spot ricevuto: ${eName} 🏴`,
     html: `
 <!DOCTYPE html>
 <html lang="it">
@@ -93,14 +120,14 @@ export async function sendContributorConfirmation(
 </style></head>
 <body><div class="card">
   <h1>SPOT RICEVUTO 🏴</h1>
-  <p>Ciao <span class="highlight">${contributor.name}</span>,</p>
-  <p>ho ricevuto il tuo spot <strong>${spot.name}</strong>${spot.city ? ` a ${spot.city}` : ''}.</p>
+  <p>Ciao <span class="highlight">${eContribName}</span>,</p>
+  <p>ho ricevuto il tuo spot <strong>${eName}</strong>${eCity ? ` a ${eCity}` : ''}.</p>
   <p>Lo do un'occhiata il prima possibile. Se è tutto ok lo troverai sulla mappa entro 24-48 ore.</p>
   <p>Grazie per contribuire alla mappa — senza gente come te questo progetto non esisterebbe.</p>
   <div class="sig">
     <p>— Chrispy<br>
     <a href="https://www.instagram.com/chrispy_bmx" style="color:#ff6a00;">@chrispy_bmx</a> |
-    <a href="https://chrispybmx.com/map" style="color:#ff6a00;">chrispybmx.com/map</a></p>
+    <a href="${APP_CONFIG.mapUrl}" style="color:#ff6a00;">maps.chrispybmx.com</a></p>
   </div>
 </div></body></html>
     `.trim(),
@@ -113,11 +140,14 @@ export async function sendApprovalEmail(
   spot: Spot
 ): Promise<void> {
   const spotUrl = `${APP_CONFIG.url}/map/spot/${spot.slug}`;
+  const eName = escapeHtml(spot.name);
+  const eCity = escapeHtml(spot.city);
+  const eContribName = escapeHtml(contributor.name);
 
   await resend().emails.send({
     from:    FROM_EMAIL,
     to:      contributor.email,
-    subject: `Il tuo spot è online! ${spot.name} ✅`,
+    subject: `Il tuo spot è online! ${eName} ✅`,
     html: `
 <!DOCTYPE html>
 <html lang="it">
@@ -132,8 +162,8 @@ export async function sendApprovalEmail(
 </style></head>
 <body><div class="card">
   <h1>SPOT APPROVATO ✅</h1>
-  <p>Ciao <span class="highlight">${contributor.name}</span>,</p>
-  <p>il tuo spot <strong>${spot.name}</strong>${spot.city ? ` a ${spot.city}` : ''} è ora visibile sulla mappa!</p>
+  <p>Ciao <span class="highlight">${eContribName}</span>,</p>
+  <p>il tuo spot <strong>${eName}</strong>${eCity ? ` a ${eCity}` : ''} è ora visibile sulla mappa!</p>
   <p>Condividilo con la crew — ogni link condiviso aiuta la mappa a crescere.</p>
   <a href="${spotUrl}" class="btn">Vedi il tuo spot →</a>
   <div class="sig">
@@ -151,10 +181,14 @@ export async function sendRejectionEmail(
   spot: Spot,
   reason?: string
 ): Promise<void> {
+  const eName = escapeHtml(spot.name);
+  const eContribName = escapeHtml(contributor.name);
+  const eReason = escapeHtml(reason);
+
   await resend().emails.send({
     from:    FROM_EMAIL,
     to:      contributor.email,
-    subject: `Spot non approvato: ${spot.name}`,
+    subject: `Spot non approvato: ${eName}`,
     html: `
 <!DOCTYPE html>
 <html lang="it">
@@ -168,9 +202,9 @@ export async function sendRejectionEmail(
 </style></head>
 <body><div class="card">
   <h1>SPOT NON APPROVATO</h1>
-  <p>Ciao ${contributor.name},</p>
-  <p>ho dovuto scartare lo spot <strong>${spot.name}</strong>.</p>
-  ${reason ? `<div class="reason">${reason}</div>` : ''}
+  <p>Ciao ${eContribName},</p>
+  <p>ho dovuto scartare lo spot <strong>${eName}</strong>.</p>
+  ${eReason ? `<div class="reason">${eReason}</div>` : ''}
   <p>Puoi riprovare con un altro spot — ogni contributo è benvenuto.</p>
   <div class="sig">
     <p>— Chrispy<br>
