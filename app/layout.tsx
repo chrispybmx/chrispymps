@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     'dove fare BMX', 'dove andare con lo scooter', 'dove skate in Italia',
     'trovare spot skate', 'skatepark vicino a me', 'park scooter vicino a me',
     // Brand
-    'Chrispy BMX', 'ChrispyMPS', 'chrispy maps',
+    'Chrispy BMX', 'Chrispy Maps', 'chrispy maps',
   ],
   authors:  [{ name: 'Chrispy BMX', url: APP_CONFIG.url }],
   creator:  'Chrispy BMX',
@@ -82,7 +82,7 @@ const websiteJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'Chrispy Maps',
-  alternateName: ['ChrispyMPS', 'Chrispy BMX Maps'],
+  alternateName: ['Chrispy Maps', 'Chrispy BMX Maps'],
   url: APP_CONFIG.url,
   description: APP_CONFIG.description,
   inLanguage: 'it-IT',
