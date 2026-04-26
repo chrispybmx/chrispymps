@@ -66,6 +66,17 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
     sendApprovalEmail(spot.contributors, spot).catch(console.error);
   }
 
+  // Notifica in-app all'utente autenticato che ha inviato lo spot (fire-and-forget)
+  if (spot.submitted_by_user_id) {
+    supabase.from('notifications').insert({
+      user_id:   spot.submitted_by_user_id,
+      type:      'spot_approved',
+      title:     `"${spot.name}" è stato approvato! 🎉`,
+      body:      'Il tuo spot è ora visibile sulla mappa. Grazie per il contributo!',
+      spot_slug: spot.slug,
+    }).then().catch(console.error);
+  }
+
   if (req.method === 'GET') {
     // SEC-FIX: encodeURIComponent per evitare che caratteri speciali rompano la URL
     return NextResponse.redirect(new URL(`/admin?msg=approved&spot=${encodeURIComponent(spot.name)}`, req.url));
