@@ -44,7 +44,7 @@ export default async function SupportPage() {
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 20px 0' }}>
 
         {/* ── Back ── */}
-        <Link href="/map" className="sup-back" style={{
+        <Link href="/" className="sup-back" style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           color: 'var(--gray-500)', fontFamily: 'var(--font-mono)',
           fontSize: 12, textDecoration: 'none', letterSpacing: '0.05em',
