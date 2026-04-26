@@ -581,13 +581,13 @@ function SpotListPanel({
                   <div style={{ position: 'relative', background: '#0a0a0a' }}>
                     {/* Immagine principale — cliccabile per lightbox */}
                     <div
-                      style={{ height: 220, overflow: 'hidden', cursor: 'zoom-in' }}
+                      style={{ height: 'clamp(200px, 55vw, 360px)', overflow: 'hidden', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={e => { e.stopPropagation(); setLightbox({ urls: allPhotos, idx: curPhotoIdx }); }}
                     >
                       <img
                         src={curPhoto}
                         alt={spot.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
                         loading="lazy"
                       />
                       {/* Icona zoom */}
