@@ -51,10 +51,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ ok: false, error: 'Commento tra 2 e 500 caratteri.' }, { status: 400 });
   }
 
-  // Trova spot
+  // Trova spot — include submitted_by_user_id e name per la notifica
   const { data: spot } = await admin
     .from('spots')
-    .select('id')
+    .select('id, name, slug, submitted_by_user_id')
     .eq('slug', params.slug)
     .eq('status', 'approved')
     .maybeSingle();
@@ -80,6 +80,18 @@ export async function POST(req: NextRequest, { params }: Props) {
     .single();
 
   if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
+
+  // Notifica in-app al proprietario dello spot (se diverso dal commentatore) — fire-and-forget
+  if (spot.submitted_by_user_id && spot.submitted_by_user_id !== user.id) {
+    const preview = text.length > 80 ? text.slice(0, 80) + '…' : text;
+    admin.from('notifications').insert({
+      user_id:   spot.submitted_by_user_id,
+      type:      'comment_on_spot',
+      title:     `Nuovo commento su "${spot.name}"`,
+      body:      `@${username}: ${preview}`,
+      spot_slug: spot.slug,
+    }).then().catch(console.error);
+  }
 
   return NextResponse.json({ ok: true, data: comment }, { status: 201 });
 }
