@@ -98,6 +98,14 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
+
+  /* Auto-espandi il pannello quando si apre una card */
+  useEffect(() => {
+    if (expandedId) {
+      const minH = Math.min(Math.round(window.innerHeight * 0.72), 580);
+      setPanelHeight(h => h < minH ? minH : h);
+    }
+  }, [expandedId]);
   const [scrollToId,   setScrollToId]   = useState<string | null>(null);
   /* flag: cambiamento viene dallo scroll (IO) → non ri-flyare */
   const fromScrollRef = useRef(false);
@@ -581,7 +589,7 @@ function SpotListPanel({
                   <div style={{ position: 'relative', background: '#0a0a0a' }}>
                     {/* Immagine principale — cliccabile per lightbox */}
                     <div
-                      style={{ height: 'clamp(200px, 55vw, 360px)', overflow: 'hidden', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ height: 240, overflow: 'hidden', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={e => { e.stopPropagation(); setLightbox({ urls: allPhotos, idx: curPhotoIdx }); }}
                     >
                       <img
