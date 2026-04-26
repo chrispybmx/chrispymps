@@ -62,6 +62,39 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     if (autoAdd) setAddOpen(true);
   }, [autoAdd]);
 
+  /* ── Pannello ridimensionabile ── */
+  const DEFAULT_PANEL_H = () =>
+    typeof window !== 'undefined'
+      ? Math.min(480, Math.max(270, window.innerHeight * 0.54))
+      : 320;
+  const [panelHeight, setPanelHeight] = useState<number>(320);
+  useEffect(() => { setPanelHeight(DEFAULT_PANEL_H()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const dragState = useRef<{ startY: number; startH: number } | null>(null);
+
+  const onDragStart = useCallback((e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragState.current = { startY: e.clientY, startH: panelHeight };
+  }, [panelHeight]);
+
+  const onDragMove = useCallback((e: React.PointerEvent) => {
+    if (!dragState.current) return;
+    const delta  = dragState.current.startY - e.clientY; // positivo = su = pannello più alto
+    const newH   = Math.min(
+      window.innerHeight * 0.88,
+      Math.max(44, dragState.current.startH + delta),
+    );
+    setPanelHeight(newH);
+  }, []);
+
+  const onDragEnd = useCallback((e: React.PointerEvent) => {
+    if (!dragState.current) return;
+    /* Snap su/giù: se < 120px → collassa a 44; se > 75% vh → espandi a 88% */
+    const h = dragState.current.startH + (dragState.current.startY - e.clientY);
+    if (h < 120) setPanelHeight(44);
+    else if (h > window.innerHeight * 0.75) setPanelHeight(Math.round(window.innerHeight * 0.88));
+    dragState.current = null;
+  }, []);
+
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
@@ -221,40 +254,68 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         {radiusMode && !radiusCenter && <RadiusToast />}
       </div>
 
-      {/* ── OVERLAY LISTA — galleggia sulla mappa ── */}
+      {/* ── OVERLAY LISTA — galleggia sulla mappa, altezza regolabile ── */}
       <div style={{
         position: 'fixed',
         bottom: 0, left: 0, right: 0,
         zIndex: 10,
-        height: 'clamp(270px, 54dvh, 480px)',
+        height: panelHeight,
         display: 'flex', flexDirection: 'column',
         pointerEvents: 'none',
+        transition: dragState.current ? 'none' : 'height 0.18s ease',
       }}>
+        {/* ── DRAG HANDLE ── */}
+        <div
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0,
+            height: 36, zIndex: 2,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 4,
+            cursor: 'ns-resize',
+            pointerEvents: 'all',
+            touchAction: 'none',
+          }}
+        >
+          {/* pill */}
+          <div style={{
+            width: 40, height: 4, borderRadius: 3,
+            background: 'rgba(255,255,255,0.28)',
+            marginTop: 10,
+          }} />
+        </div>
+
         {/* Gradiente fade */}
         <div style={{
           height: 56, flexShrink: 0,
           background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.88) 100%)',
+          pointerEvents: 'none',
         }} />
 
-        {/* Pannello scroll */}
-        <div style={{
-          flex: 1,
-          background: 'rgba(10,10,10,0.94)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
-          overflow: 'hidden',
-          pointerEvents: 'all',
-        }}>
-          <SpotListPanel
-            spots={filtered}
-            activeId={activeListId}
-            expandedId={expandedId}
-            onActivate={handleActivateFromScroll}
-            onSpotClick={handleSpotClick}
-            scrollToId={scrollToId}
-            onScrolled={() => setScrollToId(null)}
-          />
-        </div>
+        {/* Pannello scroll — visibile solo se il pannello è abbastanza alto */}
+        {panelHeight > 80 && (
+          <div style={{
+            flex: 1,
+            background: 'rgba(10,10,10,0.94)',
+            backdropFilter: 'blur(18px)',
+            WebkitBackdropFilter: 'blur(18px)',
+            overflow: 'hidden',
+            pointerEvents: 'all',
+          }}>
+            <SpotListPanel
+              spots={filtered}
+              activeId={activeListId}
+              expandedId={expandedId}
+              onActivate={handleActivateFromScroll}
+              onSpotClick={handleSpotClick}
+              scrollToId={scrollToId}
+              onScrolled={() => setScrollToId(null)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Radius sheet */}
