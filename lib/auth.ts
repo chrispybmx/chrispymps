@@ -107,6 +107,7 @@ export function clearAdminCookieHeader(): string {
 /**
  * Genera un token di approvazione spot (link email).
  * Il token contiene: spotId + timestamp, firmato HMAC.
+ * Usa ':' come separatore — spotId è sempre un UUID senza ':'
  */
 export function generateApproveToken(spotId: string): string {
   const timestamp = Date.now().toString();
@@ -132,6 +133,47 @@ export function verifyApproveToken(token: string, maxHours = 72): string | null 
 
     // Verifica firma
     const payload = `${spotId}:${timestamp}`;
+    const expected = createHmac('sha256', getSecret()).update(payload).digest('hex');
+    if (!timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
+
+    return spotId;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Genera un token di RIFIUTO spot (link email).
+ * Usa '|' come separatore per evitare conflitti con i ':' degli UUID.
+ * BUG-FIX: in precedenza si usava generateApproveToken('reject:<uuid>') che
+ * produceva 4 segmenti quando diviso per ':' e quindi verifyApproveToken
+ * restituiva sempre null.
+ */
+export function generateRejectToken(spotId: string): string {
+  const timestamp = Date.now().toString();
+  const payload = `reject|${spotId}|${timestamp}`;
+  const sig = createHmac('sha256', getSecret()).update(payload).digest('hex');
+  return Buffer.from(`${payload}|${sig}`).toString('base64url');
+}
+
+/**
+ * Verifica e decodifica un token di rifiuto.
+ * Restituisce lo spotId se valido, null altrimenti.
+ */
+export function verifyRejectToken(token: string, maxHours = 72): string | null {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString();
+    const parts = decoded.split('|');
+    if (parts.length !== 4) return null;
+    const [prefix, spotId, timestamp, sig] = parts;
+    if (prefix !== 'reject') return null;
+
+    // Scadenza
+    const age = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
+    if (age > maxHours) return null;
+
+    // Verifica firma
+    const payload = `reject|${spotId}|${timestamp}`;
     const expected = createHmac('sha256', getSecret()).update(payload).digest('hex');
     if (!timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
 
