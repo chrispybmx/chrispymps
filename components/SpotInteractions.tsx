@@ -145,7 +145,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
           <p style={{ color: 'var(--gray-400)', fontSize: 14, marginBottom: 12 }}>
             Accedi per commentare o segnare che hai girato qui
           </p>
-          <a href="/map" style={{
+          <a href="/" style={{
             display: 'inline-block', background: 'var(--orange)', color: '#000',
             fontFamily: 'var(--font-mono)', fontSize: 12, padding: '8px 20px',
             borderRadius: 6, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.04em',
