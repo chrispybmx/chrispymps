@@ -30,8 +30,8 @@ const securityHeaders = [
       "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co",
       // Worker per Leaflet
       "worker-src blob:",
-      // Frame: solo OSM per anteprima mappa
-      "frame-src https://*.openstreetmap.org",
+      // Frame: OSM per anteprima mappa + YouTube per video spot (SEC-FIX: aggiunto youtube)
+      "frame-src https://*.openstreetmap.org https://www.youtube.com https://www.youtube-nocookie.com",
       // Object: nessuno
       "object-src 'none'",
       // Base URI limitata
@@ -65,7 +65,9 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: '/', destination: '/map', permanent: false },
+      // SEO-FIX: permanent:true emette 308 (invece di 307) — Google trasferisce
+      // il link equity dalla home alla mappa e non re-indicizza / ogni volta
+      { source: '/', destination: '/map', permanent: true },
     ];
   },
 };
