@@ -23,6 +23,8 @@ interface TopBarProps {
   onCitySelect:      (city: string, lat: number, lon: number) => void;
   onSpotSelect:      (pin: SpotMapPin) => void;
   onOpenAuth?:       () => void;
+  darkMap?:          boolean;
+  onToggleDarkMap?:  () => void;
 }
 
 interface NominatimPlace {
@@ -37,6 +39,7 @@ export default function TopBar({
   onSearch, onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onAddSpot,
   activeType, activeRegion, activeCondition, activeDifficulty,
   spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
+  darkMap, onToggleDarkMap,
 }: TopBarProps) {
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [searchOpen,      setSearchOpen]      = useState(false);
@@ -302,6 +305,27 @@ export default function TopBar({
           borderLeft: '1px solid var(--gray-700)',
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
+          {/* Toggle mappa chiara/scura */}
+          {onToggleDarkMap && (
+            <button
+              onClick={onToggleDarkMap}
+              title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
+              style={{
+                background: darkMap ? 'rgba(255,106,0,0.15)' : 'transparent',
+                border: `1px solid ${darkMap ? 'var(--orange)' : 'var(--gray-600)'}`,
+                borderRadius: 4,
+                width: 30, height: 30, fontSize: 15,
+                color: darkMap ? 'var(--orange)' : 'var(--gray-400)',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 0.15s',
+              }}
+            >
+              {darkMap ? '🌞' : '🌑'}
+            </button>
+          )}
+
           {/* Campanella notifiche — solo se loggato */}
           {sessionToken && (
             <NotificationBell token={sessionToken} />
