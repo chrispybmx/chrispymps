@@ -6,7 +6,7 @@ import { subscribeToNewsletter } from '@/lib/mailerlite';
 
 const SpotSchema = z.object({
   name:         z.string().min(2).max(100),
-  type:         z.enum(['street','park','diy','rail','ledge','trail','plaza','gap','bowl']),
+  type:         z.enum(['street','park','diy','rail','ledge','trail','plaza','gap','bowl','pumptrack']),
   lat:          z.number().min(-90).max(90),
   lon:          z.number().min(-180).max(180),
   city:         z.string().max(60).optional(),
