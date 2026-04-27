@@ -1117,7 +1117,7 @@ function SpotListPanel({
 
                 {/* Thumbnail strip */}
                 {allPhotos.length > 1 && (
-                  <div style={{ display: 'flex', gap: 4, padding: '6px 10px', background: '#080808', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
+                  <div style={{ display: 'flex', gap: 4, padding: '6px 10px', background: '#0a0a0a', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
                     {allPhotos.map((url, i) => (
                       <button key={i} className="thumb-btn" onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, i); }}
                         style={{ flexShrink: 0, width: 52, height: 40, border: `2px solid ${i === curPhotoIdx ? 'var(--orange)' : 'transparent'}`, borderRadius: 3, overflow: 'hidden', padding: 0, cursor: 'pointer', background: '#111' }}>
@@ -1128,7 +1128,7 @@ function SpotListPanel({
                 )}
 
                 {/* Info testo — compatto */}
-                <div style={{ padding: '10px 12px 12px' }}>
+                <div style={{ padding: '10px 12px 12px', background: '#0a0a0a' }}>
                   {/* Nome + badges in una riga */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
                     <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--orange)', lineHeight: 1.2 }}>
