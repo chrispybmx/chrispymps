@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminCard from '@/components/AdminCard';
+import { compressImage } from '@/lib/compress-image';
 import AdminImportKML from '@/components/AdminImportKML';
 import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
@@ -1179,8 +1180,9 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
     setUploading(true);
     setErr(null);
     try {
+      const compressed = await compressImage(file);
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', compressed);
       const res  = await fetch('/api/admin/upload-cover', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.ok) {
