@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TIPI_SPOT, CITTA_ITALIANE, CONDIZIONI, DIFFICOLTA, SUPERFICI } from '@/lib/constants';
 import type { Spot, SpotType, SpotCondition, SpotPhoto } from '@/lib/types';
+import { compressImage } from '@/lib/compress-image';
 
 interface Props { spot: Spot }
 
@@ -82,7 +83,11 @@ export default function AdminEditClient({ spot: initial }: Props) {
     try {
       const fd = new FormData();
       fd.append('spot_id', spot.id);
-      Array.from(files).slice(0, 5).forEach((f, i) => fd.append(`photo_${i}`, f));
+      /* Comprimi ogni foto prima dell'upload (iPhone = ~9MB → ~600KB) */
+      const compressed = await Promise.all(
+        Array.from(files).slice(0, 5).map(f => compressImage(f))
+      );
+      compressed.forEach((f, i) => fd.append(`photo_${i}`, f));
       const res  = await fetch('/api/admin/upload-photo', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.ok) {
