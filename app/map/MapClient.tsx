@@ -288,17 +288,33 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* Click su uno spot (da mappa o da lista) → espandi card + vola mappa
      Zoom 13: mostra il quartiere/zona, non solo il singolo marciapiede,
      così l'utente capisce subito dove si trova lo spot nel contesto urbano. */
+  /* Lock temporaneo: impedisce all'IntersectionObserver di sovrascrivere
+     l'activeListId subito dopo la chiusura di una card (il collasso cambia
+     le altezze e il IO si riattiverebbe sullo spot sbagliato). */
+  const ioLockRef = useRef(false);
+
   const handleSpotClick = useCallback((pin: SpotMapPin) => {
     setActiveListId(pin.id);
-    setExpandedId(prev => prev === pin.id ? null : pin.id); // toggle
-    // Delay scroll: aspetta che il pannello finisca di espandersi prima di scrollare
-    setTimeout(() => setScrollToId(pin.id), 260);
+    setExpandedId(prev => {
+      const isClosing = prev === pin.id;
+      if (isClosing) {
+        /* Chiusura: non scrollare (la card è già visibile) e blocca il IO
+           per 300 ms così il bordo arancione rimane sullo spot chiuso. */
+        ioLockRef.current = true;
+        setTimeout(() => { ioLockRef.current = false; }, 300);
+      } else {
+        /* Apertura: scroll dopo l'espansione */
+        setTimeout(() => setScrollToId(pin.id), 260);
+      }
+      return isClosing ? null : pin.id;
+    });
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 13 });
   }, []);
 
   /* Scroll sync: IO ha visto una card → aggiorna SOLO il pin attivo (bordo arancione)
      ma NON muove la mappa. La mappa si muove solo su click esplicito. */
   const handleActivateFromScroll = useCallback((id: string) => {
+    if (ioLockRef.current) return; // lock attivo — ignora
     fromScrollRef.current = true;
     setActiveListId(id);
     // ← nessun setFlyTarget: la mappa resta ferma durante lo scroll
