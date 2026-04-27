@@ -72,7 +72,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [panelHeight,   setPanelHeight]   = useState<number>(320);
   const [panelSnapping, setPanelSnapping] = useState(false); // true durante animazione snap
   useEffect(() => { setPanelHeight(DEFAULT_PANEL_H()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const dragState = useRef<{ startY: number; startH: number } | null>(null);
+  const dragState  = useRef<{ startY: number; startH: number } | null>(null);
+  const didDragRef = useRef(false); // distingue tap da drag sul grip
 
   const snapTo = useCallback((h: number) => {
     setPanelSnapping(true);
@@ -83,11 +84,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const onDragStart = useCallback((e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragState.current = { startY: e.clientY, startH: panelHeight };
+    didDragRef.current = false;
   }, [panelHeight]);
 
   const onDragMove = useCallback((e: React.PointerEvent) => {
     if (!dragState.current) return;
     const delta = dragState.current.startY - e.clientY;
+    if (Math.abs(delta) > 6) didDragRef.current = true;
     const newH  = Math.min(
       window.innerHeight * 0.88,
       Math.max(PANEL_MIN, dragState.current.startH + delta),
@@ -97,12 +100,14 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
   const onDragEnd = useCallback((e: React.PointerEvent) => {
     if (!dragState.current) return;
-    const h = dragState.current.startH + (dragState.current.startY - e.clientY);
-    dragState.current = null;
-    if (h < PANEL_SNAP)                     snapTo(PANEL_MIN);
+    const h       = dragState.current.startH + (dragState.current.startY - e.clientY);
+    const wasTap  = !didDragRef.current;
+    dragState.current  = null;
+    didDragRef.current = false;
+    if (wasTap)                             snapTo(PANEL_MIN);          // tap sul grip → chiude
+    else if (h < PANEL_SNAP)               snapTo(PANEL_MIN);
     else if (h > window.innerHeight * 0.75) snapTo(Math.round(window.innerHeight * 0.88));
-    // altrimenti rimane dov'è
-  }, [PANEL_SNAP, snapTo]);
+  }, [PANEL_SNAP, PANEL_MIN, snapTo]);
 
   /* ── Radius search ── dichiarati PRIMA di filtered che li usa ── */
   const [radiusMode,      setRadiusMode]      = useState(false);
@@ -668,12 +673,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         </div>
       )}
 
-      {/* ── TAB FISSO — sempre visibile, toggle su/giù ── */}
+      {/* ── TAB FISSO — sempre visibile, apre il pannello ── */}
       <div
-        onClick={() => {
-          if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H());
-          else snapTo(PANEL_MIN);
-        }}
+        onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
         style={{
           position: 'fixed',
           bottom: 0, left: '50%',
@@ -692,12 +694,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           userSelect: 'none',
         }}
       >
-        <span style={{
-          fontSize: 15,
-          display: 'inline-block',
-          transition: 'transform 0.25s ease',
-          transform: panelHeight <= PANEL_MIN + 10 ? 'rotate(0deg)' : 'rotate(180deg)',
-        }}>↑</span>
+        <span style={{ fontSize: 15 }}>↑</span>
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: 13,
           color: 'var(--orange)', letterSpacing: '0.05em',
