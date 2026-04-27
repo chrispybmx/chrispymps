@@ -1398,18 +1398,6 @@ function SpotListPanel({
               </div>
             )}
 
-            {/* 📍 Directions — appare quando lo spot è attivo e non espanso */}
-            {isAct && !isExp && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 10px 8px' }}>
-                <button
-                  onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
-                  title="Portami qui"
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)', background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, padding: '4px 9px', cursor: 'pointer', letterSpacing: '0.04em', textTransform: 'uppercase' }}
-                >
-                  <span style={{ fontSize: 13 }}>📍</span> Portami qui
-                </button>
-              </div>
-            )}
           </div>
         );
       })}
