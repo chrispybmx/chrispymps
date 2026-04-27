@@ -2,7 +2,7 @@
 
 export type SpotType =
   | 'street' | 'park' | 'diy' | 'rail' | 'ledge'
-  | 'trail'  | 'plaza' | 'gap' | 'bowl';
+  | 'trail'  | 'plaza' | 'gap' | 'bowl' | 'pumptrack';
 
 export type SpotStatus    = 'pending' | 'approved' | 'rejected' | 'archived';
 export type SpotCondition = 'alive' | 'bustato' | 'demolito';
