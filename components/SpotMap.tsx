@@ -19,13 +19,16 @@ interface SpotMapProps {
   onAddSpotAt:        (lat: number, lon: number) => void;
   flyTarget?:         { lat: number; lon: number; zoom?: number } | null;
   selectedPin?:       SpotMapPin | null;
-  overlayOffsetPx?:   number; // px da sottrarre al centro Y per compensare il pannello in basso
-  fitAllTrigger?:     number; // ogni volta che cambia → fitBounds su tutti i filtered
+  overlayOffsetPx?:   number;
+  fitAllTrigger?:     number;
   // Radius search
   radiusMode?:   boolean;
   radiusCenter?: { lat: number; lon: number } | null;
   radiusKm?:     number;
   onMapClick?:   (lat: number, lon: number) => void;
+  // GPS locate triggered from MapClient
+  locateTrigger?: number;
+  onLocatingChange?: (v: boolean) => void;
 }
 
 /* ── SVG pin individuale ── */
@@ -104,6 +107,7 @@ function computeGridClusters(spots: SpotMapPin[], zoom: number) {
 export default function SpotMap({
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
+  locateTrigger, onLocatingChange,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
@@ -560,6 +564,7 @@ export default function SpotMap({
   const locateMe = useCallback(() => {
     if (!mapInstance.current || !navigator.geolocation) return;
     setLocating(true);
+    onLocatingChange?.(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -587,11 +592,21 @@ export default function SpotMap({
           }
         }
         setLocating(false);
+        onLocatingChange?.(false);
       },
-      () => setLocating(false),
+      () => { setLocating(false); onLocatingChange?.(false); },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  }, []);
+  }, [onLocatingChange]);
+
+  /* Esegui locateMe quando il trigger esterno cambia */
+  const prevLocateTriggerRef = useRef(0);
+  useEffect(() => {
+    if (locateTrigger && locateTrigger !== prevLocateTriggerRef.current) {
+      prevLocateTriggerRef.current = locateTrigger;
+      locateMe();
+    }
+  }, [locateTrigger, locateMe]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -602,43 +617,7 @@ export default function SpotMap({
         role="application"
       />
 
-      {/* Controlli floating — in alto a destra, sotto la topbar */}
-      <div style={{
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        display: 'flex', flexDirection: 'column', gap: 8,
-        zIndex: 10,
-      }}>
-        {/* Localizza */}
-        <button
-          onClick={locateMe} disabled={locating}
-          title="Mostrami sulla mappa" aria-label="Mostrami sulla mappa"
-          style={{
-            width: 40, height: 40, background: 'var(--gray-800)',
-            border: '1px solid var(--gray-600)', borderRadius: 4,
-            color: locating ? 'var(--orange)' : 'var(--bone)',
-            fontSize: 18, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.6)',
-            animation: locating ? 'spin-slow 1s linear infinite' : 'none',
-          }}
-        >
-          {locating ? '⌛' : '📍'}
-        </button>
-
-        {/* Contatore */}
-        <div style={{
-          background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
-          borderRadius: 4, padding: '5px 7px',
-          fontFamily: 'var(--font-mono)', fontSize: 13,
-          color: 'var(--orange)', textAlign: 'center',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.6)', minWidth: 40,
-        }}>
-          {filtered.length}
-          <div style={{ color: 'var(--gray-400)', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SPOT</div>
-        </div>
-      </div>
+      {/* Bottoni spostati in MapClient come elementi fixed sopra la mappa */}
     </div>
   );
 }
