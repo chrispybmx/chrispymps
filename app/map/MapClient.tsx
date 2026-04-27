@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
-import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI, CITTA_ITALIANE, CITTA_COORDS } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
 import SupportModal from '@/components/SupportModal';
@@ -99,8 +99,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [radiusMode,      setRadiusMode]      = useState(false);
   const [radiusPanelOpen, setRadiusPanelOpen] = useState(false);
   const [radiusCenter,    setRadiusCenter]    = useState<{ lat: number; lon: number } | null>(null);
-  const [radiusKm,        setRadiusKm]        = useState(25);
+  const [radiusKm,        setRadiusKm]        = useState(10);
   const [gpsLoading,      setGpsLoading]      = useState(false);
+  const [citySearch,      setCitySearch]      = useState('');
+  const [cityPickerOpen,  setCityPickerOpen]  = useState(false);
 
   /* ── Bottoni mappa: locate trigger ── */
   const [locateTrigger, setLocateTrigger] = useState(0);
@@ -193,9 +195,12 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       .sort((a, b) => a.distance - b.distance);
   }, [spots, radiusCenter, radiusKm]);
 
+  // Il click sulla mappa NON imposta più il centro del raggio —
+  // il centro si sceglie solo tramite GPS o selezione città nel pannello
   const handleMapClick = useCallback((lat: number, lon: number) => {
-    if (radiusMode) setRadiusCenter({ lat, lon });
-  }, [radiusMode]);
+    /* intenzionalmente vuoto: radius center viene da GPS o city picker */
+    void lat; void lon;
+  }, []);
 
   const handleUseGPS = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -216,6 +221,16 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     setRadiusMode(false);
     setRadiusCenter(null);
     setRadiusPanelOpen(false);
+    setCitySearch('');
+    setCityPickerOpen(false);
+  }, []);
+
+  const handleCityForRadius = useCallback((cityLabel: string, lat: number, lon: number) => {
+    const center = { lat, lon };
+    setRadiusCenter(center);
+    setFlyTarget({ lat, lon, zoom: 11 });
+    setCitySearch(cityLabel);
+    setCityPickerOpen(false);
   }, []);
 
   const handleRadiusToggle = useCallback(() => {
@@ -307,7 +322,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           darkMap={darkMap}
         />
         {/* Toast solo quando raggio attivo e nessun centro ancora */}
-        {radiusMode && !radiusCenter && radiusPanelOpen && <RadiusToast />}
+        {/* RadiusToast rimosso: il centro si sceglie solo da GPS o città nel pannello */}
       </div>
 
       {/* ── BOTTONI MAPPA — colonna sinistra, sempre visibili ── */}
@@ -383,8 +398,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 3 }}>
                 {radiusCenter
-                  ? `${spotsInRadius.length} spot trovati nel raggio di ${radiusKm} km`
-                  : 'Tocca la mappa per scegliere il centro'}
+                  ? `${spotsInRadius.length} spot nel raggio di ${radiusKm} km`
+                  : 'Scegli il centro con GPS o città'}
               </div>
             </div>
             <button onClick={closeRadiusMode} style={{
@@ -395,31 +410,94 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
             }}>✕</button>
           </div>
 
-          {/* GPS */}
-          <button
-            onClick={handleUseGPS} disabled={gpsLoading}
-            style={{
-              width: '100%', padding: '10px 14px', marginBottom: 10,
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.4)',
-              borderRadius: 8, cursor: gpsLoading ? 'default' : 'pointer',
-              fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)',
-              opacity: gpsLoading ? 0.6 : 1,
-            }}
-          >
-            <span style={{ fontSize: 18 }}>{gpsLoading ? '⌛' : '📡'}</span>
-            {gpsLoading ? 'RICERCA POSIZIONE...' : 'USA LA MIA POSIZIONE GPS'}
-          </button>
+          {/* GPS + CITTÀ — due bottoni affiancati */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <button
+              onClick={handleUseGPS} disabled={gpsLoading}
+              style={{
+                flex: 1, padding: '10px 10px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.4)',
+                borderRadius: 8, cursor: gpsLoading ? 'default' : 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)',
+                opacity: gpsLoading ? 0.6 : 1,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{gpsLoading ? '⌛' : '📡'}</span>
+              {gpsLoading ? 'GPS...' : 'MIA POSIZIONE'}
+            </button>
+            <button
+              onClick={() => setCityPickerOpen(v => !v)}
+              style={{
+                flex: 1, padding: '10px 10px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: cityPickerOpen ? 'rgba(255,106,0,0.15)' : 'rgba(255,106,0,0.05)',
+                border: `1px solid ${cityPickerOpen ? 'var(--orange)' : 'rgba(255,106,0,0.3)'}`,
+                borderRadius: 8, cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🏙️</span>
+              {citySearch || 'SCEGLI CITTÀ'}
+            </button>
+          </div>
+
+          {/* City picker — input + lista */}
+          {cityPickerOpen && (
+            <div style={{
+              marginBottom: 10,
+              background: 'rgba(0,0,0,0.5)',
+              border: '1px solid var(--gray-600)',
+              borderRadius: 8, overflow: 'hidden',
+            }}>
+              <input
+                autoFocus
+                value={citySearch}
+                onChange={e => setCitySearch(e.target.value)}
+                placeholder="Cerca città..."
+                style={{
+                  width: '100%', padding: '9px 12px',
+                  background: 'var(--gray-800)', border: 'none', borderBottom: '1px solid var(--gray-700)',
+                  fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+                {CITTA_ITALIANE
+                  .filter(c => !citySearch || c.label.toLowerCase().includes(citySearch.toLowerCase()))
+                  .slice(0, 30)
+                  .map(c => {
+                    const coords = CITTA_COORDS[c.value];
+                    if (!coords) return null;
+                    return (
+                      <button
+                        key={c.value}
+                        onClick={() => handleCityForRadius(c.label, coords[0], coords[1])}
+                        style={{
+                          width: '100%', padding: '8px 12px', textAlign: 'left',
+                          background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                          fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {c.label}
+                      </button>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          )}
 
           {/* Chips raggio */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 14 }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', flexShrink: 0 }}>
-              RAGGIO:
+              KM:
             </span>
-            {[5, 10, 25, 50, 100].map(km => (
+            {[10, 25, 50, 100, 200, 500].map(km => (
               <button key={km} onClick={() => setRadiusKm(km)} style={{
                 flex: 1, padding: '6px 0',
-                fontFamily: 'var(--font-mono)', fontSize: 12,
+                fontFamily: 'var(--font-mono)', fontSize: 11,
                 border: `1px solid ${radiusKm === km ? 'var(--orange)' : 'var(--gray-600)'}`,
                 borderRadius: 6,
                 background: radiusKm === km ? 'var(--orange)' : 'transparent',
@@ -427,7 +505,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 cursor: 'pointer', fontWeight: radiusKm === km ? 700 : 400,
                 transition: 'all 0.1s',
               }}>
-                {km}km
+                {km}
               </button>
             ))}
           </div>
@@ -449,7 +527,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           >
             {radiusCenter
               ? `✓ APPLICA — ${spotsInRadius.length} SPOT`
-              : '↑ TOCCA LA MAPPA PER IL CENTRO'}
+              : '↑ SCEGLI GPS O CITTÀ'}
           </button>
         </div>
       )}
