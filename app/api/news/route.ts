@@ -10,11 +10,17 @@ export async function GET() {
       .from('news')
       .select('id, slug, title, excerpt, cover_url, tags, published_at, created_at')
       .eq('status', 'published')
-      .order('published_at', { ascending: false });
+      /* Ordina per published_at se disponibile, altrimenti per created_at */
+      .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[api/news] Supabase error:', error.message);
+      return NextResponse.json({ ok: false, error: error.message, data: [] }, { status: 500 });
+    }
+
     return NextResponse.json({ ok: true, data: data ?? [] });
-  } catch {
+  } catch (err) {
+    console.error('[api/news] Unexpected error:', err);
     return NextResponse.json({ ok: true, data: [] });
   }
 }
