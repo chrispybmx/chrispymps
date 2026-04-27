@@ -163,6 +163,18 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
         )}
       </div>
 
+      {/* Thumbnail strip — solo con più foto */}
+      {photos.length > 1 && (
+        <div style={{ display: 'flex', gap: 3, padding: '4px 8px', background: '#050505', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
+          {photos.map((p, i) => (
+            <button key={p.url} onClick={() => scrollTo(i)}
+              style={{ flexShrink: 0, width: 44, height: 34, border: `2px solid ${i === idx ? 'var(--orange)' : 'transparent'}`, borderRadius: 3, padding: 0, cursor: 'pointer', background: '#111', overflow: 'hidden', opacity: i === idx ? 1 : 0.55, transition: 'opacity 0.15s, border-color 0.15s' }}>
+              <img src={p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+
     </>
   );
 }
