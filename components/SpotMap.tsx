@@ -180,7 +180,7 @@ export default function SpotMap({
         maxZoom: 19, className: 'osm-tiles',
       }).addTo(map);
 
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      L.control.zoom({ position: 'bottomleft' }).addTo(map);
       markersRef.current  = L.layerGroup().addTo(map);
       mapInstance.current = map;
 
@@ -602,11 +602,11 @@ export default function SpotMap({
         role="application"
       />
 
-      {/* Controlli floating */}
+      {/* Controlli floating — in alto a destra, sotto la topbar */}
       <div style={{
         position: 'absolute',
-        bottom: 'calc(var(--strip-height, 48px) + 16px + env(safe-area-inset-bottom))',
-        right: 16,
+        top: 12,
+        right: 12,
         display: 'flex', flexDirection: 'column', gap: 8,
         zIndex: 10,
       }}>
@@ -615,12 +615,12 @@ export default function SpotMap({
           onClick={locateMe} disabled={locating}
           title="Mostrami sulla mappa" aria-label="Mostrami sulla mappa"
           style={{
-            width: 44, height: 44, background: 'var(--gray-800)',
+            width: 40, height: 40, background: 'var(--gray-800)',
             border: '1px solid var(--gray-600)', borderRadius: 4,
             color: locating ? 'var(--orange)' : 'var(--bone)',
-            fontSize: 20, cursor: 'pointer',
+            fontSize: 18, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.6)',
             animation: locating ? 'spin-slow 1s linear infinite' : 'none',
           }}
         >
@@ -630,13 +630,13 @@ export default function SpotMap({
         {/* Contatore */}
         <div style={{
           background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
-          borderRadius: 4, padding: '6px 8px',
-          fontFamily: 'var(--font-mono)', fontSize: 14,
+          borderRadius: 4, padding: '5px 7px',
+          fontFamily: 'var(--font-mono)', fontSize: 13,
           color: 'var(--orange)', textAlign: 'center',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.5)', minWidth: 44,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.6)', minWidth: 40,
         }}>
           {filtered.length}
-          <div style={{ color: 'var(--gray-400)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SPOT</div>
+          <div style={{ color: 'var(--gray-400)', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SPOT</div>
         </div>
       </div>
     </div>
