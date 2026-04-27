@@ -668,6 +668,39 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         </div>
       )}
 
+      {/* ── TAB FISSO — sempre visibile in fondo, apre il pannello ── */}
+      <div
+        onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
+        style={{
+          position: 'fixed',
+          bottom: 0, left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 11,
+          padding: '8px 20px 12px',
+          background: 'rgba(10,10,10,0.95)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: '12px 12px 0 0',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderBottom: 'none',
+          display: 'flex', alignItems: 'center', gap: 10,
+          cursor: panelHeight <= PANEL_MIN + 10 ? 'pointer' : 'default',
+          pointerEvents: panelHeight <= PANEL_MIN + 10 ? 'all' : 'none',
+          opacity: panelHeight <= PANEL_MIN + 10 ? 1 : 0,
+          transition: 'opacity 0.2s ease',
+          userSelect: 'none',
+        }}
+      >
+        <span style={{ fontSize: 15 }}>↑</span>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 13,
+          color: 'var(--orange)', letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+        }}>
+          {filtered.length} spot
+        </span>
+      </div>
+
       {/* ── OVERLAY LISTA — galleggia sulla mappa, altezza regolabile ── */}
       <div style={{
         position: 'fixed',
@@ -678,15 +711,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         pointerEvents: 'none',
         transition: (dragState.current && !panelSnapping) ? 'none' : 'height 0.25s cubic-bezier(0.34,1.2,0.64,1)',
       }}>
-        {/* Gradiente fade — visibile solo quando espanso */}
-        {panelHeight > PANEL_MIN + 10 && (
-          <div style={{
-            height: 36, flexShrink: 0,
-            background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.97) 100%)',
-            pointerEvents: 'none',
-            marginBottom: -1,
-          }} />
-        )}
+        {/* Gradiente fade */}
+        <div style={{
+          height: 36, flexShrink: 0,
+          background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.97) 100%)',
+          pointerEvents: 'none',
+          marginBottom: -1,
+        }} />
 
         {/* ── DRAG HANDLE + PANNELLO — unico layer blur/background ── */}
         <div style={{
@@ -701,67 +732,42 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           transition: 'border-radius 0.25s ease',
         }}>
 
-          {/* ── DRAG HANDLE / TAB COLLASSATO ── */}
+          {/* ── DRAG HANDLE ── */}
           <div
             onPointerDown={onDragStart}
             onPointerMove={onDragMove}
             onPointerUp={onDragEnd}
             onPointerCancel={onDragEnd}
-            onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
             style={{
               flexShrink: 0,
-              height: panelHeight <= PANEL_MIN + 10 ? PANEL_MIN : 46,
+              height: 46,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: panelHeight <= PANEL_MIN + 10 ? 'pointer' : 'ns-resize',
+              cursor: 'ns-resize',
               touchAction: 'none',
-              gap: 10,
-              transition: 'height 0.25s cubic-bezier(0.34,1.2,0.64,1)',
             }}
           >
-            {panelHeight <= PANEL_MIN + 10 ? (
-              /* ── Stato collassato: tab con freccia + conteggio ── */
+            <div style={{
+              width: 68, height: 26,
+              background: '#222',
+              borderRadius: 5,
+              boxShadow: 'inset 0 1px 0 #3e3e3e, inset 0 -1px 0 #111, 0 3px 8px rgba(0,0,0,0.9)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden', position: 'relative',
+            } as React.CSSProperties}>
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                background: 'rgba(255,106,0,0.12)',
-                border: '1px solid rgba(255,106,0,0.3)',
-                borderRadius: 20,
-                padding: '8px 18px',
-                userSelect: 'none',
-              }}>
-                <span style={{ fontSize: 16, lineHeight: 1 }}>↑</span>
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 13,
-                  color: 'var(--orange)', letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                }}>
-                  {filtered.length} spot
-                </span>
+                position: 'absolute', inset: 0,
+                background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
+                pointerEvents: 'none',
+              }} />
+              <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
+                {[0,1,2,3,4].map(col => (
+                  <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                    <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                  </div>
+                ))}
               </div>
-            ) : (
-              /* ── Stato espanso: grip classico ── */
-              <div style={{
-                width: 68, height: 26,
-                background: '#222',
-                borderRadius: 5,
-                boxShadow: 'inset 0 1px 0 #3e3e3e, inset 0 -1px 0 #111, 0 3px 8px rgba(0,0,0,0.9)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                overflow: 'hidden', position: 'relative',
-              } as React.CSSProperties}>
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
-                  pointerEvents: 'none',
-                }} />
-                <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
-                  {[0,1,2,3,4].map(col => (
-                    <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
-                      <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* Pannello scroll */}
