@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface Notification {
   id:         string;
-  type:       'spot_approved' | 'spot_rejected' | 'comment_on_spot';
+  type:       'spot_approved' | 'spot_rejected' | 'comment_on_spot' | 'comment_reply' | 'comment_like';
   title:      string;
   body:       string;
   spot_slug:  string | null;
@@ -16,6 +16,8 @@ const TYPE_EMOJI: Record<string, string> = {
   spot_approved:   '✅',
   spot_rejected:   '❌',
   comment_on_spot: '💬',
+  comment_reply:   '↩️',
+  comment_like:    '❤️',
 };
 
 function timeAgo(iso: string): string {
@@ -207,7 +209,7 @@ export default function NotificationBell({ token }: { token: string }) {
                     </span>
                     {n.spot_slug && (
                       <a
-                        href={`/spot/${n.spot_slug}`}
+                        href={`/map/spot/${n.spot_slug}`}
                         onClick={() => setOpen(false)}
                         style={{
                           fontFamily: 'var(--font-mono)', fontSize: 10,
