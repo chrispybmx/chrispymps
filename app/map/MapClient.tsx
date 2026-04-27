@@ -657,69 +657,71 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           marginBottom: -1,   /* copre il pixel di giunzione con il drag handle */
         }} />
 
-        {/* ── DRAG HANDLE — V7 rubber grip — nel nero solido ── */}
-        <div
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
-          style={{
-            flexShrink: 0,
-            height: 46,
-            background: 'rgba(10,10,10,0.97)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'ns-resize',
-            pointerEvents: 'all',
-            touchAction: 'none',
-          }}
-        >
-          {/* Rettangolo grip stile gamepad anni 2000 */}
-          <div style={{
-            width: 68, height: 26,
-            background: '#222',
-            borderRadius: 5,
-            boxShadow: 'inset 0 1px 0 #3e3e3e, inset 0 -1px 0 #111, 0 3px 8px rgba(0,0,0,0.9)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden', position: 'relative',
-          } as React.CSSProperties}>
+        {/* ── DRAG HANDLE + PANNELLO — unico layer blur/background ── */}
+        <div style={{
+          flex: 1,
+          display: 'flex', flexDirection: 'column',
+          background: 'rgba(10,10,10,0.97)',
+          backdropFilter: 'blur(18px)',
+          WebkitBackdropFilter: 'blur(18px)',
+          pointerEvents: 'all',
+          overflow: 'hidden',
+        }}>
+          {/* Drag handle */}
+          <div
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
+            style={{
+              flexShrink: 0,
+              height: 46,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'ns-resize',
+              touchAction: 'none',
+            }}
+          >
+            {/* Rettangolo grip stile gamepad anni 2000 */}
             <div style={{
-              position: 'absolute', inset: 0,
-              background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
-              pointerEvents: 'none',
-            }} />
-            <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
-              {[0,1,2,3,4].map(col => (
-                <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
-                  <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
-                </div>
-              ))}
+              width: 68, height: 26,
+              background: '#222',
+              borderRadius: 5,
+              boxShadow: 'inset 0 1px 0 #3e3e3e, inset 0 -1px 0 #111, 0 3px 8px rgba(0,0,0,0.9)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden', position: 'relative',
+            } as React.CSSProperties}>
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
+                pointerEvents: 'none',
+              }} />
+              <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
+                {[0,1,2,3,4].map(col => (
+                  <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                    <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Pannello scroll */}
-        {panelHeight > 90 && (
-          <div style={{
-            flex: 1,
-            background: 'rgba(10,10,10,0.97)',
-            backdropFilter: 'blur(18px)',
-            WebkitBackdropFilter: 'blur(18px)',
-            overflow: 'hidden',
-            pointerEvents: 'all',
-          }}>
-            <SpotListPanel
-              spots={filtered}
-              activeId={activeListId}
-              expandedId={expandedId}
-              onActivate={handleActivateFromScroll}
-              onSpotClick={handleSpotClick}
-              scrollToId={scrollToId}
-              onScrolled={() => setScrollToId(null)}
-              radiusCenter={radiusMode && !radiusPanelOpen ? radiusCenter : null}
-            />
-          </div>
-        )}
+          {/* Pannello scroll */}
+          {panelHeight > 90 && (
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <SpotListPanel
+                spots={filtered}
+                activeId={activeListId}
+                expandedId={expandedId}
+                onActivate={handleActivateFromScroll}
+                onSpotClick={handleSpotClick}
+                scrollToId={scrollToId}
+                onScrolled={() => setScrollToId(null)}
+                radiusCenter={radiusMode && !radiusPanelOpen ? radiusCenter : null}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <AddSpotModal
