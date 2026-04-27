@@ -13,7 +13,7 @@ import ShareSpotBtn from '@/components/ShareSpotBtn';
 
 export const revalidate = 300;
 
-interface Props { params: { slug: string } }
+interface Props { params: { slug: string }; searchParams: { from?: string } }
 
 async function getSpot(slug: string): Promise<Spot | null> {
   const supabase = supabaseServer();
@@ -66,9 +66,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SpotPage({ params }: Props) {
+export default async function SpotPage({ params, searchParams }: Props) {
   const spot = await getSpot(params.slug);
   if (!spot) notFound();
+
+  /* Contextual back navigation: if the user came from a profile page, go back there */
+  const fromParam = searchParams.from ?? '';
+  const backHref  = fromParam.startsWith('/u/') ? fromParam : '/';
+  const backLabel = fromParam.startsWith('/u/')
+    ? `← @${fromParam.replace('/u/', '')}`
+    : '← MAPPA';
 
   const tipo  = TIPI_SPOT[spot.type];
   const cond  = CONDIZIONI[spot.condition];
@@ -114,12 +121,13 @@ export default async function SpotPage({ params }: Props) {
           background: 'rgba(10,10,10,0.82)', borderRadius: 6,
           backdropFilter: 'blur(8px)',
         }}>
-          <Link href="/" style={{
+          <Link href={backHref} style={{
             color: 'var(--orange)', fontFamily: 'var(--font-mono)',
             fontSize: 13, textDecoration: 'none',
             padding: '6px 12px', display: 'block',
+            maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            ← MAPPA
+            {backLabel}
           </Link>
         </div>
         {/* Condition badge — top right */}
@@ -273,11 +281,11 @@ export default async function SpotPage({ params }: Props) {
         {/* ── CTA BOTTOM ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link
-            href="/"
+            href={backHref}
             className="btn-secondary"
             style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', minWidth: 140 }}
           >
-            ← Torna alla mappa
+            {fromParam.startsWith('/u/') ? `← @${fromParam.replace('/u/', '')}` : '← Torna alla mappa'}
           </Link>
           <a
             href={mapsUrl}
@@ -378,3 +386,4 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
