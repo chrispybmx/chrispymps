@@ -174,6 +174,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
+  const [isDesktop,    setIsDesktop]    = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   /* Auto-espandi il pannello quando si apre una card */
   useEffect(() => {
@@ -1118,7 +1125,7 @@ function SpotListPanel({
         </div>
       )}
 
-      {(expandedId ? spots.filter(s => s.id === expandedId) : spots).map((spot, idx) => {
+      {(expandedId && !isDesktop ? spots.filter(s => s.id === expandedId) : spots).map((spot, idx) => {
         const tipo      = TIPI_SPOT[spot.type];
         const cond      = CONDIZIONI[spot.condition];
         const isAct     = activeId   === spot.id;
@@ -1228,7 +1235,7 @@ function SpotListPanel({
                         WebkitOverflowScrolling: 'touch',
                         scrollbarWidth: 'none',
                         width: '100%',
-                        height: 140,
+                        height: isDesktop ? 220 : 140,
                         cursor: 'zoom-in',
                         touchAction: 'pan-x',
                       } as React.CSSProperties}
