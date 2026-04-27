@@ -190,6 +190,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     }
   }, [expandedId]);
   const [scrollToId,   setScrollToId]   = useState<string | null>(null);
+  const scrollInstantRef = useRef(false); // true → usa 'instant' invece di 'smooth'
   /* flag: cambiamento viene dallo scroll (IO) → non ri-flyare */
   const fromScrollRef = useRef(false);
 
@@ -320,13 +321,22 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     setExpandedId(prev => {
       const isClosing = prev === pin.id;
       if (isClosing) {
-        /* Chiusura: torna all'altezza lista */
+        /* Chiusura: torna all'altezza lista e rimane sullo spot che era aperto */
         ioLockRef.current = true;
-        setTimeout(() => { ioLockRef.current = false; }, 300);
+        setTimeout(() => { ioLockRef.current = false; }, 400);
         setTimeout(() => snapTo(DEFAULT_PANEL_H()), 50);
+        /* Su mobile tutti gli spot tornano nel DOM → aspetta il re-render (200ms),
+           poi scroll istantaneo così la lista non "vola" visibilmente */
+        setTimeout(() => {
+          scrollInstantRef.current = true;
+          setScrollToId(pin.id);
+        }, 200);
       } else {
-        /* Apertura: snap al pannello espanso (mostra tutta la card con VEDI SPOT) */
-        setTimeout(() => snapTo(EXPANDED_CARD_H), 50);
+        /* Apertura: misura l'altezza reale della card dopo il render e snappa */
+        setTimeout(() => {
+          const el = document.querySelector('[data-exp="1"]') as HTMLElement | null;
+          snapTo(el ? el.offsetHeight + 4 : EXPANDED_CARD_H);
+        }, 80);
         setTimeout(() => setScrollToId(pin.id), 260);
       }
       return isClosing ? null : pin.id;
@@ -835,6 +845,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 scrollToId={scrollToId}
                 onScrolled={() => setScrollToId(null)}
                 radiusCenter={radiusMode && !radiusPanelOpen ? radiusCenter : null}
+                isDesktop={isDesktop}
+                scrollInstantRef={scrollInstantRef}
               />
             </div>
           )}
@@ -879,15 +891,18 @@ function getMyRating(id: string): number {
 
 function SpotListPanel({
   spots, activeId, expandedId, onActivate, onSpotClick, scrollToId, onScrolled, radiusCenter,
+  isDesktop, scrollInstantRef,
 }: {
-  spots:        SpotMapPin[];
-  activeId:     string | null;
-  expandedId:   string | null;
-  onActivate:   (id: string) => void;
-  onSpotClick:  (pin: SpotMapPin) => void;
-  scrollToId:   string | null;
-  onScrolled:   () => void;
-  radiusCenter: { lat: number; lon: number } | null;
+  spots:            SpotMapPin[];
+  activeId:         string | null;
+  expandedId:       string | null;
+  onActivate:       (id: string) => void;
+  onSpotClick:      (pin: SpotMapPin) => void;
+  scrollToId:       string | null;
+  onScrolled:       () => void;
+  radiusCenter:     { lat: number; lon: number } | null;
+  isDesktop:        boolean;
+  scrollInstantRef: React.MutableRefObject<boolean>;
 }) {
   const [favs,       setFavs]       = useState<Record<string, boolean>>({});
   const [ratings,    setRatings]    = useState<Record<string, number>>({});
@@ -961,7 +976,9 @@ function SpotListPanel({
   useEffect(() => {
     if (!scrollToId || !panelRef.current) return;
     const el = cardRefs.current.get(scrollToId);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const behavior = scrollInstantRef.current ? 'instant' : 'smooth';
+    scrollInstantRef.current = false;
+    if (el) el.scrollIntoView({ behavior: behavior as ScrollBehavior, block: 'start' });
     onScrolled();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToId]);
@@ -1199,6 +1216,7 @@ function SpotListPanel({
 
                 {/* ── FOTO — scroll-snap swipeable ── */}
                 {allPhotos.length > 0 ? (
+                  <div>
                   <div style={{ position: 'relative', background: '#0a0a0a' }}>
                     {/* Scroll-snap strip — stesso schema di PhotoCarousel */}
                     <div
@@ -1289,6 +1307,7 @@ function SpotListPanel({
                       ))}
                     </div>
                   )}
+                  </div>
                 ) : (
                   /* Nessuna foto — placeholder con emoji */
                   <div style={{ height: 52, background: 'var(--gray-800)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
