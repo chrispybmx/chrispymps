@@ -1159,7 +1159,6 @@ function SpotListPanel({
         const isExp     = expandedId === spot.id;
         const myFav     = favs[spot.id]    ?? false;
         const isLast    = idx === spots.length - 1;
-        const featured  = !expandedId && idx < 3;
 
         /* Foto disponibili */
         const allPhotos = spot.photo_urls && spot.photo_urls.length > 0
@@ -1193,11 +1192,11 @@ function SpotListPanel({
             onClick={() => onSpotClick(spot)}
             style={{
               position: 'relative',
-              borderBottom: (isLast || isAct) ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              borderLeft: `3px solid ${isAct ? 'var(--orange)' : featured ? 'rgba(255,106,0,0.22)' : 'transparent'}`,
-              transition: 'border-color 0.25s, background 0.15s',
+              borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              borderLeft: `3px solid ${isAct ? 'var(--orange)' : 'transparent'}`,
+              transition: 'border-color 0.2s',
               cursor: 'pointer',
-              background: isExp ? 'rgba(255,106,0,0.04)' : featured ? 'rgba(255,106,0,0.01)' : 'transparent',
+              background: isExp ? 'rgba(255,106,0,0.04)' : 'transparent',
               touchAction: isExp ? 'auto' : 'manipulation',
             }}
           >
@@ -1373,7 +1372,7 @@ function SpotListPanel({
               /* ══ COMPACT LAYOUT ══ */
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px' }}>
                 {/* Thumbnail più grande */}
-                <div style={{ flexShrink: 0, width: 116, height: 116, borderRadius: 6, overflow: 'hidden', background: 'var(--gray-700)', border: isAct ? '2px solid var(--orange)' : '1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ flexShrink: 0, width: 116, height: 116, borderRadius: 6, overflow: 'hidden', background: 'var(--gray-700)', border: `2px solid ${isAct ? 'var(--orange)' : 'rgba(255,255,255,0.07)'}`, transition: 'border-color 0.2s' }}>
                   {spot.cover_url ? (
                     <img src={spot.cover_url} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                   ) : (
