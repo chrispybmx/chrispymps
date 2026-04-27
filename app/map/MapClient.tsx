@@ -291,7 +291,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const handleSpotClick = useCallback((pin: SpotMapPin) => {
     setActiveListId(pin.id);
     setExpandedId(prev => prev === pin.id ? null : pin.id); // toggle
-    setScrollToId(pin.id);
+    // Delay scroll: aspetta che il pannello finisca di espandersi prima di scrollare
+    setTimeout(() => setScrollToId(pin.id), 260);
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 13 });
   }, []);
 
@@ -818,7 +819,7 @@ function SpotListPanel({
   useEffect(() => {
     if (!scrollToId || !panelRef.current) return;
     const el = cardRefs.current.get(scrollToId);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     onScrolled();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToId]);
@@ -979,7 +980,7 @@ function SpotListPanel({
             onClick={() => onSpotClick(spot)}
             style={{
               position: 'relative',
-              borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              borderBottom: (isLast || isAct) ? 'none' : '1px solid rgba(255,255,255,0.06)',
               borderLeft: `3px solid ${isAct ? 'var(--orange)' : featured ? 'rgba(255,106,0,0.22)' : 'transparent'}`,
               transition: 'border-color 0.25s, background 0.15s',
               cursor: 'pointer',
@@ -992,19 +993,19 @@ function SpotListPanel({
             {isExp ? (
               <div style={{ position: 'relative' }}>
 
-                {/* X chiudi — sempre visibile, fuori dal blocco foto */}
-                <button
-                  onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
-                  style={{
-                    position: 'absolute', top: 8, right: 8, zIndex: 10,
-                    background: 'rgba(10,10,10,0.8)', border: '1px solid rgba(255,255,255,0.18)',
-                    borderRadius: '50%', width: 30, height: 30,
-                    fontSize: 14, color: '#fff', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
-                  }}
-                  aria-label="Chiudi"
-                >✕</button>
+                {/* Header row: X chiudi — nel nero solido, mai sul gradiente */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 8px 2px', background: 'transparent' }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
+                    style={{
+                      background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)',
+                      borderRadius: '50%', width: 28, height: 28,
+                      fontSize: 13, color: 'var(--bone)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+                    }}
+                    aria-label="Chiudi"
+                  >✕</button>
+                </div>
 
                 {/* ── FOTO — scroll-snap swipeable ── */}
                 {allPhotos.length > 0 ? (
