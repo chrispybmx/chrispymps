@@ -137,7 +137,7 @@ export default function TopBar({
   /* ── Città con spot count ── */
   const cityCount: Record<string, number> = {};
   spots.forEach(s => { if (s.city) cityCount[s.city] = (cityCount[s.city] ?? 0) + 1; });
-  const topCities = Object.entries(cityCount).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  const topCities = Object.entries(cityCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
   /* ── Handlers ── */
   const handleTypeToggle = useCallback((type: SpotType) => {
