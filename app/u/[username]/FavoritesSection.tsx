@@ -19,7 +19,7 @@ interface FavSpot {
 
 interface Props {
   profileUsername: string;
-  profileId:       string; // auth user UUID — per ownership check affidabile
+  profileId:       string;
 }
 
 export default function FavoritesSection({ profileUsername, profileId }: Props) {
@@ -34,27 +34,91 @@ export default function FavoritesSection({ profileUsername, profileId }: Props) 
         const u = data.session?.user;
         if (!u) { setLoading(false); return; }
 
-        /* Ownership: confronta per UUID (sicuro) oppure per username come fallback
-           (user_metadata.username potrebbe non essere settato su alcuni auth flow) */
         const uname = u.user_metadata?.username ?? u.email?.split('@')[0] ?? '';
         const own   = u.id === profileId || uname === profileUsername;
         setIsOwn(own);
         if (!own) { setLoading(false); return; }
 
-        // Leggi preferiti da localStorage
-        let ids: string[] = [];
-        try { ids = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
-
-        if (ids.length === 0) { setEmpty(true); setLoading(false); return; }
+        const t = data.session?.access_token ?? '';
 
         try {
-          const res = await fetch(`/api/favorites?ids=${ids.join(',')}`);
-          const j   = await res.json();
-          if (j.ok) {
-            setSpots(j.data);
-            if (j.data.length === 0) setEmpty(true);
+          if (t) {
+            /* Utente loggato: leggi da Supabase */
+            const res = await fetch('/api/favorites', {
+              headers: { Authorization: `Bearer ${t}` },
+            });
+            const j = await res.json();
+
+            if (j.ok && j.data.length > 0) {
+              setSpots(j.data);
+
+              /* Sync: aggiungi a Supabase eventuali preferiti locali non ancora sincronizzati */
+              let localIds: string[] = [];
+              try { localIds = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
+              const remoteIds = new Set<string>(j.ids ?? j.data.map((s: FavSpot) => s.id));
+              const toSync = localIds.filter(id => !remoteIds.has(id));
+              if (toSync.length > 0) {
+                toSync.forEach(spot_id => {
+                  fetch('/api/favorites', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+                    body: JSON.stringify({ spot_id }),
+                  }).catch(() => {});
+                });
+                /* Ricarica dopo sync */
+                setTimeout(async () => {
+                  const res2 = await fetch('/api/favorites', { headers: { Authorization: `Bearer ${t}` } }).catch(() => null);
+                  if (res2) {
+                    const j2 = await res2.json().catch(() => null);
+                    if (j2?.ok) setSpots(j2.data);
+                  }
+                }, 1000);
+              }
+              /* Pulisci localStorage una volta sincronizzato */
+              localStorage.removeItem(FAVS_KEY);
+            } else if (j.ok && j.data.length === 0) {
+              /* Nessun preferito su Supabase — prova localStorage (pre-login) */
+              let localIds: string[] = [];
+              try { localIds = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
+
+              if (localIds.length > 0) {
+                /* Migra localStorage → Supabase */
+                await Promise.all(localIds.map(spot_id =>
+                  fetch('/api/favorites', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+                    body: JSON.stringify({ spot_id }),
+                  }).catch(() => {})
+                ));
+                localStorage.removeItem(FAVS_KEY);
+
+                /* Ricarica */
+                const res2 = await fetch('/api/favorites', { headers: { Authorization: `Bearer ${t}` } }).catch(() => null);
+                if (res2) {
+                  const j2 = await res2.json().catch(() => null);
+                  if (j2?.ok && j2.data.length > 0) {
+                    setSpots(j2.data);
+                    setLoading(false);
+                    return;
+                  }
+                }
+                setEmpty(true);
+              } else {
+                setEmpty(true);
+              }
+            }
+          } else {
+            /* Fallback anonimo — localStorage */
+            let ids: string[] = [];
+            try { ids = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
+            if (ids.length === 0) { setEmpty(true); setLoading(false); return; }
+            const res = await fetch(`/api/favorites?ids=${ids.join(',')}`);
+            const j   = await res.json();
+            if (j.ok) { setSpots(j.data); if (j.data.length === 0) setEmpty(true); }
           }
-        } catch { setEmpty(true); }
+        } catch {
+          setEmpty(true);
+        }
         setLoading(false);
       });
     }).catch(() => setLoading(false));
