@@ -1055,8 +1055,18 @@ function SpotListPanel({
                       ))}
                     </div>
 
+                    {/* Frecce prev/next */}
+                    {allPhotos.length > 1 && curPhotoIdx > 0 && (
+                      <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, curPhotoIdx - 1); }} className="photo-nav-btn"
+                        style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 38, background: 'linear-gradient(to right,rgba(0,0,0,0.55),transparent)', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>‹</button>
+                    )}
+                    {allPhotos.length > 1 && curPhotoIdx < allPhotos.length - 1 && (
+                      <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, curPhotoIdx + 1); }} className="photo-nav-btn"
+                        style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 38, background: 'linear-gradient(to left,rgba(0,0,0,0.55),transparent)', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>›</button>
+                    )}
+
                     {/* Zoom hint */}
-                    <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍 zoom</div>
+                    <div style={{ position: 'absolute', bottom: 6, right: allPhotos.length > 1 && curPhotoIdx < allPhotos.length - 1 ? 44 : 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍</div>
 
                     {/* Dots */}
                     {allPhotos.length > 1 && (
