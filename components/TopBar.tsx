@@ -305,27 +305,6 @@ export default function TopBar({
           borderLeft: '1px solid var(--gray-700)',
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
-          {/* Toggle mappa chiara/scura */}
-          {onToggleDarkMap && (
-            <button
-              onClick={onToggleDarkMap}
-              title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
-              style={{
-                background: darkMap ? 'rgba(255,106,0,0.15)' : 'transparent',
-                border: `1px solid ${darkMap ? 'var(--orange)' : 'var(--gray-600)'}`,
-                borderRadius: 4,
-                width: 30, height: 30, fontSize: 15,
-                color: darkMap ? 'var(--orange)' : 'var(--gray-400)',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'all 0.15s',
-              }}
-            >
-              {darkMap ? '🌞' : '🌑'}
-            </button>
-          )}
-
           {/* Campanella notifiche — solo se loggato */}
           {sessionToken && (
             <NotificationBell token={sessionToken} />
