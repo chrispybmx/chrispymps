@@ -980,13 +980,27 @@ function SpotListPanel({
 
             {/* ══ EXPANDED LAYOUT ══ */}
             {isExp ? (
-              <div>
-                {/* ── FOTO GRANDE full-width ── */}
+              <div style={{ position: 'relative' }}>
+
+                {/* X chiudi — sempre visibile, fuori dal blocco foto */}
+                <button
+                  onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
+                  style={{
+                    position: 'absolute', top: 8, right: 8, zIndex: 10,
+                    background: 'rgba(10,10,10,0.8)', border: '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: '50%', width: 30, height: 30,
+                    fontSize: 14, color: '#fff', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
+                  }}
+                  aria-label="Chiudi"
+                >✕</button>
+
+                {/* ── FOTO — più compatta su desktop ── */}
                 {allPhotos.length > 0 ? (
                   <div style={{ position: 'relative', background: '#0a0a0a' }}>
-                    {/* Immagine principale — cliccabile per lightbox */}
                     <div
-                      style={{ height: 240, overflow: 'hidden', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ height: 180, overflow: 'hidden', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={e => { e.stopPropagation(); setLightbox({ urls: allPhotos, idx: curPhotoIdx }); }}
                     >
                       <img
@@ -995,45 +1009,38 @@ function SpotListPanel({
                         style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
                         loading="lazy"
                       />
-                      {/* Icona zoom */}
-                      <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '3px 6px', fontSize: 13, pointerEvents: 'none' }}>🔍</div>
+                      <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍 zoom</div>
                     </div>
 
-                    {/* Frecce prev/next — sempre visibili con loop */}
                     {allPhotos.length > 1 && (
-                      <button onClick={goPrev} className="photo-nav-btn" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 44, background: 'linear-gradient(to right,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+                      <button onClick={goPrev} className="photo-nav-btn" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 36, background: 'linear-gradient(to right,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
                     )}
                     {allPhotos.length > 1 && (
-                      <button onClick={goNext} className="photo-nav-btn" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 44, background: 'linear-gradient(to left,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+                      <button onClick={goNext} className="photo-nav-btn" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 36, background: 'linear-gradient(to left,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
                     )}
 
-                    {/* Contatore */}
                     {allPhotos.length > 1 && (
-                      <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 5 }}>
+                      <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 4 }}>
                         {allPhotos.map((_, i) => (
                           <div key={i} onClick={e => { e.stopPropagation(); setPhotoIdx(p => ({ ...p, [spot.id]: i })); }}
-                            style={{ width: i === curPhotoIdx ? 16 : 6, height: 6, borderRadius: 3, background: i === curPhotoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s, background 0.2s', cursor: 'pointer' }} />
+                            style={{ width: i === curPhotoIdx ? 14 : 5, height: 5, borderRadius: 3, background: i === curPhotoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s', cursor: 'pointer' }} />
                         ))}
                       </div>
                     )}
 
-                    {/* Cuore in alto a sinistra */}
                     <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
-                      style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 4, width: 34, height: 34, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 4, width: 30, height: 30, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {myFav ? '❤️' : '🤍'}
                     </button>
-
-                    {/* X chiudi — in alto a destra */}
-                    <button
-                      onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
-                      style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: 16, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, zIndex: 2 }}
-                      aria-label="Chiudi"
-                    >✕</button>
                   </div>
                 ) : (
-                  /* Nessuna foto */
-                  <div style={{ height: 80, background: 'var(--gray-800)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, opacity: 0.3 }}>
-                    {tipo.emoji}
+                  /* Nessuna foto — placeholder con emoji + cuore */
+                  <div style={{ height: 52, background: 'var(--gray-800)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
+                    <span style={{ fontSize: 28, opacity: 0.25 }}>{tipo.emoji}</span>
+                    <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: myFav ? 16 : 13, opacity: myFav ? 1 : 0.4, marginLeft: 'auto' }}>
+                      {myFav ? '❤️' : '🤍'}
+                    </button>
                   </div>
                 )}
 
@@ -1049,50 +1056,44 @@ function SpotListPanel({
                   </div>
                 )}
 
-                {/* Info testo */}
-                <div style={{ padding: '12px 14px 14px' }}>
-                  {/* Nome + badges */}
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 700, color: 'var(--orange)', marginBottom: 6, lineHeight: 1.2 }}>
-                    {spot.name}
+                {/* Info testo — compatto */}
+                <div style={{ padding: '10px 12px 12px' }}>
+                  {/* Nome + badges in una riga */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
+                    <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--orange)', lineHeight: 1.2 }}>
+                      {spot.name}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 5 }}>
                     {spot.condition === 'alive' ? (
-                      <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa' }} />
+                      <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa' }} />
                     ) : (
-                      <span style={{ background: cond.bg, color: cond.color, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase' }}>{cond.label}</span>
+                      <span style={{ background: cond.bg, color: cond.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase' }}>{cond.label}</span>
                     )}
-                    <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase' }}>{tipo.emoji} {tipo.label}</span>
-                    {spot.difficulty && <span style={{ color: '#ffce4d', fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', borderRadius: 2, border: '1px solid rgba(255,206,77,0.35)', textTransform: 'uppercase' }}>⚡ {spot.difficulty}</span>}
+                    <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase' }}>{tipo.emoji} {tipo.label}</span>
+                    {spot.difficulty && <span style={{ color: '#ffce4d', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: '1px solid rgba(255,206,77,0.3)', textTransform: 'uppercase' }}>⚡ {spot.difficulty}</span>}
                   </div>
 
-                  {/* Città + autore */}
                   {(spot.city || spot.submitted_by_username) && (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginBottom: 6 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginBottom: 8 }}>
                       {spot.city && <span>📍 {spot.city}</span>}
                       {spot.submitted_by_username && <span style={{ color: 'var(--gray-600)' }}> · @{spot.submitted_by_username}</span>}
                     </div>
                   )}
 
-                  {/* Descrizione */}
-                  {spot.description && (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.55, marginBottom: 12 }}>
-                      {spot.description}
-                    </div>
-                  )}
-
-                  {/* Azioni */}
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  {/* Azioni compatte */}
+                  <div style={{ display: 'flex', gap: 6 }}>
                     <Link
                       href={`/map/spot/${spot.slug}`}
                       onClick={e => e.stopPropagation()}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '10px 0', textDecoration: 'none', letterSpacing: '0.04em' }}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '8px 0', textDecoration: 'none', letterSpacing: '0.04em' }}
                     >
                       VEDI SPOT →
                     </Link>
                     <button
                       onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
                       title="Portami qui"
-                      style={{ width: 42, height: 42, background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.35)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}
+                      style={{ width: 36, height: 36, background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.35)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}
                     >📍</button>
                   </div>
                 </div>
