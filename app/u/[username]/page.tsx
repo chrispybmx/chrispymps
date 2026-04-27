@@ -41,7 +41,7 @@ async function getData(username: string) {
       .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
       .eq('submitted_by_username', username)
       .eq('status', 'approved')
-      .order('approved_at', { ascending: false }),
+      .order('approved_at', { ascending: false, nullsFirst: false }),
     /* Spot girati: join spot_riders → spots */
     sb
       .from('spot_riders')
