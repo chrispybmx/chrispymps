@@ -200,13 +200,13 @@ export default function SpotMap({
 
       /* ── Vista iniziale: l'Italia nello spazio visibile sopra il pannello ──
          Usiamo fitBounds con padding bottom = altezza pannello + handle,
-         così l'Italia compare nell'area mappa visibile, non coperta dalla lista. */
-      const panelH  = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+         così l'Italia compare nell'area mappa visibile, non coperta dalla lista.
+         overlayOffsetPx = panelHeight / 2 → panelHeight = overlayOffsetPx * 2. */
       const handleH = 82; // gradiente (36) + drag handle (46)
       const ITALY   = L.latLngBounds([36.0, 6.0], [47.5, 19.0]);
       map.fitBounds(ITALY, {
         paddingTopLeft:     [20, 10],
-        paddingBottomRight: [20, panelH + handleH],
+        paddingBottomRight: [20, overlayOffsetPx * 2 + handleH],
         maxZoom: 7,
         animate: false,
       });
@@ -226,7 +226,7 @@ export default function SpotMap({
                di metà altezza pannello così il centro cade nell'area visibile */
             const COUNTRY_ZOOM = 5;
             mapInstance.current.setView([latitude, longitude], COUNTRY_ZOOM, { animate: false });
-            mapInstance.current.panBy([0, getPanelOffsetPx()], { animate: false });
+            mapInstance.current.panBy([0, overlayOffsetPx], { animate: false });
             hasInitialFit.current = true;
 
             /* Dot blu "Sei qui" */
@@ -453,8 +453,10 @@ export default function SpotMap({
        Logica: proiettiamo il pin in pixel, poi AGGIUNGIAMO l'offset a Y (spostiamo
        il "centro virtuale" più a sud). Leaflet centra la mappa su quel punto sud,
        quindi il pin appare panel_height/2 px SOPRA il centro → al centro dello
-       spazio visibile sopra il pannello. Sottrarre (vecchio codice) faceva l'opposto. */
-    const offset = getPanelOffsetPx();
+       spazio visibile sopra il pannello. Sottrarre (vecchio codice) faceva l'opposto.
+       overlayOffsetPx viene passato da MapClient come Math.round(panelHeight / 2),
+       quindi traccia l'altezza reale del pannello anche quando l'utente lo trascina. */
+    const offset = overlayOffsetPx;
 
     if (isMobile) {
       // Su mobile: stesso offset, senza animazione
@@ -477,7 +479,9 @@ export default function SpotMap({
     const pins    = filteredRef.current;
     const hasRegion = !!filterRegionBboxRef.current;
     const hasSearch = !!searchQueryRef.current;
-    const panelH  = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+    /* overlayOffsetPx = panelHeight / 2 → panelHeight = overlayOffsetPx * 2.
+       Usiamo il valore dinamico passato da MapClient invece della stima statica. */
+    const panelH  = overlayOffsetPx * 2;
 
     /* Caso 0: nessun risultato */
     if (pins.length === 0) {
@@ -495,7 +499,7 @@ export default function SpotMap({
 
     /* Caso 1: singolo risultato → zoom ravvicinato centrato sopra il pannello */
     if (pins.length === 1) {
-      const offset       = getPanelOffsetPx();
+      const offset       = overlayOffsetPx;
       const p            = pins[0];
       const targetZoom   = 15;
       const targetPoint  = mapInstance.current.project([p.lat, p.lon], targetZoom);
