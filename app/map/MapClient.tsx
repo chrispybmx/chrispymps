@@ -805,9 +805,11 @@ function SpotListPanel({
   const photoTouchStartY = useRef(0);
   const photoIsSwiping   = useRef(false);
 
-  const panelRef  = useRef<HTMLDivElement>(null);
-  const cardRefs  = useRef<Map<string, Element>>(new Map());
-  const ioRef     = useRef<IntersectionObserver | null>(null);
+  const panelRef       = useRef<HTMLDivElement>(null);
+  const cardRefs       = useRef<Map<string, Element>>(new Map());
+  const ioRef          = useRef<IntersectionObserver | null>(null);
+  /* Mappa dei ratio di visibilità: id → intersectionRatio (0..1) */
+  const visibilityMap  = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const f: Record<string, boolean> = {};
@@ -817,21 +819,37 @@ function SpotListPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots.length]);
 
-  /* IntersectionObserver con root = pannello scroll */
+  /* IntersectionObserver con root = pannello scroll.
+     Strategia: aggiorna la mappa di visibilità ad ogni entry, poi scegli
+     sempre lo spot con il ratio PIÙ ALTO — evita salti durante lo scroll. */
   useEffect(() => {
     ioRef.current?.disconnect();
+    visibilityMap.current.clear();
     if (!panelRef.current) return;
     ioRef.current = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
+        entries.forEach(entry => {
+          const id = (entry.target as HTMLElement).dataset.spotId;
+          if (!id) return;
           if (entry.isIntersecting) {
-            const id = (entry.target as HTMLElement).dataset.spotId;
-            if (id) onActivate(id);
-            break;
+            visibilityMap.current.set(id, entry.intersectionRatio);
+          } else {
+            visibilityMap.current.delete(id);
           }
-        }
+        });
+        /* Spot più visibile nella viewport */
+        let bestId = '';
+        let bestRatio = -1;
+        visibilityMap.current.forEach((ratio, id) => {
+          if (ratio > bestRatio) { bestRatio = ratio; bestId = id; }
+        });
+        if (bestId) onActivate(bestId);
       },
-      { root: panelRef.current, rootMargin: '-5% 0px -60% 0px', threshold: 0.15 }
+      {
+        root: panelRef.current,
+        rootMargin: '-5% 0px -50% 0px',
+        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1.0],
+      }
     );
     cardRefs.current.forEach(el => ioRef.current!.observe(el));
     return () => ioRef.current?.disconnect();
