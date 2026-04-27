@@ -351,7 +351,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onAddSpotAt={handleAddSpotAt}
           flyTarget={flyTarget}
           selectedPin={selectedPin}
-          overlayOffsetPx={160}
+          overlayOffsetPx={Math.round(panelHeight / 2)}
           fitAllTrigger={fitAllTrigger}
           radiusMode={radiusMode}
           radiusCenter={radiusCenter}
