@@ -45,16 +45,19 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
   const [myRating,  setMyRating]  = useState(0);
   const [hoverStar, setHoverStar] = useState(0);
   const [fav,       setFav]       = useState(false);
-  const sheetRef   = useRef<HTMLDivElement>(null);
-  const startY     = useRef(0);
-  const currentY   = useRef(0);
-  const isDragging = useRef(false);
+  const sheetRef      = useRef<HTMLDivElement>(null);
+  const photoStripRef = useRef<HTMLDivElement>(null);
+  const startY        = useRef(0);
+  const currentY      = useRef(0);
+  const isDragging    = useRef(false);
 
   useEffect(() => {
     if (!spot) return;
     setPhotoIdx(0); setNavOpen(false);
     setMyRating(getMyRating(spot.id));
     setFav(isFav(spot.id));
+    // Reset scroll position quando cambia spot
+    if (photoStripRef.current) photoStripRef.current.scrollLeft = 0;
   }, [spot?.id]);
 
   /* ── swipe-to-close ── */
@@ -72,6 +75,21 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
     if (currentY.current > 120) { onClose(); }
     else { sheetRef.current.style.transform = ''; currentY.current = 0; }
   }, [onClose]);
+
+  /* ── photo scroll-snap ── */
+  const onPhotoScroll = useCallback(() => {
+    const el = photoStripRef.current;
+    if (!el) return;
+    const newIdx = Math.round(el.scrollLeft / el.offsetWidth);
+    setPhotoIdx(i => i !== newIdx ? newIdx : i);
+  }, []);
+
+  const scrollToPhoto = useCallback((i: number) => {
+    const el = photoStripRef.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.offsetWidth, behavior: 'smooth' });
+    setPhotoIdx(i);
+  }, []);
 
   if (!spot) return null;
 
@@ -126,19 +144,50 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
 
         {/* ══ FOTO ══ */}
         {photos.length > 0 ? (
-          <div style={{ position: 'relative', height: 280, overflow: 'hidden', background: '#111' }}>
-            <img
-              src={photos[photoIdx].url}
-              alt={`Foto ${photoIdx + 1} — ${spot.name}`}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              loading="lazy"
-            />
+          <div style={{ position: 'relative', height: 280, background: '#111' }}>
+
+            {/* Scroll-snap strip — swipe orizzontale nativo */}
+            <div
+              ref={photoStripRef}
+              onScroll={onPhotoScroll}
+              style={{
+                display: 'flex',
+                overflowX: 'auto',
+                scrollSnapType: 'x mandatory',
+                scrollBehavior: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                width: '100%',
+                height: '100%',
+              } as React.CSSProperties}
+            >
+              {photos.map((p, i) => (
+                <div
+                  key={p.url}
+                  style={{
+                    flexShrink: 0,
+                    width: '100%',
+                    height: '100%',
+                    scrollSnapAlign: 'start',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <img
+                    src={p.url}
+                    alt={`Foto ${i + 1} — ${spot.name}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    loading={i === 0 ? 'eager' : 'lazy'}
+                  />
+                </div>
+              ))}
+            </div>
+
             {/* gradient per leggibilità testo */}
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
-              background: 'linear-gradient(transparent, rgba(10,10,10,0.88))' }} />
+              background: 'linear-gradient(transparent, rgba(10,10,10,0.88))', pointerEvents: 'none' }} />
 
             {/* Titolo sopra la foto */}
-            <div style={{ position: 'absolute', bottom: 12, left: 16, right: 48 }}>
+            <div style={{ position: 'absolute', bottom: 12, left: 16, right: 48, pointerEvents: 'none' }}>
               <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 21, color: '#fff', margin: 0,
                 lineHeight: 1.2, textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
                 {spot.name}
@@ -156,6 +205,7 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
               background: cond.bg, color: cond.color,
               fontFamily: 'var(--font-mono)', fontSize: 11,
               padding: '3px 8px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.06em',
+              pointerEvents: 'none',
             }}>
               {cond.label}
             </div>
@@ -164,7 +214,7 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
             {photos.length > 1 && (
               <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 4, alignItems: 'center' }}>
                 {photos.map((_, i) => (
-                  <button key={i} onClick={() => setPhotoIdx(i)} style={{
+                  <button key={i} onClick={() => scrollToPhoto(i)} style={{
                     width: i === photoIdx ? 18 : 6, height: 6, borderRadius: 3,
                     border: 'none', padding: 0, cursor: 'pointer',
                     background: i === photoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.5)',
@@ -176,10 +226,10 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
 
             {/* Arrow prev/next */}
             {photos.length > 1 && photoIdx > 0 && (
-              <button onClick={() => setPhotoIdx(i => i - 1)} style={arrowBtn('left')}>‹</button>
+              <button onClick={() => scrollToPhoto(photoIdx - 1)} style={arrowBtn('left')}>‹</button>
             )}
             {photos.length > 1 && photoIdx < photos.length - 1 && (
-              <button onClick={() => setPhotoIdx(i => i + 1)} style={arrowBtn('right')}>›</button>
+              <button onClick={() => scrollToPhoto(photoIdx + 1)} style={arrowBtn('right')}>›</button>
             )}
           </div>
         ) : (
