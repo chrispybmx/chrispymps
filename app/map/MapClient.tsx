@@ -907,7 +907,7 @@ function SpotListPanel({
       </div>
     )}
 
-    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' } as React.CSSProperties}>
+    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain', touchAction: 'pan-y' } as React.CSSProperties}>
 
       <style>{`
         .spot-card-wrap { -webkit-tap-highlight-color: transparent; }
@@ -1031,6 +1031,7 @@ function SpotListPanel({
                         width: '100%',
                         height: 180,
                         cursor: 'zoom-in',
+                        touchAction: 'pan-x',
                       } as React.CSSProperties}
                     >
                       {allPhotos.map((url, i) => (
