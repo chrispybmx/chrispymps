@@ -394,6 +394,29 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
               </div>
             </div>
 
+            {/* Toggle mappa chiara/scura — fisso in alto a destra sulla mappa */}
+            <button
+              onClick={toggleDarkMap}
+              title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
+              style={{
+                position: 'fixed',
+                top: TOP_OFFSET + 10,
+                right: 12,
+                zIndex: 55,
+                width: 40, height: 40,
+                background: darkMap ? 'var(--orange)' : 'var(--gray-800)',
+                border: `1px solid ${darkMap ? 'var(--orange)' : 'var(--gray-600)'}`,
+                borderRadius: 6,
+                fontSize: 18, cursor: 'pointer',
+                color: darkMap ? '#000' : 'var(--bone)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 14px rgba(0,0,0,0.6)',
+                transition: 'all 0.15s',
+              } as React.CSSProperties}
+            >
+              {darkMap ? '🌞' : '🌑'}
+            </button>
+
             {/* Bordo sinistro — tap per rivelare i bottoni quando sono nascosti */}
             {autoHidden && !btnsRevealed && (
               <div
