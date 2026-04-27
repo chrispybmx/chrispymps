@@ -405,17 +405,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 🎯
               </MapBtn>
 
-              {/* Contatore spot */}
-              <div style={{
-                background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
-                borderRadius: 6, padding: '5px 0',
-                fontFamily: 'var(--font-mono)', fontSize: 14,
-                color: 'var(--orange)', textAlign: 'center',
-                boxShadow: '0 2px 14px rgba(0,0,0,0.6)', width: 40,
-              }}>
-                {filtered.length}
-                <div style={{ color: 'var(--gray-400)', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>spot</div>
-              </div>
             </div>
 
             {/* Toggle mappa chiara/scura — fisso in alto a destra, stessa animazione dei bottoni sinistra */}
@@ -676,7 +665,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         pointerEvents: 'none',
         transition: dragState.current ? 'none' : 'height 0.18s ease',
       }}>
-        {/* ── DRAG HANDLE ── */}
+        {/* ── DRAG HANDLE — V7 rubber grip ── */}
         <div
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
@@ -684,19 +673,49 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onPointerCancel={onDragEnd}
           style={{
             position: 'absolute', top: 0, left: 0, right: 0,
-            height: 36, zIndex: 2,
+            height: 54, zIndex: 2,
             display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: 4,
+            alignItems: 'center', justifyContent: 'center', gap: 5,
             cursor: 'ns-resize',
             pointerEvents: 'all',
             touchAction: 'none',
+            paddingTop: 6,
           }}
         >
+          {/* Rettangolo grip stile gamepad anni 2000 */}
           <div style={{
-            width: 40, height: 4, borderRadius: 3,
-            background: 'rgba(255,255,255,0.28)',
-            marginTop: 10,
-          }} />
+            width: 68, height: 26,
+            background: '#222',
+            borderRadius: 5,
+            boxShadow: 'inset 0 1px 0 #3e3e3e, inset 0 -1px 0 #111, 0 3px 8px rgba(0,0,0,0.9)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', position: 'relative',
+          } as React.CSSProperties}>
+            {/* scanlines overlay */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
+              pointerEvents: 'none',
+            }} />
+            {/* dot grid 5×2 */}
+            <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
+              {[0,1,2,3,4].map(col => (
+                <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                  <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Label spot count */}
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9,
+            color: 'rgba(255,255,255,0.22)', letterSpacing: '0.18em',
+            textTransform: 'uppercase', userSelect: 'none',
+          }}>
+            {filtered.length} SPOTS
+          </div>
         </div>
 
         {/* Gradiente fade */}
