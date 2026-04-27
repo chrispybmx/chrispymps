@@ -63,13 +63,22 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, [autoAdd]);
 
   /* ── Pannello ridimensionabile ── */
+  const PANEL_MIN  = 72;   // altezza minima: sempre visibile con tab "↑ SPOT"
+  const PANEL_SNAP = 140;  // soglia sotto cui collassa al minimo
   const DEFAULT_PANEL_H = () =>
     typeof window !== 'undefined'
       ? Math.min(480, Math.max(270, window.innerHeight * 0.54))
       : 320;
-  const [panelHeight, setPanelHeight] = useState<number>(320);
+  const [panelHeight,   setPanelHeight]   = useState<number>(320);
+  const [panelSnapping, setPanelSnapping] = useState(false); // true durante animazione snap
   useEffect(() => { setPanelHeight(DEFAULT_PANEL_H()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const dragState = useRef<{ startY: number; startH: number } | null>(null);
+
+  const snapTo = useCallback((h: number) => {
+    setPanelSnapping(true);
+    setPanelHeight(h);
+    setTimeout(() => setPanelSnapping(false), 260);
+  }, []);
 
   const onDragStart = useCallback((e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -78,22 +87,22 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
   const onDragMove = useCallback((e: React.PointerEvent) => {
     if (!dragState.current) return;
-    const delta  = dragState.current.startY - e.clientY; // positivo = su = pannello più alto
-    const newH   = Math.min(
+    const delta = dragState.current.startY - e.clientY;
+    const newH  = Math.min(
       window.innerHeight * 0.88,
-      Math.max(44, dragState.current.startH + delta),
+      Math.max(PANEL_MIN, dragState.current.startH + delta),
     );
     setPanelHeight(newH);
-  }, []);
+  }, [PANEL_MIN]);
 
   const onDragEnd = useCallback((e: React.PointerEvent) => {
     if (!dragState.current) return;
-    /* Snap su/giù: se < 120px → collassa a 44; se > 75% vh → espandi a 88% */
     const h = dragState.current.startH + (dragState.current.startY - e.clientY);
-    if (h < 120) setPanelHeight(44);
-    else if (h > window.innerHeight * 0.75) setPanelHeight(Math.round(window.innerHeight * 0.88));
     dragState.current = null;
-  }, []);
+    if (h < PANEL_SNAP)                     snapTo(PANEL_MIN);
+    else if (h > window.innerHeight * 0.75) snapTo(Math.round(window.innerHeight * 0.88));
+    // altrimenti rimane dov'è
+  }, [PANEL_SNAP, snapTo]);
 
   /* ── Radius search ── dichiarati PRIMA di filtered che li usa ── */
   const [radiusMode,      setRadiusMode]      = useState(false);
@@ -667,15 +676,17 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         height: panelHeight,
         display: 'flex', flexDirection: 'column',
         pointerEvents: 'none',
-        transition: dragState.current ? 'none' : 'height 0.18s ease',
+        transition: (dragState.current && !panelSnapping) ? 'none' : 'height 0.25s cubic-bezier(0.34,1.2,0.64,1)',
       }}>
-        {/* Gradiente fade — solo decorativo, nessun handle qui */}
-        <div style={{
-          height: 36, flexShrink: 0,
-          background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.97) 100%)',
-          pointerEvents: 'none',
-          marginBottom: -1,   /* copre il pixel di giunzione con il drag handle */
-        }} />
+        {/* Gradiente fade — visibile solo quando espanso */}
+        {panelHeight > PANEL_MIN + 10 && (
+          <div style={{
+            height: 36, flexShrink: 0,
+            background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.97) 100%)',
+            pointerEvents: 'none',
+            marginBottom: -1,
+          }} />
+        )}
 
         {/* ── DRAG HANDLE + PANNELLO — unico layer blur/background ── */}
         <div style={{
@@ -686,44 +697,71 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           WebkitBackdropFilter: 'blur(18px)',
           pointerEvents: 'all',
           overflow: 'hidden',
+          borderRadius: panelHeight <= PANEL_MIN + 10 ? '14px 14px 0 0' : '0',
+          transition: 'border-radius 0.25s ease',
         }}>
-          {/* Drag handle */}
+
+          {/* ── DRAG HANDLE / TAB COLLASSATO ── */}
           <div
             onPointerDown={onDragStart}
             onPointerMove={onDragMove}
             onPointerUp={onDragEnd}
             onPointerCancel={onDragEnd}
+            onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
             style={{
               flexShrink: 0,
-              height: 46,
+              height: panelHeight <= PANEL_MIN + 10 ? PANEL_MIN : 46,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'ns-resize',
+              cursor: panelHeight <= PANEL_MIN + 10 ? 'pointer' : 'ns-resize',
               touchAction: 'none',
+              gap: 10,
+              transition: 'height 0.25s cubic-bezier(0.34,1.2,0.64,1)',
             }}
           >
-            {/* Rettangolo grip stile gamepad anni 2000 */}
-            <div style={{
-              width: 68, height: 26,
-              background: '#222',
-              borderRadius: 5,
-              boxShadow: 'inset 0 1px 0 #3e3e3e, inset 0 -1px 0 #111, 0 3px 8px rgba(0,0,0,0.9)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden', position: 'relative',
-            } as React.CSSProperties}>
+            {panelHeight <= PANEL_MIN + 10 ? (
+              /* ── Stato collassato: tab con freccia + conteggio ── */
               <div style={{
-                position: 'absolute', inset: 0,
-                background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
-                pointerEvents: 'none',
-              }} />
-              <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
-                {[0,1,2,3,4].map(col => (
-                  <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
-                    <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
-                  </div>
-                ))}
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: 'rgba(255,106,0,0.12)',
+                border: '1px solid rgba(255,106,0,0.3)',
+                borderRadius: 20,
+                padding: '8px 18px',
+                userSelect: 'none',
+              }}>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>↑</span>
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 13,
+                  color: 'var(--orange)', letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}>
+                  {filtered.length} spot
+                </span>
               </div>
-            </div>
+            ) : (
+              /* ── Stato espanso: grip classico ── */
+              <div style={{
+                width: 68, height: 26,
+                background: '#222',
+                borderRadius: 5,
+                boxShadow: 'inset 0 1px 0 #3e3e3e, inset 0 -1px 0 #111, 0 3px 8px rgba(0,0,0,0.9)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden', position: 'relative',
+              } as React.CSSProperties}>
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
+                  pointerEvents: 'none',
+                }} />
+                <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
+                  {[0,1,2,3,4].map(col => (
+                    <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                      <div style={{ width: 4, height: 4, background: '#3a3a3a', borderRadius: '50%', boxShadow: 'inset -1px -1px 0 #222, inset 1px 1px 0 #505050' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Pannello scroll */}
