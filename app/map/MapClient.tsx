@@ -106,6 +106,16 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [locateTrigger, setLocateTrigger] = useState(0);
   const [isLocating,    setIsLocating]    = useState(false);
 
+  /* ── Stile mappa (chiaro/scuro) ── */
+  const [darkMap, setDarkMap] = useState<boolean>(() => {
+    try { return localStorage.getItem('cmaps_dark_map') === '1'; } catch { return false; }
+  });
+  const toggleDarkMap = () => setDarkMap(prev => {
+    const next = !prev;
+    try { localStorage.setItem('cmaps_dark_map', next ? '1' : '0'); } catch { /* */ }
+    return next;
+  });
+
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
@@ -294,64 +304,56 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onMapClick={handleMapClick}
           locateTrigger={locateTrigger}
           onLocatingChange={setIsLocating}
+          darkMap={darkMap}
         />
         {/* Toast solo quando raggio attivo e nessun centro ancora */}
         {radiusMode && !radiusCenter && radiusPanelOpen && <RadiusToast />}
       </div>
 
-      {/* ── BOTTONI MAPPA — position:fixed, sempre visibili sopra tutto ── */}
+      {/* ── BOTTONI MAPPA — colonna sinistra, sempre visibili ── */}
       <div style={{
         position: 'fixed',
         top: TOP_OFFSET + 10,
-        right: 12,
+        left: 12,
         display: 'flex', flexDirection: 'column', gap: 8,
         zIndex: 55,
-        pointerEvents: 'all',
       }}>
         {/* Localizza me */}
-        <button
+        <MapBtn
           onClick={() => setLocateTrigger(n => n + 1)}
           disabled={isLocating}
           title="Mostrami sulla mappa"
-          style={{
-            width: 40, height: 40,
-            background: 'var(--gray-800)',
-            border: '1px solid var(--gray-600)', borderRadius: 6,
-            color: isLocating ? 'var(--orange)' : 'var(--bone)',
-            fontSize: 18, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 14px rgba(0,0,0,0.7)',
-            animation: isLocating ? 'spin-slow 1s linear infinite' : 'none',
-          } as React.CSSProperties}
+          active={false}
+          loading={isLocating}
         >
           {isLocating ? '⌛' : '📍'}
-        </button>
+        </MapBtn>
 
-        {/* Raggio */}
-        <button
+        {/* Ricerca per raggio */}
+        <MapBtn
           onClick={handleRadiusToggle}
           title="Ricerca per raggio"
-          style={{
-            width: 40, height: 40,
-            background: radiusMode ? 'var(--orange)' : 'var(--gray-800)',
-            border: `1px solid ${radiusMode ? 'var(--orange)' : 'var(--gray-600)'}`,
-            borderRadius: 6,
-            color: radiusMode ? '#000' : 'var(--bone)',
-            fontSize: 18, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 14px rgba(0,0,0,0.7)',
-          }}
+          active={radiusMode}
         >
           🎯
-        </button>
+        </MapBtn>
 
-        {/* Contatore */}
+        {/* Toggle mappa chiara/scura */}
+        <MapBtn
+          onClick={toggleDarkMap}
+          title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
+          active={darkMap}
+        >
+          {darkMap ? '🌞' : '🌑'}
+        </MapBtn>
+
+        {/* Contatore spot */}
         <div style={{
           background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
           borderRadius: 6, padding: '5px 0',
           fontFamily: 'var(--font-mono)', fontSize: 14,
           color: 'var(--orange)', textAlign: 'center',
-          boxShadow: '0 2px 14px rgba(0,0,0,0.7)', width: 40,
+          boxShadow: '0 2px 14px rgba(0,0,0,0.6)', width: 40,
         }}>
           {filtered.length}
           <div style={{ color: 'var(--gray-400)', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>spot</div>
@@ -980,6 +982,40 @@ function SpotListPanel({
       <div style={{ height: 'calc(48px + env(safe-area-inset-bottom, 0px))' }} />
     </div>
     </>
+  );
+}
+
+/* ── Bottone mappa generico ── */
+function MapBtn({
+  children, onClick, title, active = false, disabled = false, loading = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title?: string;
+  active?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        width: 40, height: 40,
+        background: active ? 'var(--orange)' : 'var(--gray-800)',
+        border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
+        borderRadius: 6,
+        color: active ? '#000' : loading ? 'var(--orange)' : 'var(--bone)',
+        fontSize: 18, cursor: disabled ? 'default' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 2px 14px rgba(0,0,0,0.6)',
+        animation: loading ? 'spin-slow 1s linear infinite' : 'none',
+        flexShrink: 0,
+      } as React.CSSProperties}
+    >
+      {children}
+    </button>
   );
 }
 
