@@ -473,19 +473,12 @@ export default function SpotMap({
        quindi traccia l'altezza reale del pannello anche quando l'utente lo trascina. */
     const offset = overlayOffsetPx;
 
-    if (isMobile) {
-      // Su mobile: stesso offset, senza animazione
-      const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
-      const offsetPoint  = targetPoint.add(L!.point(0, offset));
-      const offsetLatLng = map.unproject(offsetPoint, zoom);
-      map.setView(offsetLatLng, zoom, { animate: false });
-    } else {
-      // Su desktop: flyTo con centro spostato a sud del pin
-      const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
-      const offsetPoint  = targetPoint.add(L!.point(0, offset));
-      const offsetLatLng = map.unproject(offsetPoint, zoom);
-      map.flyTo(offsetLatLng, zoom, { duration: 0.7, easeLinearity: 0.5 });
-    }
+    // Stessa animazione su mobile e desktop — lenta abbastanza da
+    // permettere di seguire visivamente il percorso verso lo spot
+    const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
+    const offsetPoint  = targetPoint.add(L!.point(0, offset));
+    const offsetLatLng = map.unproject(offsetPoint, zoom);
+    map.flyTo(offsetLatLng, zoom, { duration: 1.4, easeLinearity: 0.25 });
   }, [flyTarget]);
 
   /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */
