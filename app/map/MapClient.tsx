@@ -332,11 +332,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           setScrollToId(pin.id);
         }, 200);
       } else {
-        /* Apertura: misura l'altezza reale della card dopo il render e snappa */
-        setTimeout(() => {
-          const el = document.querySelector('[data-exp="1"]') as HTMLElement | null;
-          snapTo(el ? el.offsetHeight + 4 : EXPANDED_CARD_H);
-        }, 80);
         setTimeout(() => setScrollToId(pin.id), 260);
       }
       return isClosing ? null : pin.id;
@@ -347,6 +342,21 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* Scroll sync: IO ha visto una card → aggiorna SOLO il pin attivo (bordo arancione)
      ma NON muove la mappa. Debounce 120ms: il bordo si aggiorna solo quando
      lo scroll si ferma, evitando salti durante il movimento. */
+  /* Misura l'altezza reale della card espansa dopo il paint del browser
+     e snappa il pannello esattamente su di essa — doppio rAF garantisce
+     che il DOM sia già stato committed e paintato. */
+  useEffect(() => {
+    if (!expandedId) return;
+    let raf1: number, raf2: number;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = document.querySelector('[data-exp="1"]') as HTMLElement | null;
+        if (el) snapTo(el.offsetHeight + 6);
+      });
+    });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [expandedId, snapTo]);
+
   const activateDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleActivateFromScroll = useCallback((id: string) => {
     if (ioLockRef.current) return; // lock attivo — ignora
@@ -1340,19 +1350,19 @@ function SpotListPanel({
                     )}
                   </div>
 
-                  {/* Destra: VEDI SPOT + 📍 in colonna */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+                  {/* Destra: VEDI SPOT + 📍 affiancati */}
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: 5, flexShrink: 0, alignItems: 'center' }}>
                     <Link
                       href={`/map/spot/${spot.slug}`}
                       onClick={e => e.stopPropagation()}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '0 10px', height: 28, textDecoration: 'none', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '0 10px', height: 30, textDecoration: 'none', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
                     >
                       VEDI SPOT →
                     </Link>
                     <button
                       onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
                       title="Portami qui con Google Maps"
-                      style={{ width: '100%', height: 28, background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}
+                      style={{ width: 30, height: 30, flexShrink: 0, background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}
                     >📍</button>
                   </div>
 
