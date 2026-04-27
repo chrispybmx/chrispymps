@@ -968,23 +968,25 @@ function SpotListPanel({
         .thumb-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       `}</style>
 
-      {/* Header lista */}
-      <div style={{
-        padding: '7px 14px 5px',
-        fontFamily: 'var(--font-mono)', fontSize: 11,
-        color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
-        borderBottom: radiusCenter ? '1px solid rgba(255,106,0,0.2)' : '1px solid rgba(255,255,255,0.04)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0,
-        background: 'rgba(10,10,10,0.94)', zIndex: 2,
-      }}>
-        <span>{spots.length} spot</span>
-        {radiusCenter && (
-          <span style={{ color: 'var(--orange)', fontSize: 10 }}>
-            🎯 per distanza
-          </span>
-        )}
-      </div>
+      {/* Header lista — nascosto quando una card è espansa (coprirebbe la X) */}
+      {!expandedId && (
+        <div style={{
+          padding: '7px 14px 5px',
+          fontFamily: 'var(--font-mono)', fontSize: 11,
+          color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
+          borderBottom: radiusCenter ? '1px solid rgba(255,106,0,0.2)' : 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'sticky', top: 0,
+          background: 'rgba(10,10,10,0.97)', zIndex: 2,
+        }}>
+          <span>{spots.length} spot</span>
+          {radiusCenter && (
+            <span style={{ color: 'var(--orange)', fontSize: 10 }}>
+              🎯 per distanza
+            </span>
+          )}
+        </div>
+      )}
 
       {spots.map((spot, idx) => {
         const tipo      = TIPI_SPOT[spot.type];
