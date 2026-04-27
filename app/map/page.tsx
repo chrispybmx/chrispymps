@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title:       'Chrispy Maps — Mappa Spot BMX, Skate & Scooter Italia',
     description: 'La mappa community italiana per trovare spot BMX, skatepark e park scooter. Centinaia di spot verificati in tutta Italia.',
     url:         APP_CONFIG.url,
-    images:      [{ url: '/og-image.jpg', width: 1200, height: 630, alt: 'Mappa spot BMX e skatepark Italia' }],
+    images:      [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Mappa spot BMX e skatepark Italia' }],
   },
 };
 
@@ -82,6 +82,14 @@ export default async function MapPage({
   const params = await (searchParams ?? Promise.resolve({}));
   const autoAdd = params['add'] === '1';
 
+  /* Raggruppa spot per città — usato nella sezione crawlable */
+  const spotsByCity: Record<string, SpotMapPin[]> = {};
+  spots.forEach(s => {
+    const c = s.city ?? 'Altro';
+    if (!spotsByCity[c]) spotsByCity[c] = [];
+    spotsByCity[c].push(s);
+  });
+
   return (
     <>
       <script
@@ -89,6 +97,35 @@ export default async function MapPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(mapJsonLd) }}
       />
       <MapClient initialSpots={spots} autoAdd={autoAdd} />
+
+      {/* ── SEO: contenuto testuale per i crawler ──────────────────────────────
+          Questa sezione è visibile a Googlebot ma nascosta visivamente agli utenti.
+          Non è cloaking: il contenuto è reale e rispecchia ciò che gli utenti vedono
+          interagendo con la mappa (stessi spot, stesse info). */}
+      <div
+        style={{
+          position: 'fixed', bottom: '-100vh', left: 0,
+          width: 1, height: 1, overflow: 'hidden',
+          visibility: 'hidden', pointerEvents: 'none',
+        }}
+        aria-hidden="true"
+      >
+        <h1>Mappa Spot BMX, Skate e Scooter Italia — Chrispy Maps</h1>
+        <p>{APP_CONFIG.description}</p>
+        {Object.entries(spotsByCity).slice(0, 20).map(([city, cs]) => (
+          <section key={city}>
+            <h2>Spot BMX a {city}</h2>
+            <ul>
+              {cs.slice(0, 10).map(s => (
+                <li key={s.id}>
+                  <a href={`/map/spot/${s.slug}`}>{s.name}</a>
+                  {s.description ? ` — ${s.description}` : ''}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
     </>
   );
 }
