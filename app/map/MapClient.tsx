@@ -668,9 +668,12 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         </div>
       )}
 
-      {/* ── TAB FISSO — sempre visibile in fondo, apre il pannello ── */}
+      {/* ── TAB FISSO — sempre visibile, toggle su/giù ── */}
       <div
-        onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
+        onClick={() => {
+          if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H());
+          else snapTo(PANEL_MIN);
+        }}
         style={{
           position: 'fixed',
           bottom: 0, left: '50%',
@@ -684,14 +687,17 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           border: '1px solid rgba(255,255,255,0.07)',
           borderBottom: 'none',
           display: 'flex', alignItems: 'center', gap: 10,
-          cursor: panelHeight <= PANEL_MIN + 10 ? 'pointer' : 'default',
-          pointerEvents: panelHeight <= PANEL_MIN + 10 ? 'all' : 'none',
-          opacity: panelHeight <= PANEL_MIN + 10 ? 1 : 0,
-          transition: 'opacity 0.2s ease',
+          cursor: 'pointer',
+          pointerEvents: 'all',
           userSelect: 'none',
         }}
       >
-        <span style={{ fontSize: 15 }}>↑</span>
+        <span style={{
+          fontSize: 15,
+          display: 'inline-block',
+          transition: 'transform 0.25s ease',
+          transform: panelHeight <= PANEL_MIN + 10 ? 'rotate(0deg)' : 'rotate(180deg)',
+        }}>↑</span>
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: 13,
           color: 'var(--orange)', letterSpacing: '0.05em',
