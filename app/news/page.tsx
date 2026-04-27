@@ -22,7 +22,7 @@ interface NewsItem {
 async function getNews(): Promise<NewsItem[]> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://chrispybmx.com';
-    const res = await fetch(`${baseUrl}/api/news`, { next: { revalidate: 60 } });
+    const res = await fetch(`${baseUrl}/api/news`, { cache: 'no-store' });
     const json = await res.json();
     return json.data ?? [];
   } catch { return []; }
