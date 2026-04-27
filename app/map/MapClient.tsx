@@ -690,7 +690,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           borderBottom: 'none',
           display: 'flex', alignItems: 'center', gap: 10,
           cursor: 'pointer',
-          pointerEvents: 'all',
+          pointerEvents: panelHeight <= PANEL_MIN + 10 ? 'all' : 'none',
+          opacity: panelHeight <= PANEL_MIN + 10 ? 1 : 0,
+          transition: 'opacity 0.2s ease',
           userSelect: 'none',
         }}
       >
