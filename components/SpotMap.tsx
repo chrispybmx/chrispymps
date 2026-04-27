@@ -478,7 +478,7 @@ export default function SpotMap({
     const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
     const offsetPoint  = targetPoint.add(L!.point(0, offset));
     const offsetLatLng = map.unproject(offsetPoint, zoom);
-    map.flyTo(offsetLatLng, zoom, { duration: 1.4, easeLinearity: 0.25 });
+    map.flyTo(offsetLatLng, zoom, { duration: 2.2, easeLinearity: 0.15 });
   }, [flyTarget]);
 
   /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */
