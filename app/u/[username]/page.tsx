@@ -123,7 +123,7 @@ export default async function UserProfilePage({ params }: { params: { username: 
               📍 SPOT DI @{profile.username.toUpperCase()}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {spots.map(spot => <SpotTile key={spot.id} spot={spot} />)}
+              {spots.map(spot => <SpotTile key={spot.id} spot={spot} username={profile.username} />)}
             </div>
           </>
         )}
@@ -140,7 +140,7 @@ export default async function UserProfilePage({ params }: { params: { username: 
               🛹 SPOT GIRATI ({ridden.length})
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {ridden.map(spot => <SpotTile key={spot.id} spot={spot} />)}
+              {ridden.map(spot => <SpotTile key={spot.id} spot={spot} username={profile.username} />)}
             </div>
           </div>
         )}
@@ -156,12 +156,12 @@ export default async function UserProfilePage({ params }: { params: { username: 
   );
 }
 
-function SpotTile({ spot }: { spot: SpotCard }) {
+function SpotTile({ spot, username }: { spot: SpotCard; username: string }) {
   const tipo   = TIPI_SPOT[spot.type];
   const cover  = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
   const isDead = spot.condition !== 'alive';
   return (
-    <Link href={`/map/spot/${spot.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
+    <Link href={`/map/spot/${spot.slug}?from=/u/${username}`} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, overflow: 'hidden', opacity: isDead ? 0.65 : 1 }}>
         <div style={{ height: 110, background: 'var(--gray-700)', overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {cover
