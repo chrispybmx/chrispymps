@@ -10,7 +10,8 @@ export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: 
   trail:  { label: 'Trail',   emoji: '🌲', color: '#86efac' },
   plaza:  { label: 'Plaza',   emoji: '🏛️', color: '#f472b6' },
   gap:    { label: 'Gap',     emoji: '⬜', color: '#fb923c' },
-  bowl:   { label: 'Bowl',    emoji: '🥣', color: '#34d399' },
+  bowl:      { label: 'Bowl',      emoji: '🥣', color: '#34d399' },
+  pumptrack: { label: 'Pumptrack', emoji: '🌀', color: '#06b6d4' },
 };
 
 // ===== CONDIZIONI =====
