@@ -47,9 +47,11 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
   const [fav,       setFav]       = useState(false);
   const sheetRef      = useRef<HTMLDivElement>(null);
   const photoStripRef = useRef<HTMLDivElement>(null);
+  const startX        = useRef(0);
   const startY        = useRef(0);
   const currentY      = useRef(0);
   const isDragging    = useRef(false);
+  const isHoriz       = useRef(false);   // true = swipe orizzontale → non interferire
 
   useEffect(() => {
     if (!spot) return;
@@ -60,17 +62,37 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
     if (photoStripRef.current) photoStripRef.current.scrollLeft = 0;
   }, [spot?.id]);
 
-  /* ── swipe-to-close ── */
+  /* ── swipe-to-close (solo verticale) ── */
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    startY.current = e.touches[0].clientY; isDragging.current = true;
+    startX.current   = e.touches[0].clientX;
+    startY.current   = e.touches[0].clientY;
+    isDragging.current = true;
+    isHoriz.current    = false;
   }, []);
+
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isDragging.current || !sheetRef.current) return;
+    // Determina la direzione al primo movimento significativo
+    if (!isHoriz.current) {
+      const dx = Math.abs(e.touches[0].clientX - startX.current);
+      const dy = Math.abs(e.touches[0].clientY - startY.current);
+      if (dx > 6 || dy > 6) {
+        if (dx > dy) {
+          // Swipe orizzontale → lascia passare allo strip foto, ignora
+          isHoriz.current  = true;
+          isDragging.current = false;
+          return;
+        }
+      }
+    }
+    if (isHoriz.current) return;
     const delta = e.touches[0].clientY - startY.current;
     if (delta > 0) { sheetRef.current.style.transform = `translateY(${delta}px)`; currentY.current = delta; }
   }, []);
+
   const onTouchEnd = useCallback(() => {
     isDragging.current = false;
+    isHoriz.current    = false;
     if (!sheetRef.current) return;
     if (currentY.current > 120) { onClose(); }
     else { sheetRef.current.style.transform = ''; currentY.current = 0; }
@@ -138,6 +160,7 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
           animation: 'slideUp 0.3s ease-out',
           paddingBottom: 'calc(var(--strip-height) + env(safe-area-inset-bottom))',
           transition: 'transform 0.1s ease-out',
+          touchAction: 'pan-y',   // browser sa che il sheet gestisce solo verticale
         }}
       >
         {/* Handle row — grip centrato + X sempre visibile */}
@@ -175,6 +198,7 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
                 scrollbarWidth: 'none',
                 width: '100%',
                 height: '100%',
+                touchAction: 'pan-x',   // solo scroll orizzontale, non interferisce col close
               } as React.CSSProperties}
             >
               {photos.map((p, i) => (
