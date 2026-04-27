@@ -312,12 +312,16 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, []);
 
   /* Scroll sync: IO ha visto una card → aggiorna SOLO il pin attivo (bordo arancione)
-     ma NON muove la mappa. La mappa si muove solo su click esplicito. */
+     ma NON muove la mappa. Debounce 120ms: il bordo si aggiorna solo quando
+     lo scroll si ferma, evitando salti durante il movimento. */
+  const activateDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleActivateFromScroll = useCallback((id: string) => {
     if (ioLockRef.current) return; // lock attivo — ignora
-    fromScrollRef.current = true;
-    setActiveListId(id);
-    // ← nessun setFlyTarget: la mappa resta ferma durante lo scroll
+    if (activateDebounce.current) clearTimeout(activateDebounce.current);
+    activateDebounce.current = setTimeout(() => {
+      fromScrollRef.current = true;
+      setActiveListId(id);
+    }, 120);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -827,7 +831,7 @@ function SpotListPanel({
           }
         }
       },
-      { root: panelRef.current, rootMargin: '-10% 0px -55% 0px', threshold: 0 }
+      { root: panelRef.current, rootMargin: '-5% 0px -60% 0px', threshold: 0.15 }
     );
     cardRefs.current.forEach(el => ioRef.current!.observe(el));
     return () => ioRef.current?.disconnect();
