@@ -322,7 +322,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       }
       return isClosing ? null : pin.id;
     });
-    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 13 });
+    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 12 });
   }, []);
 
   /* Scroll sync: IO ha visto una card → aggiorna SOLO il pin attivo (bordo arancione)
