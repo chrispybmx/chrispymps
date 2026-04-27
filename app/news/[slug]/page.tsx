@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { APP_CONFIG } from '@/lib/constants';
 
 interface NewsArticle {
   id: string;
@@ -27,10 +28,50 @@ async function getArticle(slug: string): Promise<NewsArticle | null> {
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const article = await getArticle(params.slug);
   if (!article) return { title: 'Non trovato — Chrispy Maps' };
+
+  const url         = `${APP_CONFIG.url}/news/${article.slug}`;
+  const title       = `${article.title} | Chrispy Maps`;
+  const description = article.excerpt ?? `Leggi "${article.title}" su Chrispy Maps — news BMX, skate e scooter dall'Italia.`;
+  const tags        = article.tags ? article.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const coverImg    = article.cover_url ?? '/opengraph-image';
+  const publishedAt = article.published_at ?? article.created_at;
+
   return {
-    title: `${article.title} — Chrispy Maps`,
-    description: article.excerpt ?? 'Leggi su Chrispy Maps',
-    openGraph: article.cover_url ? { images: [article.cover_url] } : undefined,
+    title,
+    description,
+    alternates: { canonical: url },
+    keywords: [
+      ...tags,
+      'news BMX', 'notizie skate', 'BMX Italia', 'Chrispy BMX',
+      'scooter freestyle', 'street BMX', 'skatepark Italia',
+    ],
+    authors: [{ name: 'Chrispy BMX', url: APP_CONFIG.url }],
+    openGraph: {
+      type:          'article',
+      url,
+      title,
+      description,
+      siteName:      'Chrispy Maps',
+      locale:        'it_IT',
+      publishedTime: publishedAt,
+      modifiedTime:  article.created_at,
+      authors:       ['Chrispy BMX'],
+      tags,
+      images: [{
+        url:    coverImg,
+        width:  1200,
+        height: 630,
+        alt:    article.title,
+      }],
+    },
+    twitter: {
+      card:        'summary_large_image',
+      site:        '@chrispy_bmx',
+      creator:     '@chrispy_bmx',
+      title,
+      description,
+      images: [coverImg],
+    },
   };
 }
 
@@ -42,6 +83,42 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     ? new Date(article.published_at).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : '';
   const tags = article.tags ? article.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  const articleJsonLd = {
+    '@context':        'https://schema.org',
+    '@type':           'NewsArticle',
+    headline:          article.title,
+    description:       article.excerpt ?? '',
+    url:               `${APP_CONFIG.url}/news/${article.slug}`,
+    datePublished:     article.published_at ?? article.created_at,
+    dateModified:      article.created_at,
+    inLanguage:        'it-IT',
+    image:             article.cover_url ? [article.cover_url] : [`${APP_CONFIG.url}/opengraph-image`],
+    author: [{
+      '@type': 'Person',
+      name:    'Christian Ceresato',
+      url:     'https://www.instagram.com/chrispy_bmx',
+      alternateName: 'Chrispy BMX',
+    }],
+    publisher: {
+      '@type': 'Organization',
+      name:    'Chrispy Maps',
+      url:     APP_CONFIG.url,
+      logo: {
+        '@type': 'ImageObject',
+        url:     `${APP_CONFIG.url}/opengraph-image`,
+      },
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id':   `${APP_CONFIG.url}/news/${article.slug}`,
+    },
+    keywords: tags.join(', '),
+    about: {
+      '@type': 'Thing',
+      name:    'BMX, Skateboarding, Scooter Freestyle',
+    },
+  };
 
   // Parse body — support simple markdown-like: **bold**, *italic*, # headings, - lists, blank lines = paragraphs
   const renderBody = (text: string) => {
@@ -91,6 +168,10 @@ export default async function ArticlePage({ params }: { params: { slug: string }
 
   return (
     <div style={{ background: 'var(--black)', minHeight: '100dvh' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       {/* Header */}
       <div style={{ borderBottom: '1px solid var(--gray-700)', background: 'rgba(10,10,10,0.98)', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
