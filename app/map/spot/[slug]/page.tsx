@@ -13,7 +13,7 @@ import ShareSpotBtn from '@/components/ShareSpotBtn';
 
 export const revalidate = 300;
 
-interface Props { params: { slug: string }; searchParams: { from?: string } }
+interface Props { params: { slug: string } }
 
 async function getSpot(slug: string): Promise<Spot | null> {
   const supabase = supabaseServer();
@@ -66,16 +66,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SpotPage({ params, searchParams }: Props) {
+export default async function SpotPage({ params }: Props) {
   const spot = await getSpot(params.slug);
   if (!spot) notFound();
-
-  /* Contextual back navigation: if the user came from a profile page, go back there */
-  const fromParam = searchParams.from ?? '';
-  const backHref  = fromParam.startsWith('/u/') ? fromParam : '/';
-  const backLabel = fromParam.startsWith('/u/')
-    ? `← @${fromParam.replace('/u/', '')}`
-    : '← MAPPA';
 
   const tipo  = TIPI_SPOT[spot.type];
   const cond  = CONDIZIONI[spot.condition];
@@ -121,13 +114,12 @@ export default async function SpotPage({ params, searchParams }: Props) {
           background: 'rgba(10,10,10,0.82)', borderRadius: 6,
           backdropFilter: 'blur(8px)',
         }}>
-          <Link href={backHref} style={{
+          <Link href="/" style={{
             color: 'var(--orange)', fontFamily: 'var(--font-mono)',
             fontSize: 13, textDecoration: 'none',
             padding: '6px 12px', display: 'block',
-            maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {backLabel}
+            ← MAPPA
           </Link>
         </div>
         {/* Condition badge — top right */}
@@ -139,6 +131,14 @@ export default async function SpotPage({ params, searchParams }: Props) {
         }}>
           ● {cond.label}
         </div>
+
+        {/* Copre l'attribution OSM nell'iframe (bottom-right) */}
+        <div style={{
+          position: 'absolute', bottom: 0, right: 0,
+          width: 220, height: 22,
+          background: 'var(--black)',
+          pointerEvents: 'none',
+        }} />
 
         {/* ── PORTAMI QUI — overlay in basso sulla mappa ── */}
         <div style={{
@@ -281,11 +281,11 @@ export default async function SpotPage({ params, searchParams }: Props) {
         {/* ── CTA BOTTOM ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 32, flexWrap: 'wrap' }}>
           <Link
-            href={backHref}
+            href="/"
             className="btn-secondary"
             style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', minWidth: 140 }}
           >
-            {fromParam.startsWith('/u/') ? `← @${fromParam.replace('/u/', '')}` : '← Torna alla mappa'}
+            ← Torna alla mappa
           </Link>
           <a
             href={mapsUrl}
@@ -386,4 +386,3 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
