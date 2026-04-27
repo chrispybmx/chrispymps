@@ -673,6 +673,55 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         </div>
       )}
 
+      {/* ── CORNICE VHS — visibile quando il pannello è chiuso ── */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 9,
+        pointerEvents: 'none',
+        opacity: panelHeight <= PANEL_MIN + 10 ? 1 : 0,
+        transition: 'opacity 0.3s ease',
+      }}>
+        {/* Angolo top-left */}
+        <div style={{ position: 'absolute', top: 56, left: 10, width: 40, height: 40, borderTop: '2px solid rgba(255,106,0,0.6)', borderLeft: '2px solid rgba(255,106,0,0.6)' }} />
+        {/* Angolo top-right */}
+        <div style={{ position: 'absolute', top: 56, right: 10, width: 40, height: 40, borderTop: '2px solid rgba(255,106,0,0.6)', borderRight: '2px solid rgba(255,106,0,0.6)' }} />
+        {/* Angolo bottom-left */}
+        <div style={{ position: 'absolute', bottom: 44, left: 10, width: 40, height: 40, borderBottom: '2px solid rgba(255,106,0,0.6)', borderLeft: '2px solid rgba(255,106,0,0.6)' }} />
+        {/* Angolo bottom-right */}
+        <div style={{ position: 'absolute', bottom: 44, right: 10, width: 40, height: 40, borderBottom: '2px solid rgba(255,106,0,0.6)', borderRight: '2px solid rgba(255,106,0,0.6)' }} />
+
+        {/* Striscia bottom — copre attribution OSM */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          height: 46,
+          background: 'linear-gradient(to top, rgba(10,10,10,0.92) 0%, transparent 100%)',
+        }} />
+
+        {/* Attribution OSM stilizzata + rec indicator */}
+        <div style={{
+          position: 'absolute', bottom: 10, left: 14,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontFamily: 'var(--font-mono)', fontSize: 9,
+            color: 'rgba(255,106,0,0.5)', letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,60,60,0.7)', display: 'inline-block', boxShadow: '0 0 4px rgba(255,60,60,0.5)' }} />
+            REC
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
+            © OpenStreetMap contributors
+          </span>
+        </div>
+
+        {/* Scanline sottile su tutto lo schermo */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px)',
+        }} />
+      </div>
+
       {/* ── TAB FISSO — sempre visibile, apre il pannello ── */}
       <div
         onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
