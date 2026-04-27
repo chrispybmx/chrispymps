@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminCard from '@/components/AdminCard';
 import AdminImportKML from '@/components/AdminImportKML';
@@ -71,7 +71,7 @@ const EMPTY_EVENT: Omit<AdminEvent, 'id'> = {
   title: '', description: '', location: '', city: '', event_date: '', cover_url: '', link_url: '', status: 'published', spot_id: null, spot: null,
 };
 const EMPTY_NEWS: Omit<AdminNews, 'id' | 'created_at'> = {
-  title: '', excerpt: '', body: '', cover_url: '', tags: '', status: 'draft',
+  title: '', excerpt: '', body: '', cover_url: '', tags: '', status: 'published',
 };
 
 /* ─── Shared field style ─── */
@@ -982,8 +982,8 @@ function EventForm({
         </div>
 
         <div>
-          <label style={labelStyle}>URL cover (immagine)</label>
-          <input style={inputStyle} value={event.cover_url ?? ''} onChange={e => set('cover_url', e.target.value)} placeholder="https://..." />
+          <label style={labelStyle}>📸 Cover / locandina</label>
+          <ImageUploader value={event.cover_url ?? ''} onChange={url => onChange({ ...event, cover_url: url })} />
         </div>
 
         <div>
@@ -1078,8 +1078,8 @@ function NewsForm({
         </div>
 
         <div>
-          <label style={labelStyle}>URL cover (immagine)</label>
-          <input style={inputStyle} value={article.cover_url ?? ''} onChange={e => set('cover_url', e.target.value)} placeholder="https://..." />
+          <label style={labelStyle}>📸 Immagine copertina</label>
+          <ImageUploader value={article.cover_url ?? ''} onChange={url => onChange({ ...article, cover_url: url })} />
         </div>
 
         <div>
@@ -1162,6 +1162,105 @@ function StatCard({ label, value, color }: { label: string; value: string; color
     <div style={{ background: 'var(--gray-800)', border: `1px solid ${color}22`, borderRadius: 6, padding: '16px 18px' }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, color, lineHeight: 1 }}>{value}</div>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginTop: 4, textTransform: 'uppercase' }}>{label}</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════
+   IMAGE UPLOADER
+   Upload foto o incolla URL manuale.
+═══════════════════════════════════ */
+function ImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr]             = useState<string | null>(null);
+  const inputRef                  = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setErr(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res  = await fetch('/api/admin/upload-cover', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (json.ok) {
+        onChange(json.url);
+      } else {
+        setErr(json.error ?? 'Errore upload');
+      }
+    } catch {
+      setErr('Errore di rete');
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div>
+      {/* Preview cover se presente */}
+      {value && (
+        <div style={{ position: 'relative', marginBottom: 10, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--gray-700)' }}>
+          <img
+            src={value} alt="Cover"
+            style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }}
+          />
+          <button
+            onClick={() => onChange('')}
+            style={{
+              position: 'absolute', top: 8, right: 8,
+              background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: 6, color: '#fff',
+              fontFamily: 'var(--font-mono)', fontSize: 12,
+              padding: '4px 10px', cursor: 'pointer',
+            }}
+          >
+            ✕ Rimuovi
+          </button>
+        </div>
+      )}
+
+      {/* Input URL + bottone upload */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          style={{ ...inputStyle, flex: 1 }}
+          value={value}
+          onChange={e => { setErr(null); onChange(e.target.value); }}
+          placeholder="https://... oppure carica dal dispositivo →"
+        />
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          style={{
+            fontFamily: 'var(--font-mono)', fontSize: 13,
+            background: uploading ? 'var(--gray-700)' : 'rgba(255,106,0,0.15)',
+            border: '1px solid rgba(255,106,0,0.5)',
+            borderRadius: 4, color: 'var(--orange)',
+            padding: '8px 14px', cursor: uploading ? 'default' : 'pointer',
+            whiteSpace: 'nowrap', flexShrink: 0,
+            opacity: uploading ? 0.6 : 1,
+          }}
+        >
+          {uploading ? '⏳ Upload...' : '📸 Carica foto'}
+        </button>
+      </div>
+
+      {/* File input nascosto */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        style={{ display: 'none' }}
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = '';
+        }}
+      />
+
+      {err && (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff5555', marginTop: 5 }}>
+          ❌ {err}
+        </div>
+      )}
     </div>
   );
 }
