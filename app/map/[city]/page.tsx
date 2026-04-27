@@ -33,7 +33,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title:       `Spot BMX ${cityLabel} — Chrispy Maps`,
       description: `I migliori spot BMX e skatepark a ${cityLabel}. Trova dove andare con la bici, lo skateboard o lo scooter.`,
       url,
-      images: [{ url: '/og-image.jpg', width: 1200, height: 630 }],
+      images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: `Spot BMX e skatepark a ${cityLabel}` }],
+    },
+    twitter: {
+      card:        'summary_large_image',
+      site:        '@chrispy_bmx',
+      title:       `Spot BMX ${cityLabel} — Chrispy Maps`,
+      description: `I migliori spot BMX e skatepark a ${cityLabel}`,
+      images:      ['/opengraph-image'],
     },
   };
 }
@@ -157,7 +164,40 @@ export default async function CityPage({ params }: Props) {
           </Link>
         </div>
       ) : (
-        <CityMapList spots={spots} cityLabel={cityLabel} city={params.city} />
+        <>
+          <CityMapList spots={spots} cityLabel={cityLabel} city={params.city} />
+
+          {/* Lista spot leggibile dai crawler — complement al componente client */}
+          <div style={{ padding: '24px 20px 0', borderTop: '1px solid var(--gray-800)', marginTop: 8 }}>
+            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
+              {spots.length} Spot a {cityLabel}
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {spots.map(spot => {
+                const t = (spot as Spot & { type: string }).type;
+                return (
+                  <Link
+                    key={spot.id}
+                    href={`/map/spot/${spot.slug}`}
+                    style={{
+                      display: 'block', padding: '10px 14px',
+                      background: 'var(--gray-800)',
+                      border: '1px solid var(--gray-700)',
+                      borderRadius: 6, textDecoration: 'none',
+                    }}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {spot.name}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase' }}>
+                      {t} · {cityLabel}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Sezione FAQ testuale — aiuta Google a capire la pagina */}
