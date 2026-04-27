@@ -652,8 +652,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         {/* Gradiente fade — solo decorativo, nessun handle qui */}
         <div style={{
           height: 36, flexShrink: 0,
-          background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.92) 100%)',
+          background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.97) 100%)',
           pointerEvents: 'none',
+          marginBottom: -1,   /* copre il pixel di giunzione con il drag handle */
         }} />
 
         {/* ── DRAG HANDLE — V7 rubber grip — nel nero solido ── */}
