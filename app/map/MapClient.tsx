@@ -95,6 +95,17 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     dragState.current = null;
   }, []);
 
+  /* ── Radius search ── dichiarati PRIMA di filtered che li usa ── */
+  const [radiusMode,      setRadiusMode]      = useState(false);
+  const [radiusPanelOpen, setRadiusPanelOpen] = useState(false);
+  const [radiusCenter,    setRadiusCenter]    = useState<{ lat: number; lon: number } | null>(null);
+  const [radiusKm,        setRadiusKm]        = useState(25);
+  const [gpsLoading,      setGpsLoading]      = useState(false);
+
+  /* ── Bottoni mappa: locate trigger ── */
+  const [locateTrigger, setLocateTrigger] = useState(0);
+  const [isLocating,    setIsLocating]    = useState(false);
+
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
@@ -155,17 +166,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     setFitAllTrigger(n => n + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterType, filterRegion, filterCondition, filterDifficulty, searchQuery]);
-
-  /* ── Radius search ── */
-  const [radiusMode,      setRadiusMode]      = useState(false);
-  const [radiusPanelOpen, setRadiusPanelOpen] = useState(false);
-  const [radiusCenter,    setRadiusCenter]    = useState<{ lat: number; lon: number } | null>(null);
-  const [radiusKm,        setRadiusKm]        = useState(25);
-  const [gpsLoading,      setGpsLoading]      = useState(false);
-
-  /* ── Bottoni mappa: locate trigger ── */
-  const [locateTrigger, setLocateTrigger] = useState(0);
-  const [isLocating,    setIsLocating]    = useState(false);
 
   const handleFilterRegion = useCallback((label: string | null) => {
     if (!label) { setFilterRegion(null); return; }
