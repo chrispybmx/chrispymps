@@ -9,7 +9,7 @@ import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
 import SupportModal from '@/components/SupportModal';
 import AuthModal from '@/components/AuthModal';
-import RadiusSheet from '@/components/RadiusSheet';
+// RadiusSheet sostituito da TopRadiusPanel inline
 
 /* ── Haversine ── */
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -110,24 +110,36 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* flag: cambiamento viene dallo scroll (IO) → non ri-flyare */
   const fromScrollRef = useRef(false);
 
-  const filtered = useMemo(() => spots.filter((s) => {
-    if (filterType && s.type !== filterType) return false;
-    if (filterRegion) {
-      const [latMin, lonMin, latMax, lonMax] = filterRegion.bbox;
-      if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
+  const filtered = useMemo(() => {
+    let result = spots.filter((s) => {
+      if (filterType && s.type !== filterType) return false;
+      if (filterRegion) {
+        const [latMin, lonMin, latMax, lonMax] = filterRegion.bbox;
+        if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
+      }
+      if (filterCondition && s.condition !== filterCondition) return false;
+      if (filterDifficulty && s.difficulty !== filterDifficulty) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase().replace(/^@/, '');
+        return (
+          s.name.toLowerCase().includes(q) ||
+          (s.city ?? '').toLowerCase().includes(q) ||
+          (s.submitted_by_username ?? '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+    // Quando il raggio è attivo E il pannello è chiuso (confermato) → filtra per distanza
+    if (radiusMode && radiusCenter && !radiusPanelOpen) {
+      result = result
+        .filter(s => haversineKm(radiusCenter.lat, radiusCenter.lon, s.lat, s.lon) <= radiusKm)
+        .sort((a, b) =>
+          haversineKm(radiusCenter.lat, radiusCenter.lon, a.lat, a.lon) -
+          haversineKm(radiusCenter.lat, radiusCenter.lon, b.lat, b.lon)
+        );
     }
-    if (filterCondition && s.condition !== filterCondition) return false;
-    if (filterDifficulty && s.difficulty !== filterDifficulty) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase().replace(/^@/, '');
-      return (
-        s.name.toLowerCase().includes(q) ||
-        (s.city ?? '').toLowerCase().includes(q) ||
-        (s.submitted_by_username ?? '').toLowerCase().includes(q)
-      );
-    }
-    return true;
-  }), [spots, filterType, filterRegion, filterCondition, filterDifficulty, searchQuery]);
+    return result;
+  }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, radiusKm]);
 
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
@@ -145,10 +157,15 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, [filterType, filterRegion, filterCondition, filterDifficulty, searchQuery]);
 
   /* ── Radius search ── */
-  const [radiusMode,   setRadiusMode]   = useState(false);
-  const [radiusCenter, setRadiusCenter] = useState<{ lat: number; lon: number } | null>(null);
-  const [radiusKm,     setRadiusKm]     = useState(50);
-  const [gpsLoading,   setGpsLoading]   = useState(false);
+  const [radiusMode,      setRadiusMode]      = useState(false);
+  const [radiusPanelOpen, setRadiusPanelOpen] = useState(false);
+  const [radiusCenter,    setRadiusCenter]    = useState<{ lat: number; lon: number } | null>(null);
+  const [radiusKm,        setRadiusKm]        = useState(25);
+  const [gpsLoading,      setGpsLoading]      = useState(false);
+
+  /* ── Bottoni mappa: locate trigger ── */
+  const [locateTrigger, setLocateTrigger] = useState(0);
+  const [isLocating,    setIsLocating]    = useState(false);
 
   const handleFilterRegion = useCallback((label: string | null) => {
     if (!label) { setFilterRegion(null); return; }
@@ -185,7 +202,25 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     );
   }, []);
 
-  const closeRadiusMode = useCallback(() => { setRadiusMode(false); setRadiusCenter(null); }, []);
+  const closeRadiusMode = useCallback(() => {
+    setRadiusMode(false);
+    setRadiusCenter(null);
+    setRadiusPanelOpen(false);
+  }, []);
+
+  const handleRadiusToggle = useCallback(() => {
+    if (radiusMode) {
+      closeRadiusMode();
+    } else {
+      setRadiusMode(true);
+      setRadiusPanelOpen(true);
+    }
+  }, [radiusMode, closeRadiusMode]);
+
+  const handleApplyRadius = useCallback(() => {
+    setRadiusPanelOpen(false);
+    // La mappa mostra già il cerchio, la lista già filtra via spotsInRadius
+  }, []);
 
   /* Click su uno spot (da mappa o da lista) → espandi card + vola mappa
      Zoom 13: mostra il quartiere/zona, non solo il singolo marciapiede,
@@ -257,10 +292,193 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           radiusCenter={radiusCenter}
           radiusKm={radiusKm}
           onMapClick={handleMapClick}
+          locateTrigger={locateTrigger}
+          onLocatingChange={setIsLocating}
         />
-        <RadiusBtn active={radiusMode} onClick={() => radiusMode ? closeRadiusMode() : setRadiusMode(true)} />
-        {radiusMode && !radiusCenter && <RadiusToast />}
+        {/* Toast solo quando raggio attivo e nessun centro ancora */}
+        {radiusMode && !radiusCenter && radiusPanelOpen && <RadiusToast />}
       </div>
+
+      {/* ── BOTTONI MAPPA — position:fixed, sempre visibili sopra tutto ── */}
+      <div style={{
+        position: 'fixed',
+        top: TOP_OFFSET + 10,
+        right: 12,
+        display: 'flex', flexDirection: 'column', gap: 8,
+        zIndex: 55,
+        pointerEvents: 'all',
+      }}>
+        {/* Localizza me */}
+        <button
+          onClick={() => setLocateTrigger(n => n + 1)}
+          disabled={isLocating}
+          title="Mostrami sulla mappa"
+          style={{
+            width: 40, height: 40,
+            background: 'var(--gray-800)',
+            border: '1px solid var(--gray-600)', borderRadius: 6,
+            color: isLocating ? 'var(--orange)' : 'var(--bone)',
+            fontSize: 18, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 14px rgba(0,0,0,0.7)',
+            animation: isLocating ? 'spin-slow 1s linear infinite' : 'none',
+          } as React.CSSProperties}
+        >
+          {isLocating ? '⌛' : '📍'}
+        </button>
+
+        {/* Raggio */}
+        <button
+          onClick={handleRadiusToggle}
+          title="Ricerca per raggio"
+          style={{
+            width: 40, height: 40,
+            background: radiusMode ? 'var(--orange)' : 'var(--gray-800)',
+            border: `1px solid ${radiusMode ? 'var(--orange)' : 'var(--gray-600)'}`,
+            borderRadius: 6,
+            color: radiusMode ? '#000' : 'var(--bone)',
+            fontSize: 18, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 14px rgba(0,0,0,0.7)',
+          }}
+        >
+          🎯
+        </button>
+
+        {/* Contatore */}
+        <div style={{
+          background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
+          borderRadius: 6, padding: '5px 0',
+          fontFamily: 'var(--font-mono)', fontSize: 14,
+          color: 'var(--orange)', textAlign: 'center',
+          boxShadow: '0 2px 14px rgba(0,0,0,0.7)', width: 40,
+        }}>
+          {filtered.length}
+          <div style={{ color: 'var(--gray-400)', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>spot</div>
+        </div>
+      </div>
+
+      {/* ── PANNELLO RAGGIO — scende dall'alto quando attivo ── */}
+      {radiusMode && radiusPanelOpen && (
+        <div style={{
+          position: 'fixed',
+          top: TOP_OFFSET,
+          left: 0, right: 0,
+          zIndex: 50,
+          background: 'rgba(14,14,14,0.97)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '2px solid var(--orange)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+          padding: '14px 16px 16px',
+        } as React.CSSProperties}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <span style={{ fontSize: 22 }}>🎯</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--orange)', lineHeight: 1 }}>
+                RICERCA PER RAGGIO
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 3 }}>
+                {radiusCenter
+                  ? `${spotsInRadius.length} spot trovati nel raggio di ${radiusKm} km`
+                  : 'Tocca la mappa per scegliere il centro'}
+              </div>
+            </div>
+            <button onClick={closeRadiusMode} style={{
+              background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
+              borderRadius: 6, width: 32, height: 32, fontSize: 16,
+              color: 'var(--bone)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>✕</button>
+          </div>
+
+          {/* GPS */}
+          <button
+            onClick={handleUseGPS} disabled={gpsLoading}
+            style={{
+              width: '100%', padding: '10px 14px', marginBottom: 10,
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.4)',
+              borderRadius: 8, cursor: gpsLoading ? 'default' : 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)',
+              opacity: gpsLoading ? 0.6 : 1,
+            }}
+          >
+            <span style={{ fontSize: 18 }}>{gpsLoading ? '⌛' : '📡'}</span>
+            {gpsLoading ? 'RICERCA POSIZIONE...' : 'USA LA MIA POSIZIONE GPS'}
+          </button>
+
+          {/* Chips raggio */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 14 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', flexShrink: 0 }}>
+              RAGGIO:
+            </span>
+            {[5, 10, 25, 50, 100].map(km => (
+              <button key={km} onClick={() => setRadiusKm(km)} style={{
+                flex: 1, padding: '6px 0',
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                border: `1px solid ${radiusKm === km ? 'var(--orange)' : 'var(--gray-600)'}`,
+                borderRadius: 6,
+                background: radiusKm === km ? 'var(--orange)' : 'transparent',
+                color: radiusKm === km ? '#000' : 'var(--gray-400)',
+                cursor: 'pointer', fontWeight: radiusKm === km ? 700 : 400,
+                transition: 'all 0.1s',
+              }}>
+                {km}km
+              </button>
+            ))}
+          </div>
+
+          {/* APPLICA */}
+          <button
+            onClick={handleApplyRadius}
+            disabled={!radiusCenter}
+            style={{
+              width: '100%', padding: '12px',
+              background: radiusCenter ? 'var(--orange)' : 'var(--gray-700)',
+              border: 'none', borderRadius: 8,
+              fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
+              color: radiusCenter ? '#000' : 'var(--gray-500)',
+              cursor: radiusCenter ? 'pointer' : 'default',
+              letterSpacing: '0.05em',
+              transition: 'all 0.15s',
+            }}
+          >
+            {radiusCenter
+              ? `✓ APPLICA — ${spotsInRadius.length} SPOT`
+              : '↑ TOCCA LA MAPPA PER IL CENTRO'}
+          </button>
+        </div>
+      )}
+
+      {/* Banner raggio attivo (pannello chiuso) */}
+      {radiusMode && !radiusPanelOpen && radiusCenter && (
+        <div style={{
+          position: 'fixed',
+          top: TOP_OFFSET + 8,
+          left: 12,
+          zIndex: 55,
+          background: 'rgba(255,106,0,0.15)',
+          border: '1px solid var(--orange)',
+          borderRadius: 6,
+          padding: '5px 10px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: '0 2px 14px rgba(0,0,0,0.6)',
+        }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)' }}>
+            🎯 {radiusKm}km · {filtered.length} spot
+          </span>
+          <button
+            onClick={closeRadiusMode}
+            style={{
+              background: 'none', border: 'none',
+              color: 'var(--orange)', cursor: 'pointer', fontSize: 14,
+              padding: '0 2px', lineHeight: 1,
+            }}
+          >✕</button>
+        </div>
+      )}
 
       {/* ── OVERLAY LISTA — galleggia sulla mappa, altezza regolabile ── */}
       <div style={{
@@ -288,7 +506,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
             touchAction: 'none',
           }}
         >
-          {/* pill */}
           <div style={{
             width: 40, height: 4, borderRadius: 3,
             background: 'rgba(255,255,255,0.28)',
@@ -303,7 +520,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           pointerEvents: 'none',
         }} />
 
-        {/* Pannello scroll — visibile solo se il pannello è abbastanza alto */}
+        {/* Pannello scroll */}
         {panelHeight > 80 && (
           <div style={{
             flex: 1,
@@ -321,19 +538,11 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
               onSpotClick={handleSpotClick}
               scrollToId={scrollToId}
               onScrolled={() => setScrollToId(null)}
+              radiusCenter={radiusMode && !radiusPanelOpen ? radiusCenter : null}
             />
           </div>
         )}
       </div>
-
-      {/* Radius sheet */}
-      {radiusMode && (
-        <RadiusSheet
-          radiusKm={radiusKm} center={radiusCenter} spots={spotsInRadius}
-          onSetRadius={setRadiusKm} onUseGPS={handleUseGPS} onClose={closeRadiusMode}
-          onSpotClick={handleSpotClick} gpsLoading={gpsLoading}
-        />
-      )}
 
       <AddSpotModal
         open={addOpen}
@@ -372,15 +581,16 @@ function getMyRating(id: string): number {
 }
 
 function SpotListPanel({
-  spots, activeId, expandedId, onActivate, onSpotClick, scrollToId, onScrolled,
+  spots, activeId, expandedId, onActivate, onSpotClick, scrollToId, onScrolled, radiusCenter,
 }: {
-  spots:       SpotMapPin[];
-  activeId:    string | null;
-  expandedId:  string | null;
-  onActivate:  (id: string) => void;
-  onSpotClick: (pin: SpotMapPin) => void;
-  scrollToId:  string | null;
-  onScrolled:  () => void;
+  spots:        SpotMapPin[];
+  activeId:     string | null;
+  expandedId:   string | null;
+  onActivate:   (id: string) => void;
+  onSpotClick:  (pin: SpotMapPin) => void;
+  scrollToId:   string | null;
+  onScrolled:   () => void;
+  radiusCenter: { lat: number; lon: number } | null;
 }) {
   const [favs,       setFavs]       = useState<Record<string, boolean>>({});
   const [ratings,    setRatings]    = useState<Record<string, number>>({});
@@ -529,12 +739,17 @@ function SpotListPanel({
         padding: '7px 14px 5px',
         fontFamily: 'var(--font-mono)', fontSize: 11,
         color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
+        borderBottom: radiusCenter ? '1px solid rgba(255,106,0,0.2)' : '1px solid rgba(255,255,255,0.04)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0,
         background: 'rgba(10,10,10,0.94)', zIndex: 2,
       }}>
         <span>{spots.length} spot</span>
+        {radiusCenter && (
+          <span style={{ color: 'var(--orange)', fontSize: 10 }}>
+            🎯 per distanza
+          </span>
+        )}
       </div>
 
       {spots.map((spot, idx) => {
@@ -768,34 +983,17 @@ function SpotListPanel({
   );
 }
 
-/* ── Bottone raggio ── */
-function RadiusBtn({ active, onClick }: { active: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} title="Ricerca per raggio" style={{
-      position: 'absolute', top: 12, left: 12,
-      width: 40, height: 40,
-      background: active ? 'var(--orange)' : 'var(--gray-800)',
-      border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
-      borderRadius: 4, color: active ? '#000' : 'var(--bone)',
-      fontSize: 18, cursor: 'pointer',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.6)', zIndex: 10,
-    }}>
-      🎯
-    </button>
-  );
-}
-
 function RadiusToast() {
   return (
     <div style={{
-      position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(10,10,10,0.9)', border: '1px solid var(--orange)',
-      borderRadius: 8, padding: '7px 14px',
-      fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)',
+      position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+      background: 'rgba(10,10,10,0.92)', border: '1px solid var(--orange)',
+      borderRadius: 8, padding: '10px 18px',
+      fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)',
       zIndex: 20, whiteSpace: 'nowrap', pointerEvents: 'none',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.7)',
     }}>
-      🎯 Tocca la mappa per centrare la ricerca
+      🎯 Tocca la mappa per scegliere il centro
     </div>
   );
 }
