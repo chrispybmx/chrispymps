@@ -108,6 +108,20 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [locateTrigger, setLocateTrigger] = useState(0);
   const [isLocating,    setIsLocating]    = useState(false);
 
+  /* ── Auto-hide bottoni mappa ── */
+  /* I bottoni si nascondono quando il pannello è alto (> 62% vh) o il raggio è aperto.
+     Toccando il bordo sinistro si rivelano per 4 secondi. */
+  const [btnsRevealed,  setBtnsRevealed] = useState(false);
+  const btnsRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealButtons = useCallback(() => {
+    if (btnsRevealTimerRef.current) clearTimeout(btnsRevealTimerRef.current);
+    setBtnsRevealed(true);
+    btnsRevealTimerRef.current = setTimeout(() => setBtnsRevealed(false), 4000);
+  }, []);
+  useEffect(() => () => {
+    if (btnsRevealTimerRef.current) clearTimeout(btnsRevealTimerRef.current);
+  }, []);
+
   /* ── Stile mappa (chiaro/scuro) ── */
   const [darkMap, setDarkMap] = useState<boolean>(() => {
     try { return localStorage.getItem('cmaps_dark_map') === '1'; } catch { return false; }
@@ -294,6 +308,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         onCitySelect={handleCitySelect}
         onSpotSelect={handleSpotClick}
         onOpenAuth={() => setAuthOpen(true)}
+        darkMap={darkMap}
+        onToggleDarkMap={toggleDarkMap}
       />
 
       {/* ── MAPPA — schermo intero sotto topbar ── */}
@@ -325,55 +341,85 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         {/* RadiusToast rimosso: il centro si sceglie solo da GPS o città nel pannello */}
       </div>
 
-      {/* ── BOTTONI MAPPA — colonna sinistra, sempre visibili ── */}
-      <div style={{
-        position: 'fixed',
-        top: TOP_OFFSET + 10,
-        left: 12,
-        display: 'flex', flexDirection: 'column', gap: 8,
-        zIndex: 55,
-      }}>
-        {/* Localizza me */}
-        <MapBtn
-          onClick={() => setLocateTrigger(n => n + 1)}
-          disabled={isLocating}
-          title="Mostrami sulla mappa"
-          active={false}
-          loading={isLocating}
-        >
-          {isLocating ? '⌛' : '📍'}
-        </MapBtn>
+      {/* ── BOTTONI MAPPA — colonna sinistra, auto-hide ── */}
+      {(() => {
+        const windowH = typeof window !== 'undefined' ? window.innerHeight : 700;
+        // Nascondi quando il pannello è alto (>62% vh) o il raggio è aperto
+        const autoHidden = panelHeight > windowH * 0.62 || radiusPanelOpen;
+        const showBtns   = !autoHidden || btnsRevealed;
+        return (
+          <>
+            {/* Colonna bottoni con slide-in/out */}
+            <div style={{
+              position: 'fixed',
+              top: TOP_OFFSET + 10,
+              left: 12,
+              display: 'flex', flexDirection: 'column', gap: 8,
+              zIndex: 55,
+              opacity:   showBtns ? 1 : 0,
+              transform: showBtns ? 'translateX(0)' : 'translateX(-56px)',
+              pointerEvents: showBtns ? 'all' : 'none',
+              transition: 'opacity 0.22s ease, transform 0.22s ease',
+            }}>
+              {/* Localizza me */}
+              <MapBtn
+                onClick={() => setLocateTrigger(n => n + 1)}
+                disabled={isLocating}
+                title="Mostrami sulla mappa"
+                active={false}
+                loading={isLocating}
+              >
+                {isLocating ? '⌛' : '📍'}
+              </MapBtn>
 
-        {/* Ricerca per raggio */}
-        <MapBtn
-          onClick={handleRadiusToggle}
-          title="Ricerca per raggio"
-          active={radiusMode}
-        >
-          🎯
-        </MapBtn>
+              {/* Ricerca per raggio */}
+              <MapBtn
+                onClick={handleRadiusToggle}
+                title="Ricerca per raggio"
+                active={radiusMode}
+              >
+                🎯
+              </MapBtn>
 
-        {/* Toggle mappa chiara/scura */}
-        <MapBtn
-          onClick={toggleDarkMap}
-          title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
-          active={darkMap}
-        >
-          {darkMap ? '🌞' : '🌑'}
-        </MapBtn>
+              {/* Contatore spot */}
+              <div style={{
+                background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
+                borderRadius: 6, padding: '5px 0',
+                fontFamily: 'var(--font-mono)', fontSize: 14,
+                color: 'var(--orange)', textAlign: 'center',
+                boxShadow: '0 2px 14px rgba(0,0,0,0.6)', width: 40,
+              }}>
+                {filtered.length}
+                <div style={{ color: 'var(--gray-400)', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>spot</div>
+              </div>
+            </div>
 
-        {/* Contatore spot */}
-        <div style={{
-          background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
-          borderRadius: 6, padding: '5px 0',
-          fontFamily: 'var(--font-mono)', fontSize: 14,
-          color: 'var(--orange)', textAlign: 'center',
-          boxShadow: '0 2px 14px rgba(0,0,0,0.6)', width: 40,
-        }}>
-          {filtered.length}
-          <div style={{ color: 'var(--gray-400)', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>spot</div>
-        </div>
-      </div>
+            {/* Bordo sinistro — tap per rivelare i bottoni quando sono nascosti */}
+            {autoHidden && !btnsRevealed && (
+              <div
+                onClick={revealButtons}
+                style={{
+                  position: 'fixed',
+                  top: TOP_OFFSET + 10,
+                  left: 0,
+                  width: 18,
+                  height: 132,
+                  zIndex: 54,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+                }}
+              >
+                <div style={{
+                  width: 4, height: 72,
+                  background: 'rgba(255,106,0,0.35)',
+                  borderRadius: '0 4px 4px 0',
+                  transition: 'background 0.15s',
+                }} />
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* ── PANNELLO RAGGIO — scende dall'alto quando attivo ── */}
       {radiusMode && radiusPanelOpen && (
@@ -537,7 +583,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         <div style={{
           position: 'fixed',
           top: TOP_OFFSET + 8,
-          left: 12,
+          left: 60,
           zIndex: 55,
           background: 'rgba(255,106,0,0.15)',
           border: '1px solid var(--orange)',
