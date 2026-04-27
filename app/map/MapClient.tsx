@@ -774,6 +774,8 @@ function SpotListPanel({
   const [photoIdx,   setPhotoIdx]   = useState<Record<string, number>>({});
   /* Lightbox: { urls, idx } */
   const [lightbox,   setLightbox]   = useState<{ urls: string[]; idx: number } | null>(null);
+  /* Refs strip foto per scroll-snap (una per ogni spot espanso) */
+  const photoStripRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const panelRef  = useRef<HTMLDivElement>(null);
   const cardRefs  = useRef<Map<string, Element>>(new Map());
@@ -826,6 +828,14 @@ function SpotListPanel({
     const added = toggleFav(id);
     setFavs(prev => ({ ...prev, [id]: added }));
   };
+
+  /* Naviga le foto della card espansa via scroll-snap */
+  const scrollToPhotoInStrip = useCallback((spotId: string, i: number) => {
+    const el = photoStripRefs.current.get(spotId);
+    if (!el) return;
+    el.scrollTo({ left: i * el.offsetWidth, behavior: 'smooth' });
+    setPhotoIdx(p => ({ ...p, [spotId]: i }));
+  }, []);
 
   /* Chiude lightbox con Escape */
   useEffect(() => {
@@ -996,34 +1006,64 @@ function SpotListPanel({
                   aria-label="Chiudi"
                 >✕</button>
 
-                {/* ── FOTO — più compatta su desktop ── */}
+                {/* ── FOTO — scroll-snap swipeable ── */}
                 {allPhotos.length > 0 ? (
                   <div style={{ position: 'relative', background: '#0a0a0a' }}>
+                    {/* Scroll-snap strip */}
                     <div
-                      style={{ height: 180, overflow: 'hidden', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      ref={(el) => {
+                        if (el) photoStripRefs.current.set(spot.id, el);
+                        else photoStripRefs.current.delete(spot.id);
+                      }}
+                      onScroll={e => {
+                        const el = e.currentTarget;
+                        const newIdx = Math.round(el.scrollLeft / el.offsetWidth);
+                        setPhotoIdx(p => p[spot.id] !== newIdx ? { ...p, [spot.id]: newIdx } : p);
+                      }}
                       onClick={e => { e.stopPropagation(); setLightbox({ urls: allPhotos, idx: curPhotoIdx }); }}
+                      style={{
+                        display: 'flex',
+                        overflowX: 'auto',
+                        scrollSnapType: 'x mandatory',
+                        scrollBehavior: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        scrollbarWidth: 'none',
+                        width: '100%',
+                        height: 180,
+                        cursor: 'zoom-in',
+                      } as React.CSSProperties}
                     >
-                      <img
-                        src={curPhoto}
-                        alt={spot.name}
-                        style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
-                        loading="lazy"
-                      />
-                      <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍 zoom</div>
+                      {allPhotos.map((url, i) => (
+                        <div
+                          key={url + i}
+                          style={{
+                            flexShrink: 0,
+                            width: '100%',
+                            height: '100%',
+                            scrollSnapAlign: 'start',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: '#0a0a0a',
+                          }}
+                        >
+                          <img
+                            src={url}
+                            alt={spot.name}
+                            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
+                            loading={i === 0 ? 'eager' : 'lazy'}
+                          />
+                        </div>
+                      ))}
                     </div>
 
-                    {allPhotos.length > 1 && (
-                      <button onClick={goPrev} className="photo-nav-btn" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 36, background: 'linear-gradient(to right,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-                    )}
-                    {allPhotos.length > 1 && (
-                      <button onClick={goNext} className="photo-nav-btn" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 36, background: 'linear-gradient(to left,rgba(0,0,0,0.5),transparent)', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-                    )}
+                    {/* Zoom hint */}
+                    <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍 zoom</div>
 
+                    {/* Dots */}
                     {allPhotos.length > 1 && (
-                      <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 4 }}>
+                      <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 4, pointerEvents: 'none' }}>
                         {allPhotos.map((_, i) => (
-                          <div key={i} onClick={e => { e.stopPropagation(); setPhotoIdx(p => ({ ...p, [spot.id]: i })); }}
-                            style={{ width: i === curPhotoIdx ? 14 : 5, height: 5, borderRadius: 3, background: i === curPhotoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s', cursor: 'pointer' }} />
+                          <div key={i}
+                            style={{ width: i === curPhotoIdx ? 14 : 5, height: 5, borderRadius: 3, background: i === curPhotoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s' }} />
                         ))}
                       </div>
                     )}
@@ -1048,7 +1088,7 @@ function SpotListPanel({
                 {allPhotos.length > 1 && (
                   <div style={{ display: 'flex', gap: 4, padding: '6px 10px', background: '#080808', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
                     {allPhotos.map((url, i) => (
-                      <button key={i} className="thumb-btn" onClick={e => { e.stopPropagation(); setPhotoIdx(p => ({ ...p, [spot.id]: i })); }}
+                      <button key={i} className="thumb-btn" onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, i); }}
                         style={{ flexShrink: 0, width: 52, height: 40, border: `2px solid ${i === curPhotoIdx ? 'var(--orange)' : 'transparent'}`, borderRadius: 3, overflow: 'hidden', padding: 0, cursor: 'pointer', background: '#111' }}>
                         <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                       </button>
