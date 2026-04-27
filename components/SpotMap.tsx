@@ -179,6 +179,7 @@ export default function SpotMap({
         center: APP_CONFIG.mapCenter,
         zoom:   APP_CONFIG.mapZoom,
         zoomControl: false,
+        attributionControl: false,   // gestiamo noi l'attribution nel frame VHS
       });
 
       const isDark = darkMapProp ?? false;
