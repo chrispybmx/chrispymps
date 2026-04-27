@@ -7,7 +7,6 @@ import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
 import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
-import SupportModal from '@/components/SupportModal';
 import AuthModal from '@/components/AuthModal';
 // RadiusSheet sostituito da TopRadiusPanel inline
 
@@ -37,7 +36,15 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
 
 interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 
-const TOP_OFFSET = 100;
+const TOP_OFFSET      = 100;
+const PANEL_MIN       = 0;
+const PANEL_SNAP      = 140;
+const EXPANDED_CARD_H = 300;  // header(38)+foto(140)+thumbs(38)+info(84) ≈ 300px
+function DEFAULT_PANEL_H() {
+  return typeof window !== 'undefined'
+    ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
+    : 260;
+}
 
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
@@ -50,7 +57,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [filterDifficulty,setFilterDifficulty]= useState<string | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [addOpen,            setAddOpen]            = useState(false);
-  const [supportOpen,        setSupportOpen]        = useState(false);
   const [addLat,             setAddLat]             = useState<number | undefined>();
   const [addLon,             setAddLon]             = useState<number | undefined>();
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number } | null>(null);
@@ -63,13 +69,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, [autoAdd]);
 
   /* ── Pannello ridimensionabile ── */
-  const PANEL_MIN       = 0;    // collassa completamente — il tab fisso rimane sempre visibile
-  const PANEL_SNAP      = 140;  // soglia sotto cui collassa
-  const EXPANDED_CARD_H = 300;  // altezza card espansa: header(38)+foto(140)+thumbs(38)+info(84) ≈ 300px
-  const DEFAULT_PANEL_H = () =>
-    typeof window !== 'undefined'
-      ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
-      : 260;
   const [panelHeight,   setPanelHeight]   = useState<number>(320);
   const [panelSnapping, setPanelSnapping] = useState(false); // true durante animazione snap
   useEffect(() => { setPanelHeight(DEFAULT_PANEL_H()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -97,7 +96,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       Math.max(PANEL_MIN, dragState.current.startH + delta),
     );
     setPanelHeight(newH);
-  }, [PANEL_MIN]);
+  }, []);
 
   const onDragEnd = useCallback((e: React.PointerEvent) => {
     if (!dragState.current) return;
@@ -105,10 +104,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     const wasTap  = !didDragRef.current;
     dragState.current  = null;
     didDragRef.current = false;
-    if (wasTap)                             snapTo(PANEL_MIN);          // tap sul grip → chiude
+    if (wasTap)                             snapTo(PANEL_MIN);
     else if (h < PANEL_SNAP)               snapTo(PANEL_MIN);
     else if (h > window.innerHeight * 0.75) snapTo(Math.round(window.innerHeight * 0.88));
-  }, [PANEL_SNAP, PANEL_MIN, snapTo]);
+  }, [snapTo]);
 
   /* ── Radius search ── dichiarati PRIMA di filtered che li usa ── */
   const [radiusMode,      setRadiusMode]      = useState(false);
@@ -174,25 +173,28 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
-  const [isDesktop,    setIsDesktop]    = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [windowH,   setWindowH]   = useState(700);
   useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth >= 768);
+    const check = () => {
+      setIsDesktop(window.innerWidth >= 768);
+      setWindowH(window.innerHeight);
+    };
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  /* Auto-espandi il pannello quando si apre una card */
-  useEffect(() => {
-    if (expandedId) {
-      const minH = Math.min(Math.round(window.innerHeight * 0.72), 580);
-      setPanelHeight(h => h < minH ? minH : h);
-    }
-  }, [expandedId]);
-  const [scrollToId,   setScrollToId]   = useState<string | null>(null);
+  const [scrollToId,     setScrollToId]     = useState<string | null>(null);
   const scrollInstantRef = useRef(false); // true → usa 'instant' invece di 'smooth'
-  /* flag: cambiamento viene dallo scroll (IO) → non ri-flyare */
-  const fromScrollRef = useRef(false);
+
+  /* Pre-calcola le distanze una volta sola → riutilizzato da filtered e spotsInRadius */
+  const distanceMap = useMemo(() => {
+    if (!radiusCenter) return new Map<string, number>();
+    const m = new Map<string, number>();
+    spots.forEach(s => m.set(s.id, haversineKm(radiusCenter.lat, radiusCenter.lon, s.lat, s.lon)));
+    return m;
+  }, [spots, radiusCenter]);
 
   const filtered = useMemo(() => {
     let result = spots.filter((s) => {
@@ -213,17 +215,14 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       }
       return true;
     });
-    // Quando il raggio è attivo E il pannello è chiuso (confermato) → filtra per distanza
+    // Quando il raggio è attivo E il pannello è chiuso → filtra per distanza (usa distanceMap)
     if (radiusMode && radiusCenter && !radiusPanelOpen) {
       result = result
-        .filter(s => haversineKm(radiusCenter.lat, radiusCenter.lon, s.lat, s.lon) <= radiusKm)
-        .sort((a, b) =>
-          haversineKm(radiusCenter.lat, radiusCenter.lon, a.lat, a.lon) -
-          haversineKm(radiusCenter.lat, radiusCenter.lon, b.lat, b.lon)
-        );
+        .filter(s => (distanceMap.get(s.id) ?? Infinity) <= radiusKm)
+        .sort((a, b) => (distanceMap.get(a.id) ?? 0) - (distanceMap.get(b.id) ?? 0));
     }
     return result;
-  }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, radiusKm]);
+  }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, radiusKm, distanceMap]);
 
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
@@ -251,10 +250,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const spotsInRadius = useMemo(() => {
     if (!radiusCenter) return [];
     return spots
-      .map(s => ({ ...s, distance: haversineKm(radiusCenter.lat, radiusCenter.lon, s.lat, s.lon) }))
-      .filter(s => s.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance);
-  }, [spots, radiusCenter, radiusKm]);
+      .filter(s => (distanceMap.get(s.id) ?? Infinity) <= radiusKm)
+      .sort((a, b) => (distanceMap.get(a.id) ?? 0) - (distanceMap.get(b.id) ?? 0))
+      .map(s => ({ ...s, distance: distanceMap.get(s.id) ?? 0 }));
+  }, [spots, radiusCenter, radiusKm, distanceMap]);
 
   // Il click sulla mappa NON imposta più il centro del raggio —
   // il centro si sceglie solo tramite GPS o selezione città nel pannello
@@ -365,7 +364,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     if (ioLockRef.current) return; // lock attivo — ignora
     if (activateDebounce.current) clearTimeout(activateDebounce.current);
     activateDebounce.current = setTimeout(() => {
-      fromScrollRef.current = true;
       setActiveListId(id);
     }, 120);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -379,6 +377,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const handleAddSpotAt = useCallback((lat: number, lon: number) => {
     setAddLat(lat); setAddLon(lon); setAddOpen(true);
   }, []);
+
+  /* Bottoni mappa: nascosti quando il pannello è alto (>62% vh) o raggio aperto */
+  const autoHidden = panelHeight > windowH * 0.62 || radiusPanelOpen;
+  const showBtns   = !autoHidden || btnsRevealed;
 
   return (
     <div style={{ height: '100dvh', overflow: 'hidden' }}>
@@ -433,82 +435,47 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       </div>
 
       {/* ── BOTTONI MAPPA — colonna sinistra, auto-hide ── */}
-      {(() => {
-        const windowH = typeof window !== 'undefined' ? window.innerHeight : 700;
-        // Nascondi quando il pannello è alto (>62% vh) o il raggio è aperto
-        const autoHidden = panelHeight > windowH * 0.62 || radiusPanelOpen;
-        const showBtns   = !autoHidden || btnsRevealed;
-        return (
-          <>
-            {/* Colonna bottoni con slide-in/out */}
-            <div style={{
-              position: 'fixed',
-              top: TOP_OFFSET + 10,
-              left: 12,
-              display: 'flex', flexDirection: 'column', gap: 8,
-              zIndex: 55,
-              opacity:   showBtns ? 1 : 0,
-              transform: showBtns ? 'translateX(0)' : 'translateX(-56px)',
-              pointerEvents: showBtns ? 'all' : 'none',
-              transition: 'opacity 0.22s ease, transform 0.22s ease',
-            }}>
-              {/* Localizza me */}
-              <MapBtn
-                onClick={() => setLocateTrigger(n => n + 1)}
-                disabled={isLocating}
-                title="Mostrami sulla mappa"
-                active={false}
-                loading={isLocating}
-              >
-                {isLocating ? '⌛' : '📍'}
-              </MapBtn>
+      <div style={{
+        position: 'fixed',
+        top: TOP_OFFSET + 10,
+        left: 12,
+        display: 'flex', flexDirection: 'column', gap: 8,
+        zIndex: 55,
+        opacity:   showBtns ? 1 : 0,
+        transform: showBtns ? 'translateX(0)' : 'translateX(-56px)',
+        pointerEvents: showBtns ? 'all' : 'none',
+        transition: 'opacity 0.22s ease, transform 0.22s ease',
+      }}>
+        <MapBtn
+          onClick={() => setLocateTrigger(n => n + 1)}
+          disabled={isLocating}
+          title="Mostrami sulla mappa"
+          active={false}
+          loading={isLocating}
+        >
+          {isLocating ? '⌛' : '📍'}
+        </MapBtn>
+        <MapBtn onClick={handleRadiusToggle} title="Ricerca per raggio" active={radiusMode}>
+          🎯
+        </MapBtn>
+        <MapBtn onClick={toggleDarkMap} title={darkMap ? 'Mappa chiara' : 'Mappa scura'} active={darkMap}>
+          {darkMap ? '🌞' : '🌑'}
+        </MapBtn>
+      </div>
 
-              {/* Ricerca per raggio */}
-              <MapBtn
-                onClick={handleRadiusToggle}
-                title="Ricerca per raggio"
-                active={radiusMode}
-              >
-                🎯
-              </MapBtn>
-
-              {/* Toggle mappa chiara/scura */}
-              <MapBtn
-                onClick={toggleDarkMap}
-                title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
-                active={darkMap}
-              >
-                {darkMap ? '🌞' : '🌑'}
-              </MapBtn>
-
-            </div>
-
-            {/* Bordo sinistro — tap per rivelare i bottoni quando sono nascosti */}
-            {autoHidden && !btnsRevealed && (
-              <div
-                onClick={revealButtons}
-                style={{
-                  position: 'fixed',
-                  top: TOP_OFFSET + 10,
-                  left: 0,
-                  width: 18,
-                  height: 132,
-                  zIndex: 54,
-                  cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
-                }}
-              >
-                <div style={{
-                  width: 4, height: 72,
-                  background: 'rgba(255,106,0,0.35)',
-                  borderRadius: '0 4px 4px 0',
-                  transition: 'background 0.15s',
-                }} />
-              </div>
-            )}
-          </>
-        );
-      })()}
+      {/* Bordo sinistro — tap per rivelare i bottoni quando sono nascosti */}
+      {autoHidden && !btnsRevealed && (
+        <div
+          onClick={revealButtons}
+          style={{
+            position: 'fixed', top: TOP_OFFSET + 10, left: 0,
+            width: 18, height: 132, zIndex: 54,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+          }}
+        >
+          <div style={{ width: 4, height: 72, background: 'rgba(255,106,0,0.35)', borderRadius: '0 4px 4px 0', transition: 'background 0.15s' }} />
+        </div>
+      )}
 
       {/* ── PANNELLO RAGGIO — scende dall'alto quando attivo ── */}
       {radiusMode && radiusPanelOpen && (
@@ -871,7 +838,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         onClose={() => { setAddOpen(false); setAddLat(undefined); setAddLon(undefined); }}
         initialLat={addLat} initialLon={addLon}
       />
-      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
@@ -881,8 +847,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
    SPOT LIST PANEL
 ════════════════════════════════════════════════════════ */
 
-const FAVS_KEY  = 'cmaps_favs_v1';
-const ratingKey = (id: string) => `cmaps_rating_${id}`;
+const FAVS_KEY = 'cmaps_favs_v1';
 
 function isFav(id: string) {
   try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); }
@@ -896,10 +861,6 @@ function toggleFav(id: string) {
     localStorage.setItem(FAVS_KEY, JSON.stringify(favs));
     return i < 0;
   } catch { return false; }
-}
-function getMyRating(id: string): number {
-  try { return Math.min(5, Math.max(0, parseInt(localStorage.getItem(ratingKey(id)) ?? '0', 10) || 0)); }
-  catch { return 0; }
 }
 
 function SpotListPanel({
@@ -917,14 +878,13 @@ function SpotListPanel({
   isDesktop:        boolean;
   scrollInstantRef: React.MutableRefObject<boolean>;
 }) {
-  const [favs,       setFavs]       = useState<Record<string, boolean>>({});
-  const [ratings,    setRatings]    = useState<Record<string, number>>({});
+  const [favs, setFavs] = useState<Record<string, boolean>>({});
   /* Indice foto corrente per ogni spot (nella card espansa) */
   const [photoIdx,   setPhotoIdx]   = useState<Record<string, number>>({});
   /* Lightbox: { urls, idx } */
   const [lightbox,   setLightbox]   = useState<{ urls: string[]; idx: number } | null>(null);
-  /* Refs strip foto per scroll-snap (una per ogni spot espanso) */
-  const photoStripRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  /* Ref strip foto della card espansa (una sola per volta) */
+  const photoStripRef = useRef<HTMLDivElement | null>(null);
   /* Swipe-vs-tap detection per la strip foto (shared: una sola card espansa per volta) */
   const photoTouchStartX = useRef(0);
   const photoTouchStartY = useRef(0);
@@ -938,9 +898,8 @@ function SpotListPanel({
 
   useEffect(() => {
     const f: Record<string, boolean> = {};
-    const r: Record<string, number>  = {};
-    spots.forEach(s => { f[s.id] = isFav(s.id); r[s.id] = getMyRating(s.id); });
-    setFavs(f); setRatings(r);
+    spots.forEach(s => { f[s.id] = isFav(s.id); });
+    setFavs(f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots.length]);
 
@@ -1014,7 +973,7 @@ function SpotListPanel({
     /* Piccolo delay: React deve aver già renderizzato la card espansa
        prima che possiamo leggere il ref della strip. */
     const t = setTimeout(() => {
-      const stripEl = photoStripRefs.current.get(expandedId);
+      const stripEl = photoStripRef.current;
       if (!stripEl) return;
 
       let startX = 0, startY = 0, decided = false;
@@ -1046,7 +1005,7 @@ function SpotListPanel({
 
   /* Naviga le foto della card espansa via scroll-snap */
   const scrollToPhotoInStrip = useCallback((spotId: string, i: number) => {
-    const el = photoStripRefs.current.get(spotId);
+    const el = photoStripRef.current;
     if (!el) return;
     el.scrollTo({ left: i * el.offsetWidth, behavior: 'smooth' });
     setPhotoIdx(p => ({ ...p, [spotId]: i }));
@@ -1232,10 +1191,7 @@ function SpotListPanel({
                   <div style={{ position: 'relative', background: '#0a0a0a' }}>
                     {/* Scroll-snap strip — stesso schema di PhotoCarousel */}
                     <div
-                      ref={(el) => {
-                        if (el) photoStripRefs.current.set(spot.id, el);
-                        else photoStripRefs.current.delete(spot.id);
-                      }}
+                      ref={photoStripRef}
                       onScroll={e => {
                         const el = e.currentTarget;
                         const newIdx = Math.round(el.scrollLeft / el.offsetWidth);
@@ -1454,17 +1410,3 @@ function MapBtn({
   );
 }
 
-function RadiusToast() {
-  return (
-    <div style={{
-      position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-      background: 'rgba(10,10,10,0.92)', border: '1px solid var(--orange)',
-      borderRadius: 8, padding: '10px 18px',
-      fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)',
-      zIndex: 20, whiteSpace: 'nowrap', pointerEvents: 'none',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.7)',
-    }}>
-      🎯 Tocca la mappa per scegliere il centro
-    </div>
-  );
-}
