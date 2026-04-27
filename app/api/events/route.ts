@@ -11,11 +11,12 @@ export async function GET() {
     let data: unknown[] | null = null;
     let error: { message: string } | null = null;
 
+    /* Restituisce TUTTI gli eventi pubblicati (passati e futuri) così il
+       calendario mostra i pallini su tutti i mesi con eventi */
     ({ data, error } = await supabase
       .from('events')
       .select('*, spot:spots(name, slug)')
       .eq('status', 'published')
-      .gte('event_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .order('event_date', { ascending: true }) as { data: unknown[] | null; error: { message: string } | null });
 
     // Fallback: join might fail if spot_id column doesn't exist yet
@@ -24,13 +25,17 @@ export async function GET() {
         .from('events')
         .select('*')
         .eq('status', 'published')
-        .gte('event_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
         .order('event_date', { ascending: true }) as { data: unknown[] | null; error: { message: string } | null });
     }
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('[api/events] Supabase error:', error.message);
+      return NextResponse.json({ ok: false, error: error.message, data: [] }, { status: 500 });
+    }
+
     return NextResponse.json({ ok: true, data: data ?? [] });
-  } catch {
+  } catch (err) {
+    console.error('[api/events] Unexpected error:', err);
     return NextResponse.json({ ok: true, data: [] });
   }
 }
