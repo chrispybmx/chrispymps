@@ -227,14 +227,14 @@ export default function TopBar({
         display: 'flex', alignItems: 'center',
         gap: 0,
       }}>
-        {/* Scrollabile: tutti i dropdown + contatore */}
+        {/* Scrollabile: tutti i dropdown */}
         <div style={{
           flex: 1,
           overflowX: 'auto',
           WebkitOverflowScrolling: 'touch',
           display: 'flex', alignItems: 'center',
-          padding: '7px 8px',
-          gap: 6,
+          padding: '5px 8px',
+          gap: 5,
           scrollbarWidth: 'none',
         } as React.CSSProperties}>
 
@@ -242,7 +242,7 @@ export default function TopBar({
             value={activeRegion ?? ''}
             onChange={v => onFilterRegion(v || null)}
             active={!!activeRegion}
-            placeholder="🗺️ REGIONE"
+            placeholder="🗺️ REG"
           >
             <option value="">🗺️ REGIONE</option>
             {REGIONI_ITALIA.map(r => (
@@ -266,7 +266,7 @@ export default function TopBar({
             value={activeDifficulty ?? ''}
             onChange={v => onFilterDifficulty(v || null)}
             active={!!activeDifficulty}
-            placeholder="⚡ LEVEL"
+            placeholder="⚡ LVL"
           >
             <option value="">⚡ LEVEL</option>
             {DIFFICOLTA.map(d => (
@@ -274,13 +274,13 @@ export default function TopBar({
             ))}
           </FilterDropdown>
 
-          {/* Reset tutto */}
+          {/* Reset tutto — solo se un filtro è attivo */}
           {anyFilter && (
             <button
               onClick={() => { onFilterType(null); onFilterRegion(null); onFilterDifficulty(null); }}
               style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11,
-                padding: '5px 10px',
+                padding: '4px 8px',
                 border: '1px solid var(--gray-600)',
                 borderRadius: 2,
                 background: 'transparent',
@@ -290,18 +290,9 @@ export default function TopBar({
                 flexShrink: 0,
               }}
             >
-              ✕ RESET
+              ✕
             </button>
           )}
-
-          {/* Contatore spot */}
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 11,
-            color: anyFilter ? 'var(--orange)' : 'var(--gray-500)',
-            whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 2,
-          }}>
-            {filteredCount ?? spots.length} spot
-          </span>
         </div>
 
         {/* Preferiti + Profilo — fisso a destra */}
@@ -698,27 +689,28 @@ function FilterDropdown({ value, onChange, active, placeholder, children }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         style={{
-          fontFamily: 'var(--font-mono)', fontSize: 12,
-          padding: '5px 22px 5px 8px',
+          fontFamily: 'var(--font-mono)', fontSize: 11,
+          padding: '4px 18px 4px 7px',
           border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
-          borderRadius: 2,
-          background: active ? 'rgba(255,106,0,0.15)' : 'transparent',
+          borderRadius: 4,
+          background: active ? 'rgba(255,106,0,0.15)' : 'rgba(26,26,26,0.9)',
           color: active ? 'var(--orange)' : 'var(--bone)',
           cursor: 'pointer',
           appearance: 'none',
           WebkitAppearance: 'none',
-          minHeight: 34,
+          minHeight: 30,
           textTransform: 'uppercase',
-          letterSpacing: '0.05em',
+          letterSpacing: '0.04em',
           outline: 'none',
-          minWidth: 90,
+          minWidth: 72,
+          maxWidth: 110,
         } as React.CSSProperties}
       >
         {children}
       </select>
       <span style={{
-        position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-        fontSize: 9, color: active ? 'var(--orange)' : 'var(--gray-500)',
+        position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
+        fontSize: 8, color: active ? 'var(--orange)' : 'var(--gray-500)',
         pointerEvents: 'none',
       }}>▾</span>
     </div>
