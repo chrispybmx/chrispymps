@@ -109,7 +109,7 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
             width: '100%',
-            height: 'clamp(300px, 75vw, 540px)',
+            height: 'clamp(180px, 52vw, 320px)',
             cursor: 'zoom-in',
           } as React.CSSProperties}
         >
@@ -163,16 +163,6 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
         )}
       </div>
 
-      {/* Thumbnail strip */}
-      {photos.length > 1 && (
-        <div style={{ display: 'flex', gap: 4, padding: '6px 8px', overflowX: 'auto', background: '#080808', borderTop: '1px solid rgba(255,255,255,0.05)', scrollbarWidth: 'none' } as React.CSSProperties}>
-          {photos.map((p, i) => (
-            <button key={p.url} onClick={() => scrollTo(i)} style={{ flexShrink: 0, width: 68, height: 50, border: `2px solid ${i === idx ? 'var(--orange)' : 'transparent'}`, borderRadius: 4, padding: 0, cursor: 'pointer', background: '#111', transition: 'border-color 0.15s', overflow: 'hidden' }}>
-              <img src={p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            </button>
-          ))}
-        </div>
-      )}
     </>
   );
 }
