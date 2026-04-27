@@ -696,20 +696,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           background: 'linear-gradient(to top, rgba(10,10,10,0.92) 0%, transparent 100%)',
         }} />
 
-        {/* Attribution OSM stilizzata + rec indicator */}
+        {/* Attribution OSM stilizzata */}
         <div style={{
           position: 'absolute', bottom: 10, left: 14,
-          display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontFamily: 'var(--font-mono)', fontSize: 9,
-            color: 'rgba(255,106,0,0.5)', letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,60,60,0.7)', display: 'inline-block', boxShadow: '0 0 4px rgba(255,60,60,0.5)' }} />
-            REC
-          </span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
             © OpenStreetMap contributors
           </span>
@@ -1126,7 +1116,7 @@ function SpotListPanel({
         </div>
       )}
 
-      {spots.map((spot, idx) => {
+      {(expandedId ? spots.filter(s => s.id === expandedId) : spots).map((spot, idx) => {
         const tipo      = TIPI_SPOT[spot.type];
         const cond      = CONDIZIONI[spot.condition];
         const isAct     = activeId   === spot.id;
@@ -1232,7 +1222,7 @@ function SpotListPanel({
                         WebkitOverflowScrolling: 'touch',
                         scrollbarWidth: 'none',
                         width: '100%',
-                        height: 200,
+                        height: 140,
                         cursor: 'zoom-in',
                         touchAction: 'pan-x',
                       } as React.CSSProperties}
@@ -1298,18 +1288,7 @@ function SpotListPanel({
                   </div>
                 )}
 
-                {/* Thumbnail strip */}
-                {allPhotos.length > 1 && (
-                  <div style={{ display: 'flex', gap: 4, padding: '6px 10px', background: '#0a0a0a', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
-                    {allPhotos.map((url, i) => (
-                      <button key={i} className="thumb-btn" onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, i); }}
-                        style={{ flexShrink: 0, width: 52, height: 40, border: `2px solid ${i === curPhotoIdx ? 'var(--orange)' : 'transparent'}`, borderRadius: 3, overflow: 'hidden', padding: 0, cursor: 'pointer', background: '#111' }}>
-                        <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
+        
                 {/* Info testo — compatto */}
                 <div style={{ padding: '10px 12px 12px', background: '#0a0a0a' }}>
                   {/* Nome + badges in una riga */}
