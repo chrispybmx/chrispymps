@@ -67,8 +67,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const PANEL_SNAP = 140;  // soglia sotto cui collassa
   const DEFAULT_PANEL_H = () =>
     typeof window !== 'undefined'
-      ? Math.min(480, Math.max(270, window.innerHeight * 0.54))
-      : 320;
+      ? Math.min(360, Math.max(220, window.innerHeight * 0.38))
+      : 260;
   const [panelHeight,   setPanelHeight]   = useState<number>(320);
   const [panelSnapping, setPanelSnapping] = useState(false); // true durante animazione snap
   useEffect(() => { setPanelHeight(DEFAULT_PANEL_H()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
