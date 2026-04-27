@@ -29,6 +29,8 @@ interface SpotMapProps {
   // GPS locate triggered from MapClient
   locateTrigger?: number;
   onLocatingChange?: (v: boolean) => void;
+  // Stile mappa
+  darkMap?: boolean;
 }
 
 /* ── SVG pin individuale ── */
@@ -107,7 +109,7 @@ function computeGridClusters(spots: SpotMapPin[], zoom: number) {
 export default function SpotMap({
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
-  locateTrigger, onLocatingChange,
+  locateTrigger, onLocatingChange, darkMap: darkMapProp,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
@@ -129,10 +131,7 @@ export default function SpotMap({
   const searchQueryRef      = useRef(searchQuery);
   const [locating, setLocating] = useState(false);
   const [zoom, setZoom]         = useState<number>(APP_CONFIG.mapZoom ?? 6);
-  const tileLayerRef            = useRef<import('leaflet').TileLayer | null>(null);
-  const [darkMap, setDarkMap]   = useState<boolean>(() => {
-    try { return localStorage.getItem('cmaps_dark_map') === '1'; } catch { return false; }
-  });
+  const tileLayerRef = useRef<import('leaflet').TileLayer | null>(null);
 
   useEffect(() => { onMapClickRef.current       = onMapClick; });
   useEffect(() => { onSpotClickRef.current      = onSpotClick; });
@@ -182,7 +181,7 @@ export default function SpotMap({
         zoomControl: false,
       });
 
-      const isDark = (() => { try { return localStorage.getItem('cmaps_dark_map') === '1'; } catch { return false; } })();
+      const isDark = darkMapProp ?? false;
       tileLayerRef.current = L.tileLayer(
         isDark
           ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -607,27 +606,19 @@ export default function SpotMap({
     );
   }, [onLocatingChange]);
 
-  /* Cambia tile layer quando darkMap cambia */
+  /* Cambia tile layer quando darkMapProp cambia */
   useEffect(() => {
     if (!mapInstance.current || !tileLayerRef.current || !L) return;
     tileLayerRef.current.remove();
     tileLayerRef.current = L.tileLayer(
-      darkMap
+      darkMapProp
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      darkMap
+      darkMapProp
         ? { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19, className: 'osm-tiles' }
         : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, className: 'osm-tiles' }
     ).addTo(mapInstance.current);
-  }, [darkMap]);
-
-  const toggleDarkMap = () => {
-    setDarkMap(prev => {
-      const next = !prev;
-      try { localStorage.setItem('cmaps_dark_map', next ? '1' : '0'); } catch { /* */ }
-      return next;
-    });
-  };
+  }, [darkMapProp]);
 
   /* Esegui locateMe quando il trigger esterno cambia */
   const prevLocateTriggerRef = useRef(0);
@@ -647,27 +638,7 @@ export default function SpotMap({
         role="application"
       />
 
-      {/* Bottone toggle stile mappa — in basso a sinistra sopra il controllo zoom */}
-      <button
-        onClick={toggleDarkMap}
-        title={darkMap ? 'Passa a mappa chiara' : 'Passa a mappa scura'}
-        style={{
-          position: 'absolute',
-          bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
-          left: 10,
-          width: 36, height: 36,
-          background: 'rgba(10,10,10,0.85)',
-          border: '1px solid rgba(255,255,255,0.2)',
-          borderRadius: 4,
-          color: '#fff',
-          fontSize: 16, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-          zIndex: 10,
-        }}
-      >
-        {darkMap ? '🌞' : '🌑'}
-      </button>
+      {/* Bottoni ora gestiti da MapClient */}
     </div>
   );
 }
