@@ -1,11 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const FAVS_KEY  = 'cmaps_favs_v1';
 const ratingKey = (id: string) => `cmaps_rating_${id}`;
-function isFav(id: string): boolean { try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); } catch { return false; } }
-function toggleFav(id: string): boolean { try { const favs: string[] = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); const i = favs.indexOf(id); if (i >= 0) favs.splice(i, 1); else favs.push(id); localStorage.setItem(FAVS_KEY, JSON.stringify(favs)); return i < 0; } catch { return false; } }
+
+function isFavLocal(id: string): boolean {
+  try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); } catch { return false; }
+}
+function toggleFavLocal(id: string): boolean {
+  try {
+    const favs: string[] = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]');
+    const i = favs.indexOf(id);
+    if (i >= 0) favs.splice(i, 1); else favs.push(id);
+    localStorage.setItem(FAVS_KEY, JSON.stringify(favs));
+    return i < 0;
+  } catch { return false; }
+}
 function getMyRating(id: string): number { try { return Math.min(5, Math.max(0, parseInt(localStorage.getItem(ratingKey(id)) ?? '0', 10) || 0)); } catch { return 0; } }
 function saveRating(id: string, r: number): void { try { localStorage.setItem(ratingKey(id), String(r)); } catch {} }
 
@@ -18,32 +29,91 @@ export default function SpotHeaderActions({ spotId }: Props) {
   const [riderCount,   setRiderCount] = useState(0);
   const [hasRidden,    setHasRidden]  = useState(false);
   const [riderLoading, setLoading]    = useState(false);
-  const [token,        setToken]      = useState<string | null>(null);
+  const tokenRef = useRef<string | null>(null);
+  const isAuthRef = useRef(false);  // true = logged in, use Supabase
 
   useEffect(() => {
     setMyRating(getMyRating(spotId));
-    setIsFaved(isFav(spotId));
-  }, [spotId]);
 
-  useEffect(() => {
     import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
-      supabaseBrowser().auth.getSession().then(({ data }) => {
+      supabaseBrowser().auth.getSession().then(async ({ data }) => {
         const t = data.session?.access_token ?? null;
-        setToken(t);
-        fetch(`/api/riders?spot_id=${spotId}`, { headers: t ? { Authorization: `Bearer ${t}` } : {} })
-          .then(r => r.json()).then(j => { if (j.ok) { setRiderCount(j.count); setHasRidden(j.hasRidden); } }).catch(() => {});
+        tokenRef.current = t;
+        isAuthRef.current = !!t;
+
+        if (t) {
+          /* Utente loggato: leggi preferito da Supabase */
+          try {
+            const res = await fetch(`/api/favorites`, {
+              headers: { Authorization: `Bearer ${t}` },
+            });
+            const j = await res.json();
+            if (j.ok) setIsFaved((j.ids as string[]).includes(spotId));
+          } catch {
+            /* fallback localStorage */
+            setIsFaved(isFavLocal(spotId));
+          }
+
+          /* "Ho girato" */
+          fetch(`/api/riders?spot_id=${spotId}`, { headers: { Authorization: `Bearer ${t}` } })
+            .then(r => r.json()).then(j => { if (j.ok) { setRiderCount(j.count); setHasRidden(j.hasRidden); } }).catch(() => {});
+        } else {
+          /* Anonimo: localStorage */
+          setIsFaved(isFavLocal(spotId));
+          fetch(`/api/riders?spot_id=${spotId}`)
+            .then(r => r.json()).then(j => { if (j.ok) setRiderCount(j.count); }).catch(() => {});
+        }
       });
-    }).catch(() => {});
+    }).catch(() => {
+      setIsFaved(isFavLocal(spotId));
+    });
   }, [spotId]);
 
-  const handleStar  = (star: number) => { const next = star === myRating ? 0 : star; saveRating(spotId, next); setMyRating(next); };
-  const handleFav   = () => { const added = toggleFav(spotId); setIsFaved(added); };
+  const handleStar = (star: number) => {
+    const next = star === myRating ? 0 : star;
+    saveRating(spotId, next);
+    setMyRating(next);
+  };
+
+  const handleFav = async () => {
+    const t = tokenRef.current;
+    if (t && isAuthRef.current) {
+      /* Ottimistic update */
+      const next = !isFaved;
+      setIsFaved(next);
+      try {
+        const res = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+          body: JSON.stringify({ spot_id: spotId }),
+        });
+        const j = await res.json();
+        if (j.ok) {
+          setIsFaved(j.isFaved);
+        } else {
+          /* Rollback */
+          setIsFaved(!next);
+        }
+      } catch {
+        setIsFaved(!next);
+      }
+    } else {
+      /* Anonimo: localStorage */
+      const added = toggleFavLocal(spotId);
+      setIsFaved(added);
+    }
+  };
 
   const handleRider = async () => {
-    if (!token) return;
+    const t = tokenRef.current;
+    if (!t) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/riders', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ spot_id: spotId }) });
+      const res = await fetch('/api/riders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ spot_id: spotId }),
+      });
       const j = await res.json();
       if (j.ok) { setHasRidden(j.hasRidden); setRiderCount(j.count); }
     } catch {}
@@ -51,6 +121,7 @@ export default function SpotHeaderActions({ spotId }: Props) {
   };
 
   const displayStars = hoverStar || myRating;
+  const token = tokenRef.current;
 
   return (
     <div style={{
