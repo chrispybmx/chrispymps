@@ -835,6 +835,48 @@ function SpotListPanel({
     setFavs(prev => ({ ...prev, [id]: added }));
   };
 
+  /* ── Non-passive touchmove sulla strip foto ──────────────────────────────
+     Safari iOS ignora touch-action: pan-x dentro overflow-y: auto.
+     L'unico fix affidabile è preventDefault() in un listener non-passivo
+     quando il gesto è orizzontale — impossibile farlo con i synthetic events
+     di React (sempre passivi). Lo montiamo/smontiamo via useEffect. */
+  useEffect(() => {
+    if (!expandedId) return;
+    let removeListeners: (() => void) | undefined;
+
+    /* Piccolo delay: React deve aver già renderizzato la card espansa
+       prima che possiamo leggere il ref della strip. */
+    const t = setTimeout(() => {
+      const stripEl = photoStripRefs.current.get(expandedId);
+      if (!stripEl) return;
+
+      let startX = 0, startY = 0, decided = false;
+
+      const onStart = (e: TouchEvent) => {
+        startX  = e.touches[0].clientX;
+        startY  = e.touches[0].clientY;
+        decided = false;
+      };
+      const onMove = (e: TouchEvent) => {
+        const dx = Math.abs(e.touches[0].clientX - startX);
+        const dy = Math.abs(e.touches[0].clientY - startY);
+        if (!decided && (dx > 4 || dy > 4)) decided = true;
+        /* Gesto orizzontale → blocca lo scroll verticale del parent */
+        if (decided && dx > dy) e.preventDefault();
+      };
+
+      stripEl.addEventListener('touchstart', onStart, { passive: true });
+      stripEl.addEventListener('touchmove',  onMove,  { passive: false });
+
+      removeListeners = () => {
+        stripEl.removeEventListener('touchstart', onStart);
+        stripEl.removeEventListener('touchmove',  onMove);
+      };
+    }, 30);
+
+    return () => { clearTimeout(t); removeListeners?.(); };
+  }, [expandedId]);
+
   /* Naviga le foto della card espansa via scroll-snap */
   const scrollToPhotoInStrip = useCallback((spotId: string, i: number) => {
     const el = photoStripRefs.current.get(spotId);
