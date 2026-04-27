@@ -65,7 +65,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* ── Pannello ridimensionabile ── */
   const PANEL_MIN       = 0;    // collassa completamente — il tab fisso rimane sempre visibile
   const PANEL_SNAP      = 140;  // soglia sotto cui collassa
-  const EXPANDED_CARD_H = 308;  // altezza card espansa: header(42)+foto(140)+info(126) ≈ 308px
+  const EXPANDED_CARD_H = 278;  // altezza card espansa: header(40)+foto(140)+info(98) ≈ 278px
   const DEFAULT_PANEL_H = () =>
     typeof window !== 'undefined'
       ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
@@ -1287,15 +1287,16 @@ function SpotListPanel({
                 )}
 
         
-                {/* Info testo — compatto */}
-                <div style={{ padding: '10px 12px 12px', background: '#0a0a0a' }}>
-                  {/* Nome + badges in una riga */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
-                    <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--orange)', lineHeight: 1.2 }}>
-                      {spot.name}
-                    </div>
+                {/* Info testo + azioni */}
+                <div style={{ padding: '8px 12px 10px', background: '#0a0a0a' }}>
+
+                  {/* Nome */}
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--orange)', lineHeight: 1.2, marginBottom: 4 }}>
+                    {spot.name}
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 5 }}>
+
+                  {/* Badges */}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
                     {spot.condition === 'alive' ? (
                       <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa' }} />
                     ) : (
@@ -1303,28 +1304,26 @@ function SpotListPanel({
                     )}
                     <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase' }}>{tipo.emoji} {tipo.label}</span>
                     {spot.difficulty && <span style={{ color: '#ffce4d', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: '1px solid rgba(255,206,77,0.3)', textTransform: 'uppercase' }}>⚡ {spot.difficulty}</span>}
+                    {(spot.city || spot.submitted_by_username) && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--gray-500)' }}>
+                        {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
                   </div>
 
-                  {(spot.city || spot.submitted_by_username) && (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginBottom: 8 }}>
-                      {spot.city && <span>📍 {spot.city}</span>}
-                      {spot.submitted_by_username && <span style={{ color: 'var(--gray-600)' }}> · @{spot.submitted_by_username}</span>}
-                    </div>
-                  )}
-
-                  {/* Azioni compatte */}
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  {/* Azioni — due bottoni quadrati affiancati */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                     <Link
                       href={`/map/spot/${spot.slug}`}
                       onClick={e => e.stopPropagation()}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '8px 0', textDecoration: 'none', letterSpacing: '0.04em' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '0 14px', height: 32, textDecoration: 'none', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
                     >
                       VEDI SPOT →
                     </Link>
                     <button
                       onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
-                      title="Portami qui"
-                      style={{ width: 36, height: 36, background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.35)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}
+                      title="Portami qui con Google Maps"
+                      style={{ width: 32, height: 32, flexShrink: 0, background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}
                     >📍</button>
                   </div>
                 </div>
