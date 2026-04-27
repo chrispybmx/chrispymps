@@ -198,26 +198,35 @@ export default function SpotMap({
       /* Aggiorna stato zoom React */
       map.on('zoomend', () => setZoom(map.getZoom()));
 
-      /* nessun CSS extra necessario: il pin selezionato usa già il bordo arancione in pinSvg */
+      /* ── Vista iniziale: l'Italia nello spazio visibile sopra il pannello ──
+         Usiamo fitBounds con padding bottom = altezza pannello + handle,
+         così l'Italia compare nell'area mappa visibile, non coperta dalla lista. */
+      const panelH  = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+      const handleH = 82; // gradiente (36) + drag handle (46)
+      const ITALY   = L.latLngBounds([36.0, 6.0], [47.5, 19.0]);
+      map.fitBounds(ITALY, {
+        paddingTopLeft:     [20, 10],
+        paddingBottomRight: [20, panelH + handleH],
+        maxZoom: 7,
+        animate: false,
+      });
+      hasInitialFit.current = true;
 
       /* ── Geolocalizzazione automatica all'avvio ──
-         Se il browser conosce la posizione dell'utente, partiamo da lì.
-         Se non risponde prima che gli spot facciano il loro auto-fit, aggiungiamo
-         solo il dot blu senza spostare la mappa. */
+         Se il browser conosce la posizione dell'utente, centra sulla sua zona
+         rimanendo a zoom paese (~5) — l'utente vede il suo Paese nello spazio
+         visibile sopra il pannello, non zoomato a livello città. */
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             if (!mapInstance.current || !L) return;
             const { latitude, longitude } = pos.coords;
 
-            /* Vola sempre alla posizione utente quando la geo risponde —
-               dà un'apertura della mappa centrata su dove ti trovi */
-            const isMobile = window.innerWidth < 768;
-            if (isMobile) {
-              mapInstance.current.setView([latitude, longitude], APP_CONFIG.mapZoomCity, { animate: false });
-            } else {
-              mapInstance.current.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.0, easeLinearity: 0.4 });
-            }
+            /* Zoom 5 = paese intero visibile; poi offsettiamo verso il basso
+               di metà altezza pannello così il centro cade nell'area visibile */
+            const COUNTRY_ZOOM = 5;
+            mapInstance.current.setView([latitude, longitude], COUNTRY_ZOOM, { animate: false });
+            mapInstance.current.panBy([0, getPanelOffsetPx()], { animate: false });
             hasInitialFit.current = true;
 
             /* Dot blu "Sei qui" */
