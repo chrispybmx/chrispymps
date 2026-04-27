@@ -1,6 +1,6 @@
 {
-  "name": "ChrispyMPS — Find Your Spot",
-  "short_name": "ChrispyMPS",
+  "name": "ChrispyMaps",
+  "short_name": "ChrispyMaps",
   "description": "La mappa BMX street italiana. Trova spot nella tua città.",
   "start_url": "/map",
   "scope": "/",
@@ -9,7 +9,11 @@
   "background_color": "#0a0a0a",
   "theme_color": "#ff6a00",
   "lang": "it",
-  "categories": ["sports", "lifestyle", "maps"],
+  "categories": [
+    "sports",
+    "lifestyle",
+    "maps"
+  ],
   "icons": [
     {
       "src": "/icons/icon-72.png",
@@ -75,7 +79,12 @@
       "short_name": "Aggiungi",
       "description": "Segnala un nuovo spot BMX",
       "url": "/map?add=1",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ]
 }
