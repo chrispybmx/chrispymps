@@ -35,7 +35,7 @@ async function getData(username: string) {
     .maybeSingle();
   if (!profile) return null;
 
-  const [{ data: spots }, { data: riddenRaw }] = await Promise.all([
+  const [{ data: spots }, { data: riddenRaw }, { count: commentCount }] = await Promise.all([
     sb
       .from('spots')
       .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
@@ -48,6 +48,11 @@ async function getData(username: string) {
       .select('spots(id, slug, name, type, city, condition, spot_photos(url, position))')
       .eq('user_id', profile.id)
       .limit(50),
+    /* Conteggio commenti scritti */
+    sb
+      .from('comments')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', profile.id),
   ]);
 
   /* Estrae i dati annidati da spot_riders → spots (Supabase returns array) */
@@ -56,10 +61,19 @@ async function getData(username: string) {
     .flatMap((r: RiddenRow) => r.spots ?? [])
     .filter((s): s is SpotCard => !!s);
 
+  /* Città uniche visitate (da spot girati + pubblicati) */
+  const allCities = [
+    ...ridden.map(s => s.city),
+    ...(spots ?? []).map(s => s.city),
+  ].filter((c): c is string => !!c);
+  const citiesCount = new Set(allCities).size;
+
   return {
-    profile:    profile as Profile,
-    spots:      (spots ?? []) as SpotCard[],
+    profile:       profile as Profile,
+    spots:         (spots ?? []) as SpotCard[],
     ridden,
+    commentCount:  commentCount ?? 0,
+    citiesCount,
   };
 }
 
@@ -75,7 +89,7 @@ export const dynamic = 'force-dynamic';
 export default async function UserProfilePage({ params }: { params: { username: string } }) {
   const data = await getData(params.username);
   if (!data) notFound();
-  const { profile, spots, ridden } = data;
+  const { profile, spots, ridden, commentCount, citiesCount } = data;
   const joinDate = new Date(profile.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   return (
@@ -98,8 +112,10 @@ export default async function UserProfilePage({ params }: { params: { username: 
 
         {/* Stats strip */}
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--gray-700)', marginBottom: 24 }}>
-          <StatPill value={spots.length}  label="📍 spot pubblicati" />
-          <StatPill value={ridden.length} label="🛹 spot girati" last />
+          <StatPill value={spots.length}    label="📍 pubblicati" />
+          <StatPill value={ridden.length}   label="🛹 girati" />
+          <StatPill value={citiesCount}     label="🌆 città" />
+          <StatPill value={commentCount}    label="💬 commenti" last />
         </div>
 
         {/* Spot pubblicati */}
