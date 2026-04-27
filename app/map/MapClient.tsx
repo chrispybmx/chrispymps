@@ -63,8 +63,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, [autoAdd]);
 
   /* ── Pannello ridimensionabile ── */
-  const PANEL_MIN  = 72;   // altezza minima: sempre visibile con tab "↑ SPOT"
-  const PANEL_SNAP = 140;  // soglia sotto cui collassa al minimo
+  const PANEL_MIN  = 0;    // collassa completamente — il tab fisso rimane sempre visibile
+  const PANEL_SNAP = 140;  // soglia sotto cui collassa
   const DEFAULT_PANEL_H = () =>
     typeof window !== 'undefined'
       ? Math.min(480, Math.max(270, window.innerHeight * 0.54))
