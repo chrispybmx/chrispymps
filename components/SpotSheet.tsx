@@ -140,7 +140,23 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
           transition: 'transform 0.1s ease-out',
         }}
       >
-        <div className="bottom-sheet-handle" />
+        {/* Handle row — grip centrato + X sempre visibile */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px 6px', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 4, background: 'var(--gray-600)', borderRadius: 2 }} />
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onClose(); }}
+            style={{
+              position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: '50%', width: 36, height: 36,
+              fontSize: 17, color: 'var(--bone)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              lineHeight: 1, zIndex: 10, WebkitTapHighlightColor: 'transparent',
+            } as React.CSSProperties}
+            aria-label="Chiudi"
+          >✕</button>
+        </div>
 
         {/* ══ FOTO ══ */}
         {photos.length > 0 ? (
