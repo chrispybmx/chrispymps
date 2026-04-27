@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     title:       'Chrispy Maps — Mappa Spot BMX, Skate & Scooter Italia',
     description: APP_CONFIG.description,
     images: [{
-      url:    '/og-image.jpg',
+      url:    '/opengraph-image',
       width:  1200,
       height: 630,
       alt:    'Chrispy Maps — Trova spot BMX, skatepark e spot scooter in Italia',
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     creator:     '@chrispy_bmx',
     title:       'Chrispy Maps — Mappa Spot BMX Italia',
     description: APP_CONFIG.description,
-    images:      ['/og-image.jpg'],
+    images:      ['/opengraph-image'],
   },
   manifest: '/manifest.json',
   icons: {
@@ -62,9 +62,8 @@ export const metadata: Metadata = {
       { url: '/icons/icon-96.png',  sizes: '96x96',   type: 'image/png' },
     ],
     apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-      { url: '/icons/icon-152.png',   sizes: '152x152', type: 'image/png' },
-      { url: '/icons/icon-192.png',   sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
     ],
   },
 };
@@ -129,4 +128,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-
