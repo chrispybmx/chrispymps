@@ -65,7 +65,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* ── Pannello ridimensionabile ── */
   const PANEL_MIN       = 0;    // collassa completamente — il tab fisso rimane sempre visibile
   const PANEL_SNAP      = 140;  // soglia sotto cui collassa
-  const EXPANDED_CARD_H = 278;  // altezza card espansa: header(40)+foto(140)+info(98) ≈ 278px
+  const EXPANDED_CARD_H = 262;  // altezza card espansa: header(38)+foto(140)+info(84) ≈ 262px
   const DEFAULT_PANEL_H = () =>
     typeof window !== 'undefined'
       ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
@@ -1287,45 +1287,46 @@ function SpotListPanel({
                 )}
 
         
-                {/* Info testo + azioni */}
-                <div style={{ padding: '8px 12px 10px', background: '#0a0a0a' }}>
+                {/* Info: nome+badge sinistra · bottoni destra */}
+                <div style={{ padding: '8px 12px 10px', background: '#0a0a0a', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
 
-                  {/* Nome */}
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--orange)', lineHeight: 1.2, marginBottom: 4 }}>
-                    {spot.name}
-                  </div>
-
-                  {/* Badges */}
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                    {spot.condition === 'alive' ? (
-                      <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa' }} />
-                    ) : (
-                      <span style={{ background: cond.bg, color: cond.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase' }}>{cond.label}</span>
-                    )}
-                    <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase' }}>{tipo.emoji} {tipo.label}</span>
-                    {spot.difficulty && <span style={{ color: '#ffce4d', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: '1px solid rgba(255,206,77,0.3)', textTransform: 'uppercase' }}>⚡ {spot.difficulty}</span>}
+                  {/* Sinistra: nome + badge */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--orange)', lineHeight: 1.25, marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+                      {spot.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {spot.condition === 'alive' ? (
+                        <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa' }} />
+                      ) : (
+                        <span style={{ background: cond.bg, color: cond.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase' }}>{cond.label}</span>
+                      )}
+                      <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase' }}>{tipo.emoji} {tipo.label}</span>
+                      {spot.difficulty && <span style={{ color: '#ffce4d', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: '1px solid rgba(255,206,77,0.3)', textTransform: 'uppercase' }}>⚡ {spot.difficulty}</span>}
+                    </div>
                     {(spot.city || spot.submitted_by_username) && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--gray-500)' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--gray-500)', marginTop: 3 }}>
                         {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
-                      </span>
+                      </div>
                     )}
                   </div>
 
-                  {/* Azioni — due bottoni quadrati affiancati */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                  {/* Destra: VEDI SPOT + 📍 in colonna */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
                     <Link
                       href={`/map/spot/${spot.slug}`}
                       onClick={e => e.stopPropagation()}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '0 14px', height: 32, textDecoration: 'none', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '0 10px', height: 28, textDecoration: 'none', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
                     >
                       VEDI SPOT →
                     </Link>
                     <button
                       onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
                       title="Portami qui con Google Maps"
-                      style={{ width: 32, height: 32, flexShrink: 0, background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}
+                      style={{ width: '100%', height: 28, background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}
                     >📍</button>
                   </div>
+
                 </div>
               </div>
 
