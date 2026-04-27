@@ -109,7 +109,7 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
             width: '100%',
-            height: 'clamp(180px, 52vw, 320px)',
+            height: 'clamp(300px, 75vw, 540px)',
             cursor: 'zoom-in',
           } as React.CSSProperties}
         >
