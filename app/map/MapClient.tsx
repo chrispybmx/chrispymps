@@ -405,33 +405,16 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 🎯
               </MapBtn>
 
-            </div>
+              {/* Toggle mappa chiara/scura */}
+              <MapBtn
+                onClick={toggleDarkMap}
+                title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
+                active={darkMap}
+              >
+                {darkMap ? '🌞' : '🌑'}
+              </MapBtn>
 
-            {/* Toggle mappa chiara/scura — fisso in alto a destra, stessa animazione dei bottoni sinistra */}
-            <button
-              onClick={toggleDarkMap}
-              title={darkMap ? 'Mappa chiara' : 'Mappa scura'}
-              style={{
-                position: 'fixed',
-                top: TOP_OFFSET + 10,
-                right: 12,
-                zIndex: 55,
-                width: 40, height: 40,
-                background: darkMap ? 'var(--orange)' : 'var(--gray-800)',
-                border: `1px solid ${darkMap ? 'var(--orange)' : 'var(--gray-600)'}`,
-                borderRadius: 6,
-                fontSize: 18, cursor: 'pointer',
-                color: darkMap ? '#000' : 'var(--bone)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 14px rgba(0,0,0,0.6)',
-                opacity:   showBtns ? 1 : 0,
-                transform: showBtns ? 'translateX(0)' : 'translateX(56px)',
-                pointerEvents: showBtns ? 'all' : 'none',
-                transition: 'background 0.15s, opacity 0.22s ease, transform 0.22s ease',
-              } as React.CSSProperties}
-            >
-              {darkMap ? '🌞' : '🌑'}
-            </button>
+            </div>
 
             {/* Bordo sinistro — tap per rivelare i bottoni quando sono nascosti */}
             {autoHidden && !btnsRevealed && (
@@ -665,21 +648,27 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         pointerEvents: 'none',
         transition: dragState.current ? 'none' : 'height 0.18s ease',
       }}>
-        {/* ── DRAG HANDLE — V7 rubber grip ── */}
+        {/* Gradiente fade — solo decorativo, nessun handle qui */}
+        <div style={{
+          height: 36, flexShrink: 0,
+          background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.92) 100%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* ── DRAG HANDLE — V7 rubber grip — nel nero solido ── */}
         <div
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
           style={{
-            position: 'absolute', top: 0, left: 0, right: 0,
-            height: 54, zIndex: 2,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: 5,
+            flexShrink: 0,
+            height: 46,
+            background: 'rgba(10,10,10,0.97)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'ns-resize',
             pointerEvents: 'all',
             touchAction: 'none',
-            paddingTop: 6,
           }}
         >
           {/* Rettangolo grip stile gamepad anni 2000 */}
@@ -691,13 +680,11 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden', position: 'relative',
           } as React.CSSProperties}>
-            {/* scanlines overlay */}
             <div style={{
               position: 'absolute', inset: 0,
               background: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)',
               pointerEvents: 'none',
             }} />
-            {/* dot grid 5×2 */}
             <div style={{ display: 'flex', gap: 3, position: 'relative' }}>
               {[0,1,2,3,4].map(col => (
                 <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -707,26 +694,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
               ))}
             </div>
           </div>
-
-          {/* Label spot count */}
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 9,
-            color: 'rgba(255,255,255,0.22)', letterSpacing: '0.18em',
-            textTransform: 'uppercase', userSelect: 'none',
-          }}>
-            {filtered.length} SPOTS
-          </div>
         </div>
 
-        {/* Gradiente fade */}
-        <div style={{
-          height: 56, flexShrink: 0,
-          background: 'linear-gradient(to bottom, transparent 0%, rgba(10,10,10,0.88) 100%)',
-          pointerEvents: 'none',
-        }} />
-
         {/* Pannello scroll */}
-        {panelHeight > 80 && (
+        {panelHeight > 90 && (
           <div style={{
             flex: 1,
             background: 'rgba(10,10,10,0.94)',
