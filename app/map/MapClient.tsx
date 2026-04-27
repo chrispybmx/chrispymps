@@ -984,7 +984,7 @@ function SpotListPanel({
               transition: 'border-color 0.25s, background 0.15s',
               cursor: 'pointer',
               background: isExp ? 'rgba(255,106,0,0.04)' : featured ? 'rgba(255,106,0,0.01)' : 'transparent',
-              touchAction: 'manipulation',
+              touchAction: isExp ? 'auto' : 'manipulation',
             }}
           >
 
