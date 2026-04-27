@@ -842,7 +842,7 @@ function SpotListPanel({
   useEffect(() => {
     if (!scrollToId || !panelRef.current) return;
     const el = cardRefs.current.get(scrollToId);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     onScrolled();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToId]);
