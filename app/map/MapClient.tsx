@@ -63,11 +63,12 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, [autoAdd]);
 
   /* ── Pannello ridimensionabile ── */
-  const PANEL_MIN  = 0;    // collassa completamente — il tab fisso rimane sempre visibile
-  const PANEL_SNAP = 140;  // soglia sotto cui collassa
+  const PANEL_MIN       = 0;    // collassa completamente — il tab fisso rimane sempre visibile
+  const PANEL_SNAP      = 140;  // soglia sotto cui collassa
+  const EXPANDED_CARD_H = 308;  // altezza card espansa: header(42)+foto(140)+info(126) ≈ 308px
   const DEFAULT_PANEL_H = () =>
     typeof window !== 'undefined'
-      ? Math.min(360, Math.max(220, window.innerHeight * 0.38))
+      ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
       : 260;
   const [panelHeight,   setPanelHeight]   = useState<number>(320);
   const [panelSnapping, setPanelSnapping] = useState(false); // true durante animazione snap
@@ -312,18 +313,19 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     setExpandedId(prev => {
       const isClosing = prev === pin.id;
       if (isClosing) {
-        /* Chiusura: non scrollare (la card è già visibile) e blocca il IO
-           per 300 ms così il bordo arancione rimane sullo spot chiuso. */
+        /* Chiusura: torna all'altezza lista */
         ioLockRef.current = true;
         setTimeout(() => { ioLockRef.current = false; }, 300);
+        setTimeout(() => snapTo(DEFAULT_PANEL_H()), 50);
       } else {
-        /* Apertura: scroll dopo l'espansione */
+        /* Apertura: snap al pannello espanso (mostra tutta la card con VEDI SPOT) */
+        setTimeout(() => snapTo(EXPANDED_CARD_H), 50);
         setTimeout(() => setScrollToId(pin.id), 260);
       }
       return isClosing ? null : pin.id;
     });
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 12 });
-  }, []);
+  }, [snapTo]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Scroll sync: IO ha visto una card → aggiorna SOLO il pin attivo (bordo arancione)
      ma NON muove la mappa. Debounce 120ms: il bordo si aggiorna solo quando
