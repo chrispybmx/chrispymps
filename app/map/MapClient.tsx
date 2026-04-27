@@ -701,7 +701,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         {panelHeight > 90 && (
           <div style={{
             flex: 1,
-            background: 'rgba(10,10,10,0.94)',
+            background: 'rgba(10,10,10,0.97)',
             backdropFilter: 'blur(18px)',
             WebkitBackdropFilter: 'blur(18px)',
             overflow: 'hidden',
@@ -908,7 +908,7 @@ function SpotListPanel({
       </div>
     )}
 
-    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain', touchAction: 'pan-y' } as React.CSSProperties}>
+    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' } as React.CSSProperties}>
 
       <style>{`
         .spot-card-wrap { -webkit-tap-highlight-color: transparent; }
@@ -993,8 +993,8 @@ function SpotListPanel({
             {isExp ? (
               <div style={{ position: 'relative' }}>
 
-                {/* Header row: X chiudi — nel nero solido, mai sul gradiente */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 8px 2px', background: 'transparent' }}>
+                {/* Header row: X chiudi — sticky, sempre visibile, mai sul gradiente */}
+                <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'flex-end', padding: '6px 8px 2px', background: 'rgba(10,10,10,0.97)' }}>
                   <button
                     onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
                     style={{
