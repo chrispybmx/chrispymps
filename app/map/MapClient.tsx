@@ -1172,8 +1172,12 @@ function SpotListPanel({
             {isExp ? (
               <div style={{ position: 'relative' }}>
 
-                {/* Header row: X chiudi — sticky, sempre visibile, mai sul gradiente */}
-                <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'flex-end', padding: '6px 8px 2px', background: 'rgba(10,10,10,0.97)' }}>
+                {/* Header row: ❤️ sinistra · X destra — sticky */}
+                <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px 2px', background: 'rgba(10,10,10,0.97)' }}>
+                  <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
+                    style={{ background: 'rgba(0,0,0,0.0)', border: 'none', borderRadius: 4, width: 30, height: 30, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                    {myFav ? '❤️' : '🤍'}
+                  </button>
                   <button
                     onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
                     style={{
@@ -1274,19 +1278,11 @@ function SpotListPanel({
                       </div>
                     )}
 
-                    <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
-                      style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 4, width: 30, height: 30, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {myFav ? '❤️' : '🤍'}
-                    </button>
                   </div>
                 ) : (
-                  /* Nessuna foto — placeholder con emoji + cuore */
+                  /* Nessuna foto — placeholder con emoji */
                   <div style={{ height: 52, background: 'var(--gray-800)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
                     <span style={{ fontSize: 28, opacity: 0.25 }}>{tipo.emoji}</span>
-                    <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
-                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: myFav ? 16 : 13, opacity: myFav ? 1 : 0.4, marginLeft: 'auto' }}>
-                      {myFav ? '❤️' : '🤍'}
-                    </button>
                   </div>
                 )}
 
