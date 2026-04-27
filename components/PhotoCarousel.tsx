@@ -1,115 +1,219 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface Photo { url: string; credit_name?: string }
 
 export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
-  const [idx, setIdx] = useState(0);
+  const [idx,      setIdx]      = useState(0);
+  const [lightbox, setLightbox] = useState(false);
   const startX = useRef(0);
   const dragging = useRef(false);
 
-  const prev = useCallback(() => setIdx(i => (i - 1 + photos.length) % photos.length), [photos.length]);
-  const next = useCallback(() => setIdx(i => (i + 1) % photos.length), [photos.length]);
+  const prev = () => setIdx(i => (i - 1 + photos.length) % photos.length);
+  const next = () => setIdx(i => (i + 1) % photos.length);
 
-  const onTouchStart = (e: React.TouchEvent) => { startX.current = e.touches[0].clientX; dragging.current = true; };
-  const onTouchEnd   = (e: React.TouchEvent) => {
+  const onTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+    dragging.current = true;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
     if (!dragging.current) return;
     dragging.current = false;
     const dx = e.changedTouches[0].clientX - startX.current;
     if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
   };
 
+  /* Keyboard nel lightbox */
+  useEffect(() => {
+    if (!lightbox) return;
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === 'Escape')     setLightbox(false);
+      if (e.key === 'ArrowRight') setIdx(i => (i + 1) % photos.length);
+      if (e.key === 'ArrowLeft')  setIdx(i => (i - 1 + photos.length) % photos.length);
+    };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [lightbox, photos.length]);
+
   if (photos.length === 0) return null;
 
   return (
-    <div style={{ position: 'relative', userSelect: 'none', background: '#0a0a0a' }}>
-
-      {/* Foto principale — altezza fissa, contain per non tagliare */}
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: 'clamp(220px, 55vw, 420px)',
-          background: '#0a0a0a',
-          cursor: photos.length > 1 ? 'grab' : 'default',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        <img
-          key={idx}
-          src={photos[idx].url}
-          alt=""
-          style={{
-            maxWidth: '100%',
-            maxHeight: '100%',
-            width: 'auto',
-            height: 'auto',
-            objectFit: 'contain',
-            display: 'block',
-          }}
-        />
-
-        {/* Scanlines leggere */}
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.06) 3px,rgba(0,0,0,0.06) 5px)',
-        }} />
-
-        {/* Frecce — solo se più foto */}
-        {photos.length > 1 && (
-          <>
-            <button onClick={prev} style={arrowStyle('left')} aria-label="Precedente">‹</button>
-            <button onClick={next} style={arrowStyle('right')} aria-label="Successiva">›</button>
-          </>
-        )}
-
-        {/* Counter */}
-        {photos.length > 1 && (
-          <div style={{
-            position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(0,0,0,0.65)', borderRadius: 12,
-            padding: '3px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff',
-            letterSpacing: '0.04em',
-          }}>
-            {idx + 1} / {photos.length}
-          </div>
-        )}
-
-        {/* Credit */}
-        {photos[idx].credit_name && <Credit name={photos[idx].credit_name!} />}
-      </div>
-
-      {/* Thumbnail strip — solo se più foto */}
-      {photos.length > 1 && (
+    <>
+      {/* ── LIGHTBOX ── */}
+      {lightbox && (
         <div
+          onClick={() => setLightbox(false)}
           style={{
-            display: 'flex', gap: 3, padding: '4px 6px',
-            overflowX: 'auto', background: '#080808',
-            borderTop: '1px solid rgba(255,255,255,0.05)',
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.97)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
-          ref={el => { if (el) el.style.setProperty('scrollbar-width', 'none'); }}
         >
-          {photos.map((p, i) => (
-            <button key={p.url} onClick={() => setIdx(i)} style={{
-              flexShrink: 0, width: 52, height: 36,
-              border: i === idx ? '2px solid var(--orange)' : '2px solid transparent',
-              borderRadius: 3, padding: 0, cursor: 'pointer',
-              background: '#111', transition: 'border-color 0.15s',
-              overflow: 'hidden',
-            }}>
-              <img
-                src={p.url}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#111' }}
-              />
-            </button>
-          ))}
+          {/* Chiudi */}
+          <button
+            onClick={() => setLightbox(false)}
+            style={{
+              position: 'absolute', top: 16, right: 16,
+              background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+              width: 48, height: 48, fontSize: 22, color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
+            }}
+          >✕</button>
+
+          {/* Prev */}
+          {photos.length > 1 && (
+            <button
+              onClick={e => { e.stopPropagation(); prev(); }}
+              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 52, height: 52, fontSize: 28, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >‹</button>
+          )}
+
+          {/* Immagine */}
+          <img
+            src={photos[idx].url}
+            alt=""
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '94vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 6, boxShadow: '0 8px 48px rgba(0,0,0,0.8)' }}
+          />
+
+          {/* Next */}
+          {photos.length > 1 && (
+            <button
+              onClick={e => { e.stopPropagation(); next(); }}
+              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 52, height: 52, fontSize: 28, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >›</button>
+          )}
+
+          {/* Dot indicators */}
+          {photos.length > 1 && (
+            <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
+              {photos.map((_, i) => (
+                <div
+                  key={i}
+                  onClick={e => { e.stopPropagation(); setIdx(i); }}
+                  style={{ width: i === idx ? 18 : 6, height: 6, borderRadius: 3, background: i === idx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s', cursor: 'pointer' }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Credit */}
+          {photos[idx].credit_name && (
+            <div style={{ position: 'absolute', bottom: 16, right: 16, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+              📷 {photos[idx].credit_name}
+            </div>
+          )}
         </div>
       )}
-    </div>
+
+      {/* ── CAROUSEL ── */}
+      <div style={{ position: 'relative', userSelect: 'none', background: '#0a0a0a' }}>
+
+        {/* Foto principale — più alta, cliccabile per lightbox */}
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: 'clamp(300px, 75vw, 540px)',
+            background: '#0a0a0a',
+            cursor: 'zoom-in',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+          onClick={() => setLightbox(true)}
+        >
+          <img
+            key={idx}
+            src={photos[idx].url}
+            alt=""
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+
+          {/* Hint zoom */}
+          <div style={{
+            position: 'absolute', top: 10, right: 10,
+            background: 'rgba(0,0,0,0.55)', borderRadius: 4,
+            padding: '3px 8px', fontSize: 14, pointerEvents: 'none', zIndex: 1,
+          }}>🔍</div>
+
+          {/* Frecce — sempre visibili con loop */}
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={e => { e.stopPropagation(); prev(); }}
+                style={arrowStyle('left')}
+                aria-label="Precedente"
+              >‹</button>
+              <button
+                onClick={e => { e.stopPropagation(); next(); }}
+                style={arrowStyle('right')}
+                aria-label="Successiva"
+              >›</button>
+            </>
+          )}
+
+          {/* Dot indicators */}
+          {photos.length > 1 && (
+            <div style={{
+              position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
+              display: 'flex', gap: 5,
+            }}>
+              {photos.map((_, i) => (
+                <div
+                  key={i}
+                  onClick={e => { e.stopPropagation(); setIdx(i); }}
+                  style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 3, background: i === idx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s', cursor: 'pointer' }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Credit */}
+          {photos[idx].credit_name && <Credit name={photos[idx].credit_name!} />}
+        </div>
+
+        {/* Thumbnail strip — solo se più foto */}
+        {photos.length > 1 && (
+          <div
+            style={{
+              display: 'flex', gap: 4, padding: '6px 8px',
+              overflowX: 'auto', background: '#080808',
+              borderTop: '1px solid rgba(255,255,255,0.05)',
+              scrollbarWidth: 'none',
+            } as React.CSSProperties}
+          >
+            {photos.map((p, i) => (
+              <button
+                key={p.url}
+                onClick={() => setIdx(i)}
+                style={{
+                  flexShrink: 0, width: 68, height: 50,
+                  border: i === idx ? '2px solid var(--orange)' : '2px solid transparent',
+                  borderRadius: 4, padding: 0, cursor: 'pointer',
+                  background: '#111', transition: 'border-color 0.15s',
+                  overflow: 'hidden',
+                }}
+              >
+                <img
+                  src={p.url}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -119,9 +223,9 @@ function arrowStyle(side: 'left' | 'right'): React.CSSProperties {
     transform: 'translateY(-50%)',
     background: 'rgba(0,0,0,0.6)',
     border: '1px solid rgba(255,255,255,0.18)',
-    borderRadius: '50%', width: 38, height: 38,
+    borderRadius: '50%', width: 44, height: 44,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#fff', fontSize: 24, cursor: 'pointer',
+    color: '#fff', fontSize: 26, cursor: 'pointer',
     fontFamily: 'serif', lineHeight: 1, padding: 0,
     backdropFilter: 'blur(6px)',
     zIndex: 2,
