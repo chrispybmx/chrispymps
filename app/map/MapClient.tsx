@@ -772,14 +772,14 @@ function SpotListPanel({
 function RadiusBtn({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} title="Ricerca per raggio" style={{
-      position: 'absolute', bottom: 'calc(80px + env(safe-area-inset-bottom))', left: 12,
+      position: 'absolute', top: 12, left: 12,
       width: 40, height: 40,
       background: active ? 'var(--orange)' : 'var(--gray-800)',
       border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
       borderRadius: 4, color: active ? '#000' : 'var(--bone)',
-      fontSize: 20, cursor: 'pointer',
+      fontSize: 18, cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.5)', zIndex: 10,
+      boxShadow: '0 2px 12px rgba(0,0,0,0.6)', zIndex: 10,
     }}>
       🎯
     </button>
