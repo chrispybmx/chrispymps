@@ -332,6 +332,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           setScrollToId(pin.id);
         }, 200);
       } else {
+        /* Passo 1: apri subito il pannello a un'altezza generosa (EXPANDED_CARD_H)
+           così React può committare e paintare il DOM della card espansa. */
+        snapTo(EXPANDED_CARD_H);
         setTimeout(() => setScrollToId(pin.id), 260);
       }
       return isClosing ? null : pin.id;
@@ -339,19 +342,19 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 12 });
   }, [snapTo]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Scroll sync: IO ha visto una card → aggiorna SOLO il pin attivo (bordo arancione)
-     ma NON muove la mappa. Debounce 120ms: il bordo si aggiorna solo quando
-     lo scroll si ferma, evitando salti durante il movimento. */
-  /* Misura l'altezza reale della card espansa dopo il paint del browser
-     e snappa il pannello esattamente su di essa — doppio rAF garantisce
-     che il DOM sia già stato committed e paintato. */
+  /* Passo 2: dopo che React ha committato la card espansa e il browser ha paintato,
+     misura l'altezza reale e rifina lo snap — doppio rAF garantisce che il paint
+     sia completato. Se la card è più alta di EXPANDED_CARD_H aggiorniamo. */
   useEffect(() => {
     if (!expandedId) return;
     let raf1: number, raf2: number;
     raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
         const el = document.querySelector('[data-exp="1"]') as HTMLElement | null;
-        if (el) snapTo(el.offsetHeight + 6);
+        if (el) {
+          const measured = el.offsetHeight + 6;
+          snapTo(measured);
+        }
       });
     });
     return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
