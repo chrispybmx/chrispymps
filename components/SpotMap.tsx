@@ -59,16 +59,6 @@ function pinSvg(type: SpotType, condition: string, isSelected = false): string {
   </svg>`;
 }
 
-/* ── Calcola l'offset in pixel per centrare il punto nello spazio visibile ──
-   Il pannello lista occupa clamp(270px, 54dvh, 480px) in fondo.
-   Per centrare nello spazio sopra il pannello: offset = panelHeight / 2.
-   (Il topbar è già gestito da Leaflet perché il container mappa parte sotto di esso.)
-   Su mobile usiamo lo stesso valore perché la mappa copre comunque la viewport intera. */
-function getPanelOffsetPx(): number {
-  if (typeof window === 'undefined') return 160;
-  const panelH = Math.min(480, Math.max(270, window.innerHeight * 0.54));
-  return Math.round(panelH / 2);
-}
 
 /* ── Clustering geografico a griglia adattiva allo zoom ──
    Celle più piccole = cluster più granulari e precisi. */
@@ -319,33 +309,25 @@ export default function SpotMap({
 
         marker.on('click', () => {
           if (!mapInstance.current || !L) return;
-          const isMobile = window.innerWidth < 768;
 
           if (c.count === 1) {
-            /* Spot singolo → vola diretto + apri la card */
-            const targetZoom = 17;
-            if (isMobile) mapInstance.current.setView([c.lat, c.lon], targetZoom, { animate: false });
-            else mapInstance.current.flyTo([c.lat, c.lon], targetZoom, { duration: 0.6 });
+            /* Spot singolo → vola diretto + apri la card — stessa animazione su mobile e desktop */
+            const targetZoom  = 17;
+            const targetPoint = mapInstance.current.project([c.lat, c.lon], targetZoom);
+            const offsetPoint = targetPoint.add(L!.point(0, overlayOffsetPx));
+            const offsetLL    = mapInstance.current.unproject(offsetPoint, targetZoom);
+            mapInstance.current.flyTo(offsetLL, targetZoom, { duration: 1.4, easeLinearity: 0.22 });
             onSpotClickRef.current(c.spots[0]);
           } else {
-            /* Multi-spot → fitBounds sul gruppo reale, non zoom fisso.
-               Padding inferiore = altezza pannello (calcolata live dalla viewport). */
+            /* Multi-spot → flyToBounds cinematico, stesso comportamento su mobile e desktop */
             const bounds    = L!.latLngBounds(c.spots.map(s => [s.lat, s.lon] as [number, number]));
-            const panelH    = Math.min(480, Math.max(270, window.innerHeight * 0.54));
-            const padBottom = panelH + 20;
-            if (isMobile) {
-              mapInstance.current.fitBounds(bounds, {
-                paddingTopLeft:     [20, 20],
-                paddingBottomRight: [20, padBottom],
-                maxZoom: 16, animate: false,
-              });
-            } else {
-              mapInstance.current.fitBounds(bounds, {
-                paddingTopLeft:     [40, 40],
-                paddingBottomRight: [40, padBottom],
-                maxZoom: 16,
-              });
-            }
+            const padBottom = overlayOffsetPx * 2 + 20;
+            mapInstance.current.flyToBounds(bounds, {
+              paddingTopLeft:     [24, 24],
+              paddingBottomRight: [24, padBottom],
+              maxZoom: 16,
+              duration: 1.2,
+            });
           }
         });
 
@@ -410,13 +392,13 @@ export default function SpotMap({
 
     /* ── Auto-fit al primo render con spot ── */
     if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
-      const bounds = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
-      const panelH = Math.min(480, Math.max(270, window.innerHeight * 0.54));
+      const bounds  = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
+      const padBot  = overlayOffsetPx * 2 + 32;
       mapInstance.current.fitBounds(bounds, {
         paddingTopLeft:     [32, 32],
-        paddingBottomRight: [32, panelH + 32],
+        paddingBottomRight: [32, padBot],
         maxZoom: 15,
-        animate: false,
+        animate: false,   // primo render: nessuna animazione
       });
       hasInitialFit.current = true;
     }
@@ -479,7 +461,7 @@ export default function SpotMap({
     const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
     const offsetPoint  = targetPoint.add(L!.point(0, offset));
     const offsetLatLng = map.unproject(offsetPoint, zoom);
-    map.flyTo(offsetLatLng, zoom, { duration: 2.2, easeLinearity: 0.15 });
+    map.flyTo(offsetLatLng, zoom, { duration: 1.8, easeLinearity: 0.22 });
   }, [flyTarget]);
 
   /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */
@@ -490,69 +472,47 @@ export default function SpotMap({
     const hasSearch = !!searchQueryRef.current;
     /* overlayOffsetPx = panelHeight / 2 → panelHeight = overlayOffsetPx * 2.
        Usiamo il valore dinamico passato da MapClient invece della stima statica. */
-    const panelH  = overlayOffsetPx * 2;
+    const padBot = overlayOffsetPx * 2 + 32;
+    const pad    = { paddingTopLeft: [32, 32] as [number, number], paddingBottomRight: [32, padBot] as [number, number] };
 
     /* Caso 0: nessun risultato */
     if (pins.length === 0) {
       if (hasRegion) {
-        // Mostra comunque la regione selezionata
         const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
-        mapInstance.current.fitBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), {
-          paddingTopLeft: [32, 32], paddingBottomRight: [32, panelH + 32], animate: true,
-        });
-      } else {
-        // Nessun risultato → lascia la mappa dove si trova (nessun refit)
+        mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 1.2 });
       }
       return;
     }
 
-    /* Caso 1: singolo risultato → zoom ravvicinato centrato sopra il pannello */
+    /* Caso 1: singolo risultato → flyTo con offset pannello */
     if (pins.length === 1) {
-      const offset       = overlayOffsetPx;
       const p            = pins[0];
       const targetZoom   = 15;
       const targetPoint  = mapInstance.current.project([p.lat, p.lon], targetZoom);
-      const offsetPoint  = targetPoint.add(L!.point(0, offset));
+      const offsetPoint  = targetPoint.add(L!.point(0, overlayOffsetPx));
       const offsetLatLng = mapInstance.current.unproject(offsetPoint, targetZoom);
-      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 0.7, easeLinearity: 0.5 });
+      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 1.2, easeLinearity: 0.22 });
       return;
     }
 
-    /* Caso 2: filtro regione attivo → mostra sempre l'intera bbox della regione,
-       così la distribuzione degli spot nella regione è chiara anche se sono
-       concentrati in una città sola */
+    /* Caso 2: filtro regione attivo */
     if (hasRegion) {
       const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
-      mapInstance.current.fitBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), {
-        paddingTopLeft:     [32, 32],
-        paddingBottomRight: [32, panelH + 32],
-        animate: true,
-      });
+      mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 1.2 });
       return;
     }
 
-    /* Caso 3: ricerca testuale → fitBounds sui risultati effettivi */
+    /* Caso 3: ricerca testuale */
     if (hasSearch) {
       const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
-      mapInstance.current.fitBounds(bounds, {
-        paddingTopLeft:     [32, 32],
-        paddingBottomRight: [32, panelH + 32],
-        maxZoom: 14,
-        animate: true,
-      });
+      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 14, duration: 1.2 });
       return;
     }
 
-    /* Caso 4: solo filtro categoria (no regione, no ricerca) → fitBounds sugli spot
-       reali, ovunque si trovino nel mondo — zoom calibrato sulla distribuzione effettiva */
+    /* Caso 4: solo filtro categoria */
     {
       const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
-      mapInstance.current.fitBounds(bounds, {
-        paddingTopLeft:     [32, 32],
-        paddingBottomRight: [32, panelH + 32],
-        maxZoom: 12,
-        animate: true,
-      });
+      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 12, duration: 1.2 });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitAllTrigger]);
@@ -597,12 +557,7 @@ export default function SpotMap({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        const isMobile = window.innerWidth < 768;
-        if (isMobile) {
-          mapInstance.current!.setView([latitude, longitude], APP_CONFIG.mapZoomCity, { animate: false });
-        } else {
-          mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 0.8 });
-        }
+        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.4, easeLinearity: 0.22 });
 
         if (L) {
           const dotSvg = `<div style="
