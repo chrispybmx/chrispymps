@@ -777,6 +777,10 @@ function SpotListPanel({
   const [lightbox,   setLightbox]   = useState<{ urls: string[]; idx: number } | null>(null);
   /* Refs strip foto per scroll-snap (una per ogni spot espanso) */
   const photoStripRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  /* Swipe-vs-tap detection per la strip foto (shared: una sola card espansa per volta) */
+  const photoTouchStartX = useRef(0);
+  const photoTouchStartY = useRef(0);
+  const photoIsSwiping   = useRef(false);
 
   const panelRef  = useRef<HTMLDivElement>(null);
   const cardRefs  = useRef<Map<string, Element>>(new Map());
@@ -1010,7 +1014,7 @@ function SpotListPanel({
                 {/* ── FOTO — scroll-snap swipeable ── */}
                 {allPhotos.length > 0 ? (
                   <div style={{ position: 'relative', background: '#0a0a0a' }}>
-                    {/* Scroll-snap strip */}
+                    {/* Scroll-snap strip — stesso schema di PhotoCarousel */}
                     <div
                       ref={(el) => {
                         if (el) photoStripRefs.current.set(spot.id, el);
@@ -1021,7 +1025,22 @@ function SpotListPanel({
                         const newIdx = Math.round(el.scrollLeft / el.offsetWidth);
                         setPhotoIdx(p => p[spot.id] !== newIdx ? { ...p, [spot.id]: newIdx } : p);
                       }}
-                      onClick={e => { e.stopPropagation(); setLightbox({ urls: allPhotos, idx: curPhotoIdx }); }}
+                      onTouchStart={e => {
+                        photoTouchStartX.current = e.touches[0].clientX;
+                        photoTouchStartY.current = e.touches[0].clientY;
+                        photoIsSwiping.current   = false;
+                      }}
+                      onTouchMove={e => {
+                        const dx = Math.abs(e.touches[0].clientX - photoTouchStartX.current);
+                        const dy = Math.abs(e.touches[0].clientY - photoTouchStartY.current);
+                        if (dx > 6 || dy > 6) photoIsSwiping.current = true;
+                        /* Se il gesto è orizzontale blocca la card dal ricevere il touch */
+                        if (dx > dy) e.stopPropagation();
+                      }}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!photoIsSwiping.current) setLightbox({ urls: allPhotos, idx: curPhotoIdx });
+                      }}
                       style={{
                         display: 'flex',
                         overflowX: 'auto',
@@ -1030,7 +1049,7 @@ function SpotListPanel({
                         WebkitOverflowScrolling: 'touch',
                         scrollbarWidth: 'none',
                         width: '100%',
-                        height: 180,
+                        height: 200,
                         cursor: 'zoom-in',
                         touchAction: 'pan-x',
                       } as React.CSSProperties}
@@ -1057,18 +1076,18 @@ function SpotListPanel({
                       ))}
                     </div>
 
-                    {/* Frecce prev/next */}
-                    {allPhotos.length > 1 && curPhotoIdx > 0 && (
-                      <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, curPhotoIdx - 1); }} className="photo-nav-btn"
-                        style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 38, background: 'linear-gradient(to right,rgba(0,0,0,0.55),transparent)', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>‹</button>
-                    )}
-                    {allPhotos.length > 1 && curPhotoIdx < allPhotos.length - 1 && (
-                      <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, curPhotoIdx + 1); }} className="photo-nav-btn"
-                        style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 38, background: 'linear-gradient(to left,rgba(0,0,0,0.55),transparent)', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>›</button>
+                    {/* Frecce — circolari centrate come PhotoCarousel */}
+                    {allPhotos.length > 1 && (
+                      <>
+                        <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, curPhotoIdx === 0 ? allPhotos.length - 1 : curPhotoIdx - 1); }} className="photo-nav-btn"
+                          style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.62)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', borderRadius: '50%', width: 36, height: 36, color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, padding: 0, fontFamily: 'serif', lineHeight: 1 }}>‹</button>
+                        <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, (curPhotoIdx + 1) % allPhotos.length); }} className="photo-nav-btn"
+                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.62)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', borderRadius: '50%', width: 36, height: 36, color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, padding: 0, fontFamily: 'serif', lineHeight: 1 }}>›</button>
+                      </>
                     )}
 
                     {/* Zoom hint */}
-                    <div style={{ position: 'absolute', bottom: 6, right: allPhotos.length > 1 && curPhotoIdx < allPhotos.length - 1 ? 44 : 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍</div>
+                    <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍</div>
 
                     {/* Dots */}
                     {allPhotos.length > 1 && (
