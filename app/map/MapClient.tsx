@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
-import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI, CITTA_ITALIANE, CITTA_COORDS } from '@/lib/constants';
+import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
 import SupportModal from '@/components/SupportModal';
@@ -103,6 +103,30 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [gpsLoading,      setGpsLoading]      = useState(false);
   const [citySearch,      setCitySearch]      = useState('');
   const [cityPickerOpen,  setCityPickerOpen]  = useState(false);
+  const [cityResults,     setCityResults]     = useState<{ name: string; display: string; lat: number; lon: number }[]>([]);
+  const [cityLoading,     setCityLoading]     = useState(false);
+
+  /* Nominatim debounce per comuni italiani */
+  useEffect(() => {
+    if (!cityPickerOpen) return;
+    if (citySearch.trim().length < 2) { setCityResults([]); return; }
+    const t = setTimeout(async () => {
+      setCityLoading(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(citySearch)}&format=json&limit=8&countrycodes=it&accept-language=it&featuretype=city,town,village,municipality`;
+        const res  = await fetch(url, { headers: { 'User-Agent': 'ChrispyMaps/1.0' } });
+        const data = await res.json() as Array<{ name: string; display_name: string; lat: string; lon: string; type: string }>;
+        setCityResults(data.map(r => ({
+          name:    r.name || r.display_name.split(',')[0],
+          display: r.display_name.split(',').slice(1, 3).join(',').trim(),
+          lat:     parseFloat(r.lat),
+          lon:     parseFloat(r.lon),
+        })));
+      } catch { setCityResults([]); }
+      setCityLoading(false);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [citySearch, cityPickerOpen]);
 
   /* ── Bottoni mappa: locate trigger ── */
   const [locateTrigger, setLocateTrigger] = useState(0);
@@ -511,7 +535,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
             </button>
           </div>
 
-          {/* City picker — input + lista */}
+          {/* City picker — input + lista comuni via Nominatim */}
           {cityPickerOpen && (
             <div style={{
               marginBottom: 10,
@@ -519,41 +543,51 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
               border: '1px solid var(--gray-600)',
               borderRadius: 8, overflow: 'hidden',
             }}>
-              <input
-                autoFocus
-                value={citySearch}
-                onChange={e => setCitySearch(e.target.value)}
-                placeholder="Cerca città..."
-                style={{
-                  width: '100%', padding: '9px 12px',
-                  background: 'var(--gray-800)', border: 'none', borderBottom: '1px solid var(--gray-700)',
-                  fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
-                  outline: 'none', boxSizing: 'border-box',
-                }}
-              />
-              <div style={{ maxHeight: 160, overflowY: 'auto' }}>
-                {CITTA_ITALIANE
-                  .filter(c => !citySearch || c.label.toLowerCase().includes(citySearch.toLowerCase()))
-                  .slice(0, 30)
-                  .map(c => {
-                    const coords = CITTA_COORDS[c.value];
-                    if (!coords) return null;
-                    return (
-                      <button
-                        key={c.value}
-                        onClick={() => handleCityForRadius(c.label, coords[0], coords[1])}
-                        style={{
-                          width: '100%', padding: '8px 12px', textAlign: 'left',
-                          background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
-                          fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {c.label}
-                      </button>
-                    );
-                  })
-                }
+              <div style={{ position: 'relative' }}>
+                <input
+                  autoFocus
+                  value={citySearch}
+                  onChange={e => setCitySearch(e.target.value)}
+                  placeholder="Cerca comune..."
+                  style={{
+                    width: '100%', padding: '9px 36px 9px 12px',
+                    background: 'var(--gray-800)', border: 'none', borderBottom: '1px solid var(--gray-700)',
+                    fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
+                    outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                {cityLoading && (
+                  <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>...</span>
+                )}
+              </div>
+              <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                {/* Risultati Nominatim */}
+                {cityResults.length > 0 && cityResults.map((r, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleCityForRadius(r.name, r.lat, r.lon)}
+                    style={{
+                      width: '100%', padding: '9px 12px', textAlign: 'left',
+                      background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
+                      cursor: 'pointer', display: 'block',
+                    }}
+                  >
+                    {r.name}
+                    {r.display && <span style={{ color: 'var(--gray-500)', fontSize: 10, marginLeft: 6 }}>{r.display}</span>}
+                  </button>
+                ))}
+                {/* Stato vuoto */}
+                {!cityLoading && citySearch.trim().length >= 2 && cityResults.length === 0 && (
+                  <div style={{ padding: '12px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center' }}>
+                    Nessun comune trovato
+                  </div>
+                )}
+                {citySearch.trim().length < 2 && (
+                  <div style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>
+                    Digita almeno 2 lettere...
+                  </div>
+                )}
               </div>
             </div>
           )}
