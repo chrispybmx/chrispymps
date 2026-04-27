@@ -372,15 +372,30 @@ export default function SpotMap({
         const marker = L!.marker([pin.lat, pin.lon], { icon });
         const tipo   = TIPI_SPOT[pin.type];
 
+        /* Popup hover: foto thumbnail + nome + info
+           La foto è mostrata solo su desktop (mouseover non funziona su touch) */
+        const imgHtml = pin.cover_url
+          ? `<img src="${pin.cover_url}"
+               style="width:100%;height:90px;object-fit:cover;display:block;border-radius:4px 4px 0 0;margin-bottom:6px"
+               loading="lazy" />`
+          : '';
+
         const popupContent = `
-          <div style="font-family:'Barlow Condensed',sans-serif;min-width:130px;padding:2px 0">
-            <div style="font-family:'VT323',monospace;font-size:16px;color:#ff6a00;line-height:1.2">${pin.name}</div>
-            ${pin.city ? `<div style="font-size:11px;color:#888;margin-top:2px">📍 ${pin.city}</div>` : ''}
-            <div style="font-size:11px;color:#888;margin-top:3px">${tipo.emoji} ${tipo.label}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;min-width:160px;padding:0;overflow:hidden;border-radius:6px">
+            ${imgHtml}
+            <div style="padding:4px 8px 6px">
+              <div style="font-family:'VT323',monospace;font-size:17px;color:#ff6a00;line-height:1.2">${pin.name}</div>
+              ${pin.city ? `<div style="font-size:11px;color:#888;margin-top:2px">📍 ${pin.city}</div>` : ''}
+              <div style="font-size:11px;color:#999;margin-top:2px">${tipo.emoji} ${tipo.label}</div>
+            </div>
           </div>
         `;
 
-        marker.bindPopup(popupContent, { maxWidth: 200, closeButton: false });
+        marker.bindPopup(popupContent, {
+          maxWidth: pin.cover_url ? 200 : 180,
+          closeButton: false,
+          className: 'spot-hover-popup',
+        });
         marker.on('click',     () => onSpotClickRef.current(pin));
         marker.on('mouseover', () => marker.openPopup());
         marker.on('mouseout',  () => marker.closePopup());
