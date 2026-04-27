@@ -65,7 +65,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   /* ── Pannello ridimensionabile ── */
   const PANEL_MIN       = 0;    // collassa completamente — il tab fisso rimane sempre visibile
   const PANEL_SNAP      = 140;  // soglia sotto cui collassa
-  const EXPANDED_CARD_H = 262;  // altezza card espansa: header(38)+foto(140)+info(84) ≈ 262px
+  const EXPANDED_CARD_H = 300;  // altezza card espansa: header(38)+foto(140)+thumbs(38)+info(84) ≈ 300px
   const DEFAULT_PANEL_H = () =>
     typeof window !== 'undefined'
       ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
@@ -1268,17 +1268,20 @@ function SpotListPanel({
                     {/* Zoom hint */}
                     <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍</div>
 
-                    {/* Dots */}
-                    {allPhotos.length > 1 && (
-                      <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 4, pointerEvents: 'none' }}>
-                        {allPhotos.map((_, i) => (
-                          <div key={i}
-                            style={{ width: i === curPhotoIdx ? 14 : 5, height: 5, borderRadius: 3, background: i === curPhotoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s' }} />
-                        ))}
-                      </div>
-                    )}
-
                   </div>
+
+                  {/* Thumbnail strip — solo con più foto */}
+                  {allPhotos.length > 1 && (
+                    <div style={{ display: 'flex', gap: 3, padding: '4px 8px', background: '#050505', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
+                      {allPhotos.map((url, i) => (
+                        <button key={i} className="thumb-btn"
+                          onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, i); }}
+                          style={{ flexShrink: 0, width: 40, height: 30, border: `2px solid ${i === curPhotoIdx ? 'var(--orange)' : 'transparent'}`, borderRadius: 3, overflow: 'hidden', padding: 0, cursor: 'pointer', background: '#111', opacity: i === curPhotoIdx ? 1 : 0.55, transition: 'opacity 0.15s, border-color 0.15s' }}>
+                          <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 ) : (
                   /* Nessuna foto — placeholder con emoji */
                   <div style={{ height: 52, background: 'var(--gray-800)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
