@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase';
-import { TIPI_SPOT } from '@/lib/constants';
+import { TIPI_SPOT, APP_CONFIG } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import ProfileClient from './ProfileClient';
 import FavoritesSection from './FavoritesSection';
@@ -71,14 +71,62 @@ async function getData(username: string) {
   };
 }
 
+export const revalidate = 300;
+
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
+  const sb = supabaseAdmin();
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('username, bio')
+    .eq('username', params.username)
+    .maybeSingle();
+
+  const { count: spotsCount } = await sb
+    .from('spots')
+    .select('id', { count: 'exact', head: true })
+    .eq('submitted_by_username', params.username)
+    .eq('status', 'approved');
+
+  if (!profile) {
+    return { title: `Profilo non trovato — Chrispy Maps` };
+  }
+
+  const url         = `${APP_CONFIG.url}/u/${profile.username}`;
+  const title       = `@${profile.username} — Profilo Rider | Chrispy Maps`;
+  const spotsStr    = spotsCount ? `${spotsCount} spot pubblicati` : '';
+  const bioStr      = profile.bio ? ` · ${profile.bio}` : '';
+  const description = `Profilo di @${profile.username} su Chrispy Maps.${spotsStr ? ` ${spotsStr}.` : ''}${bioStr} Spot BMX, skate e scooter in Italia.`;
+
   return {
-    title: `@${params.username} — Chrispy Maps`,
-    description: `Profilo di @${params.username} su Chrispy Maps`,
+    title,
+    description,
+    alternates: { canonical: url },
+    keywords: [
+      `@${profile.username}`, `${profile.username} BMX`,
+      `rider BMX Italia`, `spot BMX`, `Chrispy Maps rider`,
+    ],
+    openGraph: {
+      type:        'profile',
+      url,
+      title,
+      description,
+      siteName:    'Chrispy Maps',
+      locale:      'it_IT',
+      images: [{
+        url:    '/opengraph-image',
+        width:  1200,
+        height: 630,
+        alt:    `Profilo di @${profile.username} su Chrispy Maps`,
+      }],
+    },
+    twitter: {
+      card:        'summary',
+      site:        '@chrispy_bmx',
+      title,
+      description,
+    },
   };
 }
-
-export const dynamic = 'force-dynamic';
 
 export default async function UserProfilePage({ params }: { params: { username: string } }) {
   const data = await getData(params.username);
