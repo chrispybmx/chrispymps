@@ -80,21 +80,21 @@ export default function FavoritesSection({ profileUsername, profileId }: Props) 
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {spots.map(spot => <SpotTile key={spot.id} spot={spot} />)}
+          {spots.map(spot => <SpotTile key={spot.id} spot={spot} username={profileUsername} />)}
         </div>
       )}
     </div>
   );
 }
 
-function SpotTile({ spot }: { spot: FavSpot }) {
+function SpotTile({ spot, username }: { spot: FavSpot; username: string }) {
   const tipo   = TIPI_SPOT[spot.type];
   const cond   = CONDIZIONI[spot.condition as keyof typeof CONDIZIONI];
   const cover  = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
   const isDead = spot.condition !== 'alive';
 
   return (
-    <Link href={`/map/spot/${spot.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
+    <Link href={`/map/spot/${spot.slug}?from=/u/${username}`} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{
         background: 'var(--gray-800)',
         border: '1px solid var(--gray-700)',
