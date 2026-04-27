@@ -129,6 +129,10 @@ export default function SpotMap({
   const searchQueryRef      = useRef(searchQuery);
   const [locating, setLocating] = useState(false);
   const [zoom, setZoom]         = useState<number>(APP_CONFIG.mapZoom ?? 6);
+  const tileLayerRef            = useRef<import('leaflet').TileLayer | null>(null);
+  const [darkMap, setDarkMap]   = useState<boolean>(() => {
+    try { return localStorage.getItem('cmaps_dark_map') === '1'; } catch { return false; }
+  });
 
   useEffect(() => { onMapClickRef.current       = onMapClick; });
   useEffect(() => { onSpotClickRef.current      = onSpotClick; });
@@ -178,10 +182,15 @@ export default function SpotMap({
         zoomControl: false,
       });
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19, className: 'osm-tiles',
-      }).addTo(map);
+      const isDark = (() => { try { return localStorage.getItem('cmaps_dark_map') === '1'; } catch { return false; } })();
+      tileLayerRef.current = L.tileLayer(
+        isDark
+          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        isDark
+          ? { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19, className: 'osm-tiles' }
+          : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, className: 'osm-tiles' }
+      ).addTo(map);
 
       L.control.zoom({ position: 'bottomleft' }).addTo(map);
       markersRef.current  = L.layerGroup().addTo(map);
@@ -598,6 +607,28 @@ export default function SpotMap({
     );
   }, [onLocatingChange]);
 
+  /* Cambia tile layer quando darkMap cambia */
+  useEffect(() => {
+    if (!mapInstance.current || !tileLayerRef.current || !L) return;
+    tileLayerRef.current.remove();
+    tileLayerRef.current = L.tileLayer(
+      darkMap
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      darkMap
+        ? { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19, className: 'osm-tiles' }
+        : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, className: 'osm-tiles' }
+    ).addTo(mapInstance.current);
+  }, [darkMap]);
+
+  const toggleDarkMap = () => {
+    setDarkMap(prev => {
+      const next = !prev;
+      try { localStorage.setItem('cmaps_dark_map', next ? '1' : '0'); } catch { /* */ }
+      return next;
+    });
+  };
+
   /* Esegui locateMe quando il trigger esterno cambia */
   const prevLocateTriggerRef = useRef(0);
   useEffect(() => {
@@ -616,7 +647,27 @@ export default function SpotMap({
         role="application"
       />
 
-      {/* Bottoni spostati in MapClient come elementi fixed sopra la mappa */}
+      {/* Bottone toggle stile mappa — in basso a sinistra sopra il controllo zoom */}
+      <button
+        onClick={toggleDarkMap}
+        title={darkMap ? 'Passa a mappa chiara' : 'Passa a mappa scura'}
+        style={{
+          position: 'absolute',
+          bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
+          left: 10,
+          width: 36, height: 36,
+          background: 'rgba(10,10,10,0.85)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          borderRadius: 4,
+          color: '#fff',
+          fontSize: 16, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+          zIndex: 10,
+        }}
+      >
+        {darkMap ? '🌞' : '🌑'}
+      </button>
     </div>
   );
 }
