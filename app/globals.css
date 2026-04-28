@@ -444,10 +444,10 @@ select.input-vhs {
    Pannello mappa e tab button salgono sopra la bottom nav (56px).
    Su desktop (≥768px) rimangono a bottom:0 come prima.           */
 .map-panel-wrap {
-  bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
 }
 .map-panel-tab {
-  bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
 }
 @media (min-width: 768px) {
   .map-panel-wrap { bottom: 0 !important; }
