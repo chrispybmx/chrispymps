@@ -208,6 +208,18 @@ export default function TopBar({
           {APP_CONFIG.siteName}
           <span style={{ color: 'var(--gray-400)', fontSize: 14, marginLeft: 6 }}>BETA</span>
         </a>
+        {/* Notifiche + Preferiti — solo su mobile */}
+        <div className="topbar-mobile-actions" style={{ alignItems: 'center', gap: 4 }}>
+          <Link href="/preferiti" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 36, height: 36, borderRadius: 2,
+            color: 'var(--gray-400)', textDecoration: 'none', fontSize: 18,
+            transition: 'color 0.15s',
+          }} aria-label="Preferiti">
+            ❤️
+          </Link>
+          {sessionToken && <NotificationBell token={sessionToken} />}
+        </div>
         <button onClick={openSearch} className="btn-ghost" aria-label="Cerca spot" style={{ fontSize: 18 }}>
           🔍
         </button>
@@ -216,8 +228,9 @@ export default function TopBar({
         </button>
       </header>
 
-      {/* Filter bar — dropdown + preferiti — nascosta su mobile (vedi globals.css .map-filter-bar) */}
-      <div className="map-filter-bar" style={{
+      {/* Filter bar — dropdown + preferiti */}
+      <div style={{
+        display: 'flex',
         position: 'fixed',
         top: 'var(--topbar-height)',
         left: 0, right: 0,
@@ -226,7 +239,7 @@ export default function TopBar({
         zIndex: 38,
         alignItems: 'center',
         gap: 0,
-      }}>
+      }} className="map-filter-bar">
         {/* Scrollabile: tutti i dropdown */}
         <div style={{
           flex: 1,
@@ -295,16 +308,18 @@ export default function TopBar({
           )}
         </div>
 
-        {/* Preferiti + Profilo — fisso a destra */}
-        <div style={{
+        {/* Preferiti + Profilo — fisso a destra, nascosto su mobile */}
+        <div className="map-profile-section" style={{
           padding: '7px 10px 7px 6px',
           flexShrink: 0,
           borderLeft: '1px solid var(--gray-700)',
-          display: 'flex', alignItems: 'center', gap: 6,
+          alignItems: 'center', gap: 6,
         }}>
-          {/* Campanella notifiche — solo se loggato */}
+          {/* Campanella notifiche — solo desktop */}
           {sessionToken && (
-            <NotificationBell token={sessionToken} />
+            <div className="filterbar-bell" style={{ alignItems: 'center' }}>
+              <NotificationBell token={sessionToken} />
+            </div>
           )}
 
           {/* Profilo — visibile solo se loggato */}
