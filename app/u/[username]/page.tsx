@@ -6,6 +6,7 @@ import { TIPI_SPOT, APP_CONFIG } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import ProfileClient from './ProfileClient';
 import FavoritesSection from './FavoritesSection';
+import BottomNav from '@/components/BottomNav';
 
 interface Profile {
   id:               string;
@@ -147,7 +148,7 @@ export default async function UserProfilePage({ params }: { params: { username: 
         </div>
       </div>
 
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 16px 60px' }}>
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 16px calc(60px + env(safe-area-inset-bottom, 0px) + 8px)' }}>
 
         {/* Profile hero */}
         <ProfileClient profile={profile} joinDate={joinDate} />
@@ -200,6 +201,8 @@ export default async function UserProfilePage({ params }: { params: { username: 
         />
 
       </div>
+
+      <BottomNav />
     </div>
   );
 }
@@ -211,7 +214,7 @@ function SpotTile({ spot, username }: { spot: SpotCard; username: string }) {
   return (
     <Link href={`/map/spot/${spot.slug}?from=/u/${username}`} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, overflow: 'hidden', opacity: isDead ? 0.65 : 1 }}>
-        <div style={{ height: 110, background: 'var(--gray-700)', overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ aspectRatio: '1 / 1', background: 'var(--gray-700)', overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {cover
             ? <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: isDead ? 'grayscale(0.5)' : 'none' }} loading="lazy" />
             : <span style={{ fontSize: 36 }}>{tipo.emoji}</span>}
