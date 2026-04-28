@@ -209,15 +209,38 @@ export default function TopBar({
           <span style={{ color: 'var(--gray-400)', fontSize: 14, marginLeft: 6 }}>BETA</span>
         </a>
         {/* Notifiche + Preferiti — solo su mobile */}
-        <div className="topbar-mobile-actions" style={{ alignItems: 'center', gap: 4 }}>
-          <Link href="/preferiti" style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 36, height: 36, borderRadius: 2,
-            color: 'var(--gray-400)', textDecoration: 'none', fontSize: 18,
-            transition: 'color 0.15s',
-          }} aria-label="Preferiti">
-            ❤️
-          </Link>
+        <div className="topbar-mobile-actions" style={{ alignItems: 'center', gap: 2 }}>
+          {/* Cuore → profilo (preferiti) se loggato, altrimenti apre auth */}
+          {profileUsername ? (
+            <Link
+              href={`/u/${profileUsername}`}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 40, height: 40, borderRadius: 4,
+                color: 'var(--gray-400)', textDecoration: 'none', fontSize: 20,
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              } as React.CSSProperties}
+              aria-label="Preferiti"
+            >
+              ❤️
+            </Link>
+          ) : (
+            <button
+              onClick={onOpenAuth}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 40, height: 40, borderRadius: 4,
+                background: 'transparent', border: 'none',
+                fontSize: 20, cursor: 'pointer',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              } as React.CSSProperties}
+              aria-label="Accedi per i preferiti"
+            >
+              🤍
+            </button>
+          )}
           {sessionToken && <NotificationBell token={sessionToken} />}
         </div>
         <button onClick={openSearch} className="btn-ghost" aria-label="Cerca spot" style={{ fontSize: 18 }}>
