@@ -2,17 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface BottomNavProps {
-  onAddSpot: () => void;
+  /** Callback per aprire il modal aggiungi spot — opzionale.
+   *  Se non fornito, il + naviga su /map?add=1 */
+  onAddSpot?: () => void;
 }
 
 export default function BottomNav({ onAddSpot }: BottomNavProps) {
   const pathname = usePathname();
+  const router   = useRouter();
   const [username, setUsername] = useState<string | null>(null);
 
-  /* Carica l'username dal session token — stesso pattern di TopBar */
   useEffect(() => {
     import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
       supabaseBrowser().auth.getSession().then(({ data }) => {
@@ -25,21 +27,27 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
     }).catch(() => {});
   }, []);
 
-  const isMap     = !!pathname?.startsWith('/map');
-  const isProfile = !!pathname?.startsWith('/u/');
+  const handleAdd = () => {
+    if (onAddSpot) onAddSpot();
+    else router.push('/map?add=1');
+  };
+
+  const isMap       = !!pathname?.startsWith('/map');
+  const isClassifica= !!pathname?.startsWith('/classifica');
+  const isScopri    = !!pathname?.startsWith('/scopri');
+  const isProfile   = !!pathname?.startsWith('/u/');
 
   return (
     <>
       <style>{`
-        /* ── Mobile-only bottom nav ── */
         .mobile-bnav {
           position: fixed;
           bottom: 0; left: 0; right: 0;
-          height: calc(56px + env(safe-area-inset-bottom, 0px));
+          height: calc(60px + env(safe-area-inset-bottom, 0px));
           padding-bottom: env(safe-area-inset-bottom, 0px);
           background: rgba(8,8,8,0.97);
-          backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           border-top: 1px solid rgba(255,255,255,0.06);
           display: flex;
           align-items: center;
@@ -53,14 +61,14 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 3px;
+          gap: 4px;
           text-decoration: none;
-          color: #555;
+          color: #444;
           font-family: var(--font-mono);
-          font-size: 8px;
+          font-size: 9px;
           letter-spacing: 0.06em;
           flex: 1;
-          padding: 8px 0;
+          padding: 8px 0 4px;
           transition: color 0.15s;
           -webkit-tap-highlight-color: transparent;
           border: none;
@@ -73,25 +81,27 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
           flex-direction: column;
           align-items: center;
           flex: 1;
-          gap: 3px;
+          gap: 4px;
         }
         .mbn-add {
-          width: 44px;
-          height: 44px;
+          width: 50px;
+          height: 50px;
           background: var(--orange);
-          border-radius: 12px;
+          border-radius: 14px;
           border: none;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: transform 0.1s, opacity 0.1s;
+          transition: transform 0.12s, opacity 0.12s;
           -webkit-tap-highlight-color: transparent;
+          box-shadow: 0 2px 16px rgba(255,106,0,0.35);
+          margin-top: -8px;
         }
-        .mbn-add:active { transform: scale(0.92); opacity: 0.85; }
+        .mbn-add:active { transform: scale(0.90); opacity: 0.85; }
         .mbn-add-lbl {
           font-family: var(--font-mono);
-          font-size: 8px;
+          font-size: 9px;
           color: var(--orange);
           letter-spacing: 0.06em;
         }
@@ -100,60 +110,58 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
       <nav className="mobile-bnav" aria-label="Navigazione principale">
 
         {/* HOME */}
-        <Link href="/" className={`mbn-link${pathname === '/' ? ' active' : ''}`} aria-label="Home">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.5" stroke="currentColor">
-            <path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H5a1 1 0 01-1-1V10.5z" strokeLinejoin="round"/>
-            <path d="M9 22V13h6v9" />
+        <Link href="/" className={`mbn-link${!isMap && !isClassifica && !isScopri && !isProfile ? ' active' : ''}`} aria-label="Home">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H5a1 1 0 01-1-1V10.5z"/>
+            <path d="M9 22V13h6v9"/>
           </svg>
           HOME
         </Link>
 
-        {/* MAPPA */}
-        <Link href="/map" className={`mbn-link${isMap ? ' active' : ''}`} aria-label="Mappa">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.5" stroke="currentColor">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" strokeLinejoin="round"/>
-            <circle cx="12" cy="9" r="2.5" fill="currentColor" stroke="none"/>
+        {/* CLASSIFICA */}
+        <Link href="/classifica" className={`mbn-link${isClassifica ? ' active' : ''}`} aria-label="Classifica">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2"  y="14" width="4" height="8" rx="1"/>
+            <rect x="10" y="9"  width="4" height="13" rx="1"/>
+            <rect x="18" y="4"  width="4" height="18" rx="1"/>
+            <path d="M20 4l-3-3m0 0l-3 3m3-3v8"/>
           </svg>
-          MAPPA
+          CLASSIFICA
         </Link>
 
-        {/* + SPOT — bottone centrale prominente */}
+        {/* + SPOT — CTA centrale */}
         <div className="mbn-add-wrap">
-          <button className="mbn-add" onClick={onAddSpot} aria-label="Aggiungi spot">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <button className="mbn-add" onClick={handleAdd} aria-label="Aggiungi spot">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
           </button>
           <span className="mbn-add-lbl">SPOT</span>
         </div>
 
-        {/* CERCA */}
-        <Link href="/map" className="mbn-link" aria-label="Cerca">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.5" stroke="currentColor">
-            <circle cx="11" cy="11" r="7"/>
-            <path d="M16.5 16.5L21 21" strokeLinecap="round"/>
+        {/* SCOPRI */}
+        <Link href="/scopri" className={`mbn-link${isScopri ? ' active' : ''}`} aria-label="Scopri spot">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M14.5 8.5L16 8l-.5 1.5-5 5L9 15l.5-1.5 5-5z"/>
+            <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>
           </svg>
-          CERCA
+          SCOPRI
         </Link>
 
         {/* PROFILO */}
-        {username ? (
-          <Link href={`/u/${username}`} className={`mbn-link${isProfile ? ' active' : ''}`} aria-label="Profilo">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.5" stroke="currentColor">
-              <circle cx="12" cy="8" r="4"/>
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round"/>
-            </svg>
-            PROFILO
-          </Link>
-        ) : (
-          <Link href="/map" className="mbn-link" aria-label="Accedi">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.5" stroke="currentColor">
-              <circle cx="12" cy="8" r="4"/>
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round"/>
-            </svg>
-            PROFILO
-          </Link>
-        )}
+        <Link
+          href={username ? `/u/${username}` : '/map'}
+          className={`mbn-link${isProfile ? ' active' : ''}`}
+          aria-label="Profilo"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
+          PROFILO
+        </Link>
+
       </nav>
     </>
   );
