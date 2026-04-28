@@ -439,3 +439,24 @@ select.input-vhs {
 .safe-top    { padding-top: env(safe-area-inset-top); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 .pb-safe     { padding-bottom: calc(var(--strip-height) + env(safe-area-inset-bottom)); }
+
+/* ── Mobile bottom nav helpers ────────────────────────────────────
+   Pannello mappa e tab button salgono sopra la bottom nav (56px).
+   Su desktop (≥768px) rimangono a bottom:0 come prima.           */
+.map-panel-wrap {
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.map-panel-tab {
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
+}
+@media (min-width: 768px) {
+  .map-panel-wrap { bottom: 0 !important; }
+  .map-panel-tab  { bottom: 0 !important; }
+}
+
+/* Nasconde il bottone +SPOT nella TopBar solo su mobile
+   (viene sostituito dal bottone centrale nella BottomNav) */
+.topbar-add-btn { display: none !important; }
+@media (min-width: 768px) {
+  .topbar-add-btn { display: inline-flex !important; }
+}
