@@ -717,10 +717,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         }} />
       </div>
 
-      {/* ── TAB FISSO — sempre visibile, apre il pannello ── */}
+      {/* ── TAB FISSO — sempre visibile, apre il pannello a tutto schermo ── */}
       <div
         className="map-panel-tab"
-        onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
+        onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(Math.round(window.innerHeight * 0.88)); }}
         style={{
           position: 'fixed',
           bottom: 0, left: '50%',
@@ -780,7 +780,25 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           overflow: 'hidden',
           borderRadius: panelHeight <= PANEL_MIN + 10 ? '14px 14px 0 0' : '0',
           transition: 'border-radius 0.25s ease',
+          position: 'relative',
         }}>
+          {/* ✕ Chiudi pannello — appare quando il pannello è aperto */}
+          {panelHeight > PANEL_MIN + 10 && (
+            <button
+              onClick={() => snapTo(PANEL_MIN)}
+              style={{
+                position: 'absolute', top: 8, right: 10, zIndex: 20,
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                borderRadius: '50%', width: 28, height: 28,
+                fontSize: 13, color: 'var(--bone)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                lineHeight: 1, touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              } as React.CSSProperties}
+              aria-label="Chiudi pannello"
+            >✕</button>
+          )}
 
           {/* ── DRAG HANDLE ── */}
           <div
@@ -1338,41 +1356,82 @@ function SpotListPanel({
               </div>
 
             ) : (
-              /* ══ COMPACT LAYOUT ══ */
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px' }}>
-                {/* Thumbnail più grande */}
-                <div style={{ flexShrink: 0, width: 116, height: 116, borderRadius: 6, overflow: 'hidden', background: 'var(--gray-700)', border: `2px solid ${isAct ? 'var(--orange)' : 'rgba(255,255,255,0.07)'}`, transition: 'border-color 0.2s' }}>
+              /* ══ COMPACT LAYOUT — formato admin/scopri ══ */
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px' }}>
+
+                {/* Thumbnail 72×72 con badge tipo sovrapposto */}
+                <div style={{
+                  flexShrink: 0, width: 72, height: 72, borderRadius: 8,
+                  overflow: 'hidden',
+                  background: spot.cover_url ? 'transparent' : 'var(--gray-800)',
+                  border: `1px solid ${isAct ? 'var(--orange)' : 'var(--gray-700)'}`,
+                  transition: 'border-color 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  position: 'relative',
+                }}>
                   {spot.cover_url ? (
                     <img src={spot.cover_url} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                   ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, opacity: 0.3 }}>{tipo.emoji}</div>
+                    <span style={{ fontSize: 26, opacity: 0.3 }}>{tipo.emoji}</span>
                   )}
+                  <div style={{
+                    position: 'absolute', bottom: 3, left: 3,
+                    background: 'rgba(0,0,0,0.75)', borderRadius: 4, padding: '2px 5px',
+                    fontFamily: 'var(--font-mono)', fontSize: 8, color: tipo.color,
+                    letterSpacing: '0.04em',
+                  }}>
+                    {spot.type.toUpperCase()}
+                  </div>
                 </div>
 
-                {/* Testo */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                    <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: isAct ? 'var(--orange)' : 'var(--bone)', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+                    <div style={{
+                      flex: 1, minWidth: 0,
+                      fontFamily: 'var(--font-mono)', fontSize: 15,
+                      color: isAct ? 'var(--orange)' : 'var(--bone)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
                       {spot.name}
                     </div>
-                    <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn" style={{ flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: myFav ? 16 : 13, opacity: myFav ? 1 : 0.4 }}>
+                    <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
+                      style={{ flexShrink: 0, background: 'none', border: 'none', padding: '0 2px', cursor: 'pointer', fontSize: myFav ? 14 : 12, opacity: myFav ? 1 : 0.35 }}>
                       {myFav ? '❤️' : '🤍'}
                     </button>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {spot.condition === 'alive' ? (
-                      <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa' }} />
-                    ) : (
-                      <span style={{ background: cond.bg, color: cond.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase' }}>{cond.label}</span>
+
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {spot.city && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
+                        {spot.city}
+                      </span>
                     )}
-                    <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase' }}>{tipo.label}</span>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9,
+                      padding: '2px 6px', borderRadius: 10,
+                      background: `${cond.bg}22`, color: cond.bg,
+                      border: `1px solid ${cond.bg}44`,
+                      letterSpacing: '0.04em',
+                    }}>
+                      {cond.label.toUpperCase()}
+                    </span>
+                    {spot.difficulty && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#ffce4d' }}>
+                        ⚡ {spot.difficulty.toUpperCase()}
+                      </span>
+                    )}
                   </div>
-                  {(spot.city || spot.submitted_by_username) && (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
+
+                  {spot.submitted_by_username && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>
+                      @{spot.submitted_by_username}
                     </div>
                   )}
                 </div>
+
+                {/* Arrow */}
+                <div style={{ color: 'var(--gray-600)', fontSize: 18, flexShrink: 0 }}>›</div>
               </div>
             )}
 
