@@ -214,7 +214,7 @@ export default function TopBar({
         <button onClick={openSearch} className="btn-ghost" aria-label="Cerca spot" style={{ fontSize: 18 }}>
           🔍
         </button>
-        <button onClick={onAddSpot} className="btn-primary" style={{ marginLeft: 8, padding: '8px 14px', fontSize: 14 }} aria-label="Aggiungi spot">
+        <button onClick={onAddSpot} className="btn-primary topbar-add-btn" style={{ marginLeft: 8, padding: '8px 14px', fontSize: 14 }} aria-label="Aggiungi spot">
           + SPOT
         </button>
       </header>
