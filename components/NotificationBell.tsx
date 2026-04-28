@@ -56,16 +56,20 @@ export default function NotificationBell({ token }: { token: string }) {
     return () => clearInterval(id);
   }, [fetchNotifications]);
 
-  /* Chiudi cliccando fuori dal dropdown */
+  /* Chiudi toccando/cliccando fuori dal dropdown — mousedown + touchstart per mobile */
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent | TouchEvent) => {
       if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handler as EventListener);
+    document.addEventListener('touchstart', handler as EventListener, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handler as EventListener);
+      document.removeEventListener('touchstart', handler as EventListener);
+    };
   }, [open]);
 
   const handleOpen = useCallback(async () => {
@@ -94,16 +98,17 @@ export default function NotificationBell({ token }: { token: string }) {
         onClick={handleOpen}
         aria-label={`Notifiche${unread > 0 ? ` (${unread} non lette)` : ''}`}
         style={{
-          fontFamily: 'var(--font-mono)', fontSize: 13,
-          padding: '5px 10px',
-          border: `1px solid ${unread > 0 ? 'rgba(255,106,0,0.7)' : 'var(--gray-600)'}`,
-          borderRadius: 2,
+          fontFamily: 'var(--font-mono)', fontSize: 18,
+          padding: '0',
+          width: 40, height: 40,
+          border: `1px solid ${unread > 0 ? 'rgba(255,106,0,0.7)' : 'transparent'}`,
+          borderRadius: 4,
           background: unread > 0 ? 'rgba(255,106,0,0.12)' : 'transparent',
           color: 'var(--bone)',
           cursor: 'pointer',
-          display: 'flex', alignItems: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative',
-          minHeight: 32, touchAction: 'manipulation',
+          touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent',
           transition: 'border-color 0.2s, background 0.2s',
         } as React.CSSProperties}
