@@ -190,14 +190,14 @@ export default function SpotMap({
       map.on('zoomend', () => setZoom(map.getZoom()));
 
       /* ── Vista iniziale: l'Italia nello spazio visibile sopra il pannello ──
-         Usiamo fitBounds con padding bottom = altezza pannello + handle,
-         così l'Italia compare nell'area mappa visibile, non coperta dalla lista.
-         overlayOffsetPx = panelHeight / 2 → panelHeight = overlayOffsetPx * 2. */
+         paddingBottomRight bottom = overlayOffsetPx (= panelHeight/2) + handle:
+         il pannello occupa overlayOffsetPx px al di sotto del centro visibile.
+         NON moltiplichiamo per 2: overlayOffsetPx è già metà pannello, non tutto. */
       const handleH = 82; // gradiente (36) + drag handle (46)
       const ITALY   = L.latLngBounds([36.0, 6.0], [47.5, 19.0]);
       map.fitBounds(ITALY, {
         paddingTopLeft:     [20, 10],
-        paddingBottomRight: [20, overlayOffsetPx * 2 + handleH],
+        paddingBottomRight: [20, overlayOffsetPx + handleH],
         maxZoom: 7,
         animate: false,
       });
