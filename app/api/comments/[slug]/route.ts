@@ -62,8 +62,18 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const text      = typeof body.text      === 'string' ? body.text.trim()      : '';
-  const parent_id = typeof body.parent_id === 'string' ? body.parent_id.trim() : null;
+
+  // Strip HTML tags to prevent stored XSS
+  const rawText = typeof body.text === 'string' ? body.text.trim() : '';
+  const text    = rawText.replace(/<[^>]*>/g, '').trim();
+
+  // Validate parent_id as UUID v4 format
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const rawParent = typeof body.parent_id === 'string' ? body.parent_id.trim() : null;
+  const parent_id = rawParent && UUID_RE.test(rawParent) ? rawParent : null;
+  if (rawParent && !UUID_RE.test(rawParent)) {
+    return NextResponse.json({ ok: false, error: 'parent_id non valido.' }, { status: 400 });
+  }
 
   if (text.length < 2 || text.length > 500) {
     return NextResponse.json({ ok: false, error: 'Commento tra 2 e 500 caratteri.' }, { status: 400 });
