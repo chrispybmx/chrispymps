@@ -8,6 +8,7 @@ import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
 import AuthModal from '@/components/AuthModal';
+import BottomNav from '@/components/BottomNav';
 // RadiusSheet sostituito da TopRadiusPanel inline
 
 /* ── Haversine ── */
@@ -453,13 +454,33 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           active={false}
           loading={isLocating}
         >
-          {isLocating ? '⌛' : '📍'}
+          {/* GPS / locate icon */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+            <circle cx="12" cy="12" r="9" strokeDasharray="2 3" strokeWidth="1.2"/>
+          </svg>
         </MapBtn>
         <MapBtn onClick={handleRadiusToggle} title="Ricerca per raggio" active={radiusMode}>
-          🎯
+          {/* Radius / target icon */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="12" cy="12" r="9"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>
+          </svg>
         </MapBtn>
         <MapBtn onClick={toggleDarkMap} title={darkMap ? 'Mappa chiara' : 'Mappa scura'} active={darkMap}>
-          {darkMap ? '🌞' : '🌑'}
+          {/* Sun / moon toggle */}
+          {darkMap ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="12" cy="12" r="5"/>
+              <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z"/>
+            </svg>
+          )}
         </MapBtn>
       </div>
 
@@ -713,6 +734,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
       {/* ── TAB FISSO — sempre visibile, apre il pannello ── */}
       <div
+        className="map-panel-tab"
         onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(DEFAULT_PANEL_H()); }}
         style={{
           position: 'fixed',
@@ -745,7 +767,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       </div>
 
       {/* ── OVERLAY LISTA — galleggia sulla mappa, altezza regolabile ── */}
-      <div style={{
+      <div className="map-panel-wrap" style={{
         position: 'fixed',
         bottom: 0, left: 0, right: 0,
         zIndex: 10,
@@ -839,6 +861,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         initialLat={addLat} initialLon={addLon}
       />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+
+      {/* ── BOTTOM NAV — solo mobile, sostituisce il pulsante +SPOT della topbar ── */}
+      <BottomNav onAddSpot={() => setAddOpen(true)} />
     </div>
   );
 }
