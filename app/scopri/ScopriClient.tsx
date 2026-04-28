@@ -1,60 +1,24 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, REGIONI_ITALIA, DIFFICOLTA } from '@/lib/constants';
 import BottomNav from '@/components/BottomNav';
-import NotificationBell from '@/components/NotificationBell';
-
-/* ── Costanti ── */
-const FAVS_KEY = 'cmaps_favs_v1';
-
-function getFavIds(): string[] {
-  try { return JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]; }
-  catch { return []; }
-}
-
-const TIPO_CHIPS: Array<{ key: SpotType | 'all'; label: string }> = [
-  { key: 'all',       label: 'Tutti' },
-  { key: 'street',    label: 'Street' },
-  { key: 'park',      label: 'Park' },
-  { key: 'bowl',      label: 'Bowl' },
-  { key: 'rail',      label: 'Rail' },
-  { key: 'ledge',     label: 'Ledge' },
-  { key: 'gap',       label: 'Gap' },
-  { key: 'plaza',     label: 'Plaza' },
-  { key: 'diy',       label: 'DIY' },
-  { key: 'pumptrack', label: 'Pump' },
-  { key: 'trail',     label: 'Trail' },
-];
 
 interface ScopriClientProps { spots: SpotMapPin[] }
 
 export default function ScopriClient({ spots }: ScopriClientProps) {
-  const [filterType,   setFilterType]   = useState<SpotType | 'all'>('all');
-  const [filterCond,   setFilterCond]   = useState<SpotCondition | 'all'>('all');
+  const [filterType,   setFilterType]   = useState<SpotType | ''>('');
+  const [filterCond,   setFilterCond]   = useState<SpotCondition | ''>('');
   const [filterDiff,   setFilterDiff]   = useState('');
   const [filterRegion, setFilterRegion] = useState('');
   const [query,        setQuery]        = useState('');
-  const [favsMode,     setFavsMode]     = useState(false);
-  const [favIds,       setFavIds]       = useState<string[]>([]);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
-
-  /* Carica sessione + preferiti al mount */
-  useEffect(() => {
-    setFavIds(getFavIds());
-    import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
-      supabaseBrowser().auth.getSession().then(({ data }) => {
-        setSessionToken(data.session?.access_token ?? null);
-      });
-    }).catch(() => {});
-  }, []);
 
   const filtered = useMemo(() => {
     return spots.filter(s => {
-      if (filterType !== 'all' && s.type !== filterType) return false;
-      if (filterCond !== 'all' && s.condition !== filterCond) return false;
+      if (filterType && s.type !== filterType) return false;
+      if (filterCond && s.condition !== filterCond) return false;
       if (filterDiff && s.difficulty !== filterDiff) return false;
       if (filterRegion) {
         const region = REGIONI_ITALIA.find(r => r.label === filterRegion);
@@ -63,7 +27,6 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
           if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
         }
       }
-      if (favsMode && !favIds.includes(s.id)) return false;
       if (query.trim()) {
         const q = query.toLowerCase();
         return (
@@ -74,16 +37,13 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
       }
       return true;
     });
-  }, [spots, filterType, filterCond, filterDiff, filterRegion, favsMode, favIds, query]);
+  }, [spots, filterType, filterCond, filterDiff, filterRegion, query]);
 
-  const handleTypeChip = useCallback((k: SpotType | 'all') => setFilterType(k), []);
-
-  const anyFilter = filterType !== 'all' || filterCond !== 'all' || filterDiff !== '' ||
-    filterRegion !== '' || query !== '' || favsMode;
+  const anyFilter = !!(filterType || filterCond || filterDiff || filterRegion || query);
 
   const resetAll = useCallback(() => {
-    setFilterType('all'); setFilterCond('all'); setFilterDiff('');
-    setFilterRegion(''); setQuery(''); setFavsMode(false);
+    setFilterType(''); setFilterCond(''); setFilterDiff('');
+    setFilterRegion(''); setQuery('');
   }, []);
 
   return (
@@ -97,7 +57,7 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
         flexShrink: 0,
       }}>
 
-        {/* Row 1: Titolo + azioni */}
+        {/* Row 1: Titolo + spot count */}
         <div style={{
           display: 'flex', alignItems: 'center',
           padding: '12px 14px 8px', gap: 10,
@@ -108,30 +68,9 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
           }}>
             SCOPRI
           </div>
-
-          {/* Spot count */}
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>
             {filtered.length} spot
           </div>
-
-          {/* Preferiti toggle */}
-          <button
-            onClick={() => setFavsMode(v => !v)}
-            title={favsMode ? 'Mostra tutti' : 'Solo preferiti'}
-            style={{
-              width: 34, height: 34,
-              background: favsMode ? 'rgba(255,60,60,0.15)' : 'transparent',
-              border: `1px solid ${favsMode ? 'rgba(255,80,80,0.5)' : 'var(--gray-700)'}`,
-              borderRadius: 8, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 16, transition: 'all 0.15s',
-            }}
-          >
-            {favsMode ? '❤️' : '🤍'}
-          </button>
-
-          {/* Campanella notifiche — solo se loggato */}
-          {sessionToken && <NotificationBell token={sessionToken} />}
         </div>
 
         {/* Search input */}
@@ -161,122 +100,61 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
           </div>
         </div>
 
-        {/* Chip tipo */}
+        {/* 3 dropdown filters: TIPO · CONDIZIONE · REGIONE */}
         <div style={{
-          display: 'flex', gap: 6, padding: '0 12px 6px',
+          display: 'flex', gap: 6, padding: '0 12px 10px',
           overflowX: 'auto', scrollbarWidth: 'none',
           WebkitOverflowScrolling: 'touch',
+          alignItems: 'center',
         } as React.CSSProperties}>
-          {TIPO_CHIPS.map(({ key, label }) => {
-            const isActive = filterType === key;
-            const info = key !== 'all' ? TIPI_SPOT[key as SpotType] : null;
-            return (
-              <button
-                key={key}
-                onClick={() => handleTypeChip(key)}
-                style={{
-                  flexShrink: 0, padding: '5px 11px', borderRadius: 20,
-                  border: `1px solid ${isActive ? 'var(--orange)' : 'var(--gray-700)'}`,
-                  background: isActive ? 'var(--orange)' : 'transparent',
-                  color: isActive ? '#000' : 'var(--gray-400)',
-                  fontFamily: 'var(--font-mono)', fontSize: 11,
-                  cursor: 'pointer', transition: 'all 0.12s',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                {info?.emoji && <span style={{ fontSize: 12 }}>{info.emoji}</span>}
-                {label.toUpperCase()}
-              </button>
-            );
-          })}
-        </div>
 
-        {/* Chip condizione + difficoltà */}
-        <div style={{
-          display: 'flex', gap: 5, padding: '0 12px 6px',
-          overflowX: 'auto', scrollbarWidth: 'none',
-        } as React.CSSProperties}>
-          {/* Condizione */}
-          {(['all', 'alive', 'bustato', 'demolito'] as const).map(k => {
-            const isActive = filterCond === k;
-            const cond = k !== 'all' ? CONDIZIONI[k] : null;
-            const color = cond?.bg ?? '#666';
-            return (
-              <button key={k} onClick={() => setFilterCond(k)} style={{
-                flexShrink: 0, padding: '4px 10px', borderRadius: 20,
-                border: `1px solid ${isActive ? color : 'var(--gray-700)'}`,
-                background: isActive ? `${color}22` : 'transparent',
-                color: isActive ? color : 'var(--gray-500)',
-                fontFamily: 'var(--font-mono)', fontSize: 10,
-                cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap',
-              }}>
-                {k === 'all' ? 'COND.' : cond?.label.toUpperCase()}
-              </button>
-            );
-          })}
+          {/* TIPO */}
+          <ScopriDropdown
+            value={filterType}
+            onChange={v => setFilterType(v as SpotType | '')}
+            active={!!filterType}
+          >
+            <option value="">🎯 TIPO</option>
+            {(Object.entries(TIPI_SPOT) as [SpotType, { label: string; emoji: string }][]).map(([key, info]) => (
+              <option key={key} value={key}>{info.emoji} {info.label.toUpperCase()}</option>
+            ))}
+          </ScopriDropdown>
 
-          {/* Separatore */}
-          <div style={{ width: 1, background: 'var(--gray-700)', margin: '4px 3px', flexShrink: 0 }} />
+          {/* CONDIZIONE */}
+          <ScopriDropdown
+            value={filterCond}
+            onChange={v => setFilterCond(v as SpotCondition | '')}
+            active={!!filterCond}
+          >
+            <option value="">⚙️ COND.</option>
+            {(Object.entries(CONDIZIONI) as [SpotCondition, { label: string; bg: string }][]).map(([key, info]) => (
+              <option key={key} value={key}>{info.label.toUpperCase()}</option>
+            ))}
+          </ScopriDropdown>
 
-          {/* Difficoltà */}
-          {DIFFICOLTA.map(d => {
-            const isActive = filterDiff === d.value;
-            return (
-              <button key={d.value} onClick={() => setFilterDiff(isActive ? '' : d.value)} style={{
-                flexShrink: 0, padding: '4px 10px', borderRadius: 20,
-                border: `1px solid ${isActive ? '#ffce4d' : 'var(--gray-700)'}`,
-                background: isActive ? 'rgba(255,206,77,0.12)' : 'transparent',
-                color: isActive ? '#ffce4d' : 'var(--gray-500)',
-                fontFamily: 'var(--font-mono)', fontSize: 10,
-                cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap',
-              }}>
-                ⚡ {d.label.toUpperCase()}
-              </button>
-            );
-          })}
-        </div>
+          {/* REGIONE */}
+          <ScopriDropdown
+            value={filterRegion}
+            onChange={v => setFilterRegion(v)}
+            active={!!filterRegion}
+          >
+            <option value="">🗺️ REG.</option>
+            {REGIONI_ITALIA.map(r => (
+              <option key={r.label} value={r.label}>{r.label}</option>
+            ))}
+          </ScopriDropdown>
 
-        {/* Regione dropdown + Reset */}
-        <div style={{ padding: '0 12px 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <select
-              value={filterRegion}
-              onChange={e => setFilterRegion(e.target.value)}
-              style={{
-                width: '100%',
-                fontFamily: 'var(--font-mono)', fontSize: 11,
-                padding: '7px 24px 7px 10px',
-                border: `1px solid ${filterRegion ? 'var(--orange)' : 'var(--gray-700)'}`,
-                borderRadius: 8,
-                background: filterRegion ? 'rgba(255,106,0,0.08)' : 'var(--gray-800)',
-                color: filterRegion ? 'var(--orange)' : 'var(--gray-400)',
-                cursor: 'pointer',
-                appearance: 'none', WebkitAppearance: 'none',
-                outline: 'none', letterSpacing: '0.04em', textTransform: 'uppercase',
-              } as React.CSSProperties}
-            >
-              <option value="">🗺️ TUTTE LE REGIONI</option>
-              {REGIONI_ITALIA.map(r => (
-                <option key={r.label} value={r.label}>{r.label}</option>
-              ))}
-            </select>
-            <span style={{
-              position: 'absolute', right: 8, top: '50%',
-              transform: 'translateY(-50%)',
-              fontSize: 8, color: filterRegion ? 'var(--orange)' : 'var(--gray-500)',
-              pointerEvents: 'none',
-            }}>▾</span>
-          </div>
-
+          {/* Reset — solo se un filtro è attivo */}
           {anyFilter && (
             <button
               onClick={resetAll}
               style={{
-                flexShrink: 0, padding: '7px 12px',
-                border: '1px solid var(--gray-700)', borderRadius: 8,
+                flexShrink: 0, padding: '6px 10px',
+                border: '1px solid var(--gray-700)', borderRadius: 6,
                 background: 'transparent',
-                fontFamily: 'var(--font-mono)', fontSize: 11,
+                fontFamily: 'var(--font-mono)', fontSize: 10,
                 color: 'var(--gray-500)', cursor: 'pointer', whiteSpace: 'nowrap',
+                letterSpacing: '0.04em',
               }}
             >
               ✕ RESET
@@ -386,6 +264,45 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
       </div>
 
       <BottomNav />
+    </div>
+  );
+}
+
+/* ── Dropdown helper ── */
+function ScopriDropdown({ value, onChange, active, children }: {
+  value: string;
+  onChange: (v: string) => void;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          fontFamily: 'var(--font-mono)', fontSize: 11,
+          padding: '6px 20px 6px 8px',
+          border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-700)'}`,
+          borderRadius: 6,
+          background: active ? 'rgba(255,106,0,0.12)' : 'var(--gray-800)',
+          color: active ? 'var(--orange)' : 'var(--gray-400)',
+          cursor: 'pointer',
+          appearance: 'none', WebkitAppearance: 'none',
+          outline: 'none',
+          textTransform: 'uppercase', letterSpacing: '0.04em',
+          minHeight: 32,
+          minWidth: 80,
+        } as React.CSSProperties}
+      >
+        {children}
+      </select>
+      <span style={{
+        position: 'absolute', right: 6, top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: 8, color: active ? 'var(--orange)' : 'var(--gray-600)',
+        pointerEvents: 'none',
+      }}>▾</span>
     </div>
   );
 }
