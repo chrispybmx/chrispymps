@@ -460,3 +460,10 @@ select.input-vhs {
 @media (min-width: 768px) {
   .topbar-add-btn { display: inline-flex !important; }
 }
+
+/* Nasconde la filter bar (REG/TIPO/LEVEL) e il profilo su mobile —
+   su mobile i filtri vivono in /scopri, il profilo è nella bottom nav */
+.map-filter-bar { display: none !important; }
+@media (min-width: 768px) {
+  .map-filter-bar { display: flex !important; }
+}
