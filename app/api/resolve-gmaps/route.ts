@@ -24,13 +24,32 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 1. Segui i redirect
-    const res = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChrispyMPS/1.0)' },
-    });
+    // 1. Segui i redirect (con timeout 8s per evitare SSRF lenti)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChrispyMPS/1.0)' },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     const finalUrl = res.url;
+
+    // SSRF guard: l'URL finale (dopo i redirect) deve essere ancora Google Maps
+    const ALLOWED_FINAL_HOSTS = [
+      'maps.google.com', 'www.google.com', 'maps.google.it',
+      'maps.app.goo.gl', 'goo.gl',
+    ];
+    let finalHost: string;
+    try { finalHost = new URL(finalUrl).hostname; } catch { finalHost = ''; }
+    if (!ALLOWED_FINAL_HOSTS.includes(finalHost)) {
+      return NextResponse.json({ ok: false, error: 'URL non valido' }, { status: 400 });
+    }
 
     // 2. Prova a estrarre @lat,lon dall'URL finale
     const coords = extractCoordsFromUrl(finalUrl);
@@ -110,10 +129,17 @@ async function geocodeWithNominatim(query: string): Promise<{ lat: number; lon: 
     if (attempt.length < 3) continue;
     try {
       const encoded = encodeURIComponent(attempt);
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&addressdetails=0`,
-        { headers: { 'User-Agent': 'ChrispyMPS/1.0 (contact: info@chrispybmx.com)' } }
-      );
+      const nominatimCtrl = new AbortController();
+      const nominatimTimeout = setTimeout(() => nominatimCtrl.abort(), 6_000);
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&addressdetails=0`,
+          { headers: { 'User-Agent': 'ChrispyMPS/1.0 (contact: info@chrispybmx.com)' }, signal: nominatimCtrl.signal }
+        );
+      } finally {
+        clearTimeout(nominatimTimeout);
+      }
       const data = await res.json();
       if (data && data.length > 0) {
         return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
