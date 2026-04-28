@@ -14,11 +14,23 @@ interface RateLimitEntry { count: number; resetAt: number }
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 function getClientIp(req: NextRequest): string {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown'
-  );
+  // Su Vercel, x-real-ip è impostato dall'infrastruttura e non può essere
+  // falsificato dall'utente. x-forwarded-for invece può essere spoofato
+  // (l'utente può aggiungere IP arbitrari come primo elemento della lista).
+  // Priorità: x-real-ip → ultimo IP in x-forwarded-for (aggiunto dal proxy) → fallback
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    // Prendiamo l'ULTIMO IP della catena — è quello aggiunto dal proxy più vicino
+    // (Vercel CDN) e non può essere falsificato dall'utente finale
+    const parts = forwarded.split(',');
+    const last = parts[parts.length - 1]?.trim();
+    if (last) return last;
+  }
+
+  return 'unknown';
 }
 
 function checkRateLimit(
@@ -117,6 +129,17 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // ── 5. Rate limit su resolve-gmaps: 20 richieste / 10 minuti per IP ──
+  if (pathname === '/api/resolve-gmaps' && req.method === 'GET') {
+    const { allowed } = checkRateLimit(`gmaps:${ip}`, 20, 10 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'Troppe richieste. Riprova tra qualche minuto.' },
+        { status: 429 }
+      );
+    }
+  }
+
   return NextResponse.next();
 }
 
@@ -126,5 +149,6 @@ export const config = {
     '/api/flag',
     '/api/submit-spot',
     '/api/comments/:path*',
+    '/api/resolve-gmaps',
   ],
 };
