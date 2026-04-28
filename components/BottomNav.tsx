@@ -14,6 +14,7 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
   const pathname = usePathname();
   const router   = useRouter();
   const [username, setUsername] = useState<string | null>(null);
+  const [loaded,   setLoaded]   = useState(false);
 
   useEffect(() => {
     import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
@@ -23,8 +24,9 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
           data.session?.user?.email?.split('@')[0] ??
           null;
         setUsername(un);
+        setLoaded(true);
       });
-    }).catch(() => {});
+    }).catch(() => { setLoaded(true); });
   }, []);
 
   const handleAdd = () => {
@@ -149,18 +151,23 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
           SCOPRI
         </Link>
 
-        {/* PROFILO */}
-        <Link
-          href={username ? `/u/${username}` : '/map'}
+        {/* PROFILO — button per gestire il caricamento asincrono della sessione */}
+        <button
           className={`mbn-link${isProfile ? ' active' : ''}`}
           aria-label="Profilo"
+          onClick={() => {
+            if (!loaded) return; // sessione ancora in caricamento, ignora il tap
+            if (username) router.push(`/u/${username}`);
+            else router.push('/map'); // non loggato
+          }}
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' } as React.CSSProperties}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round">
             <circle cx="12" cy="8" r="4"/>
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
           </svg>
-          PROFILO
-        </Link>
+          {!loaded ? '···' : 'PROFILO'}
+        </button>
 
       </nav>
     </>
