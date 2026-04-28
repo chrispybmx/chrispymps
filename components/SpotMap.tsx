@@ -355,32 +355,58 @@ export default function SpotMap({
         const marker = L!.marker([pin.lat, pin.lon], { icon });
         const tipo   = TIPI_SPOT[pin.type];
 
-        /* Popup hover: foto thumbnail + nome + info
-           La foto è mostrata solo su desktop (mouseover non funziona su touch) */
+        /* Popup: foto + nome + info + link VEDI SPOT
+           Su desktop appare al hover; su mobile appare al tap (al posto di aprire il pannello) */
         const imgHtml = pin.cover_url
           ? `<img src="${pin.cover_url}"
-               style="width:100%;height:90px;object-fit:cover;display:block;border-radius:4px 4px 0 0;margin-bottom:6px"
+               style="width:100%;height:100px;object-fit:cover;display:block;border-radius:6px 6px 0 0"
                loading="lazy" />`
           : '';
 
         const popupContent = `
-          <div style="font-family:'Barlow Condensed',sans-serif;min-width:160px;padding:0;overflow:hidden;border-radius:6px">
+          <div style="font-family:'Barlow Condensed',sans-serif;min-width:180px;padding:0;overflow:hidden;border-radius:6px">
             ${imgHtml}
-            <div style="padding:4px 8px 6px">
-              <div style="font-family:'VT323',monospace;font-size:17px;color:#ff6a00;line-height:1.2">${pin.name}</div>
-              ${pin.city ? `<div style="font-size:11px;color:#888;margin-top:2px">📍 ${pin.city}</div>` : ''}
-              <div style="font-size:11px;color:#999;margin-top:2px">${tipo.emoji} ${tipo.label}</div>
+            <div style="padding:6px 10px 8px;background:#111">
+              <div style="font-family:'VT323',monospace;font-size:18px;color:#ff6a00;line-height:1.2;margin-bottom:3px">${pin.name}</div>
+              ${pin.city ? `<div style="font-size:11px;color:#777;margin-bottom:2px">📍 ${pin.city}</div>` : ''}
+              <div style="font-size:11px;color:#888;margin-bottom:6px">${tipo.emoji} ${tipo.label}</div>
+              <a href="/map/spot/${pin.slug}"
+                 style="display:inline-block;font-family:'VT323',monospace;font-size:14px;
+                        color:#000;background:#ff6a00;padding:3px 10px;border-radius:3px;
+                        text-decoration:none;letter-spacing:0.04em">
+                VEDI SPOT →
+              </a>
             </div>
           </div>
         `;
 
         marker.bindPopup(popupContent, {
-          maxWidth: pin.cover_url ? 200 : 180,
+          maxWidth: pin.cover_url ? 210 : 190,
           closeButton: false,
           className: 'spot-hover-popup',
+          autoPan: false,
         });
-        marker.on('click',     () => onSpotClickRef.current(pin));
-        marker.on('mouseover', () => marker.openPopup());
+
+        marker.on('click', (e) => {
+          /* Su touch/mobile: apri/chiudi il popup (non aprire il pannello) */
+          const pe = (e as unknown as { originalEvent: PointerEvent }).originalEvent;
+          const isTouch = pe?.pointerType === 'touch' || pe?.pointerType === '';
+          if (isTouch) {
+            if (marker.isPopupOpen()) {
+              marker.closePopup();
+            } else {
+              marker.openPopup();
+            }
+          } else {
+            /* Desktop: il popup era già aperto dal mouseover → chiudilo e apri il pannello */
+            marker.closePopup();
+            onSpotClickRef.current(pin);
+          }
+        });
+        marker.on('mouseover', () => {
+          /* Mouseover funziona solo su desktop — su mobile non si attiva */
+          marker.openPopup();
+        });
         marker.on('mouseout',  () => marker.closePopup());
 
         markersRef.current!.addLayer(marker);
