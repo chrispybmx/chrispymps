@@ -461,9 +461,23 @@ select.input-vhs {
   .topbar-add-btn { display: inline-flex !important; }
 }
 
-/* Nasconde la filter bar (REG/TIPO/LEVEL) e il profilo su mobile —
-   su mobile i filtri vivono in /scopri, il profilo è nella bottom nav */
-.map-filter-bar { display: none !important; }
+/* Filter bar: sempre visibile (filtri utili anche su mobile) */
+.map-filter-bar { display: flex !important; }
+
+/* Sezione profilo nella filter bar: nascosta su mobile (c'è nella bottom nav) */
+.map-profile-section { display: none !important; }
 @media (min-width: 768px) {
-  .map-filter-bar { display: flex !important; }
+  .map-profile-section { display: flex !important; }
+}
+
+/* Azioni topbar mobile (🔔❤️): visibili solo su mobile */
+.topbar-mobile-actions { display: flex !important; }
+@media (min-width: 768px) {
+  .topbar-mobile-actions { display: none !important; }
+}
+
+/* Campanella nella filter bar: solo su desktop */
+.filterbar-bell { display: flex !important; }
+@media (max-width: 767px) {
+  .filterbar-bell { display: none !important; }
 }
