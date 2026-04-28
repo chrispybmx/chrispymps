@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
+import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, REGIONI_ITALIA, DIFFICOLTA } from '@/lib/constants';
 import BottomNav from '@/components/BottomNav';
 
@@ -10,7 +10,6 @@ interface ScopriClientProps { spots: SpotMapPin[] }
 
 export default function ScopriClient({ spots }: ScopriClientProps) {
   const [filterType,   setFilterType]   = useState<SpotType | ''>('');
-  const [filterCond,   setFilterCond]   = useState<SpotCondition | ''>('');
   const [filterDiff,   setFilterDiff]   = useState('');
   const [filterRegion, setFilterRegion] = useState('');
   const [query,        setQuery]        = useState('');
@@ -18,7 +17,6 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
   const filtered = useMemo(() => {
     return spots.filter(s => {
       if (filterType && s.type !== filterType) return false;
-      if (filterCond && s.condition !== filterCond) return false;
       if (filterDiff && s.difficulty !== filterDiff) return false;
       if (filterRegion) {
         const region = REGIONI_ITALIA.find(r => r.label === filterRegion);
@@ -37,12 +35,12 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
       }
       return true;
     });
-  }, [spots, filterType, filterCond, filterDiff, filterRegion, query]);
+  }, [spots, filterType, filterDiff, filterRegion, query]);
 
-  const anyFilter = !!(filterType || filterCond || filterDiff || filterRegion || query);
+  const anyFilter = !!(filterType || filterDiff || filterRegion || query);
 
   const resetAll = useCallback(() => {
-    setFilterType(''); setFilterCond(''); setFilterDiff('');
+    setFilterType(''); setFilterDiff('');
     setFilterRegion(''); setQuery('');
   }, []);
 
@@ -85,7 +83,7 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
             </svg>
             <input
               type="text"
-              placeholder="Cerca spot, città, rider..."
+              placeholder="Nome spot, città, @rider..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               style={{
@@ -100,7 +98,7 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
           </div>
         </div>
 
-        {/* 3 dropdown filters: TIPO · CONDIZIONE · REGIONE */}
+        {/* 3 dropdown filters: TIPO · DIFFICOLTÀ · REGIONE */}
         <div style={{
           display: 'flex', gap: 6, padding: '0 12px 10px',
           overflowX: 'auto', scrollbarWidth: 'none',
@@ -120,15 +118,15 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
             ))}
           </ScopriDropdown>
 
-          {/* CONDIZIONE */}
+          {/* DIFFICOLTÀ */}
           <ScopriDropdown
-            value={filterCond}
-            onChange={v => setFilterCond(v as SpotCondition | '')}
-            active={!!filterCond}
+            value={filterDiff}
+            onChange={v => setFilterDiff(v)}
+            active={!!filterDiff}
           >
-            <option value="">⚙️ COND.</option>
-            {(Object.entries(CONDIZIONI) as [SpotCondition, { label: string; bg: string }][]).map(([key, info]) => (
-              <option key={key} value={key}>{info.label.toUpperCase()}</option>
+            <option value="">⚡ LVL</option>
+            {DIFFICOLTA.map(d => (
+              <option key={d.value} value={d.value}>{d.label.toUpperCase()}</option>
             ))}
           </ScopriDropdown>
 
@@ -173,10 +171,8 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
 
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14 }}>
-            {favsMode ? 'Nessuno spot nei preferiti.' : 'Nessuno spot trovato.'}<br/>
-            <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-              {favsMode ? 'Salva spot con ❤️ dalla mappa.' : 'Prova a cambiare filtro.'}
-            </span>
+            Nessuno spot trovato.<br/>
+            <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>Prova a cambiare filtro.</span>
           </div>
         ) : (
           filtered.map(spot => {
