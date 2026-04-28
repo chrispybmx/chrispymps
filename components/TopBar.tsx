@@ -23,8 +23,6 @@ interface TopBarProps {
   onCitySelect:      (city: string, lat: number, lon: number) => void;
   onSpotSelect:      (pin: SpotMapPin) => void;
   onOpenAuth?:       () => void;
-  darkMap?:          boolean;
-  onToggleDarkMap?:  () => void;
 }
 
 interface NominatimPlace {
@@ -39,7 +37,6 @@ export default function TopBar({
   onSearch, onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onAddSpot,
   activeType, activeRegion, activeCondition, activeDifficulty,
   spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
-  darkMap, onToggleDarkMap,
 }: TopBarProps) {
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [searchOpen,      setSearchOpen]      = useState(false);
@@ -219,15 +216,15 @@ export default function TopBar({
         </button>
       </header>
 
-      {/* Filter bar — dropdown + preferiti */}
-      <div style={{
+      {/* Filter bar — dropdown + preferiti — nascosta su mobile (vedi globals.css .map-filter-bar) */}
+      <div className="map-filter-bar" style={{
         position: 'fixed',
         top: 'var(--topbar-height)',
         left: 0, right: 0,
         background: 'rgba(10,10,10,0.92)',
         borderBottom: '1px solid var(--gray-700)',
         zIndex: 38,
-        display: 'flex', alignItems: 'center',
+        alignItems: 'center',
         gap: 0,
       }}>
         {/* Scrollabile: tutti i dropdown */}
