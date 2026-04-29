@@ -140,6 +140,38 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // ── 6. Rate limit su upload immagini: 10 / 10 minuti per IP ──
+  if (pathname === '/api/upload-image' && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`upload:${ip}`, 10, 10 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppi upload. Riprova tra qualche minuto.' }, { status: 429 });
+    }
+  }
+
+  // ── 7. Rate limit su photo upload spot: 5 / 10 minuti per IP ──
+  if (pathname === '/api/spot-photos' && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`spotphoto:${ip}`, 5, 10 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppi upload foto. Riprova tra qualche minuto.' }, { status: 429 });
+    }
+  }
+
+  // ── 8. Rate limit su submit event/news: 3 / 10 minuti per IP ──
+  if ((pathname === '/api/submit-event' || pathname === '/api/submit-news') && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`community:${ip}`, 3, 10 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppi invii. Riprova tra qualche minuto.' }, { status: 429 });
+    }
+  }
+
+  // ── 9. Rate limit su status confirm: 10 / 10 minuti per IP ──
+  if (pathname === '/api/status-confirm' && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`status:${ip}`, 10, 10 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppe conferme. Riprova tra qualche minuto.' }, { status: 429 });
+    }
+  }
+
   return NextResponse.next();
 }
 
@@ -150,5 +182,10 @@ export const config = {
     '/api/submit-spot',
     '/api/comments/:path*',
     '/api/resolve-gmaps',
+    '/api/upload-image',
+    '/api/spot-photos',
+    '/api/submit-event',
+    '/api/submit-news',
+    '/api/status-confirm',
   ],
 };

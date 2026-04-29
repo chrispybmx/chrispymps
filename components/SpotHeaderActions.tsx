@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-const FAVS_KEY  = 'cmaps_favs_v1';
-const ratingKey = (id: string) => `cmaps_rating_${id}`;
+const FAVS_KEY = 'cmaps_favs_v1';
 
 function isFavLocal(id: string): boolean {
   try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); } catch { return false; }
@@ -17,14 +16,10 @@ function toggleFavLocal(id: string): boolean {
     return i < 0;
   } catch { return false; }
 }
-function getMyRating(id: string): number { try { return Math.min(5, Math.max(0, parseInt(localStorage.getItem(ratingKey(id)) ?? '0', 10) || 0)); } catch { return 0; } }
-function saveRating(id: string, r: number): void { try { localStorage.setItem(ratingKey(id), String(r)); } catch {} }
 
 interface Props { spotId: string }
 
 export default function SpotHeaderActions({ spotId }: Props) {
-  const [myRating,     setMyRating]   = useState(0);
-  const [hoverStar,    setHoverStar]  = useState(0);
   const [isFaved,      setIsFaved]    = useState(false);
   const [riderCount,   setRiderCount] = useState(0);
   const [hasRidden,    setHasRidden]  = useState(false);
@@ -33,8 +28,6 @@ export default function SpotHeaderActions({ spotId }: Props) {
   const isAuthRef = useRef(false);  // true = logged in, use Supabase
 
   useEffect(() => {
-    setMyRating(getMyRating(spotId));
-
     import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
       supabaseBrowser().auth.getSession().then(async ({ data }) => {
         const t = data.session?.access_token ?? null;
@@ -68,12 +61,6 @@ export default function SpotHeaderActions({ spotId }: Props) {
       setIsFaved(isFavLocal(spotId));
     });
   }, [spotId]);
-
-  const handleStar = (star: number) => {
-    const next = star === myRating ? 0 : star;
-    saveRating(spotId, next);
-    setMyRating(next);
-  };
 
   const handleFav = async () => {
     const t = tokenRef.current;
@@ -120,7 +107,6 @@ export default function SpotHeaderActions({ spotId }: Props) {
     setLoading(false);
   };
 
-  const displayStars = hoverStar || myRating;
   const token = tokenRef.current;
 
   return (
@@ -134,38 +120,6 @@ export default function SpotHeaderActions({ spotId }: Props) {
       borderRadius: 12,
       overflow: 'hidden',
     }}>
-
-      {/* ── STELLE ── */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '12px 8px',
-        gap: 4,
-        borderRight: '1px solid var(--gray-700)',
-      }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          {myRating > 0 ? `${myRating} / 5` : 'vota'}
-        </div>
-        <div style={{ display: 'flex', gap: 1 }}>
-          {[1,2,3,4,5].map(star => (
-            <button
-              key={star}
-              onMouseEnter={() => setHoverStar(star)}
-              onMouseLeave={() => setHoverStar(0)}
-              onClick={() => handleStar(star)}
-              style={{
-                background: 'none', border: 'none', padding: '1px',
-                cursor: 'pointer', fontSize: 18, lineHeight: 1,
-                color: star <= displayStars ? '#ffce4d' : 'var(--gray-600)',
-                transition: 'color 0.1s, transform 0.1s',
-                transform: star === hoverStar ? 'scale(1.25)' : 'scale(1)',
-              }}
-            >★</button>
-          ))}
-        </div>
-      </div>
 
       {/* ── HO GIRATO QUI ── */}
       <button
