@@ -10,7 +10,7 @@ import SupportStrip from '@/components/SupportStrip';
 import ShareSpotBtn from '@/components/ShareSpotBtn';
 import SpotContributeCTA from '@/components/SpotContributeCTA';
 import SpotLikeBtn from '@/components/SpotLikeBtn';
-import SpotPageActions from '@/components/SpotPageActions';
+import SpotPageActions, { SpotStarRating } from '@/components/SpotPageActions';
 
 export const revalidate = 300;
 
@@ -165,6 +165,9 @@ export default async function SpotPage({ params }: Props) {
             {spot.guardians && <div>⚠️ {spot.guardians}</div>}
           </div>
         )}
+
+        {/* ── STELLE ── */}
+        <SpotStarRating spotId={spot.id} />
 
         {/* ── PORTAMI QUI — grande, prominente ── */}
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
