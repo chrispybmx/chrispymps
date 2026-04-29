@@ -94,8 +94,6 @@ export async function POST(req: NextRequest) {
   }
 
   // 6. Validate + upload each photo
-  const uploadedUrls: string[] = [];
-
   // Get current max position for this spot
   const { data: existingPhotos } = await supabase
     .from('spot_photos')
@@ -123,54 +121,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Errore creazione contributo.' }, { status: 500 });
   }
 
-  for (let i = 0; i < photos.length; i++) {
-    const file = photos[i];
+  // Upload all photos in PARALLEL
+  const uploadResults = await Promise.all(
+    photos.map(async (file, i) => {
+      if (file.size > MAX_PHOTO_SIZE) return null;
+      const buf = await file.arrayBuffer();
+      const mime = detectMime(buf);
+      if (!mime || !MIME_EXT[mime]) return null;
 
-    // Size check
-    if (file.size > MAX_PHOTO_SIZE) {
-      return NextResponse.json({ ok: false, error: `Foto troppo grande (max 5MB). Comprimi prima di caricare.` }, { status: 400 });
-    }
+      const ext = MIME_EXT[mime];
+      const filename = `${spotId}/user_${user.id}_${Date.now()}_${i}.${ext}`;
 
-    // Magic byte check
-    const buf = await file.arrayBuffer();
-    const mime = detectMime(buf);
-    if (!mime || !MIME_EXT[mime]) {
-      return NextResponse.json({ ok: false, error: 'Formato non supportato. Usa JPEG, PNG o WebP.' }, { status: 400 });
-    }
+      const { error: uploadErr } = await supabase.storage
+        .from('spot-photos')
+        .upload(filename, buf, { contentType: mime, upsert: false });
 
-    const ext = MIME_EXT[mime];
-    const filename = `${spotId}/user_${user.id}_${Date.now()}_${i}.${ext}`;
+      if (uploadErr) { console.error('[spot-photos] upload error:', uploadErr); return null; }
 
-    // Upload to storage
-    const { error: uploadErr } = await supabase.storage
-      .from('spot-photos')
-      .upload(filename, buf, { contentType: mime, upsert: false });
+      const url = supabase.storage.from('spot-photos').getPublicUrl(filename).data.publicUrl;
 
-    if (uploadErr) {
-      console.error('[spot-photos] upload error:', uploadErr);
-      continue; // skip this photo, try others
-    }
-
-    const { data: publicUrl } = supabase.storage
-      .from('spot-photos')
-      .getPublicUrl(filename);
-
-    // Insert photo record as PENDING
-    const { error: insertErr } = await supabase
-      .from('spot_photos')
-      .insert({
-        spot_id: spotId,
-        url: publicUrl.publicUrl,
-        position: nextPos++,
-        uploaded_by: user.id,
-        moderation_status: 'pending',
+      const { error: insertErr } = await supabase.from('spot_photos').insert({
+        spot_id: spotId, url, position: nextPos + i,
+        uploaded_by: user.id, moderation_status: 'pending',
         contribution_id: contribution.id,
       });
 
-    if (!insertErr) {
-      uploadedUrls.push(publicUrl.publicUrl);
-    }
-  }
+      return insertErr ? null : url;
+    })
+  );
+
+  const uploadedUrls = uploadResults.filter((u): u is string => u !== null);
 
   if (uploadedUrls.length === 0) {
     return NextResponse.json({ ok: false, error: 'Errore durante il caricamento. Riprova.' }, { status: 500 });

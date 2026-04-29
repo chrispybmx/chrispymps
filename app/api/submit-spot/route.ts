@@ -92,53 +92,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Errore interno. Riprova più tardi.' }, { status: 500 });
   }
 
-  // 4. Upload foto (max 5, con validazione)
-  const photoUrls: string[] = [];
+  // 4. Upload foto — PARALLELO per velocità (max 5)
+  const uploadPromises: Promise<string | null>[] = [];
   for (let i = 0; i < 5; i++) {
     const file = formData.get(`photo_${i}`);
     if (!file || !(file instanceof Blob)) continue;
-
-    // Valida dimensione
     if (file.size > MAX_PHOTO_SIZE) continue;
 
-    // Valida MIME dichiarato dal client
     const mimeType = file.type.toLowerCase();
     const ext = ALLOWED_MIME[mimeType];
     if (!ext) continue;
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // Verifica magic bytes (il client potrebbe dichiarare MIME falso)
-    if (!isValidImageMagicBytes(buffer, mimeType)) {
-      console.warn(`[submit-spot] magic bytes non validi per ${mimeType}`);
-      continue;
-    }
-
-    const path = `${spot.id}/${i}.${ext}`;
-
-    const { error: uploadErr } = await supabase.storage
-      .from('spot-photos')
-      .upload(path, buffer, { contentType: mimeType, upsert: true });
-
-    if (uploadErr) {
-      console.error('[submit-spot] foto upload error:', uploadErr.message);
-      continue;
-    }
-
-    const { data: urlData } = supabase.storage.from('spot-photos').getPublicUrl(path);
-    photoUrls.push(urlData.publicUrl);
+    uploadPromises.push(
+      (async () => {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        if (!isValidImageMagicBytes(buffer, mimeType)) return null;
+        const path = `${spot.id}/${i}.${ext}`;
+        const { error } = await supabase.storage.from('spot-photos').upload(path, buffer, { contentType: mimeType, upsert: true });
+        if (error) { console.error('[submit-spot] upload error:', error.message); return null; }
+        return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
+      })()
+    );
   }
 
+  const results = await Promise.all(uploadPromises);
+  const photoUrls = results.filter((u): u is string => u !== null);
+
   if (photoUrls.length > 0) {
-    const { error: photosErr } = await supabase.from('spot_photos').insert(
-      photoUrls.map((url, position) => ({
-        spot_id:     spot.id,
-        url,
-        position,
-        credit_name: profile.username,
-      }))
+    await supabase.from('spot_photos').insert(
+      photoUrls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
     );
-    if (photosErr) console.error('[submit-spot] spot_photos insert error:', photosErr.message);
   }
 
   // 5. Aggiungi a MailerLite (fire-and-forget — non blocca mai la risposta)
