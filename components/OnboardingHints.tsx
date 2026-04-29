@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useUser } from '@/hooks/useUser';
 
 const STORAGE_KEY = 'cmaps_onboarding_v1';
 
@@ -23,18 +24,25 @@ const HINTS = [
 ];
 
 export default function OnboardingHints() {
+  const user = useUser();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
 
   useEffect(() => {
+    // Don't show if logged in or already seen
+    if (user === undefined) return; // still loading auth
+    if (user) {
+      // Logged in → mark as seen, never show
+      try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+      return;
+    }
     try {
       if (!localStorage.getItem(STORAGE_KEY)) {
-        // Small delay so the map loads first
         const t = setTimeout(() => setVisible(true), 1500);
         return () => clearTimeout(t);
       }
     } catch {}
-  }, []);
+  }, [user]);
 
   const dismiss = () => {
     setVisible(false);
