@@ -124,6 +124,11 @@ body {
   100% { transform: translateY(100vh); }
 }
 
+/* Pausa animazione scanline quando tab nascosto */
+.vhs-overlay.paused::after {
+  animation-play-state: paused;
+}
+
 /* ===== NOISE FILTER ===== */
 .vhs-noise {
   position: relative;
@@ -461,8 +466,11 @@ select.input-vhs {
   .topbar-add-btn { display: inline-flex !important; }
 }
 
-/* Filter bar: sempre visibile (filtri utili anche su mobile) */
-.map-filter-bar { display: flex !important; }
+/* Filter bar: hidden on mobile (FILTRI button integrated in TopBar), visible on desktop */
+.map-filter-bar { display: none !important; }
+@media (min-width: 768px) {
+  .map-filter-bar { display: flex !important; }
+}
 
 /* Sezione profilo nella filter bar: nascosta su mobile (c'è nella bottom nav) */
 .map-profile-section { display: none !important; }
@@ -480,4 +488,32 @@ select.input-vhs {
 .filterbar-bell { display: flex !important; }
 @media (max-width: 767px) {
   .filterbar-bell { display: none !important; }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes dragBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ===== FILTER BUTTON IN TOPBAR (mobile only) ===== */
+.topbar-filter-btn { display: inline-flex !important; }
+@media (min-width: 768px) {
+  .topbar-filter-btn { display: none !important; }
 }

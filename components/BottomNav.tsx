@@ -1,33 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useUser } from '@/hooks/useUser';
 
 interface BottomNavProps {
   /** Callback per aprire il modal aggiungi spot — opzionale.
    *  Se non fornito, il + naviga su /map?add=1 */
   onAddSpot?: () => void;
+  /** Callback per aprire il modal auth (quando utente non loggato tappa profilo) */
+  onOpenAuth?: () => void;
 }
 
-export default function BottomNav({ onAddSpot }: BottomNavProps) {
+export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
   const pathname = usePathname();
   const router   = useRouter();
-  const [username, setUsername] = useState<string | null>(null);
-  const [loaded,   setLoaded]   = useState(false);
-
-  useEffect(() => {
-    import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
-      supabaseBrowser().auth.getSession().then(({ data }) => {
-        const un =
-          data.session?.user?.user_metadata?.username ??
-          data.session?.user?.email?.split('@')[0] ??
-          null;
-        setUsername(un);
-        setLoaded(true);
-      });
-    }).catch(() => { setLoaded(true); });
-  }, []);
+  const user     = useUser(); // undefined=loading, null=guest, UserSession=logged
 
   const handleAdd = () => {
     if (onAddSpot) onAddSpot();
@@ -111,13 +99,13 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
 
       <nav className="mobile-bnav" aria-label="Navigazione principale">
 
-        {/* HOME */}
-        <Link href="/" className={`mbn-link${!isMap && !isClassifica && !isScopri && !isProfile ? ' active' : ''}`} aria-label="Home">
+        {/* MAPPA */}
+        <Link href="/map" className={`mbn-link${isMap ? ' active' : ''}`} aria-label="Mappa">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H5a1 1 0 01-1-1V10.5z"/>
-            <path d="M9 22V13h6v9"/>
+            <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/>
+            <path d="M8 2v16M16 6v16"/>
           </svg>
-          HOME
+          MAPPA
         </Link>
 
         {/* CLASSIFICA */}
@@ -156,9 +144,10 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
           className={`mbn-link${isProfile ? ' active' : ''}`}
           aria-label="Profilo"
           onClick={() => {
-            if (!loaded) return; // sessione ancora in caricamento, ignora il tap
-            if (username) router.push(`/u/${username}`);
-            else router.push('/map'); // non loggato
+            if (user === undefined) return; // sessione ancora in caricamento, ignora il tap
+            if (user) router.push(`/u/${user.username}`);
+            else if (onOpenAuth) onOpenAuth(); // non loggato → apri auth modal
+            else router.push('/map');
           }}
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' } as React.CSSProperties}
         >
@@ -166,7 +155,7 @@ export default function BottomNav({ onAddSpot }: BottomNavProps) {
             <circle cx="12" cy="8" r="4"/>
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
           </svg>
-          {!loaded ? '···' : 'PROFILO'}
+          {user === undefined ? '···' : 'PROFILO'}
         </button>
 
       </nav>

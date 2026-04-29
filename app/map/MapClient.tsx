@@ -4,12 +4,17 @@ import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
-import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
+import { geocodeForward } from '@/lib/geocoding';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
 import AuthModal from '@/components/AuthModal';
 import BottomNav from '@/components/BottomNav';
-// RadiusSheet sostituito da TopRadiusPanel inline
+import Lightbox from '@/components/Lightbox';
+import { useToast } from '@/components/Toast';
+import { useFavorites } from '@/hooks/useFavorites';
+import { useUser } from '@/hooks/useUser';
+import OnboardingHints from '@/components/OnboardingHints';
 
 /* ── Haversine ── */
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -26,11 +31,34 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
   loading: () => (
     <div style={{
       width: '100%', height: '100%',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--gray-800)', fontFamily: 'var(--font-mono)',
-      color: 'var(--orange)', fontSize: 16,
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'var(--gray-800)',
+      position: 'relative', overflow: 'hidden',
     }}>
-      CARICAMENTO MAPPA...
+      {/* Shimmer skeleton */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(110deg, var(--gray-800) 30%, rgba(255,106,0,0.04) 50%, var(--gray-800) 70%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.8s ease-in-out infinite',
+      }} />
+      <div style={{
+        position: 'relative', zIndex: 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+      }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" strokeWidth="1.5" strokeLinecap="round" style={{ opacity: 0.6, animation: 'pulse 1.5s ease-in-out infinite' }}>
+          <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/>
+          <path d="M8 2v16M16 6v16"/>
+        </svg>
+        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14, opacity: 0.7 }}>
+          CARICAMENTO MAPPA...
+        </span>
+      </div>
+      <style>{`
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+      `}</style>
     </div>
   ),
 });
@@ -40,7 +68,7 @@ interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 const TOP_OFFSET      = 100;
 const PANEL_MIN       = 0;
 const PANEL_SNAP      = 140;
-const EXPANDED_CARD_H = 300;  // header(38)+foto(140)+thumbs(38)+info(84) ≈ 300px
+const EXPANDED_CARD_H = 380;  // handle(46)+foto(180)+info(54)+cta(60)+padding ≈ 380px
 function DEFAULT_PANEL_H() {
   return typeof window !== 'undefined'
     ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
@@ -52,6 +80,9 @@ function DEFAULT_PANEL_H() {
 ════════════════════════════════════════════════════════ */
 export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [spots]              = useState<SpotMapPin[]>(initialSpots);
+  const user = useUser();
+  const { toast } = useToast();
+  const { isFav, toggleFav: toggleFavHook } = useFavorites();
   const [filterType,      setFilterType]      = useState<SpotType | null>(null);
   const [filterRegion,    setFilterRegion]    = useState<typeof REGIONI_ITALIA[0] | null>(null);
   const [filterCondition, setFilterCondition] = useState<SpotCondition | null>(null);
@@ -64,10 +95,20 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [authOpen,           setAuthOpen]           = useState(false);
   const [fitAllTrigger,      setFitAllTrigger]      = useState(0);
 
+  /* ── Auth-gated add spot ── */
+  const openAddSpot = useCallback(() => {
+    if (user === undefined) return; // still loading
+    if (!user) { setAuthOpen(true); return; } // not logged → auth first
+    setAddOpen(true);
+  }, [user]);
+
   /* ── Auto-open add modal se URL contiene ?add=1 ── */
   useEffect(() => {
-    if (autoAdd) setAddOpen(true);
-  }, [autoAdd]);
+    if (autoAdd && user !== undefined) {
+      if (user) setAddOpen(true);
+      else setAuthOpen(true);
+    }
+  }, [autoAdd, user]);
 
   /* ── Pannello ridimensionabile ── */
   const [panelHeight,   setPanelHeight]   = useState<number>(320);
@@ -105,9 +146,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     const wasTap  = !didDragRef.current;
     dragState.current  = null;
     didDragRef.current = false;
-    if (wasTap)                             snapTo(PANEL_MIN);
-    else if (h < PANEL_SNAP)               snapTo(PANEL_MIN);
+    if (wasTap) {
+      // a max height: tap → torna a default (non chiudere)
+      if (panelHeight > window.innerHeight * 0.75) snapTo(DEFAULT_PANEL_H());
+      else snapTo(PANEL_MIN);
+    } else if (h < PANEL_SNAP)               snapTo(PANEL_MIN);
     else if (h > window.innerHeight * 0.75) snapTo(Math.round(window.innerHeight * 0.88));
+    else                                    snapTo(DEFAULT_PANEL_H());
   }, [snapTo]);
 
   /* ── Radius search ── dichiarati PRIMA di filtered che li usa ── */
@@ -128,24 +173,32 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     const t = setTimeout(async () => {
       setCityLoading(true);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(citySearch)}&format=json&limit=8&countrycodes=it&accept-language=it&featuretype=city,town,village,municipality`;
-        const res  = await fetch(url, { headers: { 'User-Agent': 'ChrispyMaps/1.0' } });
-        const data = await res.json() as Array<{ name: string; display_name: string; lat: string; lon: string; type: string }>;
-        setCityResults(data.map(r => ({
-          name:    r.name || r.display_name.split(',')[0],
-          display: r.display_name.split(',').slice(1, 3).join(',').trim(),
-          lat:     parseFloat(r.lat),
-          lon:     parseFloat(r.lon),
-        })));
+        const places = await geocodeForward(citySearch, {
+          limit: 8,
+          featureType: 'city,town,village,municipality',
+        });
+        setCityResults(places.map(p => ({ name: p.name, display: p.displayExtra, lat: p.lat, lon: p.lon })));
       } catch { setCityResults([]); }
       setCityLoading(false);
-    }, 350);
+    }, DEBOUNCE_SEARCH_MS);
     return () => clearTimeout(t);
   }, [citySearch, cityPickerOpen]);
 
   /* ── Bottoni mappa: locate trigger ── */
   const [locateTrigger, setLocateTrigger] = useState(0);
   const [isLocating,    setIsLocating]    = useState(false);
+
+  /* ── Drag handle hint — bounce on first visit ── */
+  const [showDragHint, setShowDragHint] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('cmaps_drag_hint')) {
+        setShowDragHint(true);
+        localStorage.setItem('cmaps_drag_hint', '1');
+        setTimeout(() => setShowDragHint(false), 4000);
+      }
+    } catch {}
+  }, []);
 
   /* ── Auto-hide bottoni mappa ── */
   /* I bottoni si nascondono quando il pannello è alto (> 62% vh) o il raggio è aperto.
@@ -352,8 +405,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       raf2 = requestAnimationFrame(() => {
         const el = document.querySelector('[data-exp="1"]') as HTMLElement | null;
         if (el) {
-          const measured = el.offsetHeight + 6;
-          snapTo(measured);
+          const HANDLE_H = 46; // drag handle height
+          const measured = el.offsetHeight + HANDLE_H + 6;
+          snapTo(Math.min(measured, Math.round(window.innerHeight * 0.88)));
         }
       });
     });
@@ -376,8 +430,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, []);
 
   const handleAddSpotAt = useCallback((lat: number, lon: number) => {
+    if (!user) { setAuthOpen(true); return; }
     setAddLat(lat); setAddLon(lon); setAddOpen(true);
-  }, []);
+  }, [user]);
 
   /* Bottoni mappa: nascosti quando il pannello è alto (>62% vh) o raggio aperto */
   const autoHidden = panelHeight > windowH * 0.62 || radiusPanelOpen;
@@ -392,7 +447,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         onFilterRegion={handleFilterRegion}
         onFilterCondition={setFilterCondition}
         onFilterDifficulty={setFilterDifficulty}
-        onAddSpot={() => setAddOpen(true)}
+        onAddSpot={openAddSpot}
         activeType={filterType}
         activeRegion={filterRegion?.label ?? null}
         activeCondition={filterCondition}
@@ -475,11 +530,22 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onClick={revealButtons}
           style={{
             position: 'fixed', top: TOP_OFFSET + 10, left: 0,
-            width: 18, height: 132, zIndex: 54,
+            width: 36, height: 132, zIndex: 54,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
           }}
         >
-          <div style={{ width: 4, height: 72, background: 'rgba(255,106,0,0.35)', borderRadius: '0 4px 4px 0', transition: 'background 0.15s' }} />
+          <div style={{
+            width: 28, height: 28,
+            background: 'rgba(10,10,10,0.85)',
+            border: '1px solid rgba(255,106,0,0.5)',
+            borderRadius: '0 8px 8px 0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginTop: 20,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" strokeWidth="2" strokeLinecap="round">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </div>
         </div>
       )}
 
@@ -782,8 +848,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           transition: 'border-radius 0.25s ease',
           position: 'relative',
         }}>
-          {/* ✕ Chiudi pannello — appare quando il pannello è aperto */}
-          {panelHeight > PANEL_MIN + 10 && (
+          {/* ✕ Chiudi pannello — appare quando il pannello è aperto e NON c'è card espansa */}
+          {panelHeight > PANEL_MIN + 10 && !expandedId && (
             <button
               onClick={() => snapTo(PANEL_MIN)}
               style={{
@@ -812,6 +878,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'ns-resize',
               touchAction: 'none',
+              animation: showDragHint ? 'dragBounce 0.6s ease-in-out 0.8s 3' : 'none',
+              position: 'relative',
             }}
           >
             <div style={{
@@ -836,6 +904,17 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 ))}
               </div>
             </div>
+            {/* First-visit hint */}
+            {showDragHint && (
+              <div style={{
+                position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%)',
+                fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)',
+                whiteSpace: 'nowrap', pointerEvents: 'none',
+                animation: 'fadeIn 0.3s ease-out 1s both',
+              }}>
+                ↕ trascina
+              </div>
+            )}
           </div>
 
           {/* Pannello scroll */}
@@ -852,6 +931,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 radiusCenter={radiusMode && !radiusPanelOpen ? radiusCenter : null}
                 isDesktop={isDesktop}
                 scrollInstantRef={scrollInstantRef}
+                onReset={() => { setFilterType(null); setFilterRegion(null); setFilterCondition(null); setFilterDifficulty(null); }}
+                isFav={isFav}
+                onToggleFav={(e, id) => {
+                  e.stopPropagation();
+                  const added = toggleFavHook(id);
+                  toast(added ? 'Aggiunto ai preferiti' : 'Rimosso dai preferiti', added ? 'success' : 'info');
+                }}
               />
             </div>
           )}
@@ -866,7 +952,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
 
       {/* ── BOTTOM NAV — solo mobile, sostituisce il pulsante +SPOT della topbar ── */}
-      <BottomNav onAddSpot={() => setAddOpen(true)} />
+      <BottomNav onAddSpot={openAddSpot} onOpenAuth={() => setAuthOpen(true)} />
+
+      {/* ── ONBOARDING — first visit only ── */}
+      <OnboardingHints />
     </div>
   );
 }
@@ -875,25 +964,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
    SPOT LIST PANEL
 ════════════════════════════════════════════════════════ */
 
-const FAVS_KEY = 'cmaps_favs_v1';
-
-function isFav(id: string) {
-  try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); }
-  catch { return false; }
-}
-function toggleFav(id: string) {
-  try {
-    const favs: string[] = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]');
-    const i = favs.indexOf(id);
-    if (i >= 0) favs.splice(i, 1); else favs.push(id);
-    localStorage.setItem(FAVS_KEY, JSON.stringify(favs));
-    return i < 0;
-  } catch { return false; }
-}
-
 function SpotListPanel({
   spots, activeId, expandedId, onActivate, onSpotClick, scrollToId, onScrolled, radiusCenter,
-  isDesktop, scrollInstantRef,
+  isDesktop, scrollInstantRef, onReset, isFav, onToggleFav,
 }: {
   spots:            SpotMapPin[];
   activeId:         string | null;
@@ -905,11 +978,13 @@ function SpotListPanel({
   radiusCenter:     { lat: number; lon: number } | null;
   isDesktop:        boolean;
   scrollInstantRef: React.MutableRefObject<boolean>;
+  onReset?:         () => void;
+  isFav:            (id: string) => boolean;
+  onToggleFav:      (e: React.MouseEvent, id: string) => void;
 }) {
-  const [favs, setFavs] = useState<Record<string, boolean>>({});
   /* Indice foto corrente per ogni spot (nella card espansa) */
   const [photoIdx,   setPhotoIdx]   = useState<Record<string, number>>({});
-  /* Lightbox: { urls, idx } */
+  /* Lightbox */
   const [lightbox,   setLightbox]   = useState<{ urls: string[]; idx: number } | null>(null);
   /* Ref strip foto della card espansa (una sola per volta) */
   const photoStripRef = useRef<HTMLDivElement | null>(null);
@@ -924,12 +999,7 @@ function SpotListPanel({
   /* Mappa dei ratio di visibilità: id → intersectionRatio (0..1) */
   const visibilityMap  = useRef<Map<string, number>>(new Map());
 
-  useEffect(() => {
-    const f: Record<string, boolean> = {};
-    spots.forEach(s => { f[s.id] = isFav(s.id); });
-    setFavs(f);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spots.length]);
+  /* favs now come from parent via isFav/onToggleFav props */
 
   /* IntersectionObserver con root = pannello scroll.
      Strategia: aggiorna la mappa di visibilità ad ogni entry, poi scegli
@@ -983,11 +1053,7 @@ function SpotListPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToId]);
 
-  const handleFav = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    const added = toggleFav(id);
-    setFavs(prev => ({ ...prev, [id]: added }));
-  };
+  /* handleFav now passed via onToggleFav prop */
 
   /* ── Non-passive touchmove sulla strip foto ──────────────────────────────
      Safari iOS ignora touch-action: pan-x dentro overflow-y: auto.
@@ -1039,74 +1105,44 @@ function SpotListPanel({
     setPhotoIdx(p => ({ ...p, [spotId]: i }));
   }, []);
 
-  /* Chiude lightbox con Escape */
-  useEffect(() => {
-    if (!lightbox) return;
-    const fn = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightbox(null);
-      if (e.key === 'ArrowRight') setLightbox(l => l ? { ...l, idx: l.idx === l.urls.length - 1 ? 0 : l.idx + 1 } : l);
-      if (e.key === 'ArrowLeft')  setLightbox(l => l ? { ...l, idx: l.idx === 0 ? l.urls.length - 1 : l.idx - 1 } : l);
-    };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, [lightbox]);
+  /* Lightbox keyboard/close handled by shared <Lightbox> component */
 
   if (spots.length === 0) {
     return (
-      <div style={{ padding: '48px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14 }}>
-        Nessuno spot trovato.<br />
-        <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>Prova a cambiare filtro.</span>
+      <div style={{ padding: '48px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
+        <div style={{ color: 'var(--bone)', fontSize: 15, marginBottom: 6 }}>Nessuno spot trovato</div>
+        <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 20 }}>Prova a cambiare o azzerare i filtri.</div>
+        {onReset && (
+          <button
+            onClick={onReset}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13,
+              padding: '9px 20px',
+              border: '1px solid var(--orange)',
+              borderRadius: 4, background: 'transparent',
+              color: 'var(--orange)', cursor: 'pointer',
+              letterSpacing: '0.05em',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            } as React.CSSProperties}
+          >
+            ✕ AZZERA FILTRI
+          </button>
+        )}
       </div>
     );
   }
 
   return (
     <>
-    {/* ── LIGHTBOX ── */}
+    {/* ── LIGHTBOX (shared component) ── */}
     {lightbox && (
-      <div
-        onClick={() => setLightbox(null)}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(0,0,0,0.96)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        {/* Close */}
-        <button onClick={() => setLightbox(null)} style={{
-          position: 'absolute', top: 16, right: 16,
-          background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
-          width: 44, height: 44, fontSize: 22, color: '#fff', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
-        }}>✕</button>
-
-        {/* Prev */}
-        {lightbox.idx > 0 && (
-          <button onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, idx: l.idx - 1 } : l); }}
-            style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 48, height: 48, fontSize: 26, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-        )}
-
-        {/* Image */}
-        <img
-          src={lightbox.urls[lightbox.idx]}
-          alt=""
-          onClick={e => e.stopPropagation()}
-          style={{ maxWidth: '92vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 4, boxShadow: '0 8px 48px rgba(0,0,0,0.8)' }}
-        />
-
-        {/* Next */}
-        {lightbox.idx < lightbox.urls.length - 1 && (
-          <button onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, idx: l.idx + 1 } : l); }}
-            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 48, height: 48, fontSize: 26, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-        )}
-
-        {/* Counter */}
-        {lightbox.urls.length > 1 && (
-          <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-            {lightbox.idx + 1} / {lightbox.urls.length}
-          </div>
-        )}
-      </div>
+      <Lightbox
+        urls={lightbox.urls}
+        initialIdx={lightbox.idx}
+        onClose={() => setLightbox(null)}
+      />
     )}
 
     <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' } as React.CSSProperties}>
@@ -1147,7 +1183,7 @@ function SpotListPanel({
         const cond      = CONDIZIONI[spot.condition];
         const isAct     = activeId   === spot.id;
         const isExp     = expandedId === spot.id;
-        const myFav     = favs[spot.id]    ?? false;
+        const myFav     = isFav(spot.id);
         const isLast    = idx === spots.length - 1;
 
         /* Foto disponibili */
@@ -1195,29 +1231,9 @@ function SpotListPanel({
             {isExp ? (
               <div style={{ position: 'relative' }}>
 
-                {/* Header row: ❤️ sinistra · X destra — sticky */}
-                <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px 2px', background: 'rgba(10,10,10,0.97)' }}>
-                  <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
-                    style={{ background: 'rgba(0,0,0,0.0)', border: 'none', borderRadius: 4, width: 30, height: 30, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
-                    {myFav ? '❤️' : '🤍'}
-                  </button>
-                  <button
-                    onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
-                    style={{
-                      background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)',
-                      borderRadius: '50%', width: 28, height: 28,
-                      fontSize: 13, color: 'var(--bone)', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
-                    }}
-                    aria-label="Chiudi"
-                  >✕</button>
-                </div>
-
                 {/* ── FOTO — scroll-snap swipeable ── */}
                 {allPhotos.length > 0 ? (
-                  <div>
-                  <div style={{ position: 'relative', background: '#0a0a0a' }}>
-                    {/* Scroll-snap strip — stesso schema di PhotoCarousel */}
+                  <div style={{ position: 'relative', background: '#000' }}>
                     <div
                       ref={photoStripRef}
                       onScroll={e => {
@@ -1234,7 +1250,6 @@ function SpotListPanel({
                         const dx = Math.abs(e.touches[0].clientX - photoTouchStartX.current);
                         const dy = Math.abs(e.touches[0].clientY - photoTouchStartY.current);
                         if (dx > 6 || dy > 6) photoIsSwiping.current = true;
-                        /* Se il gesto è orizzontale blocca la card dal ricevere il touch */
                         if (dx > dy) e.stopPropagation();
                       }}
                       onClick={e => {
@@ -1242,116 +1257,103 @@ function SpotListPanel({
                         if (!photoIsSwiping.current) setLightbox({ urls: allPhotos, idx: curPhotoIdx });
                       }}
                       style={{
-                        display: 'flex',
-                        overflowX: 'auto',
-                        scrollSnapType: 'x mandatory',
-                        scrollBehavior: 'auto',
-                        WebkitOverflowScrolling: 'touch',
-                        scrollbarWidth: 'none',
-                        width: '100%',
-                        height: isDesktop ? 220 : 140,
-                        cursor: 'zoom-in',
-                        touchAction: 'pan-x',
+                        display: 'flex', overflowX: 'auto',
+                        scrollSnapType: 'x mandatory', scrollBehavior: 'auto',
+                        WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+                        width: '100%', height: isDesktop ? 240 : 180,
+                        cursor: 'zoom-in', touchAction: 'pan-x',
                       } as React.CSSProperties}
                     >
                       {allPhotos.map((url, i) => (
-                        <div
-                          key={url + i}
-                          style={{
-                            flexShrink: 0,
-                            width: '100%',
-                            height: '100%',
-                            scrollSnapAlign: 'start',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: '#0a0a0a',
-                          }}
-                        >
+                        <div key={url + i} style={{ flexShrink: 0, width: '100%', height: '100%', scrollSnapAlign: 'start' }}>
                           <img
-                            src={url}
-                            alt={spot.name}
-                            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
+                            src={url} alt={spot.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
                             loading={i === 0 ? 'eager' : 'lazy'}
                           />
                         </div>
                       ))}
                     </div>
 
-                    {/* Frecce — circolari centrate come PhotoCarousel */}
+                    {/* Overlay sfumato in basso per leggere i badge */}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(transparent, rgba(0,0,0,0.75))', pointerEvents: 'none' }} />
+
+                    {/* Badge tipo — in basso a sinistra sulla foto */}
+                    <div style={{ position: 'absolute', bottom: 8, left: 10, display: 'flex', gap: 5, alignItems: 'center', pointerEvents: 'none' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '3px 7px', borderRadius: 4, border: `1px solid ${tipo.color}55` }}>
+                        {tipo.emoji} {tipo.label.toUpperCase()}
+                      </span>
+                      {spot.condition === 'alive' ? (
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851', display: 'inline-block' }} />
+                      ) : (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, background: cond.bg, color: cond.color, padding: '2px 6px', borderRadius: 4 }}>{cond.label.toUpperCase()}</span>
+                      )}
+                    </div>
+
+                    {/* Close — top-right only (fav moved to CTA bar) */}
+                    <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                      <button onClick={e => { e.stopPropagation(); onSpotClick(spot); }}
+                        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: 'none', borderRadius: '50%', width: 34, height: 34, fontSize: 16, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        aria-label="Chiudi">✕</button>
+                    </div>
+
+                    {/* Dots navigazione foto */}
+                    {allPhotos.length > 1 && (
+                      <div style={{ position: 'absolute', bottom: 8, right: 10, display: 'flex', gap: 4, pointerEvents: 'none' }}>
+                        {allPhotos.map((_, i) => (
+                          <div key={i} style={{ width: i === curPhotoIdx ? 16 : 5, height: 5, borderRadius: 3, background: i === curPhotoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.4)', transition: 'all 0.2s' }} />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Frecce laterali */}
                     {allPhotos.length > 1 && (
                       <>
                         <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, curPhotoIdx === 0 ? allPhotos.length - 1 : curPhotoIdx - 1); }} className="photo-nav-btn"
-                          style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.62)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', borderRadius: '50%', width: 36, height: 36, color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, padding: 0, fontFamily: 'serif', lineHeight: 1 }}>‹</button>
+                          style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: 'none', borderRadius: '50%', width: 34, height: 34, color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>‹</button>
                         <button onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, (curPhotoIdx + 1) % allPhotos.length); }} className="photo-nav-btn"
-                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.62)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', borderRadius: '50%', width: 36, height: 36, color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, padding: 0, fontFamily: 'serif', lineHeight: 1 }}>›</button>
+                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: 'none', borderRadius: '50%', width: 34, height: 34, color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>›</button>
                       </>
                     )}
-
-                    {/* Zoom hint */}
-                    <div style={{ position: 'absolute', bottom: 6, right: 8, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '2px 5px', fontSize: 11, pointerEvents: 'none', color: '#fff' }}>🔍</div>
-
-                  </div>
-
-                  {/* Thumbnail strip — solo con più foto */}
-                  {allPhotos.length > 1 && (
-                    <div style={{ display: 'flex', gap: 3, padding: '4px 8px', background: '#050505', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
-                      {allPhotos.map((url, i) => (
-                        <button key={i} className="thumb-btn"
-                          onClick={e => { e.stopPropagation(); scrollToPhotoInStrip(spot.id, i); }}
-                          style={{ flexShrink: 0, width: 40, height: 30, border: `2px solid ${i === curPhotoIdx ? 'var(--orange)' : 'transparent'}`, borderRadius: 3, overflow: 'hidden', padding: 0, cursor: 'pointer', background: '#111', opacity: i === curPhotoIdx ? 1 : 0.55, transition: 'opacity 0.15s, border-color 0.15s' }}>
-                          <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
                   </div>
                 ) : (
-                  /* Nessuna foto — placeholder con emoji */
-                  <div style={{ height: 52, background: 'var(--gray-800)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
-                    <span style={{ fontSize: 28, opacity: 0.25 }}>{tipo.emoji}</span>
+                  <div style={{ height: 80, background: 'var(--gray-800)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 36, opacity: 0.2 }}>{tipo.emoji}</span>
                   </div>
                 )}
 
-        
-                {/* Info: nome+badge sinistra · bottoni destra */}
-                <div style={{ padding: '8px 12px 10px', background: '#0a0a0a', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-
-                  {/* Sinistra: nome + badge */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--orange)', lineHeight: 1.25, marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
-                      {spot.name}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {spot.condition === 'alive' ? (
-                        <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 5px #00c851aa' }} />
-                      ) : (
-                        <span style={{ background: cond.bg, color: cond.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase' }}>{cond.label}</span>
-                      )}
-                      <span style={{ color: tipo.color, fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: `1px solid ${tipo.color}55`, textTransform: 'uppercase' }}>{tipo.emoji} {tipo.label}</span>
-                      {spot.difficulty && <span style={{ color: '#ffce4d', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 5px', borderRadius: 2, border: '1px solid rgba(255,206,77,0.3)', textTransform: 'uppercase' }}>⚡ {spot.difficulty}</span>}
-                    </div>
-                    {(spot.city || spot.submitted_by_username) && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--gray-500)', marginTop: 3 }}>
-                        {[spot.city, spot.submitted_by_username ? `@${spot.submitted_by_username}` : null].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
+                {/* Info */}
+                <div style={{ padding: '10px 12px 4px', background: '#0a0a0a' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--bone)', lineHeight: 1.2, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+                    {spot.name}
                   </div>
-
-                  {/* Destra: VEDI SPOT + 📍 affiancati */}
-                  <div style={{ display: 'flex', flexDirection: 'row', gap: 5, flexShrink: 0, alignItems: 'center' }}>
-                    <Link
-                      href={`/map/spot/${spot.slug}`}
-                      onClick={e => e.stopPropagation()}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: '#000', background: 'var(--orange)', border: 'none', borderRadius: 4, padding: '0 10px', height: 30, textDecoration: 'none', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
-                    >
-                      VEDI SPOT →
-                    </Link>
-                    <button
-                      onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
-                      title="Portami qui con Google Maps"
-                      style={{ width: 30, height: 30, flexShrink: 0, background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}
-                    >📍</button>
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {spot.city && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>📍 {spot.city}</span>}
+                    {spot.difficulty && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ffce4d' }}>⚡ {spot.difficulty.toUpperCase()}</span>}
+                    {spot.submitted_by_username && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>@{spot.submitted_by_username}</span>}
                   </div>
+                </div>
 
+                {/* CTA bottom */}
+                <div style={{ display: 'flex', gap: 8, padding: '8px 12px 12px', background: '#0a0a0a' }}>
+                  <button
+                    onClick={e => onToggleFav(e, spot.id)}
+                    className="spot-fav-btn"
+                    aria-label={myFav ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+                    style={{ width: 40, height: 40, flexShrink: 0, background: myFav ? 'rgba(255,106,0,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${myFav ? 'var(--orange)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, transition: 'all 0.15s' }}
+                  >{myFav ? '❤️' : '🤍'}</button>
+                  <Link
+                    href={`/map/spot/${spot.slug}`}
+                    onClick={e => e.stopPropagation()}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: '#000', background: 'var(--orange)', borderRadius: 8, height: 40, textDecoration: 'none', letterSpacing: '0.05em', boxShadow: '0 2px 12px rgba(255,106,0,0.3)' }}
+                  >
+                    VEDI SPOT →
+                  </Link>
+                  <button
+                    onClick={e => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`, '_blank'); }}
+                    aria-label="Portami qui"
+                    style={{ width: 40, height: 40, flexShrink: 0, background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}
+                  >📍</button>
                 </div>
               </div>
 
@@ -1395,7 +1397,7 @@ function SpotListPanel({
                     }}>
                       {spot.name}
                     </div>
-                    <button onClick={e => handleFav(e, spot.id)} className="spot-fav-btn"
+                    <button onClick={e => onToggleFav(e, spot.id)} className="spot-fav-btn"
                       style={{ flexShrink: 0, background: 'none', border: 'none', padding: '0 2px', cursor: 'pointer', fontSize: myFav ? 14 : 12, opacity: myFav ? 1 : 0.35 }}>
                       {myFav ? '❤️' : '🤍'}
                     </button>

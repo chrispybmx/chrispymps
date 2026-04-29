@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyApproveToken, isAdminAuthenticated } from '@/lib/auth';
 import { sendApprovalEmail } from '@/lib/email';
+import { onSpotApproved } from '@/lib/xp';
 
 export async function GET(req: NextRequest) {
   // Approvazione via link email (token HMAC nel query string)
@@ -75,6 +76,11 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
       body:      'Il tuo spot è ora visibile sulla mappa. Grazie per il contributo!',
       spot_slug: spot.slug,
     }).then().catch(console.error);
+  }
+
+  // Award XP to contributor (fire-and-forget)
+  if (spot.submitted_by_user_id) {
+    onSpotApproved(spot.submitted_by_user_id, spotId, undefined, spot.city).catch(console.error);
   }
 
   if (req.method === 'GET') {

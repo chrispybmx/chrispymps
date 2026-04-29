@@ -8,7 +8,7 @@ import AdminImportKML from '@/components/AdminImportKML';
 import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 
-type Tab = 'pending' | 'all' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users';
+type Tab = 'pending' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users';
 
 interface AdminComment {
   id: string;
@@ -120,6 +120,11 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   const [loadingUsers, setLoadingUsers]   = useState(false);
   const [userSearch, setUserSearch]       = useState('');
 
+  /* ── Pending photos state ── */
+  interface PendingPhoto { id: string; spot_id: string; url: string; uploaded_by: string; created_at: string; spots?: { name: string; slug: string; city?: string } }
+  const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+
   /* ── Load all spots ── */
   useEffect(() => {
     if (tab !== 'all' && tab !== 'stats') return;
@@ -162,6 +167,32 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       .then(j => { if (j.ok) setAdminComments(j.data); })
       .finally(() => setLoadingComments(false));
   }, [tab]);
+
+  /* ── Load pending photos ── */
+  useEffect(() => {
+    if (tab !== 'photos') return;
+    setLoadingPhotos(true);
+    fetch('/api/admin/pending-photos')
+      .then(r => r.json())
+      .then(j => { if (j.ok) setPendingPhotos(j.data); })
+      .finally(() => setLoadingPhotos(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const handlePhotoAction = async (photoId: string, action: 'approve' | 'reject') => {
+    try {
+      const res = await fetch('/api/admin/pending-photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_id: photoId, action }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setPendingPhotos(prev => prev.filter(p => p.id !== photoId));
+        showMsg(j.message);
+      }
+    } catch { showMsg('Errore'); }
+  };
 
   /* ── Load users ── */
   useEffect(() => {
@@ -337,6 +368,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
 
   const TABS: { key: Tab; label: string; badge?: number }[] = [
     { key: 'pending',  label: '📥 In attesa', badge: pending.length },
+    { key: 'photos',   label: '📸 Foto', badge: pendingPhotos.length },
     { key: 'all',      label: '🗺️ Spot' },
     { key: 'comments', label: '💬 Commenti' },
     { key: 'users',    label: '👤 Utenti' },
@@ -765,6 +797,60 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ── TAB: FOTO PENDENTI ── */}
+      {tab === 'photos' && (
+        <div style={{ padding: '16px 20px 0' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', marginBottom: 16 }}>
+            {loadingPhotos ? 'Caricamento...' : `${pendingPhotos.length} foto in attesa di approvazione`}
+          </div>
+          {pendingPhotos.length === 0 && !loadingPhotos && (
+            <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-500)' }}>
+              Nessuna foto in attesa ✓
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {pendingPhotos.map(photo => (
+              <div key={photo.id} style={{
+                background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
+                borderRadius: 8, overflow: 'hidden',
+              }}>
+                <img src={photo.url} alt="" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} loading="lazy" />
+                <div style={{ padding: '10px 12px' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 4 }}>
+                    {(photo.spots as any)?.name ?? 'Spot sconosciuto'}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginBottom: 8 }}>
+                    {(photo.spots as any)?.city ?? ''} · {new Date(photo.created_at).toLocaleDateString('it-IT')}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      onClick={() => handlePhotoAction(photo.id, 'approve')}
+                      style={{
+                        flex: 1, padding: '8px', border: 'none', borderRadius: 4,
+                        background: '#00c851', color: '#000', fontFamily: 'var(--font-mono)',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      ✓ APPROVA
+                    </button>
+                    <button
+                      onClick={() => handlePhotoAction(photo.id, 'reject')}
+                      style={{
+                        flex: 1, padding: '8px', border: '1px solid var(--gray-600)', borderRadius: 4,
+                        background: 'transparent', color: '#ff4444', fontFamily: 'var(--font-mono)',
+                        fontSize: 12, cursor: 'pointer',
+                      }}
+                    >
+                      ✕ RIFIUTA
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

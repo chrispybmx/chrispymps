@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Spot, SpotMapPin } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import Lightbox from './Lightbox';
 
 interface SpotSheetProps {
   spot:        Spot | null;
@@ -16,7 +17,6 @@ interface SpotSheetProps {
 
 /* ── localStorage utils ── */
 const FAVS_KEY   = 'cmaps_favs_v1';
-const ratingKey  = (id: string) => `cmaps_rating_${id}`;
 
 function isFav(id: string): boolean {
   try { return (JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]') as string[]).includes(id); }
@@ -31,24 +31,14 @@ function toggleFav(id: string): boolean {
     return i < 0; // true = aggiunto
   } catch { return false; }
 }
-function getMyRating(id: string): number {
-  try { return Math.min(5, Math.max(0, parseInt(localStorage.getItem(ratingKey(id)) ?? '0', 10) || 0)); }
-  catch { return 0; }
-}
-function saveRating(id: string, r: number): void {
-  try { localStorage.setItem(ratingKey(id), String(r)); } catch {}
-}
 
 export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx, onNavigate }: SpotSheetProps) {
   const [photoIdx,  setPhotoIdx]  = useState(0);
   const [lightbox,  setLightbox]  = useState(false);
   const [navOpen,   setNavOpen]   = useState(false);
-  const [myRating,  setMyRating]  = useState(0);
-  const [hoverStar, setHoverStar] = useState(0);
   const [fav,       setFav]       = useState(false);
   const sheetRef      = useRef<HTMLDivElement>(null);
   const photoStripRef = useRef<HTMLDivElement>(null);
-  const ltbStripRef   = useRef<HTMLDivElement>(null);  // lightbox strip
   const startX        = useRef(0);
   const startY        = useRef(0);
   const currentY      = useRef(0);
@@ -58,7 +48,6 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
   useEffect(() => {
     if (!spot) return;
     setPhotoIdx(0); setNavOpen(false);
-    setMyRating(getMyRating(spot.id));
     setFav(isFav(spot.id));
     // Reset scroll position quando cambia spot
     if (photoStripRef.current) photoStripRef.current.scrollLeft = 0;
@@ -100,47 +89,7 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
     else { sheetRef.current.style.transform = ''; currentY.current = 0; }
   }, [onClose]);
 
-  /* ── lightbox: scroll all'indice giusto quando si apre ── */
-  useEffect(() => {
-    if (!lightbox) return;
-    const el = ltbStripRef.current;
-    if (!el) return;
-    // Salta direttamente alla foto corrente senza animazione
-    el.scrollLeft = photoIdx * el.offsetWidth;
-  }, [lightbox]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* ── lightbox: keyboard ── */
-  useEffect(() => {
-    if (!lightbox) return;
-    const fn = (e: KeyboardEvent) => {
-      if (e.key === 'Escape')     setLightbox(false);
-      if (e.key === 'ArrowRight') {
-        const el = ltbStripRef.current;
-        if (el) el.scrollTo({ left: el.scrollLeft + el.offsetWidth, behavior: 'smooth' });
-      }
-      if (e.key === 'ArrowLeft') {
-        const el = ltbStripRef.current;
-        if (el) el.scrollTo({ left: el.scrollLeft - el.offsetWidth, behavior: 'smooth' });
-      }
-    };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, [lightbox]);
-
-  /* ── lightbox strip scroll sync ── */
-  const onLtbScroll = useCallback(() => {
-    const el = ltbStripRef.current;
-    if (!el) return;
-    const newIdx = Math.round(el.scrollLeft / el.offsetWidth);
-    setPhotoIdx(i => i !== newIdx ? newIdx : i);
-  }, []);
-
-  const scrollLtbTo = useCallback((i: number) => {
-    const el = ltbStripRef.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.offsetWidth, behavior: 'smooth' });
-    setPhotoIdx(i);
-  }, []);
+  /* lightbox now uses shared <Lightbox> component — no inline logic needed */
 
   /* ── photo scroll-snap ── */
   const onPhotoScroll = useCallback(() => {
@@ -174,10 +123,6 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
       await navigator.share({ title: `${spot.name} — Chrispy Maps`, text: `Spot BMX: ${spot.name}`, url: shareUrl }).catch(() => {});
     } else { await navigator.clipboard.writeText(shareUrl); alert('Link copiato!'); }
   };
-  const handleRating = (r: number) => {
-    const next = r === myRating ? 0 : r;
-    saveRating(spot.id, next); setMyRating(next);
-  };
   const handleFav = () => { const added = toggleFav(spot.id); setFav(added); };
 
   const hasPrev = currentIdx != null && currentIdx > 0;
@@ -185,73 +130,13 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
 
   return (
     <>
-      {/* ── LIGHTBOX ── */}
+      {/* ── LIGHTBOX (shared component) ── */}
       {lightbox && photos.length > 0 && (
-        <div
-          onClick={() => setLightbox(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.97)', display: 'flex', flexDirection: 'column' }}
-        >
-          {/* Header: contatore + chiudi */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'linear-gradient(rgba(0,0,0,0.6),transparent)', pointerEvents: 'none' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-              {photoIdx + 1} / {photos.length}
-            </div>
-            <button
-              onPointerDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); setLightbox(false); }}
-              style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '50%', width: 40, height: 40, fontSize: 20, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all' }}
-            >✕</button>
-          </div>
-
-          {/* Strip scroll-snap — swipe per cambiare foto */}
-          <div
-            ref={ltbStripRef}
-            onScroll={onLtbScroll}
-            onClick={e => e.stopPropagation()}
-            style={{
-              display: 'flex', flex: 1,
-              overflowX: 'auto',
-              scrollSnapType: 'x mandatory',
-              scrollBehavior: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'none',
-              touchAction: 'pan-x',
-            } as React.CSSProperties}
-          >
-            {photos.map((p, i) => (
-              <div
-                key={p.url}
-                style={{ flexShrink: 0, width: '100vw', height: '100%', scrollSnapAlign: 'start', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <img
-                  src={p.url}
-                  alt={`Foto ${i + 1}`}
-                  style={{ maxWidth: '96vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 4, boxShadow: '0 8px 40px rgba(0,0,0,0.9)' }}
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Frecce desktop */}
-          {photos.length > 1 && photoIdx > 0 && (
-            <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); scrollLtbTo(photoIdx - 1); }}
-              style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 52, height: 52, fontSize: 30, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-          )}
-          {photos.length > 1 && photoIdx < photos.length - 1 && (
-            <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); scrollLtbTo(photoIdx + 1); }}
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 52, height: 52, fontSize: 30, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-          )}
-
-          {/* Dots */}
-          {photos.length > 1 && (
-            <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
-              {photos.map((_, i) => (
-                <div key={i} style={{ width: i === photoIdx ? 18 : 6, height: 6, borderRadius: 3, background: i === photoIdx ? 'var(--orange)' : 'rgba(255,255,255,0.35)', transition: 'width 0.2s' }} />
-              ))}
-            </div>
-          )}
-        </div>
+        <Lightbox
+          urls={photos.map(p => p.url)}
+          initialIdx={photoIdx}
+          onClose={() => setLightbox(false)}
+        />
       )}
 
       {/* Backdrop */}
@@ -406,48 +291,20 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
         {/* ══ CONTENUTO ══ */}
         <div style={{ padding: '12px 18px' }}>
 
-          {/* ── Stelle + Tipo + Preferiti ── */}
+          {/* ── Tipo + Preferiti ── */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            {/* Stars */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {[1, 2, 3, 4, 5].map(star => (
-                <button
-                  key={star}
-                  onClick={() => handleRating(star)}
-                  onMouseEnter={() => setHoverStar(star)}
-                  onMouseLeave={() => setHoverStar(0)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: '2px 1px',
-                    fontSize: 23, lineHeight: 1,
-                    color: star <= (hoverStar || myRating) ? '#ffce4d' : 'var(--gray-600)',
-                    transition: 'color 0.1s, transform 0.1s',
-                    transform: star <= (hoverStar || myRating) ? 'scale(1.15)' : 'scale(1)',
-                  }}
-                  aria-label={`${star} stelle`}
-                >★</button>
-              ))}
-              {myRating > 0 && (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginLeft: 3 }}>
-                  {myRating}/5
-                </span>
-              )}
-            </div>
-
-            {/* Tipo + Favoriti */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="badge-tipo" style={{ color: tipo.color, borderColor: tipo.color, fontSize: 11 }}>
-                {tipo.emoji} {tipo.label}
-              </span>
-              <button onClick={handleFav} style={{
-                background: fav ? 'rgba(255,106,0,0.12)' : 'transparent',
-                border: `1px solid ${fav ? 'var(--orange)' : 'var(--gray-600)'}`,
-                borderRadius: 6, padding: '5px 9px', cursor: 'pointer',
-                fontSize: 17, lineHeight: 1, transition: 'all 0.15s',
-                display: 'flex', alignItems: 'center',
-              }} aria-label={fav ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'} title={fav ? 'Salvato' : 'Salva'}>
-                {fav ? '❤️' : '🤍'}
-              </button>
-            </div>
+            <span className="badge-tipo" style={{ color: tipo.color, borderColor: tipo.color, fontSize: 11 }}>
+              {tipo.emoji} {tipo.label}
+            </span>
+            <button onClick={handleFav} style={{
+              background: fav ? 'rgba(255,106,0,0.12)' : 'transparent',
+              border: `1px solid ${fav ? 'var(--orange)' : 'var(--gray-600)'}`,
+              borderRadius: 6, padding: '5px 9px', cursor: 'pointer',
+              fontSize: 17, lineHeight: 1, transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center',
+            }} aria-label={fav ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'} title={fav ? 'Salvato' : 'Salva'}>
+              {fav ? '❤️' : '🤍'}
+            </button>
           </div>
 
           {/* ── @username ── */}

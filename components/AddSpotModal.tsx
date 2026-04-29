@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, DIFFICOLTA } from '@/lib/constants';
+import { TIPI_SPOT, DIFFICOLTA, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
+import { reverseGeocode } from '@/lib/geocoding';
 import type { SpotType } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
@@ -206,11 +207,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
   /* Reverse geocode → auto-popola città */
   const [city, setCity] = useState('');
-  const reverseGeocode = useCallback(async (eLat: number, eLon: number) => {
+  const fetchCity = useCallback(async (eLat: number, eLon: number) => {
     try {
-      const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${eLat}&lon=${eLon}&format=json&addressdetails=1&accept-language=it`);
-      const data = await res.json();
-      const cn = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '';
+      const cn = await reverseGeocode(eLat, eLon);
       if (cn) setCity(cn);
     } catch { /* silent */ }
   }, []);
@@ -219,9 +218,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   useEffect(() => {
     if (initialLat != null && initialLon != null) {
       setLat(initialLat); setLon(initialLon); setGpsState('ok');
-      reverseGeocode(initialLat, initialLon);
+      fetchCity(initialLat, initialLon);
     }
-  }, [initialLat, initialLon, reverseGeocode]);
+  }, [initialLat, initialLon, fetchCity]);
 
   /* Reset */
   const handleClose = useCallback(() => {
@@ -261,7 +260,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         }
         setCoordError(null);
         setLat(json.lat); setLon(json.lon);
-        reverseGeocode(json.lat, json.lon);
+        fetchCity(json.lat, json.lon);
         return;
       } catch {
         setCoordError('Errore di rete. Prova con le coordinate dirette.');
@@ -281,7 +280,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       return;
     }
     setLat(pLat); setLon(pLon);
-    reverseGeocode(pLat, pLon);
+    fetchCity(pLat, pLon);
   };
 
   /* GPS */
@@ -292,14 +291,15 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       pos => {
         const { latitude, longitude } = pos.coords;
         setLat(latitude); setLon(longitude); setGpsState('ok');
-        reverseGeocode(latitude, longitude);
+        navigator.vibrate?.(15);
+        fetchCity(latitude, longitude);
       },
       (err) => {
         if (err.code === 1) setGpsState('denied');       // utente ha negato
         else if (err.code === 3) setGpsState('timeout'); // timeout
         else setGpsState('error');                        // non disponibile
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS }
     );
   };
 
@@ -326,6 +326,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       const res  = await fetch('/api/submit-spot', { method: 'POST', body: fd });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? 'Errore durante l\'invio.');
+      navigator.vibrate?.([30, 60, 30]);
       setStep('successo');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore sconosciuto. Riprova.');
@@ -343,7 +344,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     unDebounce = setTimeout(async () => {
       const free = await checkUsername(clean);
       setUsernameOk(free); setCheckingUn(false);
-    }, 600);
+    }, DEBOUNCE_USERNAME_MS);
   };
 
   const handleSignUp = async () => {

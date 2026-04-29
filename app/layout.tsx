@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { APP_CONFIG } from '@/lib/constants';
 import VhsOverlay from '@/components/VhsOverlay';
+import { ToastProvider } from '@/components/Toast';
 
 export const metadata: Metadata = {
   title: {
@@ -128,8 +129,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="ai-keywords" content="spot BMX Italia, skatepark Italia, park scooter Italia, mappa spot BMX, Chrispy Maps, BMX freestyle Italia, street spot BMX, bowl skate Italia" />
       </head>
       <body>
-        <VhsOverlay />
-        {children}
+        <ToastProvider>
+          <VhsOverlay />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

@@ -18,6 +18,14 @@ export async function POST(req: NextRequest) {
 
   const supabase = supabaseAdmin();
 
+  // Try to identify logged-in user (optional — flag works for anon too)
+  let reporterUserId: string | null = null;
+  const auth = req.headers.get('Authorization');
+  if (auth?.startsWith('Bearer ')) {
+    const { data: { user } } = await supabase.auth.getUser(auth.slice(7));
+    if (user) reporterUserId = user.id;
+  }
+
   // Verifica che lo spot esista (evita insert orphan su spot_id inesistente)
   const { data: spotExists } = await supabase
     .from('spots')
@@ -35,6 +43,7 @@ export async function POST(req: NextRequest) {
     reason:         result.data.reason,
     details:        result.data.details ?? null,
     reporter_email: result.data.reporter_email ?? null,
+    ...(reporterUserId ? { reporter_user_id: reporterUserId } : {}),
   });
 
   if (error) {

@@ -346,3 +346,8 @@ export const APP_CONFIG = {
 
 // Token per approvazione (HMAC key viene da env)
 export const APPROVE_TOKEN_EXPIRES_HOURS = 72;
+
+// ===== TIMING =====
+export const DEBOUNCE_SEARCH_MS   = 380;  // TopBar: debounce ricerca/geocoding
+export const DEBOUNCE_USERNAME_MS = 600;  // AddSpotModal/AuthModal: debounce username check
+export const GPS_TIMEOUT_MS       = 10_000; // AddSpotModal: timeout GPS

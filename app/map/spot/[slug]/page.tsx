@@ -10,6 +10,7 @@ import PhotoCarousel from '@/components/PhotoCarousel';
 import StatusUpdateBtn from '@/components/StatusUpdateBtn';
 import SupportStrip from '@/components/SupportStrip';
 import ShareSpotBtn from '@/components/ShareSpotBtn';
+import SpotContributeCTA from '@/components/SpotContributeCTA';
 
 export const revalidate = 300;
 
@@ -172,7 +173,18 @@ export default async function SpotPage({ params }: Props) {
         <PhotoCarousel photos={photos.map(p => ({ url: p.url, credit_name: p.credit_name ?? undefined }))} />
       )}
 
-      <div style={{ padding: '20px 20px 0' }}>
+      {/* ── CONTRIBUTE CTA — prominent, above content ── */}
+      <div style={{ padding: '16px 20px 0' }}>
+        <SpotContributeCTA
+          spotId={spot.id}
+          spotName={spot.name}
+          currentCondition={spot.condition}
+          photoCount={photos.length}
+          lastConfirmedAt={spot.condition_updated_at}
+        />
+      </div>
+
+      <div style={{ padding: '0 20px 0' }}>
 
         {/* ── HEADER: Tipo + Titolo + Publisher ── */}
         <div style={{ marginBottom: 20 }}>

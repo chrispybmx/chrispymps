@@ -6,6 +6,7 @@ import { TIPI_SPOT, APP_CONFIG } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import ProfileClient from './ProfileClient';
 import FavoritesSection from './FavoritesSection';
+import ProfileGamification from '@/components/ProfileGamification';
 import BottomNav from '@/components/BottomNav';
 
 interface Profile {
@@ -36,7 +37,7 @@ async function getData(username: string) {
     .maybeSingle();
   if (!profile) return null;
 
-  const [{ data: spots }, { data: riddenRaw }] = await Promise.all([
+  const [{ data: spots }, { data: riddenRaw }, { count: photosCount }, { count: statusCount }] = await Promise.all([
     sb
       .from('spots')
       .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
@@ -49,6 +50,17 @@ async function getData(username: string) {
       .select('spots(id, slug, name, type, city, condition, spot_photos(url, position))')
       .eq('user_id', profile.id)
       .limit(50),
+    /* Foto caricate dall'utente (approvate) */
+    sb
+      .from('spot_photos')
+      .select('id', { count: 'exact', head: true })
+      .eq('uploaded_by', profile.id)
+      .eq('moderation_status', 'approved'),
+    /* Conferme stato */
+    sb
+      .from('spot_status_updates')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', profile.id),
   ]);
 
   /* Estrae i dati annidati da spot_riders → spots (Supabase returns array) */
@@ -69,6 +81,8 @@ async function getData(username: string) {
     spots:    (spots ?? []) as SpotCard[],
     ridden,
     citiesCount,
+    photosCount: photosCount ?? 0,
+    statusCount: statusCount ?? 0,
   };
 }
 
@@ -132,7 +146,7 @@ export async function generateMetadata({ params }: { params: { username: string 
 export default async function UserProfilePage({ params }: { params: { username: string } }) {
   const data = await getData(params.username);
   if (!data) notFound();
-  const { profile, spots, ridden, citiesCount } = data;
+  const { profile, spots, ridden, citiesCount, photosCount, statusCount } = data;
   const joinDate = new Date(profile.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   return (
@@ -154,11 +168,16 @@ export default async function UserProfilePage({ params }: { params: { username: 
         <ProfileClient profile={profile} joinDate={joinDate} />
 
         {/* Stats strip */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--gray-700)', marginBottom: 24 }}>
-          <StatPill value={spots.length}  label="📍 pubblicati" />
-          <StatPill value={ridden.length} label="🛹 girati" />
-          <StatPill value={citiesCount}   label="🌆 città" last />
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--gray-700)', marginBottom: 24, overflowX: 'auto' }}>
+          <StatPill value={spots.length}   label="📍 spot" />
+          <StatPill value={photosCount}    label="📸 foto" />
+          <StatPill value={ridden.length}  label="🛹 girati" />
+          <StatPill value={statusCount}    label="✓ conferme" />
+          <StatPill value={citiesCount}    label="🌆 città" last />
         </div>
+
+        {/* Gamification: XP, level, badges */}
+        <ProfileGamification username={profile.username} />
 
         {/* Spot pubblicati */}
         {spots.length === 0 ? (

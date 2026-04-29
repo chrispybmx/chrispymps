@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
 import type { SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
+import { geocodeForward, type GeoPlace } from '@/lib/geocoding';
+import { useUser } from '@/hooks/useUser';
 import SideMenu from './SideMenu';
 import NotificationBell from './NotificationBell';
 import Link from 'next/link';
@@ -25,14 +27,6 @@ interface TopBarProps {
   onOpenAuth?:       () => void;
 }
 
-interface NominatimPlace {
-  name:        string;
-  lat:         number;
-  lon:         number;
-  displayExtra: string;
-  type:        string;
-}
-
 export default function TopBar({
   onSearch, onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onAddSpot,
   activeType, activeRegion, activeCondition, activeDifficulty,
@@ -40,26 +34,17 @@ export default function TopBar({
 }: TopBarProps) {
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [searchOpen,      setSearchOpen]      = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [query,           setQuery]           = useState('');
-  const [profileUsername, setProfileUsername] = useState<string | null>(null);
-  const [sessionToken,    setSessionToken]    = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* ── Load current user session for profile button + notification bell ── */
-  useEffect(() => {
-    import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
-      supabaseBrowser().auth.getSession().then(({ data }) => {
-        const un = data.session?.user?.user_metadata?.username
-          ?? data.session?.user?.email?.split('@')[0]
-          ?? null;
-        setProfileUsername(un);
-        setSessionToken(data.session?.access_token ?? null);
-      });
-    }).catch(() => {});
-  }, []);
+  /* ── Sessione utente (hook centralizzato) ── */
+  const user = useUser(); // undefined=loading, null=guest, UserSession=logged
+  const profileUsername = user?.username ?? null;
+  const sessionToken    = user?.accessToken ?? null;
 
   /* ── Nominatim live geocoding ── */
-  const [places,        setPlaces]        = useState<NominatimPlace[]>([]);
+  const [places,        setPlaces]        = useState<GeoPlace[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
 
   /* ── Ricerca utenti via API (include utenti senza spot) ── */
@@ -74,16 +59,7 @@ export default function TopBar({
       if (!isAtSearch) {
         setPlacesLoading(true);
         try {
-          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=it&accept-language=it`;
-          const res  = await fetch(url, { headers: { 'User-Agent': 'ChrispyMaps/1.0' } });
-          const data = await res.json() as Array<{ name: string; lat: string; lon: string; type: string; display_name: string }>;
-          setPlaces(data.map(r => ({
-            name:        r.name || r.display_name.split(',')[0],
-            lat:         parseFloat(r.lat),
-            lon:         parseFloat(r.lon),
-            type:        r.type,
-            displayExtra: r.display_name.split(',').slice(1, 3).join(',').trim(),
-          })));
+          setPlaces(await geocodeForward(query, { limit: 5 }));
         } catch { setPlaces([]); }
         setPlacesLoading(false);
       }
@@ -96,7 +72,7 @@ export default function TopBar({
         if (j.ok) setApiUsers(j.data ?? []);
       } catch { setApiUsers([]); }
       setUsersLoading(false);
-    }, 380);
+    }, DEBOUNCE_SEARCH_MS);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
@@ -165,7 +141,7 @@ export default function TopBar({
     }
   };
 
-  const pickPlace = (p: NominatimPlace) => {
+  const pickPlace = (p: GeoPlace) => {
     onCitySelect(p.name, p.lat, p.lon);
     onSearch('');
     setQuery('');
@@ -243,6 +219,33 @@ export default function TopBar({
           )}
           {sessionToken && <NotificationBell token={sessionToken} />}
         </div>
+        {/* FILTRI button — mobile only (filter bar hidden on mobile) */}
+        <button
+          onClick={() => setFilterSheetOpen(true)}
+          className="topbar-filter-btn"
+          style={{
+            background: anyFilter ? 'var(--orange)' : 'transparent',
+            border: 'none',
+            borderRadius: 4,
+            width: 40, height: 40,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            position: 'relative',
+            color: anyFilter ? '#000' : 'var(--gray-400)',
+          }}
+          aria-label="Filtri"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+          </svg>
+          {anyFilter && (
+            <span style={{
+              position: 'absolute', top: 4, right: 4,
+              width: 8, height: 8, borderRadius: '50%',
+              background: anyFilter ? '#000' : 'var(--orange)',
+            }} />
+          )}
+        </button>
         <button onClick={openSearch} className="btn-ghost" aria-label="Cerca spot" style={{ fontSize: 18 }}>
           🔍
         </button>
@@ -251,7 +254,7 @@ export default function TopBar({
         </button>
       </header>
 
-      {/* Filter bar — dropdown + preferiti */}
+      {/* Filter bar */}
       <div style={{
         display: 'flex',
         position: 'fixed',
@@ -261,144 +264,157 @@ export default function TopBar({
         borderBottom: '1px solid var(--gray-700)',
         zIndex: 38,
         alignItems: 'center',
-        gap: 0,
+        padding: '6px 10px',
+        gap: 8,
       }} className="map-filter-bar">
-        {/* Scrollabile: tutti i dropdown */}
-        <div style={{
-          flex: 1,
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          display: 'flex', alignItems: 'center',
-          padding: '5px 8px',
-          gap: 5,
-          scrollbarWidth: 'none',
-        } as React.CSSProperties}>
 
-          <FilterDropdown
-            value={activeRegion ?? ''}
-            onChange={v => onFilterRegion(v || null)}
-            active={!!activeRegion}
-            placeholder="🗺️ REG"
-          >
-            <option value="">🗺️ REGIONE</option>
-            {REGIONI_ITALIA.map(r => (
-              <option key={r.label} value={r.label}>{r.label}</option>
-            ))}
-          </FilterDropdown>
-
-          <FilterDropdown
-            value={activeType ?? ''}
-            onChange={v => onFilterType((v as SpotType) || null)}
-            active={!!activeType}
-            placeholder="🎯 TIPO"
-          >
-            <option value="">🎯 TIPO</option>
-            {(Object.entries(TIPI_SPOT) as [SpotType, { label: string; emoji: string }][]).map(([key, info]) => (
-              <option key={key} value={key}>{info.emoji} {info.label.toUpperCase()}</option>
-            ))}
-          </FilterDropdown>
-
-          <FilterDropdown
-            value={activeDifficulty ?? ''}
-            onChange={v => onFilterDifficulty(v || null)}
-            active={!!activeDifficulty}
-            placeholder="⚡ LVL"
-          >
-            <option value="">⚡ LEVEL</option>
-            {DIFFICOLTA.map(d => (
-              <option key={d.value} value={d.value}>{d.label.toUpperCase()}</option>
-            ))}
-          </FilterDropdown>
-
-          {/* Reset tutto — solo se un filtro è attivo */}
+        {/* Bottone FILTRI */}
+        <button
+          onClick={() => setFilterSheetOpen(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            fontFamily: 'var(--font-mono)', fontSize: 11,
+            padding: '0 14px',
+            height: 36,
+            border: 'none',
+            borderRadius: 8,
+            background: anyFilter ? 'var(--orange)' : 'rgba(255,255,255,0.07)',
+            color: anyFilter ? '#000' : 'var(--gray-300)',
+            cursor: 'pointer', whiteSpace: 'nowrap',
+            letterSpacing: '0.06em',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            flexShrink: 0,
+            fontWeight: anyFilter ? 700 : 400,
+            transition: 'background 0.15s, color 0.15s',
+            boxShadow: anyFilter ? '0 0 12px rgba(255,106,0,0.35)' : 'none',
+          } as React.CSSProperties}
+          aria-label="Apri filtri"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+          </svg>
+          FILTRI
           {anyFilter && (
-            <button
-              onClick={() => { onFilterType(null); onFilterRegion(null); onFilterDifficulty(null); }}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11,
-                padding: '4px 8px',
-                border: '1px solid var(--gray-600)',
-                borderRadius: 2,
-                background: 'transparent',
-                color: 'var(--gray-400)',
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                letterSpacing: '0.05em',
-                flexShrink: 0,
-              }}
-            >
-              ✕
-            </button>
+            <span style={{
+              background: '#000', color: 'var(--orange)',
+              borderRadius: '50%', width: 17, height: 17,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700, lineHeight: 1, flexShrink: 0,
+            }}>
+              {[activeType, activeRegion, activeCondition, activeDifficulty].filter(Boolean).length}
+            </span>
           )}
-        </div>
+        </button>
 
-        {/* Preferiti + Profilo — fisso a destra, nascosto su mobile */}
+        {/* Chips filtri attivi — scorribili */}
+        {anyFilter && (
+          <div style={{
+            flex: 1, display: 'flex', gap: 6, overflowX: 'auto',
+            scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+            alignItems: 'center',
+          } as React.CSSProperties}>
+            {activeType && (
+              <ActiveChip label={`${TIPI_SPOT[activeType].emoji} ${TIPI_SPOT[activeType].label}`} onRemove={() => onFilterType(null)} />
+            )}
+            {activeRegion && (
+              <ActiveChip label={activeRegion} onRemove={() => onFilterRegion(null)} />
+            )}
+            {activeCondition && (
+              <ActiveChip label={activeCondition.toUpperCase()} onRemove={() => onFilterCondition(null)} />
+            )}
+            {activeDifficulty && (
+              <ActiveChip label={`⚡ ${activeDifficulty}`} onRemove={() => onFilterDifficulty(null)} />
+            )}
+          </div>
+        )}
+
+        {/* Reset tutto */}
+        {anyFilter && (
+          <button
+            onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); }}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 12,
+              padding: '0 10px', height: 36,
+              border: 'none',
+              borderRadius: 8, background: 'rgba(255,255,255,0.07)',
+              color: 'var(--gray-400)', cursor: 'pointer',
+              whiteSpace: 'nowrap', flexShrink: 0,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            } as React.CSSProperties}
+            aria-label="Azzera filtri"
+          >
+            ✕
+          </button>
+        )}
+
+        {/* Profilo — desktop only */}
         <div className="map-profile-section" style={{
-          padding: '7px 10px 7px 6px',
-          flexShrink: 0,
-          borderLeft: '1px solid var(--gray-700)',
-          alignItems: 'center', gap: 6,
+          flexShrink: 0, borderLeft: '1px solid var(--gray-700)',
+          paddingLeft: 10, alignItems: 'center', gap: 6,
         }}>
-          {/* Campanella notifiche — solo desktop */}
           {sessionToken && (
-            <div className="filterbar-bell" style={{ alignItems: 'center' }}>
+            <div className="filterbar-bell">
               <NotificationBell token={sessionToken} />
             </div>
           )}
-
-          {/* Profilo — visibile solo se loggato */}
           {profileUsername ? (
-            <Link
-              href={`/u/${profileUsername}`}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 13,
-                padding: '5px 10px',
-                border: '1px solid var(--gray-600)',
-                borderRadius: 2,
-                background: 'transparent',
-                color: 'var(--bone)',
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                textDecoration: 'none',
-                display: 'flex', alignItems: 'center', gap: 5,
-                transition: 'all 0.15s',
-                minHeight: 32, touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              } as React.CSSProperties}
-              title={`Il mio profilo (@${profileUsername})`}
-            >
-              👤
-            </Link>
+            <Link href={`/u/${profileUsername}`} style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13,
+              padding: '5px 10px', border: '1px solid var(--gray-600)',
+              borderRadius: 2, background: 'transparent',
+              color: 'var(--bone)', textDecoration: 'none',
+              display: 'flex', alignItems: 'center', gap: 5,
+              minHeight: 32, touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            } as React.CSSProperties}>👤</Link>
           ) : (
-            <button
-              onClick={onOpenAuth}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 13,
-                padding: '5px 10px',
-                border: '1px solid var(--gray-600)',
-                borderRadius: 2,
-                background: 'transparent',
-                color: 'var(--gray-500)',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center',
-                minHeight: 32, touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              } as React.CSSProperties}
-              title="Accedi per vedere il tuo profilo"
-            >
-              👤
-            </button>
+            <button onClick={onOpenAuth} style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13,
+              padding: '5px 10px', border: '1px solid var(--gray-600)',
+              borderRadius: 2, background: 'transparent',
+              color: 'var(--gray-500)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center',
+              minHeight: 32, touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            } as React.CSSProperties}>👤</button>
           )}
         </div>
       </div>
 
+      {/* ══ FILTER SHEET ══ */}
+      {filterSheetOpen && (
+        <FilterSheet
+          activeType={activeType}
+          activeRegion={activeRegion}
+          activeCondition={activeCondition}
+          activeDifficulty={activeDifficulty}
+          onFilterType={onFilterType}
+          onFilterRegion={onFilterRegion}
+          onFilterCondition={onFilterCondition}
+          onFilterDifficulty={onFilterDifficulty}
+          onClose={() => setFilterSheetOpen(false)}
+          filteredCount={filteredCount ?? spots.length}
+        />
+      )}
+
       {/* ══ SEARCH OVERLAY ══ */}
       {searchOpen && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(10,10,10,0.97)',
-          zIndex: 99,
-          display: 'flex', flexDirection: 'column',
-          animation: 'fadeIn 0.15s ease-out',
-        }}>
+        <div
+          onTouchStart={e => { (e.currentTarget as HTMLElement).dataset.sx = String(e.touches[0].clientX); }}
+          onTouchEnd={e => {
+            const sx = parseFloat((e.currentTarget as HTMLElement).dataset.sx ?? '0');
+            const dx = (e.changedTouches[0]?.clientX ?? 0) - sx;
+            if (dx > 100) closeSearch(); // swipe right to dismiss
+          }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(10,10,10,0.97)',
+            zIndex: 99,
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideDown 0.2s ease-out',
+          }}>
           <style>{`
             @media (hover: hover) and (pointer: fine) {
               .search-row-btn:hover { background: rgba(255,106,0,0.08) !important; }
@@ -633,7 +649,7 @@ export default function TopBar({
    SUB-COMPONENTS
 ═══════════════════════════════════════ */
 
-function PlaceRow({ place, onPick }: { place: NominatimPlace; onPick: () => void }) {
+function PlaceRow({ place, onPick }: { place: GeoPlace; onPick: () => void }) {
   const placeEmoji = place.type === 'city' || place.type === 'town' || place.type === 'village'
     ? '🏙️'
     : place.type === 'administrative'
@@ -736,7 +752,7 @@ function FilterDropdown({ value, onChange, active, placeholder, children }: {
           cursor: 'pointer',
           appearance: 'none',
           WebkitAppearance: 'none',
-          minHeight: 30,
+          minHeight: 44,
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
           outline: 'none',
@@ -763,5 +779,214 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     }}>
       {children}
     </div>
+  );
+}
+
+/* ── Chip filtro attivo nella filter bar ── */
+function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      fontFamily: 'var(--font-mono)', fontSize: 11,
+      padding: '4px 8px 4px 10px',
+      background: 'rgba(255,106,0,0.15)',
+      border: '1px solid rgba(255,106,0,0.4)',
+      borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0,
+      color: 'var(--orange)',
+    }}>
+      {label}
+      <button
+        onClick={onRemove}
+        style={{
+          background: 'none', border: 'none', color: 'var(--orange)',
+          cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0,
+          display: 'flex', alignItems: 'center',
+          touchAction: 'manipulation',
+        }}
+        aria-label={`Rimuovi filtro ${label}`}
+      >✕</button>
+    </div>
+  );
+}
+
+/* ── Filter Sheet (slide-up) ── */
+function FilterSheet({
+  activeType, activeRegion, activeCondition, activeDifficulty,
+  onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty,
+  onClose, filteredCount,
+}: {
+  activeType: SpotType | null;
+  activeRegion: string | null;
+  activeCondition: SpotCondition | null;
+  activeDifficulty: string | null;
+  onFilterType: (t: SpotType | null) => void;
+  onFilterRegion: (r: string | null) => void;
+  onFilterCondition: (c: SpotCondition | null) => void;
+  onFilterDifficulty: (d: string | null) => void;
+  onClose: () => void;
+  filteredCount: number;
+}) {
+  const hasFilters = !!(activeType || activeRegion || activeCondition || activeDifficulty);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 79, backdropFilter: 'blur(2px)' }}
+      />
+      {/* Sheet */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: 'var(--gray-800)',
+        borderTop: '2px solid var(--orange)',
+        borderRadius: '16px 16px 0 0',
+        zIndex: 80,
+        maxHeight: '80dvh', overflowY: 'auto',
+        paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
+        animation: 'slideUp 0.25s ease-out',
+      }}>
+        <div className="bottom-sheet-handle" />
+
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 20px 16px',
+          borderBottom: '1px solid var(--gray-700)',
+        }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--orange)' }}>
+            ⚡ FILTRI
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {hasFilters && (
+              <button
+                onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); }}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11,
+                  padding: '6px 12px', border: '1px solid var(--gray-600)',
+                  borderRadius: 4, background: 'transparent',
+                  color: 'var(--gray-400)', cursor: 'pointer',
+                  touchAction: 'manipulation',
+                }}
+              >
+                RESET
+              </button>
+            )}
+            <button onClick={onClose} style={{
+              background: 'none', border: 'none', color: 'var(--gray-400)',
+              fontSize: 22, cursor: 'pointer', padding: '0 4px',
+            }} aria-label="Chiudi">✕</button>
+          </div>
+        </div>
+
+        <div style={{ padding: '20px' }}>
+
+          {/* TIPO */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              Tipo spot
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(Object.entries(TIPI_SPOT) as [SpotType, { label: string; emoji: string; color: string }][]).map(([key, info]) => (
+                <button
+                  key={key}
+                  onClick={() => onFilterType(activeType === key ? null : key)}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 13,
+                    padding: '8px 14px',
+                    border: `1px solid ${activeType === key ? info.color : 'var(--gray-600)'}`,
+                    borderRadius: 20,
+                    background: activeType === key ? `${info.color}22` : 'transparent',
+                    color: activeType === key ? info.color : 'var(--gray-400)',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    transition: 'all 0.15s',
+                  } as React.CSSProperties}
+                >
+                  <span>{info.emoji}</span>
+                  <span>{info.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* DIFFICOLTÀ */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              Difficoltà
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {DIFFICOLTA.map(d => (
+                <button
+                  key={d.value}
+                  onClick={() => onFilterDifficulty(activeDifficulty === d.value ? null : d.value)}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 13,
+                    padding: '8px 16px',
+                    border: `1px solid ${activeDifficulty === d.value ? '#ffce4d' : 'var(--gray-600)'}`,
+                    borderRadius: 20,
+                    background: activeDifficulty === d.value ? 'rgba(255,206,77,0.15)' : 'transparent',
+                    color: activeDifficulty === d.value ? '#ffce4d' : 'var(--gray-400)',
+                    cursor: 'pointer',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    transition: 'all 0.15s',
+                  } as React.CSSProperties}
+                >
+                  ⚡ {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* REGIONE */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              Regione
+            </div>
+            <div style={{ position: 'relative' }}>
+              <select
+                value={activeRegion ?? ''}
+                onChange={e => onFilterRegion(e.target.value || null)}
+                style={{
+                  width: '100%', fontFamily: 'var(--font-mono)', fontSize: 14,
+                  padding: '12px 36px 12px 14px',
+                  border: `1px solid ${activeRegion ? 'var(--orange)' : 'var(--gray-600)'}`,
+                  borderRadius: 8, background: 'var(--gray-700)',
+                  color: activeRegion ? 'var(--orange)' : 'var(--bone)',
+                  appearance: 'none', WebkitAppearance: 'none', outline: 'none',
+                  cursor: 'pointer',
+                } as React.CSSProperties}
+              >
+                <option value="">Tutte le regioni</option>
+                {REGIONI_ITALIA.map(r => (
+                  <option key={r.label} value={r.label}>{r.emoji} {r.label}</option>
+                ))}
+              </select>
+              <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--gray-400)', pointerEvents: 'none' }}>▾</span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer — Vedi risultati */}
+        <div style={{ padding: '0 20px 8px' }}>
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%', fontFamily: 'var(--font-mono)', fontSize: 15,
+              padding: '14px', background: 'var(--orange)', color: '#000',
+              border: 'none', borderRadius: 10, cursor: 'pointer',
+              fontWeight: 700, letterSpacing: '0.04em',
+              touchAction: 'manipulation',
+            }}
+          >
+            VEDI {filteredCount} SPOT
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { APP_CONFIG } from '@/lib/constants';
+import { compressImage } from '@/lib/compress-image';
 
 interface PhotoUploadProps {
   photos:     File[];
@@ -36,20 +37,21 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
     setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
   }, []);
 
-  const addFiles = useCallback((files: FileList | File[]) => {
+  const addFiles = useCallback(async (files: FileList | File[]) => {
     setError(null);
     const arr = Array.from(files);
     const valid: File[] = [];
     for (const f of arr) {
-      if (!ACCEPTED.includes(f.type)) {
+      if (!ACCEPTED.includes(f.type) && !f.name.toLowerCase().endsWith('.heic')) {
         setError(`Formato non supportato: ${f.name}. Usa JPG, PNG, WebP o HEIC.`);
         continue;
       }
-      if (f.size > MAX_SIZE_MB * 1024 * 1024) {
-        setError(`${f.name} supera ${MAX_SIZE_MB}MB.`);
+      const compressed = await compressImage(f);
+      if (compressed.size > MAX_SIZE_MB * 1024 * 1024) {
+        setError(`${f.name} supera ${MAX_SIZE_MB}MB anche dopo compressione.`);
         continue;
       }
-      valid.push(f);
+      valid.push(compressed);
     }
     const updated = [...photos, ...valid].slice(0, maxPhotos);
     onChange(updated);
