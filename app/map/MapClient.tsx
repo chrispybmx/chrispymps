@@ -1145,44 +1145,116 @@ function SpotListPanel({
       />
     )}
 
-    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' } as React.CSSProperties}>
+    <div ref={panelRef} style={{ height: '100%', overflowY: expandedId ? 'auto' : 'hidden', overscrollBehavior: 'contain' } as React.CSSProperties}>
 
       <style>{`
         .spot-card-wrap { -webkit-tap-highlight-color: transparent; }
-        @media (hover: hover) and (pointer: fine) {
-          .spot-card-wrap:not([data-exp="1"]):hover { background: rgba(255,255,255,0.025) !important; }
-        }
         .spot-card-wrap:active { opacity: 0.9; }
         .spot-fav-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .photo-nav-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-        .thumb-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .spot-hstrip { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 10px; padding: 0 14px; }
+        .spot-hstrip::-webkit-scrollbar { display: none; }
+        .spot-hcard { flex-shrink: 0; width: 260px; scroll-snap-align: start; }
       `}</style>
 
-      {/* Header lista — nascosto quando una card è espansa (coprirebbe la X) */}
+      {/* Header + horizontal strip — when NOT expanded */}
       {!expandedId && (
-        <div style={{
-          padding: '7px 14px 5px',
-          fontFamily: 'var(--font-mono)', fontSize: 11,
-          color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
-          borderBottom: radiusCenter ? '1px solid rgba(255,106,0,0.2)' : 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          position: 'sticky', top: 0,
-          background: 'rgba(10,10,10,0.97)', zIndex: 2,
-        }}>
-          <span>{spots.length} spot</span>
-          {radiusCenter && (
-            <span style={{ color: 'var(--orange)', fontSize: 10 }}>
-              🎯 per distanza
-            </span>
-          )}
-        </div>
+        <>
+          <div style={{
+            padding: '7px 14px 5px',
+            fontFamily: 'var(--font-mono)', fontSize: 11,
+            color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span>{spots.length} spot</span>
+            {radiusCenter && (
+              <span style={{ color: 'var(--orange)', fontSize: 10 }}>
+                🎯 per distanza
+              </span>
+            )}
+          </div>
+
+          {/* ══ HORIZONTAL SWIPE STRIP ══ */}
+          <div className="spot-hstrip" style={{ paddingBottom: 12 }}>
+            {spots.map(spot => {
+              const tipo = TIPI_SPOT[spot.type];
+              const cond = CONDIZIONI[spot.condition];
+              const cover = spot.cover_url || (spot.photo_urls?.[0]);
+              const myFav = isFav(spot.id);
+              const isAct = activeId === spot.id;
+
+              return (
+                <div
+                  key={spot.id}
+                  ref={(el) => setRef(spot.id, el)}
+                  data-spot-id={spot.id}
+                  className="spot-hcard spot-card-wrap"
+                  onClick={() => onSpotClick(spot)}
+                  style={{
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: 'var(--gray-800)',
+                    border: `1.5px solid ${isAct ? 'var(--orange)' : 'var(--gray-700)'}`,
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s',
+                  }}
+                >
+                  {/* Cover photo */}
+                  <div style={{
+                    height: 130, background: '#111',
+                    position: 'relative', overflow: 'hidden',
+                  }}>
+                    {cover ? (
+                      <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 36, opacity: 0.2 }}>{tipo.emoji}</span>
+                      </div>
+                    )}
+                    {/* Gradient bottom */}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 50, background: 'linear-gradient(transparent, rgba(0,0,0,0.7))', pointerEvents: 'none' }} />
+                    {/* Type badge */}
+                    <div style={{ position: 'absolute', bottom: 6, left: 8, fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
+                      {tipo.emoji} {tipo.label.toUpperCase()}
+                    </div>
+                    {/* Condition dot */}
+                    {spot.condition === 'alive' ? (
+                      <div style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851' }} />
+                    ) : (
+                      <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-mono)', fontSize: 9, background: cond.bg, color: cond.color, padding: '2px 6px', borderRadius: 3 }}>
+                        {cond.label.toUpperCase()}
+                      </div>
+                    )}
+                    {/* Fav */}
+                    <button onClick={e => onToggleFav(e, spot.id)} className="spot-fav-btn"
+                      style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', width: 28, height: 28, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {myFav ? '❤️' : '🤍'}
+                    </button>
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>
+                      {spot.name}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {spot.city && <span>📍 {spot.city}</span>}
+                      {spot.submitted_by_username && <span style={{ color: 'var(--gray-600)' }}>@{spot.submitted_by_username}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      {(expandedId && !isDesktop ? spots.filter(s => s.id === expandedId) : spots).map((spot, idx) => {
+      {/* ══ EXPANDED CARD — shown when a spot is tapped ══ */}
+      {expandedId && spots.filter(s => s.id === expandedId).map((spot, idx) => {
         const tipo      = TIPI_SPOT[spot.type];
         const cond      = CONDIZIONI[spot.condition];
-        const isAct     = activeId   === spot.id;
-        const isExp     = expandedId === spot.id;
+        const isAct     = true; // always active when expanded
+        const isExp     = true; // always expanded in this section
         const myFav     = isFav(spot.id);
         const isLast    = idx === spots.length - 1;
 

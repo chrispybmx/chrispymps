@@ -466,10 +466,23 @@ select.input-vhs {
   .topbar-add-btn { display: inline-flex !important; }
 }
 
-/* Filter bar: hidden on mobile (FILTRI button integrated in TopBar), visible on desktop */
-.map-filter-bar { display: none !important; }
+/* Filter bar: completely hidden on mobile, visible on desktop */
+.map-filter-bar {
+  display: none !important;
+  height: 0 !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
 @media (min-width: 768px) {
-  .map-filter-bar { display: flex !important; }
+  .map-filter-bar {
+    display: flex !important;
+    height: auto !important;
+    border-bottom: 1px solid var(--gray-700) !important;
+    padding: 6px 10px !important;
+    overflow: visible !important;
+  }
 }
 
 /* Sezione profilo nella filter bar: nascosta su mobile (c'è nella bottom nav) */

@@ -63,9 +63,8 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
       >
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--gray-700)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ marginBottom: 12 }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)' }}>{APP_CONFIG.siteName}</div>
-            <button onClick={onClose} className="btn-ghost" aria-label="Chiudi menu" style={{ fontSize: 20 }}>✕</button>
           </div>
 
           {/* User section */}

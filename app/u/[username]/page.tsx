@@ -164,20 +164,25 @@ export default async function UserProfilePage({ params }: { params: { username: 
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 16px calc(60px + env(safe-area-inset-bottom, 0px) + 8px)' }}>
 
-        {/* Profile hero */}
-        <ProfileClient profile={profile} joinDate={joinDate} />
-
-        {/* Stats strip */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--gray-700)', marginBottom: 24, overflowX: 'auto' }}>
-          <StatPill value={spots.length}   label="📍 spot" />
-          <StatPill value={photosCount}    label="📸 foto" />
-          <StatPill value={ridden.length}  label="🛹 girati" />
-          <StatPill value={statusCount}    label="✓ conferme" />
-          <StatPill value={citiesCount}    label="🌆 città" last />
+        {/* Profile hero — badge in top-right via ProfileGamification */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, paddingTop: 24, paddingBottom: 20, borderBottom: '1px solid var(--gray-700)', marginBottom: 20 }}>
+          <div style={{ flex: 1 }}>
+            <ProfileClient profile={profile} joinDate={joinDate} />
+          </div>
+          <ProfileGamification username={profile.username} />
         </div>
 
-        {/* Gamification: XP, level, badges */}
-        <ProfileGamification username={profile.username} />
+        {/* Minimal stats — inline text, not pill boxes */}
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 12,
+          color: 'var(--gray-500)', marginBottom: 24,
+          display: 'flex', flexWrap: 'wrap', gap: 12,
+        }}>
+          <span><strong style={{ color: 'var(--bone)' }}>{spots.length}</strong> spot</span>
+          {photosCount > 0 && <span><strong style={{ color: 'var(--bone)' }}>{photosCount}</strong> foto</span>}
+          {ridden.length > 0 && <span><strong style={{ color: 'var(--bone)' }}>{ridden.length}</strong> girati</span>}
+          {citiesCount > 0 && <span><strong style={{ color: 'var(--bone)' }}>{citiesCount}</strong> città</span>}
+        </div>
 
         {/* Spot pubblicati */}
         {spots.length === 0 ? (

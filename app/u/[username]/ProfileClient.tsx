@@ -55,7 +55,7 @@ export default function ProfileClient({ profile, joinDate }: Props) {
   const instaHandle = insta || profile.instagram_handle;
 
   return (
-    <div style={{ padding: '28px 0 24px', borderBottom: '1px solid var(--gray-700)' }}>
+    <div style={{ padding: '0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
         {/* Avatar */}
         <div style={{
