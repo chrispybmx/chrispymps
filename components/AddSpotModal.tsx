@@ -176,8 +176,38 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [coordError,  setCoordError]  = useState<string | null>(null);
   const [gpsState,    setGpsState]    = useState<'idle' | 'loading' | 'ok' | 'error' | 'denied' | 'timeout'>('idle');
 
-  /* Step 2 */
+  /* Step 2 — photos + pre-upload */
   const [photos, setPhotos] = useState<File[]>([]);
+  const [preUploadedUrls, setPreUploadedUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  /* Pre-upload photos as soon as selected — runs in background while user fills step 3 */
+  const handlePhotosChange = useCallback(async (files: File[]) => {
+    setPhotos(files);
+    if (!user || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const { data: { session } } = await supabaseBrowser().auth.getSession();
+      if (!session?.access_token) return;
+
+      const urls = await Promise.all(
+        files.map(async (file) => {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('access_token', session.access_token);
+          fd.append('purpose', 'general');
+          try {
+            const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
+            const j = await res.json();
+            return j.ok ? j.url : null;
+          } catch { return null; }
+        })
+      );
+      setPreUploadedUrls(urls.filter((u): u is string => u !== null));
+    } catch {}
+    finally { setUploading(false); }
+  }, [user]);
 
   /* Step 3 */
   const [name,        setName]        = useState('');
@@ -251,6 +281,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setName(''); setType(''); setDescription(''); setNotes('');
     setError(null); setSubmitting(false);
     setNearbySpots([]); setNearbyDismissed(false);
+    setPreUploadedUrls([]); setUploading(false);
     setAuthError(null); setAuthDone(null);
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
@@ -332,17 +363,39 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         setError('Sessione scaduta. Chiudi il modal, ricarica la pagina e riprova.');
         return;
       }
-      const fd = new FormData();
-      fd.append('data', JSON.stringify({
-        name: name.trim(), type, lat, lon,
-        city: city || undefined,
-        description: description || undefined,
-        guardians: notes || undefined,
-        difficulty: difficulty || undefined,
-        access_token: session.access_token,
-      }));
-      photos.forEach((p, i) => fd.append(`photo_${i}`, p));
-      const res  = await fetch('/api/submit-spot', { method: 'POST', body: fd });
+      // If pre-upload finished, send URLs. Otherwise fallback to FormData with files.
+      const hasPreUploaded = preUploadedUrls.length > 0;
+
+      let res: Response;
+      if (hasPreUploaded) {
+        // Fast path: photos already uploaded, just send URLs
+        res = await fetch('/api/submit-spot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.trim(), type, lat, lon,
+            city: city || undefined,
+            description: description || undefined,
+            guardians: notes || undefined,
+            difficulty: difficulty || undefined,
+            photo_urls: preUploadedUrls,
+            access_token: session.access_token,
+          }),
+        });
+      } else {
+        // Fallback: send files in FormData
+        const fd = new FormData();
+        fd.append('data', JSON.stringify({
+          name: name.trim(), type, lat, lon,
+          city: city || undefined,
+          description: description || undefined,
+          guardians: notes || undefined,
+          difficulty: difficulty || undefined,
+          access_token: session.access_token,
+        }));
+        photos.forEach((p, i) => fd.append(`photo_${i}`, p));
+        res = await fetch('/api/submit-spot', { method: 'POST', body: fd });
+      }
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? 'Errore durante l\'invio.');
       navigator.vibrate?.([30, 60, 30]);
@@ -807,7 +860,17 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   </span>
                 )}
               </p>
-              <PhotoUpload photos={photos} onChange={setPhotos} />
+              <PhotoUpload photos={photos} onChange={handlePhotosChange} />
+              {uploading && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)', textAlign: 'center' }}>
+                  ⏳ Caricamento foto in corso...
+                </div>
+              )}
+              {preUploadedUrls.length > 0 && !uploading && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#00c851', textAlign: 'center' }}>
+                  ✓ {preUploadedUrls.length} foto pronte
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setStep('posizione')} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
                 <button

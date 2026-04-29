@@ -13,6 +13,7 @@ const SpotSchema = z.object({
   description:  z.string().max(500).optional(),
   guardians:    z.string().max(200).optional(),
   difficulty:   z.string().max(30).optional(),
+  photo_urls:   z.array(z.string().url()).max(5).optional(),
   access_token: z.string().min(1).max(2048),
 });
 
@@ -28,24 +29,33 @@ const ALLOWED_MIME: Record<string, string> = {
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
-  let formData: FormData;
-  try {
-    formData = await req.formData();
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Request non valida' }, { status: 400 });
-  }
-
-  const rawData = formData.get('data');
-  if (!rawData || typeof rawData !== 'string') {
-    return NextResponse.json({ ok: false, error: 'Dati mancanti' }, { status: 400 });
-  }
-
+  const contentType = req.headers.get('content-type') ?? '';
   let parsed: z.infer<typeof SpotSchema>;
-  try {
-    parsed = SpotSchema.parse(JSON.parse(rawData));
-  } catch {
-    // Non esponiamo i dettagli Zod al client
-    return NextResponse.json({ ok: false, error: 'Dati non validi. Controlla tutti i campi.' }, { status: 422 });
+  let formData: FormData | null = null;
+
+  if (contentType.includes('application/json')) {
+    // Fast path: pre-uploaded photos, JSON body
+    try {
+      parsed = SpotSchema.parse(await req.json());
+    } catch {
+      return NextResponse.json({ ok: false, error: 'Dati non validi. Controlla tutti i campi.' }, { status: 422 });
+    }
+  } else {
+    // Legacy path: FormData with photo files
+    try {
+      formData = await req.formData();
+    } catch {
+      return NextResponse.json({ ok: false, error: 'Request non valida' }, { status: 400 });
+    }
+    const rawData = formData.get('data');
+    if (!rawData || typeof rawData !== 'string') {
+      return NextResponse.json({ ok: false, error: 'Dati mancanti' }, { status: 400 });
+    }
+    try {
+      parsed = SpotSchema.parse(JSON.parse(rawData));
+    } catch {
+      return NextResponse.json({ ok: false, error: 'Dati non validi. Controlla tutti i campi.' }, { status: 422 });
+    }
   }
 
   const supabase = supabaseAdmin();
@@ -92,53 +102,55 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Errore interno. Riprova più tardi.' }, { status: 500 });
   }
 
-  // 4. Read photo buffers into memory BEFORE responding
-  //    (FormData is lost after response — must read now)
-  const photoBuffers: { buffer: Buffer; mimeType: string; ext: string; index: number }[] = [];
-  for (let i = 0; i < 5; i++) {
-    const file = formData.get(`photo_${i}`);
-    if (!file || !(file instanceof Blob)) continue;
-    if (file.size > MAX_PHOTO_SIZE) continue;
-    const mimeType = file.type.toLowerCase();
-    const ext = ALLOWED_MIME[mimeType];
-    if (!ext) continue;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    if (!isValidImageMagicBytes(buffer, mimeType)) continue;
-    photoBuffers.push({ buffer, mimeType, ext, index: i });
+  // 4. Handle photos — either pre-uploaded URLs or FormData files
+  if (parsed.photo_urls && parsed.photo_urls.length > 0) {
+    // FAST PATH: photos already uploaded, just create records
+    await supabase.from('spot_photos').insert(
+      parsed.photo_urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
+    );
+  } else if (formData) {
+    // LEGACY PATH: read buffers + upload in background
+    const photoBuffers: { buffer: Buffer; mimeType: string; ext: string; index: number }[] = [];
+    for (let i = 0; i < 5; i++) {
+      const file = formData.get(`photo_${i}`);
+      if (!file || !(file instanceof Blob)) continue;
+      if (file.size > MAX_PHOTO_SIZE) continue;
+      const mimeType = file.type.toLowerCase();
+      const ext = ALLOWED_MIME[mimeType];
+      if (!ext) continue;
+      const buffer = Buffer.from(await file.arrayBuffer());
+      if (!isValidImageMagicBytes(buffer, mimeType)) continue;
+      photoBuffers.push({ buffer, mimeType, ext, index: i });
+    }
+
+    // Upload in background after responding
+    if (photoBuffers.length > 0) {
+      const bgUpload = async () => {
+        const results = await Promise.all(
+          photoBuffers.map(async ({ buffer, mimeType, ext, index }) => {
+            const path = `${spot.id}/${index}.${ext}`;
+            const { error } = await supabase.storage.from('spot-photos').upload(path, buffer, { contentType: mimeType, upsert: true });
+            if (error) return null;
+            return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
+          })
+        );
+        const urls = results.filter((u): u is string => u !== null);
+        if (urls.length > 0) {
+          await supabase.from('spot_photos').insert(
+            urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
+          );
+        }
+      };
+      bgUpload().catch(err => console.error('[submit-spot] bg upload error:', err));
+    }
   }
 
-  // 5. RESPOND IMMEDIATELY — user sees "Spot inviato!" right now
-  //    Photos upload in background (fire-and-forget)
-  const response = NextResponse.json({ ok: true, data: { id: spot.id, slug: spot.slug } }, { status: 201 });
+  // 5. Newsletter + admin notification (fire-and-forget)
+  if (user.email) subscribeToNewsletter(user.email, profile.username).catch(() => {});
+  const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
+  sendAdminNotification(spot, contributor as any).catch(() => {});
 
-  // 6. Background: upload photos + insert records + notify
-  const bgUpload = async () => {
-    if (photoBuffers.length > 0) {
-      const results = await Promise.all(
-        photoBuffers.map(async ({ buffer, mimeType, ext, index }) => {
-          const path = `${spot.id}/${index}.${ext}`;
-          const { error } = await supabase.storage.from('spot-photos').upload(path, buffer, { contentType: mimeType, upsert: true });
-          if (error) return null;
-          return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
-        })
-      );
-      const urls = results.filter((u): u is string => u !== null);
-      if (urls.length > 0) {
-        await supabase.from('spot_photos').insert(
-          urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
-        );
-      }
-    }
-    // Newsletter + admin notification
-    if (user.email) subscribeToNewsletter(user.email, profile.username).catch(() => {});
-    const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
-    sendAdminNotification(spot, contributor as any).catch(() => {});
-  };
-
-  // Fire and forget — continues even after response is sent
-  bgUpload().catch(err => console.error('[submit-spot] bg upload error:', err));
-
-  return response;
+  return NextResponse.json({ ok: true, data: { id: spot.id, slug: spot.slug } }, { status: 201 });
 }
 
 /** Verifica magic bytes per JPEG, PNG, WebP */
