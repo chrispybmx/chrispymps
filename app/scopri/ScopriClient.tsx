@@ -191,9 +191,9 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                   background: 'var(--gray-800)',
                   border: '1px solid var(--gray-700)',
                 }}>
-                  {/* Cover photo */}
+                  {/* Cover photo — square, consistent with profile */}
                   <div style={{
-                    aspectRatio: '4/3', overflow: 'hidden',
+                    aspectRatio: '1/1', overflow: 'hidden',
                     background: '#111', position: 'relative',
                   }}>
                     {cover ? (
