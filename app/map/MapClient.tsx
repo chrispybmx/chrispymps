@@ -68,7 +68,7 @@ interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 const TOP_OFFSET      = 100;
 const PANEL_MIN       = 0;
 const PANEL_SNAP      = 140;
-const EXPANDED_CARD_H = 380;  // handle(46)+foto(180)+info(54)+cta(60)+padding ≈ 380px
+const EXPANDED_CARD_H = 340;  // handle(46)+foto(140)+info(54)+cta(60)+padding ≈ 340px
 function DEFAULT_PANEL_H() {
   return typeof window !== 'undefined'
     ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
@@ -1145,16 +1145,13 @@ function SpotListPanel({
       />
     )}
 
-    <div ref={panelRef} style={{ height: '100%', overflowY: expandedId ? 'auto' : 'hidden', overscrollBehavior: 'contain' } as React.CSSProperties}>
+    <div ref={panelRef} style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' } as React.CSSProperties}>
 
       <style>{`
         .spot-card-wrap { -webkit-tap-highlight-color: transparent; }
         .spot-card-wrap:active { opacity: 0.9; }
         .spot-fav-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .photo-nav-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-        .spot-hstrip { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 10px; padding: 0 14px; }
-        .spot-hstrip::-webkit-scrollbar { display: none; }
-        .spot-hcard { flex-shrink: 0; width: 260px; scroll-snap-align: start; }
       `}</style>
 
       {/* Header + horizontal strip — when NOT expanded */}
@@ -1174,8 +1171,8 @@ function SpotListPanel({
             )}
           </div>
 
-          {/* ══ HORIZONTAL SWIPE STRIP ══ */}
-          <div className="spot-hstrip" style={{ paddingBottom: 12 }}>
+          {/* ══ 2-COLUMN VERTICAL GRID ══ */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 10px 12px' }}>
             {spots.map(spot => {
               const tipo = TIPI_SPOT[spot.type];
               const cond = CONDIZIONI[spot.condition];
@@ -1188,7 +1185,7 @@ function SpotListPanel({
                   key={spot.id}
                   ref={(el) => setRef(spot.id, el)}
                   data-spot-id={spot.id}
-                  className="spot-hcard spot-card-wrap"
+                  className="spot-card-wrap"
                   onClick={() => onSpotClick(spot)}
                   style={{
                     borderRadius: 10,
@@ -1332,7 +1329,7 @@ function SpotListPanel({
                         display: 'flex', overflowX: 'auto',
                         scrollSnapType: 'x mandatory', scrollBehavior: 'auto',
                         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
-                        width: '100%', height: isDesktop ? 240 : 180,
+                        width: '100%', height: isDesktop ? 200 : 140,
                         cursor: 'zoom-in', touchAction: 'pan-x',
                       } as React.CSSProperties}
                     >
