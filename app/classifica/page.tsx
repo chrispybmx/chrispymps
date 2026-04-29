@@ -6,8 +6,20 @@ import type { SpotType, SpotCondition } from '@/lib/types';
 import BottomNav from '@/components/BottomNav';
 
 export const metadata: Metadata = {
-  title: 'Classifica — Chrispy Maps',
-  description: 'I migliori spot BMX, skatepark e park scooter in Italia per qualità e documentazione. Classifica rider e spot top.',
+  title: 'Classifica Spot e Rider BMX Italia — Chrispy Maps',
+  description: 'I migliori spot BMX, skatepark e park scooter in Italia per qualità e documentazione. Top rider e spot più fotografati.',
+  alternates: { canonical: 'https://maps.chrispybmx.com/classifica' },
+  keywords: ['classifica spot BMX', 'migliori skatepark Italia', 'top rider BMX', 'spot più fotografati'],
+  openGraph: {
+    title: 'Classifica — Chrispy Maps',
+    description: 'Top spot e rider BMX in Italia. Classifica basata su foto e contributi della community.',
+    url: 'https://maps.chrispybmx.com/classifica',
+    siteName: 'Chrispy Maps',
+    locale: 'it_IT',
+    type: 'website',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
+  },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Classifica — Chrispy Maps' },
 };
 
 export const revalidate = 600;

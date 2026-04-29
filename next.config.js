@@ -71,12 +71,9 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    return [
-      // Normalizza /map → / con 308 permanente, così i vecchi link
-      // (share, email, backlink) arrivano comunque alla home pulita.
-      // ATTENZIONE: source '/map' matcha solo il path esatto, NON /map/spot ecc.
-      { source: '/map', destination: '/', permanent: true },
-    ];
+    // Redirect /map rimosso — il rewrite / → /map è sufficiente.
+    // Mantenere entrambi creava una redirect chain inutile.
+    return [];
   },
 };
 

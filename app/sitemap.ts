@@ -10,11 +10,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Pagine statiche principali
   // NOTA: la home è "/" (rewrite interno → /map), NON "/map" (che ora ridireziona a "/")
   const staticPages: MetadataRoute.Sitemap = [
-    { url: `${base}`,             lastModified: new Date(), changeFrequency: 'daily',   priority: 1.0 },
-    { url: `${base}/events`,      lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
-    { url: `${base}/news`,        lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.7 },
-    { url: `${base}/map/about`,   lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${base}/map/support`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${base}`,              lastModified: new Date(), changeFrequency: 'daily',   priority: 1.0 },
+    { url: `${base}/scopri`,       lastModified: new Date(), changeFrequency: 'daily',   priority: 0.9 },
+    { url: `${base}/classifica`,   lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
+    { url: `${base}/events`,       lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
+    { url: `${base}/news`,         lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.7 },
+    { url: `${base}/map/about`,    lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${base}/map/support`,  lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
   ];
 
   // Pagine città — alta priorità per SEO locale

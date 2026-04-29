@@ -4,8 +4,20 @@ import type { SpotMapPin } from '@/lib/types';
 import ScopriClient from './ScopriClient';
 
 export const metadata: Metadata = {
-  title: 'Scopri Spot — Chrispy Maps',
-  description: 'Esplora e filtra centinaia di spot BMX, skatepark e park scooter in Italia. Scorri, filtra per tipo e condizione.',
+  title: 'Scopri Spot BMX, Skatepark e Park Scooter — Chrispy Maps',
+  description: 'Esplora e filtra centinaia di spot BMX, skatepark e park scooter in Italia. Cerca per tipo, regione, difficoltà e condizione.',
+  alternates: { canonical: 'https://maps.chrispybmx.com/scopri' },
+  keywords: ['scopri spot BMX', 'trova skatepark Italia', 'spot scooter freestyle', 'street spot BMX', 'park BMX Italia'],
+  openGraph: {
+    title: 'Scopri Spot — Chrispy Maps',
+    description: 'Esplora centinaia di spot BMX, skatepark e park scooter in tutta Italia.',
+    url: 'https://maps.chrispybmx.com/scopri',
+    siteName: 'Chrispy Maps',
+    locale: 'it_IT',
+    type: 'website',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
+  },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Scopri Spot — Chrispy Maps' },
 };
 
 export const revalidate = 300;

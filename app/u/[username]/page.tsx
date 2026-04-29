@@ -115,6 +115,7 @@ export async function generateMetadata({ params }: { params: { username: string 
   return {
     title,
     description,
+    robots: { index: false, follow: true }, // profile pages not indexed
     alternates: { canonical: url },
     keywords: [
       `@${profile.username}`, `${profile.username} BMX`,

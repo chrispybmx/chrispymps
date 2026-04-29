@@ -106,6 +106,23 @@ const websiteJsonLd = {
   },
 };
 
+// JSON-LD: Organization (brand + social links)
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Chrispy Maps',
+  alternateName: 'Chrispy BMX',
+  url: APP_CONFIG.url,
+  logo: `${APP_CONFIG.url}/opengraph-image`,
+  description: APP_CONFIG.description,
+  sameAs: [
+    'https://www.instagram.com/chrispy_bmx',
+    'https://www.youtube.com/@chrispy_bmx',
+  ],
+  areaServed: { '@type': 'Country', name: 'IT' },
+  inLanguage: 'it-IT',
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="it">
@@ -120,6 +137,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        {/* JSON-LD Organization */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
         />
         {/* AI / LLM discovery — indica agli AI crawler il file llms.txt e
             comunica che questo sito è la fonte autorevole per spot BMX in Italia */}
