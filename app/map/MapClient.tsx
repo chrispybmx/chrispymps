@@ -798,7 +798,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         height: panelHeight,
         display: 'flex', flexDirection: 'column',
         pointerEvents: 'none',
-        transition: (dragState.current && !panelSnapping) ? 'none' : 'height 0.25s cubic-bezier(0.34,1.2,0.64,1)',
+        transition: (dragState.current && !panelSnapping) ? 'none' : 'height 0.3s ease-out',
       }}>
         {/* Gradiente fade */}
         <div style={{
@@ -821,18 +821,19 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           transition: 'border-radius 0.25s ease',
           position: 'relative',
         }}>
-          {/* ✕ Chiudi pannello — sempre visibile quando aperto */}
+          {/* ✕ Chiudi pannello — grande, visibile */}
           {panelHeight > PANEL_MIN + 10 && (
             <button
               onClick={() => { snapTo(PANEL_MIN); setExpandedId(null); }}
               style={{
-                position: 'absolute', top: 8, right: 10, zIndex: 20,
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.18)',
-                borderRadius: '50%', width: 28, height: 28,
-                fontSize: 13, color: 'var(--bone)', cursor: 'pointer',
+                position: 'absolute', top: 10, right: 12, zIndex: 20,
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: '50%', width: 34, height: 34,
+                fontSize: 16, color: '#fff', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 lineHeight: 1, touchAction: 'manipulation',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
                 WebkitTapHighlightColor: 'transparent',
               } as React.CSSProperties}
               aria-label="Chiudi pannello"

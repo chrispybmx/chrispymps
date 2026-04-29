@@ -240,10 +240,10 @@ function SpotTile({ spot, username }: { spot: SpotCard; username: string }) {
   return (
     <Link href={`/map/spot/${spot.slug}?from=/u/${username}`} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, overflow: 'hidden', opacity: isDead ? 0.65 : 1 }}>
-        <div style={{ aspectRatio: '1 / 1', background: 'var(--gray-700)', overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '100%', paddingBottom: '100%', background: 'var(--gray-700)', overflow: 'hidden', position: 'relative' }}>
           {cover
-            ? <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: isDead ? 'grayscale(0.5)' : 'none' }} loading="lazy" />
-            : <span style={{ fontSize: 36 }}>{tipo.emoji}</span>}
+            ? <img src={cover} alt={spot.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: isDead ? 'grayscale(0.5)' : 'none' }} loading="lazy" />
+            : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 36 }}>{tipo.emoji}</span></div>}
           {isDead && (
             <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.7)', fontFamily: 'var(--font-mono)', fontSize: 9, color: '#aaa', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase' }}>
               {spot.condition}

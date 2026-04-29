@@ -191,15 +191,16 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                   background: 'var(--gray-800)',
                   border: '1px solid var(--gray-700)',
                 }}>
-                  {/* Cover photo — square, consistent with profile */}
+                  {/* Cover photo — square, forced via padding trick */}
                   <div style={{
-                    aspectRatio: '1/1', overflow: 'hidden',
-                    background: '#111', position: 'relative',
+                    width: '100%', paddingBottom: '100%',
+                    overflow: 'hidden', background: '#111',
+                    position: 'relative',
                   }}>
                     {cover ? (
-                      <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                      <img src={cover} alt={spot.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                     ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 36, opacity: 0.2 }}>{tipo.emoji}</span>
                       </div>
                     )}
