@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const supabase = supabaseAdmin();
 
-  const fields = {
+  const fields: Record<string, unknown> = {
     title:       body.title,
     description: body.description,
     location:    body.location,
@@ -39,6 +39,8 @@ export async function POST(req: Request) {
     status:      body.status     ?? 'published',
     spot_id:     body.spot_id    || null,
   };
+  // Include moderation_status if provided (for approving user submissions)
+  if (body.moderation_status) fields.moderation_status = body.moderation_status;
 
   if (body.id) {
     // UPDATE

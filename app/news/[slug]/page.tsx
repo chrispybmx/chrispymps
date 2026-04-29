@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { APP_CONFIG } from '@/lib/constants';
+import NewsComments from '@/components/NewsComments';
 
 interface NewsArticle {
   id: string;
@@ -250,8 +251,11 @@ export default async function ArticlePage({ params }: { params: { slug: string }
           }
         </div>
 
+        {/* Comments */}
+        <NewsComments newsId={article.id} newsSlug={article.slug} />
+
         {/* Footer nav */}
-        <div style={{ marginTop: 48, paddingTop: 20, borderTop: '1px solid var(--gray-700)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid var(--gray-700)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link href="/news" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', textDecoration: 'none' }}>
             ← Tutte le news
           </Link>

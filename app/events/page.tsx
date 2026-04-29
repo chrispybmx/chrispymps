@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import EventsCalendar, { type CalendarEvent } from './EventsCalendar';
+import { ProponiEventoBtn } from '@/components/CommunityActions';
 
 export const metadata: Metadata = {
   title: 'Eventi BMX Italia — Gare, Jam e Contest | Chrispy Maps',
@@ -61,6 +62,9 @@ export default async function EventsPage() {
       </div>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '20px 16px 60px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+          <ProponiEventoBtn />
+        </div>
         <EventsCalendar events={events} />
       </div>
     </div>

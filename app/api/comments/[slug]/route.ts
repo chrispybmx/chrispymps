@@ -3,10 +3,34 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 interface Props { params: { slug: string } }
 
-/* ── GET: leggi commenti per uno spot ── */
+/* ── GET: leggi commenti per uno spot o una news ── */
 export async function GET(req: NextRequest, { params }: Props) {
   const admin = supabaseAdmin();
+  const isNews = req.nextUrl.searchParams.get('type') === 'news';
 
+  if (isNews) {
+    // Comments on news article
+    const { data: news } = await admin
+      .from('news')
+      .select('id')
+      .eq('slug', params.slug)
+      .eq('status', 'published')
+      .maybeSingle();
+
+    if (!news) return NextResponse.json({ ok: false, error: 'Articolo non trovato' }, { status: 404 });
+
+    const { data: comments, error } = await admin
+      .from('comments')
+      .select('id, username, text, created_at, parent_id, likes_count')
+      .eq('news_id', news.id)
+      .order('created_at', { ascending: true })
+      .limit(200);
+
+    if (error) return NextResponse.json({ ok: false, error: 'Errore lettura' }, { status: 500 });
+    return NextResponse.json({ ok: true, data: comments ?? [], myLikes: [] });
+  }
+
+  // Comments on spot (default)
   const { data: spot } = await admin
     .from('spots')
     .select('id')
@@ -79,14 +103,32 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ ok: false, error: 'Commento tra 2 e 500 caratteri.' }, { status: 400 });
   }
 
-  const { data: spot } = await admin
-    .from('spots')
-    .select('id, name, slug, submitted_by_user_id')
-    .eq('slug', params.slug)
-    .eq('status', 'approved')
-    .maybeSingle();
+  // Support both spot comments and news comments
+  const newsId = typeof body.news_id === 'string' ? body.news_id : null;
 
-  if (!spot) return NextResponse.json({ ok: false, error: 'Spot non trovato' }, { status: 404 });
+  let spot: { id: string; name: string; slug: string; submitted_by_user_id?: string } | null = null;
+
+  if (newsId) {
+    // Commenting on a news article
+    const { data: news } = await admin
+      .from('news')
+      .select('id, title, slug')
+      .eq('id', newsId)
+      .eq('status', 'published')
+      .maybeSingle();
+    if (!news) return NextResponse.json({ ok: false, error: 'Articolo non trovato' }, { status: 404 });
+    // Use news as "spot" for comment insertion (news_id column)
+    spot = { id: news.id, name: news.title, slug: news.slug };
+  } else {
+    const { data: spotData } = await admin
+      .from('spots')
+      .select('id, name, slug, submitted_by_user_id')
+      .eq('slug', params.slug)
+      .eq('status', 'approved')
+      .maybeSingle();
+    if (!spotData) return NextResponse.json({ ok: false, error: 'Spot non trovato' }, { status: 404 });
+    spot = spotData;
+  }
 
   // Username di chi commenta
   const { data: profile } = await admin
@@ -114,9 +156,13 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   // Inserisci commento / risposta
+  const insertData = newsId
+    ? { news_id: newsId, user_id: user.id, username, text, parent_id: parent_id || null }
+    : { spot_id: spot!.id, user_id: user.id, username, text, parent_id: parent_id || null };
+
   const { data: comment, error: insertErr } = await admin
     .from('comments')
-    .insert({ spot_id: spot.id, user_id: user.id, username, text, parent_id: parent_id || null })
+    .insert(insertData)
     .select('id, username, text, created_at, parent_id, likes_count')
     .single();
 

@@ -30,8 +30,8 @@ export async function POST(req: Request) {
   if (!title || title.length < 3 || title.length > 200) {
     return NextResponse.json({ ok: false, error: 'Titolo tra 3 e 200 caratteri.' }, { status: 400 });
   }
-  if (content.length > 10000) {
-    return NextResponse.json({ ok: false, error: 'Contenuto troppo lungo (max 10.000 caratteri).' }, { status: 400 });
+  if (content.length > 50000) {
+    return NextResponse.json({ ok: false, error: 'Contenuto troppo lungo (max 50.000 caratteri).' }, { status: 400 });
   }
 
   const supabase = supabaseAdmin();
@@ -39,10 +39,12 @@ export async function POST(req: Request) {
   if (body.id) {
     // UPDATE
     if (!UUID_RE.test(String(body.id))) return NextResponse.json({ ok: false, error: 'ID non valido' }, { status: 400 });
-    const { error } = await supabase.from('news').update({
+    const updateFields: Record<string, unknown> = {
       title, excerpt, body: content, cover_url, tags, status,
       published_at: status === 'published' ? (body.published_at || new Date().toISOString()) : null,
-    }).eq('id', body.id);
+    };
+    if (body.moderation_status) updateFields.moderation_status = body.moderation_status;
+    const { error } = await supabase.from('news').update(updateFields).eq('id', body.id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   } else {
     // CREATE
