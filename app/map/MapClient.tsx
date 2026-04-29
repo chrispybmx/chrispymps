@@ -376,26 +376,16 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     setExpandedId(prev => {
       const isClosing = prev === pin.id;
       if (isClosing) {
-        /* Chiusura: torna all'altezza lista e rimane sullo spot che era aperto */
-        ioLockRef.current = true;
-        setTimeout(() => { ioLockRef.current = false; }, 400);
-        setTimeout(() => snapTo(DEFAULT_PANEL_H()), 50);
-        /* Su mobile tutti gli spot tornano nel DOM → aspetta il re-render (200ms),
-           poi scroll istantaneo così la lista non "vola" visibilmente */
-        setTimeout(() => {
-          scrollInstantRef.current = true;
-          setScrollToId(pin.id);
-        }, 200);
+        // Chiudi card → torna a lista
+        snapTo(DEFAULT_PANEL_H());
       } else {
-        /* Apri pannello — altezza che mostra foto + info + CTA senza tagliare */
-        snapTo(Math.round(window.innerHeight * 0.65));
+        // Apri anteprima — 50% schermo, giusto per foto + info + VEDI SPOT
+        snapTo(Math.round(window.innerHeight * 0.50));
       }
       return isClosing ? null : pin.id;
     });
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 12 });
   }, [snapTo]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* Expanded card: panel stays at 92% — no auto-resize jump */
 
   const activateDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleActivateFromScroll = useCallback((id: string) => {
@@ -831,10 +821,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           transition: 'border-radius 0.25s ease',
           position: 'relative',
         }}>
-          {/* ✕ Chiudi pannello — appare quando il pannello è aperto e NON c'è card espansa */}
-          {panelHeight > PANEL_MIN + 10 && !expandedId && (
+          {/* ✕ Chiudi pannello — sempre visibile quando aperto */}
+          {panelHeight > PANEL_MIN + 10 && (
             <button
-              onClick={() => snapTo(PANEL_MIN)}
+              onClick={() => { snapTo(PANEL_MIN); setExpandedId(null); }}
               style={{
                 position: 'absolute', top: 8, right: 10, zIndex: 20,
                 background: 'rgba(255,255,255,0.08)',

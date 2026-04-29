@@ -385,6 +385,7 @@ export default function SpotMap({
           closeButton: false,
           className: 'spot-hover-popup',
           autoPan: false,
+          interactive: true, // allows clicking links inside popup
         });
 
         marker.on('click', (e) => {
