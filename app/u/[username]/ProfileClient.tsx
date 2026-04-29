@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
 interface Profile {
@@ -8,6 +8,7 @@ interface Profile {
   username:         string;
   bio?:             string | null;
   instagram_handle?: string | null;
+  avatar_url?:      string | null;
 }
 
 interface Props {
@@ -20,6 +21,9 @@ export default function ProfileClient({ profile, joinDate }: Props) {
   const [editing,  setEditing]  = useState(false);
   const [bio,      setBio]      = useState(profile.bio ?? '');
   const [insta,    setInsta]    = useState(profile.instagram_handle ?? '');
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? '');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [saving,   setSaving]   = useState(false);
   const [msg,      setMsg]      = useState('');
   const [token,    setToken]    = useState<string | null>(null);
@@ -35,6 +39,29 @@ export default function ProfileClient({ profile, joinDate }: Props) {
       }
     });
   }, [profile.username]);
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!token || file.size > 5 * 1024 * 1024) return;
+    setUploadingAvatar(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('access_token', token);
+      fd.append('purpose', 'general');
+      const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
+      const j = await res.json();
+      if (j.ok && j.url) {
+        setAvatarUrl(j.url);
+        // Save avatar URL to profile
+        await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ avatar_url: j.url }),
+        });
+      }
+    } catch {}
+    finally { setUploadingAvatar(false); }
+  };
 
   const handleSave = async () => {
     if (!token) return;
@@ -57,16 +84,42 @@ export default function ProfileClient({ profile, joinDate }: Props) {
   return (
     <div style={{ padding: '0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18 }}>
-        {/* Avatar */}
-        <div style={{
-          width: 72, height: 72, borderRadius: '50%',
-          background: 'var(--orange)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-mono)', fontSize: 32, color: '#000',
-          flexShrink: 0, border: '3px solid var(--gray-700)',
-        }}>
-          {profile.username[0].toUpperCase()}
+        {/* Avatar — tap to change if owner */}
+        <div
+          onClick={() => { if (isOwn && !uploadingAvatar) avatarInputRef.current?.click(); }}
+          style={{
+            width: 72, height: 72, borderRadius: '50%',
+            background: avatarUrl ? 'transparent' : 'var(--orange)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-mono)', fontSize: 32, color: '#000',
+            flexShrink: 0, border: '3px solid var(--gray-700)',
+            overflow: 'hidden', cursor: isOwn ? 'pointer' : 'default',
+            position: 'relative', opacity: uploadingAvatar ? 0.5 : 1,
+          }}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={profile.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            profile.username[0].toUpperCase()
+          )}
+          {isOwn && (
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              background: 'rgba(0,0,0,0.6)', textAlign: 'center',
+              fontFamily: 'var(--font-mono)', fontSize: 8, color: '#fff',
+              padding: '2px 0',
+            }}>
+              📷
+            </div>
+          )}
         </div>
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); e.target.value = ''; }}
+        />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 26, color: 'var(--bone)', margin: '0 0 4px' }}>

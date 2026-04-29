@@ -5,6 +5,7 @@ import { z } from 'zod';
 const Schema = z.object({
   bio:              z.string().max(200).optional().nullable(),
   instagram_handle: z.string().max(60).optional().nullable(),
+  avatar_url:       z.string().url().max(500).optional().nullable(),
 });
 
 /* POST /api/profile — update own profile */

@@ -15,6 +15,7 @@ interface Profile {
   created_at:       string;
   bio?:             string | null;
   instagram_handle?: string | null;
+  avatar_url?:      string | null;
 }
 
 interface SpotCard {
@@ -32,7 +33,7 @@ async function getData(username: string) {
   const sb = supabaseAdmin();
   const { data: profile } = await sb
     .from('profiles')
-    .select('id, username, created_at, bio, instagram_handle')
+    .select('id, username, created_at, bio, instagram_handle, avatar_url')
     .eq('username', username)
     .maybeSingle();
   if (!profile) return null;
@@ -249,11 +250,10 @@ function SpotTile({ spot, username }: { spot: SpotCard; username: string }) {
             </div>
           )}
         </div>
-        <div style={{ padding: '8px 10px' }}>
+        <div style={{ padding: '8px 10px', height: 52, overflow: 'hidden' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{spot.name}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color }}>{tipo.emoji} {tipo.label}</span>
-            {spot.city && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>· {spot.city}</span>}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {tipo.emoji} {tipo.label}{spot.city ? ` · ${spot.city}` : ''}
           </div>
         </div>
       </div>

@@ -31,7 +31,7 @@ interface SpotRow {
 }
 
 interface RiderRow {
-  username: string; spot_count: number; xp: number; level: string; level_image: string;
+  username: string; spot_count: number; xp: number; level: string; level_image: string; avatar_url?: string;
 }
 
 /* ── Level info (must match lib/xp.ts) ── */
@@ -90,7 +90,7 @@ async function getData(): Promise<{ topSpots: SpotRow[]; topRiders: RiderRow[] }
   const usernames = Array.from(riderMap.keys());
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('username, id')
+    .select('username, id, avatar_url')
     .in('username', usernames);
 
   const userIds = (profiles ?? []).map(p => p.id);
@@ -99,16 +99,18 @@ async function getData(): Promise<{ topSpots: SpotRow[]; topRiders: RiderRow[] }
     : { data: [] };
 
   const xpMap = new Map<string, number>();
+  const avatarMap = new Map<string, string>();
   (profiles ?? []).forEach(p => {
     const stat = (statsRaw ?? []).find(s => s.user_id === p.id);
     xpMap.set(p.username, stat?.lifetime_xp ?? 0);
+    if (p.avatar_url) avatarMap.set(p.username, p.avatar_url);
   });
 
   const topRiders: RiderRow[] = Array.from(riderMap.entries())
     .map(([username, count]) => {
       const xp = xpMap.get(username) ?? 0;
       const level = getLevelForXP(xp);
-      return { username, spot_count: count, xp, level: level.name, level_image: level.image };
+      return { username, spot_count: count, xp, level: level.name, level_image: level.image, avatar_url: avatarMap.get(username) };
     })
     .sort((a, b) => b.xp - a.xp || b.spot_count - a.spot_count)
     .slice(0, 15);
@@ -171,11 +173,25 @@ export default async function ClassificaPage() {
                 <Medal pos={i} />
               </div>
 
-              {/* Badge image */}
+              {/* Avatar */}
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                overflow: 'hidden', background: 'var(--gray-700)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-mono)', fontSize: 16, color: i < 3 ? '#000' : 'var(--gray-400)',
+                ...(i < 3 && !rider.avatar_url ? { background: 'var(--orange)' } : {}),
+              }}>
+                {rider.avatar_url ? (
+                  <img src={rider.avatar_url} alt={rider.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  rider.username[0].toUpperCase()
+                )}
+              </div>
+              {/* Badge — scontornato (transparent bg) */}
               <img
                 src={rider.level_image}
                 alt={rider.level}
-                style={{ width: 40, height: 40, objectFit: 'contain', flexShrink: 0 }}
+                style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0, marginLeft: -8 }}
               />
 
               {/* Info */}

@@ -216,31 +216,17 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                     )}
                   </div>
 
-                  {/* Info */}
-                  <div style={{ padding: '8px 10px' }}>
+                  {/* Info — fixed height for uniform grid */}
+                  <div style={{ padding: '8px 10px', height: 60, overflow: 'hidden' }}>
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3,
                     }}>
                       {spot.name}
                     </div>
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {spot.city && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)' }}>
-                          📍 {spot.city}
-                        </span>
-                      )}
-                      {spot.difficulty && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#ffce4d' }}>
-                          ⚡ {spot.difficulty.toUpperCase()}
-                        </span>
-                      )}
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {spot.city ? `📍 ${spot.city}` : ''}{spot.difficulty ? ` · ⚡ ${spot.difficulty.toUpperCase()}` : ''}
                     </div>
-                    {spot.submitted_by_username && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)', marginTop: 2 }}>
-                        @{spot.submitted_by_username}
-                      </div>
-                    )}
                   </div>
 
                   {/* Arrow */}
