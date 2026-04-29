@@ -65,7 +65,8 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
 
 interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 
-const TOP_OFFSET      = 100;
+const topOffset_MOBILE  = 56;  // topbar only (filter bar hidden on mobile)
+const topOffset_DESKTOP = 100; // topbar + filter bar
 const PANEL_MIN       = 0;
 const PANEL_SNAP      = 140;
 const EXPANDED_CARD_H = 420;  // handle(46)+foto(160)+info(54)+cta(60)+padding — opens big
@@ -229,6 +230,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
   const [windowH,   setWindowH]   = useState(700);
+  const topOffset = isDesktop ? TOP_OFFSET_DESKTOP : TOP_OFFSET_MOBILE;
   useEffect(() => {
     const check = () => {
       setIsDesktop(window.innerWidth >= 768);
@@ -462,7 +464,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       {/* ── MAPPA — schermo intero sotto topbar ── */}
       <div style={{
         position: 'fixed',
-        top: TOP_OFFSET, left: 0, right: 0, bottom: 0,
+        top: topOffset, left: 0, right: 0, bottom: 0,
         zIndex: 1,
       }}>
         <SpotMap
@@ -491,7 +493,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       {/* ── BOTTONI MAPPA — colonna sinistra, auto-hide ── */}
       <div style={{
         position: 'fixed',
-        top: TOP_OFFSET + 10,
+        top: topOffset + 10,
         left: 12,
         display: 'flex', flexDirection: 'column', gap: 8,
         zIndex: 55,
@@ -529,7 +531,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         <div
           onClick={revealButtons}
           style={{
-            position: 'fixed', top: TOP_OFFSET + 10, left: 0,
+            position: 'fixed', top: topOffset + 10, left: 0,
             width: 36, height: 132, zIndex: 54,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
           }}
@@ -553,7 +555,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       {radiusMode && radiusPanelOpen && (
         <div style={{
           position: 'fixed',
-          top: TOP_OFFSET,
+          top: topOffset,
           left: 0, right: 0,
           zIndex: 50,
           background: 'rgba(14,14,14,0.97)',
@@ -720,7 +722,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       {radiusMode && !radiusPanelOpen && radiusCenter && (
         <div style={{
           position: 'fixed',
-          top: TOP_OFFSET + 8,
+          top: topOffset + 8,
           left: 60,
           zIndex: 55,
           background: 'rgba(255,106,0,0.15)',
