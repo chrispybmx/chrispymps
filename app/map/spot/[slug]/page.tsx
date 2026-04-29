@@ -11,6 +11,7 @@ import ShareSpotBtn from '@/components/ShareSpotBtn';
 import SpotContributeCTA from '@/components/SpotContributeCTA';
 import SpotLikeBtn from '@/components/SpotLikeBtn';
 import SpotPageActions, { SpotStarRating } from '@/components/SpotPageActions';
+import BottomNav from '@/components/BottomNav';
 
 export const revalidate = 300;
 
@@ -146,17 +147,6 @@ export default async function SpotPage({ params }: Props) {
           </Link>
         )}
 
-        {/* ── AGGIUNGI SPOT — link rapido ── */}
-        <Link href="/?add=1" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '10px', marginBottom: 16, borderRadius: 8,
-          border: '1px solid rgba(255,106,0,0.3)', background: 'rgba(255,106,0,0.05)',
-          fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)',
-          textDecoration: 'none', letterSpacing: '0.04em',
-        }}>
-          + AGGIUNGI UNO SPOT
-        </Link>
-
         {/* ── DESCRIZIONE ── */}
         {spot.description && (
           <p style={{ color: 'var(--bone)', lineHeight: 1.7, fontSize: 15, margin: '0 0 20px' }}>
@@ -238,6 +228,8 @@ export default async function SpotPage({ params }: Props) {
           image: photos.map(p => p.url),
         })}}
       />
+
+      <BottomNav />
     </main>
   );
 }

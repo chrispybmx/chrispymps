@@ -214,26 +214,14 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                     <div style={{ position: 'absolute', bottom: 6, left: 6, fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
                       {tipo.emoji} {tipo.label.toUpperCase()}
                     </div>
-                    {/* 🔥 + ❤️ top right */}
-                    <div style={{ position: 'absolute', top: 5, right: 5, display: 'flex', gap: 3 }}>
-                      <button
-                        onClick={e => { e.preventDefault(); e.stopPropagation();
-                          if (!user) { toast('Accedi per votare', 'info'); return; }
-                          fetch('/api/spot-likes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.accessToken}` }, body: JSON.stringify({ spot_id: spot.id }) }).catch(() => {});
-                        }}
-                        style={{ background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%', width: 26, height: 26, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        🔥
-                      </button>
-                      <button
-                        onClick={e => { e.preventDefault(); e.stopPropagation();
-                          if (!user) { toast('Accedi per salvare', 'info'); return; }
-                          const added = toggleFav(spot.id);
-                          toast(added ? 'Salvato' : 'Rimosso', added ? 'success' : 'info');
-                        }}
-                        style={{ background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%', width: 26, height: 26, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isFav(spot.id) ? '❤️' : '🤍'}
-                      </button>
-                    </div>
+                    {/* Condition dot */}
+                    {spot.condition === 'alive' ? (
+                      <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851' }} />
+                    ) : (
+                      <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-mono)', fontSize: 9, background: cond.bg, color: cond.color, padding: '2px 5px', borderRadius: 3 }}>
+                        {cond.label.toUpperCase()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Info — fixed height for uniform grid */}
@@ -244,8 +232,29 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                     }}>
                       {spot.name}
                     </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {spot.city ? `📍 ${spot.city}` : ''}{spot.difficulty ? ` · ⚡ ${spot.difficulty.toUpperCase()}` : ''}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                        {spot.city ? `📍 ${spot.city}` : ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                        <button
+                          onClick={e => { e.preventDefault(); e.stopPropagation();
+                            if (!user) { toast('Accedi per votare', 'info'); return; }
+                            fetch('/api/spot-likes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.accessToken}` }, body: JSON.stringify({ spot_id: spot.id }) }).then(r => r.json()).then(j => { if (j.ok) toast(j.hasLiked ? '🔥' : 'Rimosso', 'info'); }).catch(() => {});
+                          }}
+                          style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>
+                          🔥
+                        </button>
+                        <button
+                          onClick={e => { e.preventDefault(); e.stopPropagation();
+                            if (!user) { toast('Accedi per salvare', 'info'); return; }
+                            const added = toggleFav(spot.id);
+                            toast(added ? 'Salvato' : 'Rimosso', added ? 'success' : 'info');
+                          }}
+                          style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>
+                          {isFav(spot.id) ? '❤️' : '🤍'}
+                        </button>
+                      </div>
                     </div>
                   </div>
 

@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from 'next';
+import { VT323, Barlow_Condensed } from 'next/font/google';
 import './globals.css';
 import { APP_CONFIG } from '@/lib/constants';
 import VhsOverlay from '@/components/VhsOverlay';
 import { ToastProvider } from '@/components/Toast';
+
+const vt323 = VT323({ weight: '400', subsets: ['latin'], display: 'swap', variable: '--font-mono' });
+const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--font-display' });
 
 export const metadata: Metadata = {
   title: {
@@ -124,7 +128,7 @@ const organizationJsonLd = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="it">
+    <html lang="it" className={`${vt323.variable} ${barlow.variable}`}>
       <head>
         {/* Service Worker */}
         <script

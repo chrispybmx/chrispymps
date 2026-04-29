@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=VT323&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+/* Fonts loaded via next/font in layout.tsx — no render-blocking @import */
 
 @tailwind base;
 @tailwind components;
