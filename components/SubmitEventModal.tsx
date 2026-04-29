@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useToast } from './Toast';
+import ImageUploadField from './ImageUploadField';
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -15,6 +16,7 @@ export default function SubmitEventModal({ open, onClose }: Props) {
   const [city, setCity] = useState('');
   const [description, setDescription] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [coverUrl, setCoverUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -31,13 +33,14 @@ export default function SubmitEventModal({ open, onClose }: Props) {
           city: city.trim() || undefined,
           description: description.trim() || undefined,
           link_url: linkUrl.trim() || undefined,
+          cover_url: coverUrl || undefined,
           access_token: user.accessToken,
         }),
       });
       const j = await res.json();
       if (j.ok) {
         toast(j.message, 'success');
-        setTitle(''); setDate(''); setLocation(''); setCity(''); setDescription(''); setLinkUrl('');
+        setTitle(''); setDate(''); setLocation(''); setCity(''); setDescription(''); setLinkUrl(''); setCoverUrl('');
         onClose();
       } else toast(j.error, 'error');
     } catch { toast('Errore di rete', 'error'); }
@@ -81,6 +84,7 @@ export default function SubmitEventModal({ open, onClose }: Props) {
                 <Label>Descrizione</Label>
                 <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Dettagli sull'evento..." rows={3} maxLength={2000} style={{ ...inputStyle, resize: 'vertical' }} />
               </div>
+              <ImageUploadField label="Flyer / Foto evento" value={coverUrl} onChange={setCoverUrl} accessToken={user.accessToken} purpose="event" />
               <Field label="Link (iscrizione, info)" value={linkUrl} onChange={setLinkUrl} placeholder="https://..." max={500} />
 
               <button onClick={handleSubmit} disabled={!title.trim() || !date || submitting} className="btn-primary"

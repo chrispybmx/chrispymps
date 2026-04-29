@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useToast } from './Toast';
+import ImageUploadField from './ImageUploadField';
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -91,7 +92,7 @@ export default function SubmitNewsModal({ open, onClose }: Props) {
                 </div>
               </div>
 
-              <Field label="Foto copertina (URL)" value={coverUrl} onChange={setCoverUrl} placeholder="https://..." max={500} />
+              <ImageUploadField label="Foto copertina" value={coverUrl} onChange={setCoverUrl} accessToken={user.accessToken} purpose="news" />
               <Field label="Link video / sito" value={linkUrl} onChange={setLinkUrl} placeholder="https://youtube.com/..." max={500} />
               <Field label="Tag (separati da virgola)" value={tags} onChange={setTags} placeholder="bmx, street, video" max={200} />
 

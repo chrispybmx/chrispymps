@@ -9,6 +9,7 @@ const Schema = z.object({
   city:         z.string().max(60).optional(),
   event_date:   z.string().min(1), // ISO date
   link_url:     z.string().url().max(500).optional(),
+  cover_url:    z.string().url().max(500).optional(),
   access_token: z.string().min(1),
 });
 
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     city: body.city?.trim() || null,
     event_date: body.event_date,
     link_url: body.link_url || null,
+    cover_url: body.cover_url || null,
     status: 'draft', // not visible until approved
     moderation_status: 'pending',
     submitted_by_user_id: user.id,
