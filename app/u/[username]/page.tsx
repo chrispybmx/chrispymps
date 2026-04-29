@@ -238,7 +238,7 @@ function SpotTile({ spot, username }: { spot: SpotCard; username: string }) {
   const cover  = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
   const isDead = spot.condition !== 'alive';
   return (
-    <Link href={`/map/spot/${spot.slug}?from=/u/${username}`} style={{ textDecoration: 'none', display: 'block' }}>
+    <Link href={`/map/spot/${spot.slug}?from=/u/${username}`} style={{ textDecoration: 'none', display: 'block', minWidth: 0 }}>
       <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, overflow: 'hidden', opacity: isDead ? 0.65 : 1 }}>
         <div style={{ width: '100%', paddingBottom: '100%', background: 'var(--gray-700)', overflow: 'hidden', position: 'relative' }}>
           {cover

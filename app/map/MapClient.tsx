@@ -790,6 +790,29 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         </span>
       </div>
 
+      {/* ── ✕ Chiudi panel — fixed, sopra tutto ── */}
+      {panelHeight > PANEL_MIN + 10 && (
+        <button
+          onClick={() => { snapTo(PANEL_MIN); setExpandedId(null); }}
+          style={{
+            position: 'fixed',
+            bottom: `calc(${panelHeight}px + env(safe-area-inset-bottom, 0px) + 60px + 8px)`,
+            right: 14,
+            zIndex: 15,
+            background: 'rgba(10,10,10,0.9)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '50%', width: 36, height: 36,
+            fontSize: 16, color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.6)',
+            transition: 'bottom 0.3s ease-out',
+          } as React.CSSProperties}
+          aria-label="Chiudi"
+        >✕</button>
+      )}
+
       {/* ── OVERLAY LISTA — galleggia sulla mappa, altezza regolabile ── */}
       <div className="map-panel-wrap" style={{
         position: 'fixed',
@@ -821,25 +844,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           transition: 'border-radius 0.25s ease',
           position: 'relative',
         }}>
-          {/* ✕ Chiudi pannello — grande, visibile */}
-          {panelHeight > PANEL_MIN + 10 && (
-            <button
-              onClick={() => { snapTo(PANEL_MIN); setExpandedId(null); }}
-              style={{
-                position: 'absolute', top: 10, right: 12, zIndex: 20,
-                background: 'rgba(255,255,255,0.12)',
-                border: '1px solid rgba(255,255,255,0.25)',
-                borderRadius: '50%', width: 34, height: 34,
-                fontSize: 16, color: '#fff', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                lineHeight: 1, touchAction: 'manipulation',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                WebkitTapHighlightColor: 'transparent',
-              } as React.CSSProperties}
-              aria-label="Chiudi pannello"
-            >✕</button>
-          )}
-
           {/* ── DRAG HANDLE ── */}
           <div
             onPointerDown={onDragStart}
