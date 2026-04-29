@@ -12,6 +12,7 @@ const SpotSchema = z.object({
   city:         z.string().max(60).optional(),
   description:  z.string().max(500).optional(),
   guardians:    z.string().max(200).optional(),
+  difficulty:   z.string().max(30).optional(),
   access_token: z.string().min(1).max(2048),
 });
 
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
       city:                   parsed.city ?? null,
       description:            parsed.description ?? null,
       guardians:              parsed.guardians ?? null,
+      difficulty:             parsed.difficulty ?? null,
       status:                 'pending',
       condition:              'alive',
       submitted_by_user_id:   user.id,

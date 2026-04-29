@@ -11,7 +11,7 @@ interface PhotoUploadProps {
 }
 
 const MAX_SIZE_MB = 5;
-const ACCEPTED    = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+const ACCEPTED    = 'image/*'; // let iOS convert HEIC→JPEG automatically
 
 export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.maxPhotos }: PhotoUploadProps) {
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -42,8 +42,8 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
     const arr = Array.from(files);
     const valid: File[] = [];
     for (const f of arr) {
-      if (!ACCEPTED.includes(f.type) && !f.name.toLowerCase().endsWith('.heic')) {
-        setError(`Formato non supportato: ${f.name}. Usa JPG, PNG, WebP o HEIC.`);
+      if (!f.type.startsWith('image/')) {
+        setError(`Formato non supportato: ${f.name}. Usa una foto.`);
         continue;
       }
       const compressed = await compressImage(f);
@@ -185,13 +185,13 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
       )}
 
       {/* Input galleria (senza capture → apre la libreria foto) */}
-      <input ref={galleryRef} type="file" accept={ACCEPTED.join(',')} multiple
+      <input ref={galleryRef} type="file" accept={ACCEPTED} multiple
         style={{ display: 'none' }}
         onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
         aria-hidden="true" />
 
       {/* Input camera (capture=environment → apre direttamente la fotocamera) */}
-      <input ref={cameraRef} type="file" accept={ACCEPTED.join(',')}
+      <input ref={cameraRef} type="file" accept={ACCEPTED}
         capture="environment"
         style={{ display: 'none' }}
         onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
