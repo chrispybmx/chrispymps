@@ -229,9 +229,6 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                     </div>
                   </div>
 
-                  {/* Arrow */}
-                  <div style={{ color: 'var(--gray-600)', fontSize: 18, alignSelf: 'center', flexShrink: 0 }}>›</div>
-
                 </div>
               </Link>
             );
