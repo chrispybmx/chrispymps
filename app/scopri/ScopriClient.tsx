@@ -5,6 +5,9 @@ import Link from 'next/link';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, REGIONI_ITALIA, DIFFICOLTA } from '@/lib/constants';
 import BottomNav from '@/components/BottomNav';
+import { useFavorites } from '@/hooks/useFavorites';
+import { useUser } from '@/hooks/useUser';
+import { useToast } from '@/components/Toast';
 
 interface ScopriClientProps { spots: SpotMapPin[] }
 
@@ -13,6 +16,9 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
   const [filterDiff,   setFilterDiff]   = useState('');
   const [filterRegion, setFilterRegion] = useState('');
   const [query,        setQuery]        = useState('');
+  const { isFav, toggleFav } = useFavorites();
+  const user = useUser();
+  const { toast } = useToast();
 
   const filtered = useMemo(() => {
     return spots.filter(s => {
@@ -208,13 +214,26 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                     <div style={{ position: 'absolute', bottom: 6, left: 6, fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
                       {tipo.emoji} {tipo.label.toUpperCase()}
                     </div>
-                    {spot.condition === 'alive' ? (
-                      <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851' }} />
-                    ) : (
-                      <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-mono)', fontSize: 9, background: cond.bg, color: cond.color, padding: '2px 5px', borderRadius: 3 }}>
-                        {cond.label.toUpperCase()}
-                      </div>
-                    )}
+                    {/* 🔥 + ❤️ top right */}
+                    <div style={{ position: 'absolute', top: 5, right: 5, display: 'flex', gap: 3 }}>
+                      <button
+                        onClick={e => { e.preventDefault(); e.stopPropagation();
+                          if (!user) { toast('Accedi per votare', 'info'); return; }
+                          fetch('/api/spot-likes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.accessToken}` }, body: JSON.stringify({ spot_id: spot.id }) }).catch(() => {});
+                        }}
+                        style={{ background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%', width: 26, height: 26, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        🔥
+                      </button>
+                      <button
+                        onClick={e => { e.preventDefault(); e.stopPropagation();
+                          if (!user) { toast('Accedi per salvare', 'info'); return; }
+                          const added = toggleFav(spot.id);
+                          toast(added ? 'Salvato' : 'Rimosso', added ? 'success' : 'info');
+                        }}
+                        style={{ background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%', width: 26, height: 26, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isFav(spot.id) ? '❤️' : '🤍'}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Info — fixed height for uniform grid */}
