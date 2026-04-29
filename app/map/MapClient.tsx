@@ -230,7 +230,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
   const [windowH,   setWindowH]   = useState(700);
-  const topOffset = isDesktop ? TOP_OFFSET_DESKTOP : TOP_OFFSET_MOBILE;
+  const topOffset = isDesktop ? topOffset_DESKTOP : topOffset_MOBILE;
   useEffect(() => {
     const check = () => {
       setIsDesktop(window.innerWidth >= 768);
