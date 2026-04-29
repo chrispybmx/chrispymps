@@ -184,7 +184,7 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
               <Link
                 key={spot.id}
                 href={`/map/spot/${spot.slug}`}
-                style={{ textDecoration: 'none', display: 'block' }}
+                style={{ textDecoration: 'none', display: 'block', minWidth: 0 }}
               >
                 <div style={{
                   borderRadius: 10, overflow: 'hidden',
