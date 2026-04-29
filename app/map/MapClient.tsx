@@ -69,7 +69,7 @@ const topOffset_MOBILE  = 56;  // topbar only (filter bar hidden on mobile)
 const topOffset_DESKTOP = 100; // topbar + filter bar
 const PANEL_MIN       = 0;
 const PANEL_SNAP      = 140;
-const EXPANDED_CARD_H = 420;  // handle(46)+foto(160)+info(54)+cta(60)+padding — opens big
+const EXPANDED_CARD_H = 0; // not used — expanded cards open to 92% viewport
 function DEFAULT_PANEL_H() {
   return typeof window !== 'undefined'
     ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
@@ -387,9 +387,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           setScrollToId(pin.id);
         }, 200);
       } else {
-        /* Passo 1: apri subito il pannello a un'altezza generosa (EXPANDED_CARD_H)
-           così React può committare e paintare il DOM della card espansa. */
-        snapTo(EXPANDED_CARD_H);
+        /* Apri pannello a quasi tutto schermo per mostrare l'anteprima completa */
+        snapTo(Math.round(window.innerHeight * 0.92));
         setTimeout(() => setScrollToId(pin.id), 260);
       }
       return isClosing ? null : pin.id;
@@ -1299,7 +1298,6 @@ function SpotListPanel({
           >
 
             {/* ══ EXPANDED LAYOUT ══ */}
-            {isExp ? (
               <div style={{ position: 'relative' }}>
 
                 {/* ── FOTO — scroll-snap swipeable ── */}
@@ -1331,7 +1329,7 @@ function SpotListPanel({
                         display: 'flex', overflowX: 'auto',
                         scrollSnapType: 'x mandatory', scrollBehavior: 'auto',
                         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
-                        width: '100%', aspectRatio: '16/9', maxHeight: isDesktop ? 220 : 160,
+                        width: '100%', aspectRatio: '16/10', height: 'auto',
                         cursor: 'zoom-in', touchAction: 'pan-x',
                       } as React.CSSProperties}
                     >
@@ -1401,6 +1399,7 @@ function SpotListPanel({
                   <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
                     {spot.city && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>📍 {spot.city}</span>}
                     {spot.difficulty && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ffce4d' }}>⚡ {spot.difficulty.toUpperCase()}</span>}
+                    {(spot.likes_count ?? 0) > 0 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)' }}>🔥 {spot.likes_count}</span>}
                     {spot.submitted_by_username && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>@{spot.submitted_by_username}</span>}
                   </div>
                 </div>
@@ -1427,86 +1426,6 @@ function SpotListPanel({
                   >📍</button>
                 </div>
               </div>
-
-            ) : (
-              /* ══ COMPACT LAYOUT — formato admin/scopri ══ */
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px' }}>
-
-                {/* Thumbnail 72×72 con badge tipo sovrapposto */}
-                <div style={{
-                  flexShrink: 0, width: 72, height: 72, borderRadius: 8,
-                  overflow: 'hidden',
-                  background: spot.cover_url ? 'transparent' : 'var(--gray-800)',
-                  border: `1px solid ${isAct ? 'var(--orange)' : 'var(--gray-700)'}`,
-                  transition: 'border-color 0.2s',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  position: 'relative',
-                }}>
-                  {spot.cover_url ? (
-                    <img src={spot.cover_url} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-                  ) : (
-                    <span style={{ fontSize: 26, opacity: 0.3 }}>{tipo.emoji}</span>
-                  )}
-                  <div style={{
-                    position: 'absolute', bottom: 3, left: 3,
-                    background: 'rgba(0,0,0,0.75)', borderRadius: 4, padding: '2px 5px',
-                    fontFamily: 'var(--font-mono)', fontSize: 8, color: tipo.color,
-                    letterSpacing: '0.04em',
-                  }}>
-                    {spot.type.toUpperCase()}
-                  </div>
-                </div>
-
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                    <div style={{
-                      flex: 1, minWidth: 0,
-                      fontFamily: 'var(--font-mono)', fontSize: 15,
-                      color: isAct ? 'var(--orange)' : 'var(--bone)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {spot.name}
-                    </div>
-                    <button onClick={e => onToggleFav(e, spot.id)} className="spot-fav-btn"
-                      style={{ flexShrink: 0, background: 'none', border: 'none', padding: '0 2px', cursor: 'pointer', fontSize: myFav ? 14 : 12, opacity: myFav ? 1 : 0.35 }}>
-                      {myFav ? '❤️' : '🤍'}
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {spot.city && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
-                        {spot.city}
-                      </span>
-                    )}
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 9,
-                      padding: '2px 6px', borderRadius: 10,
-                      background: `${cond.bg}22`, color: cond.bg,
-                      border: `1px solid ${cond.bg}44`,
-                      letterSpacing: '0.04em',
-                    }}>
-                      {cond.label.toUpperCase()}
-                    </span>
-                    {spot.difficulty && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#ffce4d' }}>
-                        ⚡ {spot.difficulty.toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-
-                  {spot.submitted_by_username && (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>
-                      @{spot.submitted_by_username}
-                    </div>
-                  )}
-                </div>
-
-                {/* Arrow */}
-                <div style={{ color: 'var(--gray-600)', fontSize: 18, flexShrink: 0 }}>›</div>
-              </div>
-            )}
 
           </div>
         );

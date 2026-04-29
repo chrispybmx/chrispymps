@@ -9,7 +9,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('spots')
     .select(`
-      id, slug, name, type, lat, lon, city, condition, submitted_by_username,
+      id, slug, name, type, lat, lon, city, condition, submitted_by_username, likes_count,
       spot_photos (url, position)
     `)
     .eq('status', 'approved')
@@ -33,6 +33,7 @@ export async function GET() {
       condition: s.condition,
       cover_url: sorted[0]?.url,
       submitted_by_username: s.submitted_by_username ?? undefined,
+      likes_count: s.likes_count ?? 0,
     };
   });
 

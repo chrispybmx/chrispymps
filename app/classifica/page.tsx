@@ -27,7 +27,7 @@ export const revalidate = 600;
 interface SpotRow {
   id: string; slug: string; name: string;
   type: SpotType; city?: string; condition: SpotCondition;
-  cover_url?: string; photo_count: number;
+  cover_url?: string; likes_count: number;
 }
 
 interface RiderRow {
@@ -53,28 +53,25 @@ function getLevelForXP(xp: number) {
 async function getData(): Promise<{ topSpots: SpotRow[]; topRiders: RiderRow[] }> {
   const supabase = supabaseServer();
 
-  /* TOP SPOT */
+  /* TOP SPOT — sorted by likes (most voted) */
   const { data: spotsRaw } = await supabase
     .from('spots')
-    .select('id, slug, name, type, city, condition, spot_photos(url, position)')
+    .select('id, slug, name, type, city, condition, likes_count, spot_photos(url, position)')
     .eq('status', 'approved')
-    .order('approved_at', { ascending: false })
-    .limit(200);
+    .order('likes_count', { ascending: false })
+    .limit(20);
 
-  const topSpots: SpotRow[] = (spotsRaw ?? [])
-    .map(s => {
-      const photos = (s.spot_photos ?? []) as { url: string; position: number }[];
-      return {
-        id: s.id, slug: s.slug, name: s.name,
-        type: s.type as SpotType,
-        city: s.city ?? undefined,
-        condition: s.condition as SpotCondition,
-        cover_url: photos.sort((a, b) => a.position - b.position)[0]?.url,
-        photo_count: photos.length,
-      };
-    })
-    .sort((a, b) => b.photo_count - a.photo_count)
-    .slice(0, 20);
+  const topSpots: SpotRow[] = (spotsRaw ?? []).map(s => {
+    const photos = (s.spot_photos ?? []) as { url: string; position: number }[];
+    return {
+      id: s.id, slug: s.slug, name: s.name,
+      type: s.type as SpotType,
+      city: s.city ?? undefined,
+      condition: s.condition as SpotCondition,
+      cover_url: photos.sort((a, b) => a.position - b.position)[0]?.url,
+      likes_count: s.likes_count ?? 0,
+    };
+  });
 
   /* TOP RIDER — with XP from user_stats */
   const { data: ridersRaw } = await supabase
@@ -213,7 +210,7 @@ export default async function ClassificaPage() {
             color: 'var(--orange)', letterSpacing: '0.08em',
             textTransform: 'uppercase', marginBottom: 14,
           }}>
-            📍 TOP SPOT
+            🔥 SPOT PIÙ CALDI
           </div>
         </div>
 
@@ -263,9 +260,9 @@ export default async function ClassificaPage() {
 
                 <div style={{ flexShrink: 0, textAlign: 'right' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: i < 3 ? 'var(--orange)' : 'var(--gray-600)', fontWeight: 700 }}>
-                    {spot.photo_count}
+                    {spot.likes_count}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)' }}>foto</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)' }}>🔥</div>
                 </div>
               </div>
             </Link>

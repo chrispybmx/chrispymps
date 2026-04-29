@@ -72,6 +72,7 @@ export interface SpotMapPin {
   description?: string;
   difficulty?:  string;
   submitted_by_username?: string;
+  likes_count?: number;
 }
 
 // Dati del form "Aggiungi Spot"
