@@ -379,8 +379,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         // Chiudi card → torna a lista
         snapTo(DEFAULT_PANEL_H());
       } else {
-        // Apri anteprima — 50% schermo, giusto per foto + info + VEDI SPOT
-        snapTo(Math.round(window.innerHeight * 0.50));
+        // Apri anteprima — 58% schermo per vedere tutta la card
+        snapTo(Math.round(window.innerHeight * 0.58));
       }
       return isClosing ? null : pin.id;
     });
@@ -789,29 +789,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           {filtered.length} spot
         </span>
       </div>
-
-      {/* ── ✕ Chiudi panel — fixed, sopra tutto ── */}
-      {panelHeight > PANEL_MIN + 10 && (
-        <button
-          onClick={() => { snapTo(PANEL_MIN); setExpandedId(null); }}
-          style={{
-            position: 'fixed',
-            bottom: `calc(${panelHeight}px + env(safe-area-inset-bottom, 0px) + 60px + 8px)`,
-            right: 14,
-            zIndex: 15,
-            background: 'rgba(10,10,10,0.9)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: '50%', width: 36, height: 36,
-            fontSize: 16, color: '#fff', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.6)',
-            transition: 'bottom 0.3s ease-out',
-          } as React.CSSProperties}
-          aria-label="Chiudi"
-        >✕</button>
-      )}
 
       {/* ── OVERLAY LISTA — galleggia sulla mappa, altezza regolabile ── */}
       <div className="map-panel-wrap" style={{
