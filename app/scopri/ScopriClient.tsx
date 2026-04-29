@@ -19,6 +19,26 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
   const { isFav, toggleFav } = useFavorites();
   const user = useUser();
   const { toast } = useToast();
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [likedSpots, setLikedSpots] = useState<Set<string>>(new Set());
+
+  const handleLike = (e: React.MouseEvent, spotId: string) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!user) { toast('Accedi per votare', 'info'); return; }
+    const wasLiked = likedSpots.has(spotId);
+    // Optimistic update
+    setLikedSpots(prev => { const n = new Set(prev); wasLiked ? n.delete(spotId) : n.add(spotId); return n; });
+    setLikeCounts(prev => ({ ...prev, [spotId]: (prev[spotId] ?? (spots.find(s => s.id === spotId)?.likes_count ?? 0)) + (wasLiked ? -1 : 1) }));
+    fetch('/api/spot-likes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.accessToken}` }, body: JSON.stringify({ spot_id: spotId }) })
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok) {
+          setLikeCounts(prev => ({ ...prev, [spotId]: j.count }));
+          setLikedSpots(prev => { const n = new Set(prev); j.hasLiked ? n.add(spotId) : n.delete(spotId); return n; });
+          toast(j.hasLiked ? `🔥 ${j.count}` : 'Rimosso', j.hasLiked ? 'success' : 'info');
+        }
+      }).catch(() => {});
+  };
 
   const filtered = useMemo(() => {
     return spots.filter(s => {
@@ -238,12 +258,14 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                       </div>
                       <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                         <button
-                          onClick={e => { e.preventDefault(); e.stopPropagation();
-                            if (!user) { toast('Accedi per votare', 'info'); return; }
-                            fetch('/api/spot-likes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.accessToken}` }, body: JSON.stringify({ spot_id: spot.id }) }).then(r => r.json()).then(j => { if (j.ok) toast(j.hasLiked ? '🔥' : 'Rimosso', 'info'); }).catch(() => {});
-                          }}
-                          style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>
-                          🔥
+                          onClick={e => handleLike(e, spot.id)}
+                          style={{
+                            background: likedSpots.has(spot.id) ? 'rgba(255,106,0,0.15)' : 'none',
+                            border: 'none', fontSize: 12, cursor: 'pointer', padding: '1px 4px',
+                            borderRadius: 4, display: 'flex', alignItems: 'center', gap: 2,
+                            fontFamily: 'var(--font-mono)', color: likedSpots.has(spot.id) ? 'var(--orange)' : 'var(--gray-500)',
+                          }}>
+                          🔥{(likeCounts[spot.id] ?? spot.likes_count ?? 0) > 0 ? ` ${likeCounts[spot.id] ?? spot.likes_count ?? 0}` : ''}
                         </button>
                         <button
                           onClick={e => { e.preventDefault(); e.stopPropagation();
