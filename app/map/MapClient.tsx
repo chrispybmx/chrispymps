@@ -387,33 +387,16 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           setScrollToId(pin.id);
         }, 200);
       } else {
-        /* Apri pannello a quasi tutto schermo per mostrare l'anteprima completa */
-        snapTo(Math.round(window.innerHeight * 0.92));
-        setTimeout(() => setScrollToId(pin.id), 260);
+        /* Apri pannello — altezza che mostra foto + info + CTA senza tagliare */
+        const panelH = Math.round(window.innerHeight * 0.55);
+        snapTo(panelH);
       }
       return isClosing ? null : pin.id;
     });
     setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 12 });
   }, [snapTo]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Passo 2: dopo che React ha committato la card espansa e il browser ha paintato,
-     misura l'altezza reale e rifina lo snap — doppio rAF garantisce che il paint
-     sia completato. Se la card è più alta di EXPANDED_CARD_H aggiorniamo. */
-  useEffect(() => {
-    if (!expandedId) return;
-    let raf1: number, raf2: number;
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        const el = document.querySelector('[data-exp="1"]') as HTMLElement | null;
-        if (el) {
-          const HANDLE_H = 46; // drag handle height
-          const measured = el.offsetHeight + HANDLE_H + 6;
-          snapTo(Math.min(measured, Math.round(window.innerHeight * 0.92)));
-        }
-      });
-    });
-    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
-  }, [expandedId, snapTo]);
+  /* Expanded card: panel stays at 92% — no auto-resize jump */
 
   const activateDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleActivateFromScroll = useCallback((id: string) => {
@@ -1329,7 +1312,7 @@ function SpotListPanel({
                         display: 'flex', overflowX: 'auto',
                         scrollSnapType: 'x mandatory', scrollBehavior: 'auto',
                         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
-                        width: '100%', aspectRatio: '16/10', height: 'auto',
+                        width: '100%', height: 'clamp(140px, 30vh, 220px)',
                         cursor: 'zoom-in', touchAction: 'pan-x',
                       } as React.CSSProperties}
                     >
