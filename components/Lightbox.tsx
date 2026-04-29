@@ -78,7 +78,7 @@ export default function Lightbox({ urls, initialIdx, onClose }: LightboxProps) {
       <div
         ref={stripRef}
         onScroll={onScroll}
-        onClick={e => e.stopPropagation()}
+        onClick={onClose}
         style={{
           display: 'flex', flex: 1,
           overflowX: 'auto',
