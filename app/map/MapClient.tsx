@@ -379,9 +379,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         // Chiudi card → torna a lista
         snapTo(DEFAULT_PANEL_H());
       } else {
-        // Apri anteprima — foto + info + VEDI SPOT allineato sopra bottom nav
-        // clamp(140px foto) + handle(46) + info(60) + cta(56) + padding ≈ 320px
-        snapTo(320);
+        // Apri anteprima — foto + info + VEDI SPOT ben visibile
+        snapTo(400);
       }
       return isClosing ? null : pin.id;
     });
