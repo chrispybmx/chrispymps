@@ -844,7 +844,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           backdropFilter: 'blur(18px)',
           WebkitBackdropFilter: 'blur(18px)',
           pointerEvents: 'all',
-          overflow: 'hidden',
+          overflow: expandedId ? 'auto' : 'hidden',
           borderRadius: panelHeight <= PANEL_MIN + 10 ? '14px 14px 0 0' : '0',
           transition: 'border-radius 0.25s ease',
           position: 'relative',
