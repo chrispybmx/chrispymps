@@ -80,7 +80,18 @@ function DEFAULT_PANEL_H() {
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
 export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
-  const [spots]              = useState<SpotMapPin[]>(initialSpots);
+  const [spots, setSpots]    = useState<SpotMapPin[]>(initialSpots);
+  const [spotsLoading, setSpotsLoading] = useState(initialSpots.length === 0);
+
+  // Fetch spots client-side for instant page load
+  useEffect(() => {
+    if (initialSpots.length > 0) return; // already have server data
+    fetch('/api/spots')
+      .then(r => r.json())
+      .then(j => { if (j.ok) setSpots(j.data ?? []); })
+      .catch(() => {})
+      .finally(() => setSpotsLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const user = useUser();
   const { toast } = useToast();
   const { isFav, toggleFav: toggleFavHook } = useFavorites();
