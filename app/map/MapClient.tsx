@@ -68,7 +68,7 @@ interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 const TOP_OFFSET      = 100;
 const PANEL_MIN       = 0;
 const PANEL_SNAP      = 140;
-const EXPANDED_CARD_H = 340;  // handle(46)+foto(140)+info(54)+cta(60)+padding ≈ 340px
+const EXPANDED_CARD_H = 420;  // handle(46)+foto(160)+info(54)+cta(60)+padding — opens big
 function DEFAULT_PANEL_H() {
   return typeof window !== 'undefined'
     ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
@@ -134,7 +134,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     const delta = dragState.current.startY - e.clientY;
     if (Math.abs(delta) > 6) didDragRef.current = true;
     const newH  = Math.min(
-      window.innerHeight * 0.88,
+      window.innerHeight * 0.92,
       Math.max(PANEL_MIN, dragState.current.startH + delta),
     );
     setPanelHeight(newH);
@@ -151,7 +151,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       if (panelHeight > window.innerHeight * 0.75) snapTo(DEFAULT_PANEL_H());
       else snapTo(PANEL_MIN);
     } else if (h < PANEL_SNAP)               snapTo(PANEL_MIN);
-    else if (h > window.innerHeight * 0.75) snapTo(Math.round(window.innerHeight * 0.88));
+    else if (h > window.innerHeight * 0.75) snapTo(Math.round(window.innerHeight * 0.92));
     else                                    snapTo(DEFAULT_PANEL_H());
   }, [snapTo]);
 
@@ -407,7 +407,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         if (el) {
           const HANDLE_H = 46; // drag handle height
           const measured = el.offsetHeight + HANDLE_H + 6;
-          snapTo(Math.min(measured, Math.round(window.innerHeight * 0.88)));
+          snapTo(Math.min(measured, Math.round(window.innerHeight * 0.92)));
         }
       });
     });
@@ -786,7 +786,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       {/* ── TAB FISSO — sempre visibile, apre il pannello a tutto schermo ── */}
       <div
         className="map-panel-tab"
-        onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(Math.round(window.innerHeight * 0.88)); }}
+        onClick={() => { if (panelHeight <= PANEL_MIN + 10) snapTo(Math.round(window.innerHeight * 0.92)); }}
         style={{
           position: 'fixed',
           bottom: 0, left: '50%',
@@ -1329,7 +1329,7 @@ function SpotListPanel({
                         display: 'flex', overflowX: 'auto',
                         scrollSnapType: 'x mandatory', scrollBehavior: 'auto',
                         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
-                        width: '100%', height: isDesktop ? 200 : 140,
+                        width: '100%', aspectRatio: '16/9', maxHeight: isDesktop ? 220 : 160,
                         cursor: 'zoom-in', touchAction: 'pan-x',
                       } as React.CSSProperties}
                     >

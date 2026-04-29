@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   keywords: ['classifica spot BMX', 'migliori skatepark Italia', 'top rider BMX', 'spot più fotografati'],
   openGraph: {
     title: 'Classifica — Chrispy Maps',
-    description: 'Top spot e rider BMX in Italia. Classifica basata su foto e contributi della community.',
+    description: 'Top spot e rider BMX in Italia.',
     url: 'https://maps.chrispybmx.com/classifica',
     siteName: 'Chrispy Maps',
     locale: 'it_IT',
@@ -24,7 +24,6 @@ export const metadata: Metadata = {
 
 export const revalidate = 600;
 
-/* ── tipi locali ── */
 interface SpotRow {
   id: string; slug: string; name: string;
   type: SpotType; city?: string; condition: SpotCondition;
@@ -32,19 +31,35 @@ interface SpotRow {
 }
 
 interface RiderRow {
-  username: string; spot_count: number; latest_spot?: string;
+  username: string; spot_count: number; xp: number; level: string; level_image: string;
+}
+
+/* ── Level info (must match lib/xp.ts) ── */
+const LEVELS = [
+  { threshold: 2500, name: 'Chrispy Scout',  image: '/badges/level-7-chrispy-scout.png' },
+  { threshold: 1000, name: 'City Legend',     image: '/badges/level-6-city-legend.png' },
+  { threshold: 500,  name: 'Verified Rider',  image: '/badges/level-5-verified-rider.png' },
+  { threshold: 200,  name: 'Local Scout',     image: '/badges/level-4-local-scout.png' },
+  { threshold: 75,   name: 'Spot Hunter',     image: '/badges/level-3-spot-hunter.png' },
+  { threshold: 25,   name: 'Local Rider',     image: '/badges/level-2-local-rider.png' },
+  { threshold: 0,    name: 'Rookie',          image: '/badges/level-1-rookie.png' },
+];
+
+function getLevelForXP(xp: number) {
+  for (const l of LEVELS) { if (xp >= l.threshold) return l; }
+  return LEVELS[LEVELS.length - 1];
 }
 
 async function getData(): Promise<{ topSpots: SpotRow[]; topRiders: RiderRow[] }> {
   const supabase = supabaseServer();
 
-  /* TOP SPOT: spot con più foto (= più documentati e verificati) */
+  /* TOP SPOT */
   const { data: spotsRaw } = await supabase
     .from('spots')
     .select('id, slug, name, type, city, condition, spot_photos(url, position)')
     .eq('status', 'approved')
     .order('approved_at', { ascending: false })
-    .limit(200); // fetch abbondante, poi ordiniamo lato server
+    .limit(200);
 
   const topSpots: SpotRow[] = (spotsRaw ?? [])
     .map(s => {
@@ -61,39 +76,55 @@ async function getData(): Promise<{ topSpots: SpotRow[]; topRiders: RiderRow[] }
     .sort((a, b) => b.photo_count - a.photo_count)
     .slice(0, 20);
 
-  /* TOP RIDER: group by submitted_by_username */
+  /* TOP RIDER — with XP from user_stats */
   const { data: ridersRaw } = await supabase
     .from('spots')
-    .select('submitted_by_username, name')
+    .select('submitted_by_username')
     .eq('status', 'approved')
-    .not('submitted_by_username', 'is', null)
-    .order('approved_at', { ascending: false });
+    .not('submitted_by_username', 'is', null);
 
-  const riderMap = new Map<string, { count: number; latest: string }>();
+  const riderMap = new Map<string, number>();
   (ridersRaw ?? []).forEach(s => {
     const un = s.submitted_by_username as string;
-    if (!riderMap.has(un)) riderMap.set(un, { count: 0, latest: s.name });
-    riderMap.get(un)!.count++;
+    riderMap.set(un, (riderMap.get(un) ?? 0) + 1);
+  });
+
+  // Get XP for all riders
+  const usernames = Array.from(riderMap.keys());
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('username, id')
+    .in('username', usernames);
+
+  const userIds = (profiles ?? []).map(p => p.id);
+  const { data: statsRaw } = userIds.length > 0
+    ? await supabase.from('user_stats').select('user_id, lifetime_xp').in('user_id', userIds)
+    : { data: [] };
+
+  const xpMap = new Map<string, number>();
+  (profiles ?? []).forEach(p => {
+    const stat = (statsRaw ?? []).find(s => s.user_id === p.id);
+    xpMap.set(p.username, stat?.lifetime_xp ?? 0);
   });
 
   const topRiders: RiderRow[] = Array.from(riderMap.entries())
-    .map(([username, { count, latest }]) => ({ username, spot_count: count, latest_spot: latest }))
-    .sort((a, b) => b.spot_count - a.spot_count)
+    .map(([username, count]) => {
+      const xp = xpMap.get(username) ?? 0;
+      const level = getLevelForXP(xp);
+      return { username, spot_count: count, xp, level: level.name, level_image: level.image };
+    })
+    .sort((a, b) => b.xp - a.xp || b.spot_count - a.spot_count)
     .slice(0, 15);
 
   return { topSpots, topRiders };
 }
 
-/* ── Medaglia per posizione ── */
 function Medal({ pos }: { pos: number }) {
-  if (pos === 0) return <span style={{ fontSize: 18 }}>🥇</span>;
-  if (pos === 1) return <span style={{ fontSize: 18 }}>🥈</span>;
-  if (pos === 2) return <span style={{ fontSize: 18 }}>🥉</span>;
+  if (pos === 0) return <span style={{ fontSize: 20 }}>🥇</span>;
+  if (pos === 1) return <span style={{ fontSize: 20 }}>🥈</span>;
+  if (pos === 2) return <span style={{ fontSize: 20 }}>🥉</span>;
   return (
-    <span style={{
-      fontFamily: 'var(--font-mono)', fontSize: 13,
-      color: 'var(--gray-500)', width: 24, textAlign: 'center', display: 'inline-block',
-    }}>
+    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', width: 28, textAlign: 'center', display: 'inline-block' }}>
       {pos + 1}
     </span>
   );
@@ -105,7 +136,7 @@ export default async function ClassificaPage() {
   return (
     <div style={{ background: 'var(--black)', minHeight: '100dvh', paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px) + 8px)' }}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={{
         background: 'rgba(8,8,8,0.97)',
         borderBottom: '1px solid var(--gray-700)',
@@ -113,26 +144,76 @@ export default async function ClassificaPage() {
         position: 'sticky', top: 0, zIndex: 10,
       }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--orange)', letterSpacing: '0.04em' }}>
-          CLASSIFICA
-        </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
-          Spot più documentati · Rider più attivi
+          🏆 CLASSIFICA
         </div>
       </div>
 
       <div style={{ padding: '0 0 8px' }}>
 
-        {/* ══ TOP SPOT ══ */}
+        {/* ══ TOP RIDER — FIRST, with badges ══ */}
         <div style={{ padding: '20px 16px 8px' }}>
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: 13,
-            color: 'var(--gray-400)', letterSpacing: '0.08em',
-            textTransform: 'uppercase', marginBottom: 12,
-            display: 'flex', alignItems: 'center', gap: 8,
+            color: 'var(--orange)', letterSpacing: '0.08em',
+            textTransform: 'uppercase', marginBottom: 14,
           }}>
-            <span>TOP SPOT</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-            <span style={{ fontSize: 10, color: 'var(--gray-600)' }}>per foto verificate</span>
+            🏴 TOP RIDER
+          </div>
+        </div>
+
+        {topRiders.map((rider, i) => (
+          <Link key={rider.username} href={`/u/${rider.username}`} style={{ textDecoration: 'none', display: 'block' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 16px',
+              borderBottom: '1px solid rgba(255,255,255,0.04)',
+              background: i < 3 ? `rgba(255,106,0,0.0${3 - i})` : 'transparent',
+            }}>
+              {/* Position */}
+              <div style={{ width: 28, textAlign: 'center', flexShrink: 0 }}>
+                <Medal pos={i} />
+              </div>
+
+              {/* Badge image */}
+              <img
+                src={rider.level_image}
+                alt={rider.level}
+                style={{ width: 40, height: 40, objectFit: 'contain', flexShrink: 0 }}
+              />
+
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 15,
+                  color: i < 3 ? 'var(--bone)' : 'var(--gray-400)',
+                  fontWeight: i < 3 ? 700 : 400,
+                }}>
+                  @{rider.username}
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 2 }}>
+                  {rider.level} · {rider.xp} XP
+                </div>
+              </div>
+
+              {/* Spot count */}
+              <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: i < 3 ? 'var(--orange)' : 'var(--gray-600)', fontWeight: 700 }}>
+                  {rider.spot_count}
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)' }}>spot</div>
+              </div>
+            </div>
+          </Link>
+        ))}
+
+        {/* ══ TOP SPOT ══ */}
+        <div style={{ padding: '28px 16px 8px' }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 13,
+            color: 'var(--orange)', letterSpacing: '0.08em',
+            textTransform: 'uppercase', marginBottom: 14,
+          }}>
+            📍 TOP SPOT
           </div>
         </div>
 
@@ -147,13 +228,10 @@ export default async function ClassificaPage() {
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                 background: i < 3 ? `rgba(255,106,0,0.0${3 - i})` : 'transparent',
               }}>
-
-                {/* Posizione */}
                 <div style={{ width: 28, textAlign: 'center', flexShrink: 0 }}>
                   <Medal pos={i} />
                 </div>
 
-                {/* Thumbnail */}
                 <div style={{
                   width: 56, height: 56, flexShrink: 0,
                   borderRadius: 8,
@@ -163,14 +241,12 @@ export default async function ClassificaPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {spot.cover_url ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={spot.cover_url} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                   ) : (
                     <span style={{ fontSize: 22 }}>{tipo.emoji}</span>
                   )}
                 </div>
 
-                {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
                     fontFamily: 'var(--font-mono)', fontSize: 14,
@@ -180,96 +256,21 @@ export default async function ClassificaPage() {
                     {spot.name}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 3, alignItems: 'center' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: tipo.color }}>{spot.type.toUpperCase()}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: tipo.color }}>{tipo.emoji} {spot.type.toUpperCase()}</span>
                     {spot.city && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>· {spot.city}</span>}
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 9,
-                      padding: '1px 5px', borderRadius: 8,
-                      background: `${cond.bg}22`, color: cond.bg,
-                      border: `1px solid ${cond.bg}44`,
-                    }}>{cond.label.toUpperCase()}</span>
                   </div>
                 </div>
 
-                {/* Foto count */}
                 <div style={{ flexShrink: 0, textAlign: 'right' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: i < 3 ? 'var(--orange)' : 'var(--gray-600)', fontWeight: 700 }}>
                     {spot.photo_count}
                   </div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)' }}>foto</div>
                 </div>
-
               </div>
             </Link>
           );
         })}
-
-        {/* ══ TOP RIDER ══ */}
-        <div style={{ padding: '28px 16px 8px' }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 13,
-            color: 'var(--gray-400)', letterSpacing: '0.08em',
-            textTransform: 'uppercase', marginBottom: 12,
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <span>TOP RIDER</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-            <span style={{ fontSize: 10, color: 'var(--gray-600)' }}>spot approvati</span>
-          </div>
-        </div>
-
-        {topRiders.map((rider, i) => (
-          <Link key={rider.username} href={`/u/${rider.username}`} style={{ textDecoration: 'none', display: 'block' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '10px 16px',
-              borderBottom: '1px solid rgba(255,255,255,0.04)',
-            }}>
-
-              {/* Posizione */}
-              <div style={{ width: 28, textAlign: 'center', flexShrink: 0 }}>
-                <Medal pos={i} />
-              </div>
-
-              {/* Avatar iniziale */}
-              <div style={{
-                width: 42, height: 42, flexShrink: 0,
-                borderRadius: '50%',
-                background: i < 3 ? 'var(--orange)' : 'var(--gray-700)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--font-mono)', fontSize: 18,
-                color: i < 3 ? '#000' : 'var(--gray-400)',
-              }}>
-                {rider.username[0].toUpperCase()}
-              </div>
-
-              {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 14,
-                  color: i < 3 ? 'var(--bone)' : 'var(--gray-400)',
-                }}>
-                  @{rider.username}
-                </div>
-                {rider.latest_spot && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    ultimo: {rider.latest_spot}
-                  </div>
-                )}
-              </div>
-
-              {/* Spot count */}
-              <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: i < 3 ? 'var(--orange)' : 'var(--gray-600)', fontWeight: 700 }}>
-                  {rider.spot_count}
-                </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)' }}>spot</div>
-              </div>
-
-            </div>
-          </Link>
-        ))}
-
       </div>
 
       <BottomNav />

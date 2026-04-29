@@ -175,7 +175,8 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
             <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>Prova a cambiare filtro.</span>
           </div>
         ) : (
-          filtered.map(spot => {
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 12px' }}>
+          {filtered.map(spot => {
             const tipo = TIPI_SPOT[spot.type];
             const cond = CONDIZIONI[spot.condition];
             const cover = spot.cover_url;
@@ -186,56 +187,49 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                 style={{ textDecoration: 'none', display: 'block' }}
               >
                 <div style={{
-                  display: 'flex', gap: 12, padding: '12px 14px',
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 10, overflow: 'hidden',
+                  background: 'var(--gray-800)',
+                  border: '1px solid var(--gray-700)',
                 }}>
-
-                  {/* Thumbnail */}
+                  {/* Cover photo */}
                   <div style={{
-                    width: 72, height: 72, flexShrink: 0, borderRadius: 8,
-                    background: cover ? 'transparent' : 'var(--gray-800)',
-                    border: '1px solid var(--gray-700)', overflow: 'hidden',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    position: 'relative',
+                    aspectRatio: '4/3', overflow: 'hidden',
+                    background: '#111', position: 'relative',
                   }}>
                     {cover ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                     ) : (
-                      <span style={{ fontSize: 28 }}>{tipo.emoji}</span>
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 36, opacity: 0.2 }}>{tipo.emoji}</span>
+                      </div>
                     )}
-                    <div style={{
-                      position: 'absolute', bottom: 3, left: 3,
-                      background: 'rgba(0,0,0,0.75)', borderRadius: 4, padding: '2px 5px',
-                      fontFamily: 'var(--font-mono)', fontSize: 8,
-                      color: tipo.color, letterSpacing: '0.04em',
-                    }}>
-                      {spot.type.toUpperCase()}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 40, background: 'linear-gradient(transparent, rgba(0,0,0,0.7))', pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', bottom: 6, left: 6, fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
+                      {tipo.emoji} {tipo.label.toUpperCase()}
                     </div>
+                    {spot.condition === 'alive' ? (
+                      <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851' }} />
+                    ) : (
+                      <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-mono)', fontSize: 9, background: cond.bg, color: cond.color, padding: '2px 5px', borderRadius: 3 }}>
+                        {cond.label.toUpperCase()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+                  <div style={{ padding: '8px 10px' }}>
                     <div style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3,
                     }}>
                       {spot.name}
                     </div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                       {spot.city && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
-                          {spot.city}
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)' }}>
+                          📍 {spot.city}
                         </span>
                       )}
-                      <span style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 9,
-                        padding: '2px 6px', borderRadius: 10,
-                        background: `${cond.bg}22`, color: cond.bg,
-                        border: `1px solid ${cond.bg}55`, letterSpacing: '0.04em',
-                      }}>
-                        {cond.label.toUpperCase()}
-                      </span>
                       {spot.difficulty && (
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#ffce4d' }}>
                           ⚡ {spot.difficulty.toUpperCase()}
@@ -243,7 +237,7 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                       )}
                     </div>
                     {spot.submitted_by_username && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)', marginTop: 2 }}>
                         @{spot.submitted_by_username}
                       </div>
                     )}
@@ -255,7 +249,8 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                 </div>
               </Link>
             );
-          })
+          })}
+          </div>
         )}
       </div>
 
