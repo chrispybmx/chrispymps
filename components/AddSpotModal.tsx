@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, DIFFICOLTA, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
+import { TIPI_SPOT, DIFFICOLTA, CONDIZIONI, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
 import { reverseGeocode } from '@/lib/geocoding';
-import type { SpotType } from '@/lib/types';
+import type { SpotType, SpotMapPin } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
@@ -205,6 +205,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [resetSent,     setResetSent]     = useState(false);
   const [resetLoading,  setResetLoading]  = useState(false);
 
+  /* Nearby spots — duplicate detection */
+  interface NearbySpot { id: string; slug: string; name: string; type: SpotType; city?: string; condition: string; distance: number; spot_photos?: { url: string; position: number }[] }
+  const [nearbySpots, setNearbySpots] = useState<NearbySpot[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyDismissed, setNearbyDismissed] = useState(false);
+
   /* Reverse geocode → auto-popola città */
   const [city, setCity] = useState('');
   const fetchCity = useCallback(async (eLat: number, eLon: number) => {
@@ -222,6 +228,18 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     }
   }, [initialLat, initialLon, fetchCity]);
 
+  /* Fetch nearby spots when coords are set */
+  useEffect(() => {
+    if (lat == null || lon == null) { setNearbySpots([]); setNearbyDismissed(false); return; }
+    setNearbyLoading(true);
+    setNearbyDismissed(false);
+    fetch(`/api/spots/nearby?lat=${lat}&lon=${lon}&radius=150`)
+      .then(r => r.json())
+      .then(j => { if (j.ok) setNearbySpots(j.data ?? []); })
+      .catch(() => {})
+      .finally(() => setNearbyLoading(false));
+  }, [lat, lon]);
+
   /* Reset */
   const handleClose = useCallback(() => {
     setStep('posizione');
@@ -232,6 +250,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setPhotos([]);
     setName(''); setType(''); setDescription(''); setNotes('');
     setError(null); setSubmitting(false);
+    setNearbySpots([]); setNearbyDismissed(false);
     setAuthError(null); setAuthDone(null);
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
@@ -666,7 +685,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               )}
 
-              {/* Posizione confermata → avanti */}
+              {/* Posizione confermata → check duplicati → avanti */}
               {hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -681,9 +700,97 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       Cambia →
                     </button>
                   </div>
-                  <button onClick={() => setStep('foto')} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                    Avanti — Foto →
-                  </button>
+
+                  {/* ── NEARBY SPOTS — duplicate detection ── */}
+                  {nearbyLoading && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textAlign: 'center', padding: '8px 0' }}>
+                      Controllo spot vicini...
+                    </div>
+                  )}
+
+                  {!nearbyLoading && nearbySpots.length > 0 && !nearbyDismissed && (
+                    <div style={{
+                      background: 'rgba(255,106,0,0.06)',
+                      border: '1px solid rgba(255,106,0,0.3)',
+                      borderRadius: 8, overflow: 'hidden',
+                    }}>
+                      <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,106,0,0.15)' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', marginBottom: 4 }}>
+                          ⚠️ Spot vicini trovati ({nearbySpots.length})
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.5 }}>
+                          Ci sono già spot entro 150m. Il tuo è uno di questi o un ostacolo diverso?
+                        </div>
+                      </div>
+
+                      <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                        {nearbySpots.map(ns => {
+                          const tipo = TIPI_SPOT[ns.type];
+                          const cover = ns.spot_photos?.sort((a, b) => a.position - b.position)?.[0]?.url;
+                          return (
+                            <div key={ns.id} style={{
+                              display: 'flex', gap: 10, padding: '10px 14px',
+                              borderBottom: '1px solid rgba(255,255,255,0.04)',
+                              alignItems: 'center',
+                            }}>
+                              {/* Thumbnail */}
+                              <div style={{
+                                width: 48, height: 48, borderRadius: 6, overflow: 'hidden',
+                                background: 'var(--gray-800)', flexShrink: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {cover
+                                  ? <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  : <span style={{ fontSize: 20 }}>{tipo.emoji}</span>
+                                }
+                              </div>
+                              {/* Info */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {ns.name}
+                                </div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)' }}>
+                                  {tipo.emoji} {tipo.label} · {ns.distance}m · {ns.city ?? ''}
+                                </div>
+                              </div>
+                              {/* "È questo" → redirect to spot page */}
+                              <a
+                                href={`/map/spot/${ns.slug}`}
+                                onClick={e => e.stopPropagation()}
+                                style={{
+                                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                                  color: 'var(--orange)', textDecoration: 'none',
+                                  border: '1px solid rgba(255,106,0,0.4)',
+                                  borderRadius: 4, padding: '4px 8px',
+                                  whiteSpace: 'nowrap', flexShrink: 0,
+                                }}
+                              >
+                                È QUESTO →
+                              </a>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ padding: '10px 14px', display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => setNearbyDismissed(true)}
+                          className="btn-primary"
+                          style={{ flex: 1, justifyContent: 'center', fontSize: 12, padding: '10px' }}
+                        >
+                          🆕 È UN ALTRO SPOT — CONTINUA
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Avanti button — shown when no nearby or dismissed */}
+                  {(nearbySpots.length === 0 || nearbyDismissed) && !nearbyLoading && (
+                    <button onClick={() => setStep('foto')} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                      Avanti — Foto →
+                    </button>
+                  )}
                 </div>
               )}
             </div>
