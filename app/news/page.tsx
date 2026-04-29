@@ -99,12 +99,8 @@ function ForumRow({ item, isFirst }: { item: NewsItem; isFirst: boolean }) {
         background: isFirst ? 'rgba(255,106,0,0.04)' : 'transparent',
         borderBottom: '1px solid rgba(255,255,255,0.05)',
         borderLeft: isFirst ? '3px solid var(--orange)' : '3px solid transparent',
-        transition: 'background 0.1s, border-color 0.1s',
         cursor: 'pointer',
-      }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,106,0,0.06)'; (e.currentTarget as HTMLElement).style.borderLeftColor = 'var(--orange)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isFirst ? 'rgba(255,106,0,0.04)' : 'transparent'; (e.currentTarget as HTMLElement).style.borderLeftColor = isFirst ? 'var(--orange)' : 'transparent'; }}
-      >
+      }}>
         {/* Thumbnail or emoji */}
         {item.cover_url ? (
           <div style={{
