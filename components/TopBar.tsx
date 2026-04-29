@@ -186,37 +186,6 @@ export default function TopBar({
         </a>
         {/* Notifiche + Preferiti — solo su mobile */}
         <div className="topbar-mobile-actions" style={{ alignItems: 'center', gap: 2 }}>
-          {/* Cuore → profilo (preferiti) se loggato, altrimenti apre auth */}
-          {profileUsername ? (
-            <Link
-              href={`/u/${profileUsername}`}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 40, height: 40, borderRadius: 4,
-                color: 'var(--gray-400)', textDecoration: 'none', fontSize: 20,
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              } as React.CSSProperties}
-              aria-label="Preferiti"
-            >
-              ❤️
-            </Link>
-          ) : (
-            <button
-              onClick={onOpenAuth}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 40, height: 40, borderRadius: 4,
-                background: 'transparent', border: 'none',
-                fontSize: 20, cursor: 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              } as React.CSSProperties}
-              aria-label="Accedi per i preferiti"
-            >
-              🤍
-            </button>
-          )}
           {sessionToken && <NotificationBell token={sessionToken} />}
         </div>
         {/* FILTRI button — mobile only (filter bar hidden on mobile) */}

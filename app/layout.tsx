@@ -5,8 +5,8 @@ import { APP_CONFIG } from '@/lib/constants';
 import VhsOverlay from '@/components/VhsOverlay';
 import { ToastProvider } from '@/components/Toast';
 
-const vt323 = VT323({ weight: '400', subsets: ['latin'], display: 'swap', variable: '--font-mono' });
-const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--font-display' });
+const vt323 = VT323({ weight: '400', subsets: ['latin'], display: 'swap', variable: '--nf-mono' });
+const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--nf-display' });
 
 export const metadata: Metadata = {
   title: {

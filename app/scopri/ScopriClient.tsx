@@ -267,15 +267,6 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                           }}>
                           🔥{(likeCounts[spot.id] ?? spot.likes_count ?? 0) > 0 ? ` ${likeCounts[spot.id] ?? spot.likes_count ?? 0}` : ''}
                         </button>
-                        <button
-                          onClick={e => { e.preventDefault(); e.stopPropagation();
-                            if (!user) { toast('Accedi per salvare', 'info'); return; }
-                            const added = toggleFav(spot.id);
-                            toast(added ? 'Salvato' : 'Rimosso', added ? 'success' : 'info');
-                          }}
-                          style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>
-                          {isFav(spot.id) ? '❤️' : '🤍'}
-                        </button>
                       </div>
                     </div>
                   </div>

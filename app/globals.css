@@ -16,8 +16,8 @@
   --gray-500: #666666;
   --gray-400: #888888;
 
-  --font-mono:    'VT323', monospace;
-  --font-display: 'Barlow Condensed', sans-serif;
+  --font-mono:    var(--nf-mono, 'VT323', monospace);
+  --font-display: var(--nf-display, 'Barlow Condensed', sans-serif);
 
   --topbar-height: 56px;
   --strip-height:  40px;

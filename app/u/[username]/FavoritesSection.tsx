@@ -2,207 +2,73 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import { TIPI_SPOT } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 
-const FAVS_KEY = 'cmaps_favs_v1';
-
 interface FavSpot {
-  id:          string;
-  slug:        string;
-  name:        string;
-  type:        SpotType;
-  city?:       string;
-  condition:   string;
+  id: string; slug: string; name: string;
+  type: SpotType; city?: string;
   spot_photos?: { url: string; position: number }[];
 }
 
 interface Props {
   profileUsername: string;
-  profileId:       string;
+  profileId: string;
 }
 
+/**
+ * Shows favorites for ANY profile (not just own).
+ * Fetches via API using profile user ID.
+ */
 export default function FavoritesSection({ profileUsername, profileId }: Props) {
-  const [isOwn,   setIsOwn]   = useState(false);
-  const [spots,   setSpots]   = useState<FavSpot[]>([]);
+  const [spots, setSpots] = useState<FavSpot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [empty,   setEmpty]   = useState(false);
 
   useEffect(() => {
-    import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
-      supabaseBrowser().auth.getSession().then(async ({ data }) => {
-        const u = data.session?.user;
-        if (!u) { setLoading(false); return; }
+    // Fetch favorites for this profile user
+    fetch(`/api/favorites?user_id=${profileId}`)
+      .then(r => r.json())
+      .then(j => { if (j.ok) setSpots(j.data ?? []); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [profileId]);
 
-        const uname = u.user_metadata?.username ?? u.email?.split('@')[0] ?? '';
-        const own   = u.id === profileId || uname === profileUsername;
-        setIsOwn(own);
-        if (!own) { setLoading(false); return; }
-
-        const t = data.session?.access_token ?? '';
-
-        try {
-          if (t) {
-            /* Utente loggato: leggi da Supabase */
-            const res = await fetch('/api/favorites', {
-              headers: { Authorization: `Bearer ${t}` },
-            });
-            const j = await res.json();
-
-            if (j.ok && j.data.length > 0) {
-              setSpots(j.data);
-
-              /* Sync: aggiungi a Supabase eventuali preferiti locali non ancora sincronizzati */
-              let localIds: string[] = [];
-              try { localIds = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
-              const remoteIds = new Set<string>(j.ids ?? j.data.map((s: FavSpot) => s.id));
-              const toSync = localIds.filter(id => !remoteIds.has(id));
-              if (toSync.length > 0) {
-                toSync.forEach(spot_id => {
-                  fetch('/api/favorites', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
-                    body: JSON.stringify({ spot_id }),
-                  }).catch(() => {});
-                });
-                /* Ricarica dopo sync */
-                setTimeout(async () => {
-                  const res2 = await fetch('/api/favorites', { headers: { Authorization: `Bearer ${t}` } }).catch(() => null);
-                  if (res2) {
-                    const j2 = await res2.json().catch(() => null);
-                    if (j2?.ok) setSpots(j2.data);
-                  }
-                }, 1000);
-              }
-              /* Pulisci localStorage una volta sincronizzato */
-              localStorage.removeItem(FAVS_KEY);
-            } else if (j.ok && j.data.length === 0) {
-              /* Nessun preferito su Supabase — prova localStorage (pre-login) */
-              let localIds: string[] = [];
-              try { localIds = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
-
-              if (localIds.length > 0) {
-                /* Migra localStorage → Supabase */
-                await Promise.all(localIds.map(spot_id =>
-                  fetch('/api/favorites', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
-                    body: JSON.stringify({ spot_id }),
-                  }).catch(() => {})
-                ));
-                localStorage.removeItem(FAVS_KEY);
-
-                /* Ricarica */
-                const res2 = await fetch('/api/favorites', { headers: { Authorization: `Bearer ${t}` } }).catch(() => null);
-                if (res2) {
-                  const j2 = await res2.json().catch(() => null);
-                  if (j2?.ok && j2.data.length > 0) {
-                    setSpots(j2.data);
-                    setLoading(false);
-                    return;
-                  }
-                }
-                setEmpty(true);
-              } else {
-                setEmpty(true);
-              }
-            }
-          } else {
-            /* Fallback anonimo — localStorage */
-            let ids: string[] = [];
-            try { ids = JSON.parse(localStorage.getItem(FAVS_KEY) ?? '[]'); } catch {}
-            if (ids.length === 0) { setEmpty(true); setLoading(false); return; }
-            const res = await fetch(`/api/favorites?ids=${ids.join(',')}`);
-            const j   = await res.json();
-            if (j.ok) { setSpots(j.data); if (j.data.length === 0) setEmpty(true); }
-          }
-        } catch {
-          setEmpty(true);
-        }
-        setLoading(false);
-      });
-    }).catch(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, profileUsername]);
-
-  if (!isOwn || loading) return null;
+  if (loading) return null;
+  if (spots.length === 0) return null;
 
   return (
-    <div style={{ marginTop: 32 }}>
+    <div style={{ marginTop: 28 }}>
       <div style={{
         fontFamily: 'var(--font-mono)', fontSize: 12,
         color: 'var(--gray-400)', textTransform: 'uppercase',
         letterSpacing: '0.08em', marginBottom: 14,
         borderTop: '1px solid var(--gray-700)', paddingTop: 24,
       }}>
-        ❤️ I MIEI PREFERITI{spots.length > 0 ? ` (${spots.length})` : ''}
+        ❤️ PREFERITI DI @{profileUsername.toUpperCase()} ({spots.length})
       </div>
-
-      {empty || spots.length === 0 ? (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-500)', padding: '12px 0' }}>
-          Nessun preferito ancora — premi ❤️ su uno spot per salvarlo.
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {spots.map(spot => <SpotTile key={spot.id} spot={spot} username={profileUsername} />)}
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {spots.map(spot => {
+          const tipo = TIPI_SPOT[spot.type];
+          const cover = spot.spot_photos?.sort((a, b) => a.position - b.position)?.[0]?.url;
+          return (
+            <Link key={spot.id} href={`/map/spot/${spot.slug}`} style={{ textDecoration: 'none', display: 'block', minWidth: 0 }}>
+              <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ width: '100%', paddingBottom: '100%', background: 'var(--gray-700)', overflow: 'hidden', position: 'relative' }}>
+                  {cover
+                    ? <img src={cover} alt={spot.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                    : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 36 }}>{tipo.emoji}</span></div>}
+                </div>
+                <div style={{ padding: '8px 10px', height: 52, overflow: 'hidden' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{spot.name}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {tipo.emoji} {tipo.label}{spot.city ? ` · ${spot.city}` : ''}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
-  );
-}
-
-function SpotTile({ spot, username }: { spot: FavSpot; username: string }) {
-  const tipo   = TIPI_SPOT[spot.type];
-  const cond   = CONDIZIONI[spot.condition as keyof typeof CONDIZIONI];
-  const cover  = spot.spot_photos?.sort((a, b) => a.position - b.position)[0]?.url;
-  const isDead = spot.condition !== 'alive';
-
-  return (
-    <Link href={`/map/spot/${spot.slug}?from=/u/${username}`} style={{ textDecoration: 'none', display: 'block' }}>
-      <div style={{
-        background: 'var(--gray-800)',
-        border: '1px solid var(--gray-700)',
-        borderRadius: 8, overflow: 'hidden',
-        opacity: isDead ? 0.65 : 1,
-      }}>
-        <div style={{
-          height: 110, background: 'var(--gray-700)',
-          overflow: 'hidden', position: 'relative',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {cover
-            ? <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: isDead ? 'grayscale(0.5)' : 'none' }} loading="lazy" />
-            : <span style={{ fontSize: 36 }}>{tipo.emoji}</span>}
-          <div style={{
-            position: 'absolute', top: 6, right: 6,
-            background: cond?.bg ?? 'rgba(0,0,0,0.6)',
-            color: cond?.color ?? '#fff',
-            fontFamily: 'var(--font-mono)', fontSize: 9,
-            padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase',
-          }}>
-            {cond?.label ?? spot.condition}
-          </div>
-        </div>
-        <div style={{ padding: '8px 10px' }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 13,
-            color: 'var(--bone)', overflow: 'hidden',
-            textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3,
-          }}>
-            {spot.name}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color }}>
-              {tipo.emoji} {tipo.label}
-            </span>
-            {spot.city && (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
-                · {spot.city}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }
