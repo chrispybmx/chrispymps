@@ -92,48 +92,53 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Errore interno. Riprova più tardi.' }, { status: 500 });
   }
 
-  // 4. Upload foto — PARALLELO per velocità (max 5)
-  const uploadPromises: Promise<string | null>[] = [];
+  // 4. Read photo buffers into memory BEFORE responding
+  //    (FormData is lost after response — must read now)
+  const photoBuffers: { buffer: Buffer; mimeType: string; ext: string; index: number }[] = [];
   for (let i = 0; i < 5; i++) {
     const file = formData.get(`photo_${i}`);
     if (!file || !(file instanceof Blob)) continue;
     if (file.size > MAX_PHOTO_SIZE) continue;
-
     const mimeType = file.type.toLowerCase();
     const ext = ALLOWED_MIME[mimeType];
     if (!ext) continue;
-
-    uploadPromises.push(
-      (async () => {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        if (!isValidImageMagicBytes(buffer, mimeType)) return null;
-        const path = `${spot.id}/${i}.${ext}`;
-        const { error } = await supabase.storage.from('spot-photos').upload(path, buffer, { contentType: mimeType, upsert: true });
-        if (error) { console.error('[submit-spot] upload error:', error.message); return null; }
-        return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
-      })()
-    );
+    const buffer = Buffer.from(await file.arrayBuffer());
+    if (!isValidImageMagicBytes(buffer, mimeType)) continue;
+    photoBuffers.push({ buffer, mimeType, ext, index: i });
   }
 
-  const results = await Promise.all(uploadPromises);
-  const photoUrls = results.filter((u): u is string => u !== null);
+  // 5. RESPOND IMMEDIATELY — user sees "Spot inviato!" right now
+  //    Photos upload in background (fire-and-forget)
+  const response = NextResponse.json({ ok: true, data: { id: spot.id, slug: spot.slug } }, { status: 201 });
 
-  if (photoUrls.length > 0) {
-    await supabase.from('spot_photos').insert(
-      photoUrls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
-    );
-  }
+  // 6. Background: upload photos + insert records + notify
+  const bgUpload = async () => {
+    if (photoBuffers.length > 0) {
+      const results = await Promise.all(
+        photoBuffers.map(async ({ buffer, mimeType, ext, index }) => {
+          const path = `${spot.id}/${index}.${ext}`;
+          const { error } = await supabase.storage.from('spot-photos').upload(path, buffer, { contentType: mimeType, upsert: true });
+          if (error) return null;
+          return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
+        })
+      );
+      const urls = results.filter((u): u is string => u !== null);
+      if (urls.length > 0) {
+        await supabase.from('spot_photos').insert(
+          urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
+        );
+      }
+    }
+    // Newsletter + admin notification
+    if (user.email) subscribeToNewsletter(user.email, profile.username).catch(() => {});
+    const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
+    sendAdminNotification(spot, contributor as any).catch(() => {});
+  };
 
-  // 5. Aggiungi a MailerLite (fire-and-forget — non blocca mai la risposta)
-  if (user.email) {
-    subscribeToNewsletter(user.email, profile.username).catch(() => {});
-  }
+  // Fire and forget — continues even after response is sent
+  bgUpload().catch(err => console.error('[submit-spot] bg upload error:', err));
 
-  // 6. Notifica admin (fire-and-forget)
-  const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
-  sendAdminNotification(spot, contributor as any).catch(() => {});
-
-  return NextResponse.json({ ok: true, data: { id: spot.id, slug: spot.slug } }, { status: 201 });
+  return response;
 }
 
 /** Verifica magic bytes per JPEG, PNG, WebP */
