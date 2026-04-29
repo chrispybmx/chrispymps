@@ -388,8 +388,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         }, 200);
       } else {
         /* Apri pannello — altezza che mostra foto + info + CTA senza tagliare */
-        const panelH = Math.round(window.innerHeight * 0.55);
-        snapTo(panelH);
+        snapTo(Math.round(window.innerHeight * 0.65));
       }
       return isClosing ? null : pin.id;
     });
