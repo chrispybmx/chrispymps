@@ -1212,12 +1212,12 @@ function SpotListPanel({
                   }}
                 >
                   {/* Cover photo */}
-                  <div style={{
+                  <div className="spot-grid-thumb" style={{
                     height: 130, background: '#111',
                     position: 'relative', overflow: 'hidden',
                   }}>
                     {cover ? (
-                      <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                      <img className="spot-grid-img" src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                     ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 36, opacity: 0.2 }}>{tipo.emoji}</span>
@@ -1316,8 +1316,9 @@ function SpotListPanel({
 
                 {/* ── FOTO — scroll-snap swipeable ── */}
                 {allPhotos.length > 0 ? (
-                  <div style={{ position: 'relative', background: '#000' }}>
+                  <div className="spot-expanded-photo-wrap" style={{ position: 'relative', background: '#000' }}>
                     <div
+                      className="spot-expanded-strip"
                       ref={photoStripRef}
                       onScroll={e => {
                         const el = e.currentTarget;
@@ -1350,6 +1351,7 @@ function SpotListPanel({
                       {allPhotos.map((url, i) => (
                         <div key={url + i} style={{ flexShrink: 0, width: '100%', height: '100%', scrollSnapAlign: 'start' }}>
                           <img
+                            className="spot-expanded-img"
                             src={url} alt={spot.name}
                             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
                             loading={i === 0 ? 'eager' : 'lazy'}
