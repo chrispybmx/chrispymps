@@ -51,8 +51,8 @@ function parseCoordInput(raw: string): { lat: number; lon: number } | null {
   const m2 = s.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (m2) return { lat: parseFloat(m2[1]), lon: parseFloat(m2[2]) };
 
-  // ?ll=lat,lon (Apple Maps)
-  const m3 = s.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  // ?ll=lat,lon or ?coordinate=lat,lon (Apple Maps)
+  const m3 = s.match(/[?&](?:ll|coordinate)=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (m3) return { lat: parseFloat(m3[1]), lon: parseFloat(m3[2]) };
 
   // DMS iPhone: 45°27'35.2"N 11°00'42.1"E  oppure  45°27'35"N, 11°0'42"E
