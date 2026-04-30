@@ -59,8 +59,20 @@ function parseCoordInput(raw: string): { lat: number; lon: number } | null {
   const dms = parseDMS(s);
   if (dms) return dms;
 
-  // "lat, lon" | "lat lon" | "lat;lon" — con o senza parentesi/spazi
-  const m4 = s.match(/^(-?\d+\.?\d*)[,;\s]+(-?\d+\.?\d*)$/);
+  // iPhone decimal con virgola italiana: "46,66343° N, 11,15918° E"
+  const mIT = s.match(/(\d+[,.]?\d*)\s*°?\s*([NSns])\s*[,;\s]+\s*(\d+[,.]?\d*)\s*°?\s*([EWew])/);
+  if (mIT) {
+    let lat = parseFloat(mIT[1].replace(',', '.'));
+    let lon = parseFloat(mIT[3].replace(',', '.'));
+    if (mIT[2].toUpperCase() === 'S') lat = -lat;
+    if (mIT[4].toUpperCase() === 'W') lon = -lon;
+    if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) return { lat, lon };
+  }
+
+  // "lat, lon" | "lat lon" | "lat;lon" — anche con virgola italiana (46,66 11,15)
+  // Normalizza virgole italiane se ci sono lettere o doppia virgola
+  const normalized = s.replace(/(\d),(\d)/g, '$1.$2');
+  const m4 = normalized.match(/^(-?\d+\.?\d*)[,;\s]+(-?\d+\.?\d*)$/);
   if (m4) return { lat: parseFloat(m4[1]), lon: parseFloat(m4[2]) };
 
   return null;
