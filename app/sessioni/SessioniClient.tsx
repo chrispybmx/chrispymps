@@ -4,10 +4,20 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useUser } from '@/hooks/useUser';
 import { useToast } from '@/components/Toast';
+import { distanceKm } from '@/lib/nearby-radar';
 
 interface SpotSession {
   spot: { id: string; name: string; slug: string; city?: string };
   riders: { username: string }[];
+}
+
+interface NearbySpot {
+  id: string;
+  name: string;
+  city?: string;
+  lat: number;
+  lon: number;
+  dist: number;
 }
 
 export default function SessioniClient() {
@@ -16,10 +26,14 @@ export default function SessioniClient() {
   const [sessions, setSessions] = useState<SpotSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
-  const [mySession, setMySession] = useState<string | null>(null); // spot_id
-  const [spots, setSpots] = useState<{ id: string; name: string; city?: string }[]>([]);
-  const [selectedSpot, setSelectedSpot] = useState('');
+  const [mySession, setMySession] = useState<string | null>(null);
+
+  // Join flow state
   const [showJoinForm, setShowJoinForm] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [nearbySpots, setNearbySpots] = useState<NearbySpot[]>([]);
+  const [userPos, setUserPos] = useState<{ lat: number; lon: number } | null>(null);
+  const [noSpotsNearby, setNoSpotsNearby] = useState(false);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -27,7 +41,6 @@ export default function SessioniClient() {
       const j = await res.json();
       if (j.ok) {
         setSessions(j.data ?? []);
-        // Check if current user has active session
         if (user) {
           for (const s of j.data ?? []) {
             if (s.riders.some((r: { username: string }) => r.username === user.username)) {
@@ -44,32 +57,17 @@ export default function SessioniClient() {
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
-  // Load spots for dropdown
-  useEffect(() => {
-    if (!showJoinForm) return;
-    fetch('/api/spots')
-      .then(r => r.json())
-      .then(j => {
-        if (j.ok) {
-          const sorted = (j.data ?? [])
-            .map((s: { id: string; name: string; city?: string }) => ({ id: s.id, name: s.name, city: s.city }))
-            .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
-          setSpots(sorted);
-        }
-      })
-      .catch(() => {});
-  }, [showJoinForm]);
-
-  const joinSession = async () => {
-    if (!user || !selectedSpot) return;
-    setJoining(true);
-
-    // Get GPS position
+  // When user taps "SONO IN SESSION" — get GPS, fetch spots, filter nearby
+  const startJoinFlow = async () => {
     if (!('geolocation' in navigator)) {
       toast('Geolocalizzazione non disponibile', 'error');
-      setJoining(false);
       return;
     }
+
+    setShowJoinForm(true);
+    setLocating(true);
+    setNearbySpots([]);
+    setNoSpotsNearby(false);
 
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -80,14 +78,44 @@ export default function SessioniClient() {
         });
       });
 
+      const myPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      setUserPos(myPos);
+
+      // Fetch all spots and filter by distance
+      const res = await fetch('/api/spots');
+      const j = await res.json();
+      if (j.ok) {
+        const nearby = (j.data ?? [])
+          .map((s: { id: string; name: string; city?: string; lat: number; lon: number }) => ({
+            ...s,
+            dist: distanceKm(myPos, { lat: s.lat, lon: s.lon }),
+          }))
+          .filter((s: NearbySpot) => s.dist <= 1)
+          .sort((a: NearbySpot, b: NearbySpot) => a.dist - b.dist);
+
+        setNearbySpots(nearby);
+        setNoSpotsNearby(nearby.length === 0);
+      }
+    } catch {
+      toast('Abilita la posizione per entrare in session', 'error');
+      setShowJoinForm(false);
+    }
+    setLocating(false);
+  };
+
+  const joinSpot = async (spotId: string) => {
+    if (!user || !userPos) return;
+    setJoining(true);
+
+    try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'join',
-          spot_id: selectedSpot,
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
+          spot_id: spotId,
+          lat: userPos.lat,
+          lon: userPos.lon,
           access_token: user.accessToken,
         }),
       });
@@ -95,13 +123,13 @@ export default function SessioniClient() {
       if (j.ok) {
         toast(j.message, 'success');
         setShowJoinForm(false);
-        setSelectedSpot('');
+        setNearbySpots([]);
         fetchSessions();
       } else {
         toast(j.error, 'error');
       }
     } catch {
-      toast('Abilita la posizione per verificare che sei allo spot', 'error');
+      toast('Errore di rete', 'error');
     }
     setJoining(false);
   };
@@ -145,7 +173,7 @@ export default function SessioniClient() {
         {/* CTA */}
         {user && !mySession && !showJoinForm && (
           <button
-            onClick={() => setShowJoinForm(true)}
+            onClick={startJoinFlow}
             style={{
               width: '100%', padding: '14px', marginBottom: 20,
               fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
@@ -188,63 +216,117 @@ export default function SessioniClient() {
           </div>
         )}
 
-        {/* Join form */}
+        {/* Join flow — nearby spots */}
         {showJoinForm && (
           <div style={{
             padding: '18px', marginBottom: 20,
             background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
             borderRadius: 12,
           }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', marginBottom: 12 }}>
-              Scegli lo spot dove stai ridando
-            </div>
-
-            <select
-              value={selectedSpot}
-              onChange={e => setSelectedSpot(e.target.value)}
-              style={{
-                width: '100%', padding: '10px 12px', marginBottom: 12,
-                background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
-                borderRadius: 6, color: 'var(--bone)', fontFamily: 'var(--font-mono)',
-                fontSize: 14, outline: 'none',
-              }}
-            >
-              <option value="">— Seleziona spot —</option>
-              {spots.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name}{s.city ? ` — ${s.city}` : ''}
-                </option>
-              ))}
-            </select>
-
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginBottom: 14 }}>
-              📍 La tua posizione verrà verificata — devi essere entro 1 km dallo spot
-            </div>
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={joinSession}
-                disabled={!selectedSpot || joining}
-                style={{
-                  flex: 1, padding: '10px', fontFamily: 'var(--font-mono)', fontSize: 14,
-                  fontWeight: 700, background: 'var(--orange)', color: '#000', border: 'none',
-                  borderRadius: 6, cursor: 'pointer',
-                  opacity: (!selectedSpot || joining) ? 0.4 : 1,
-                }}
-              >
-                {joining ? '⏳ Verifico...' : '🔴 Entra in session'}
-              </button>
-              <button
-                onClick={() => { setShowJoinForm(false); setSelectedSpot(''); }}
-                style={{
-                  padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 14,
-                  background: 'transparent', border: '1px solid var(--gray-600)',
-                  borderRadius: 6, color: 'var(--gray-400)', cursor: 'pointer',
-                }}
-              >
-                Annulla
-              </button>
-            </div>
+            {locating ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', marginBottom: 8 }}>
+                  📍 Cerco spot vicini a te...
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>
+                  Consenti la posizione nel browser
+                </div>
+              </div>
+            ) : noSpotsNearby ? (
+              /* No spots within 1 km */
+              <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>📍</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', marginBottom: 6 }}>
+                  Nessuno spot entro 1 km
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginBottom: 16, lineHeight: 1.5 }}>
+                  Non ci sono spot registrati qui vicino. Vuoi aggiungerlo alla mappa?
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  <Link
+                    href="/map?add=1"
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+                      background: 'var(--orange)', color: '#000',
+                      padding: '10px 18px', borderRadius: 6, textDecoration: 'none',
+                    }}
+                  >
+                    + Aggiungi spot
+                  </Link>
+                  <button
+                    onClick={() => { setShowJoinForm(false); setNoSpotsNearby(false); }}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 13,
+                      background: 'transparent', border: '1px solid var(--gray-600)',
+                      borderRadius: 6, color: 'var(--gray-400)', padding: '10px 16px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Chiudi
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Nearby spots list */
+              <>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', marginBottom: 4 }}>
+                  Spot vicini a te
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginBottom: 14 }}>
+                  Seleziona dove stai ridando
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {nearbySpots.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => joinSpot(s.id)}
+                      disabled={joining}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '12px 14px',
+                        background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
+                        borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                        opacity: joining ? 0.5 : 1,
+                      }}
+                    >
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                        background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.3)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)',
+                      }}>
+                        📍
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>
+                          {s.name}
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>
+                          {s.city ? `${s.city} · ` : ''}{Math.round(s.dist * 1000)} m
+                        </div>
+                      </div>
+                      <div style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)',
+                        flexShrink: 0,
+                      }}>
+                        ENTRA →
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setShowJoinForm(false); setNearbySpots([]); }}
+                  style={{
+                    width: '100%', marginTop: 10, padding: '8px',
+                    fontFamily: 'var(--font-mono)', fontSize: 12,
+                    background: 'transparent', border: 'none',
+                    color: 'var(--gray-500)', cursor: 'pointer',
+                  }}
+                >
+                  Annulla
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -286,7 +368,6 @@ export default function SessioniClient() {
                     borderRadius: 10, padding: '14px 16px',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}>
-                    {/* Live dot */}
                     <div style={{
                       width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                       background: 'rgba(255,51,51,0.1)', border: '1px solid rgba(255,51,51,0.3)',
@@ -294,8 +375,6 @@ export default function SessioniClient() {
                     }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff3333', boxShadow: '0 0 6px #ff3333' }} />
                     </div>
-
-                    {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)', marginBottom: 3 }}>
                         {s.spot.name}
@@ -313,8 +392,6 @@ export default function SessioniClient() {
                         ))}
                       </div>
                     </div>
-
-                    {/* Count */}
                     <div style={{
                       fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)',
                       flexShrink: 0, minWidth: 28, textAlign: 'center',

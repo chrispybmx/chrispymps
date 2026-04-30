@@ -81,7 +81,7 @@ export default function SubmitRequestModal({ open, onClose }: Props) {
               </div>
 
               <div>
-                <Label>Città / Zona *</Label>
+                <Label>Città / Zona (opzionale)</Label>
                 <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder='es. "Torino centro", "Lago di Garda"' maxLength={100} style={inputStyle} />
               </div>
 
