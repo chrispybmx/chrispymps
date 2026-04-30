@@ -16,6 +16,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/events`,       lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${base}/news`,         lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.7 },
     { url: `${base}/cerca-spot`,    lastModified: new Date(), changeFrequency: 'daily',   priority: 0.7 },
+    { url: `${base}/sessioni`,     lastModified: new Date(), changeFrequency: 'always',  priority: 0.6 },
     { url: `${base}/skate-maps`,    lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
     { url: `${base}/map/about`,    lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
     { url: `${base}/map/support`,  lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },

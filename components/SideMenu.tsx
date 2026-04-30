@@ -16,6 +16,7 @@ const MENU_ITEMS = [
   { href: '/events',   label: 'Eventi',   emoji: '📅' },
   { href: '/news',       label: 'News',       emoji: '📰' },
   { href: '/cerca-spot', label: 'Cerca Spot', emoji: '📍' },
+  { href: '/sessioni',  label: 'Sessioni',   emoji: '🔴' },
   { divider: true },
   { href: LINKS.youtube,   label: 'Tutorial',    emoji: '▶️', external: true },
   { href: '/map/support',  label: 'Supporta',    emoji: '☕' },
