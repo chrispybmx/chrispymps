@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { signIn, signUp, checkUsername } from '@/lib/auth-client';
+import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
 
 interface AuthModalProps {
   open:          boolean;
@@ -28,6 +28,8 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   // Accedi
   const [loginEmail,    setLoginEmail]    = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [resetSent,     setResetSent]     = useState(false);
+  const [resetting,     setResetting]     = useState(false);
 
   // BUG-FIX: useRef per il timer debounce — una variabile locale viene ricreata
   // a ogni render e clearTimeout non annulla mai il timer precedente
@@ -37,7 +39,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setError(null); setDone(null); setLoading(false);
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
-    setUsernameOk(null);
+    setUsernameOk(null); setResetSent(false); setResetting(false);
   };
 
   const handleClose = () => { resetAll(); onClose(); };
@@ -188,6 +190,30 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                   <label style={lbl}>Password</label>
                   <input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
                 </div>
+                <div style={{ textAlign: 'right', marginTop: -8 }}>
+                  <button
+                    onClick={async () => {
+                      if (!loginEmail) { setError('Inserisci la tua email prima.'); return; }
+                      setResetting(true); setError(null);
+                      try {
+                        await resetPassword(loginEmail);
+                        setResetSent(true);
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Errore invio email');
+                      }
+                      setResetting(false);
+                    }}
+                    disabled={resetting}
+                    style={{ background: 'none', border: 'none', color: 'var(--gray-500)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, padding: 0 }}
+                  >
+                    {resetting ? '⏳...' : 'Ho dimenticato la password'}
+                  </button>
+                </div>
+                {resetSent && (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#00c851', background: 'rgba(0,200,81,0.08)', border: '1px solid rgba(0,200,81,0.2)', borderRadius: 4, padding: '8px 12px', textAlign: 'center' }}>
+                    📬 Email inviata! Controlla la posta per il link di reset.
+                  </div>
+                )}
                 {error && <Err msg={error} />}
                 <button onClick={handleSignIn} disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: loading ? 0.6 : 1 }}>
                   {loading ? '⏳ Accesso...' : '🔑 ENTRA'}
