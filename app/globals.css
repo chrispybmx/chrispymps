@@ -590,19 +590,19 @@ select.input-vhs {
     object-fit: contain !important;
   }
 
-  /* ── Spot grid cards: square, larger, contain ── */
+  /* ── Spot grid cards: taller, centered, full image ── */
   .spot-grid-thumb {
-    height: 200px !important;
-    aspect-ratio: 1 / 1;
+    height: 180px !important;
     background: var(--gray-800) !important;
   }
   .spot-grid-img {
     object-fit: contain !important;
+    padding: 4px;
   }
 
-  /* ── Spot expanded card photos: taller, contain ── */
+  /* ── Spot expanded card photos: much taller, full image ── */
   .spot-expanded-strip {
-    height: clamp(200px, 40vh, 340px) !important;
+    height: clamp(280px, 50vh, 440px) !important;
   }
   .spot-expanded-img {
     object-fit: contain !important;
