@@ -66,6 +66,8 @@ interface AdminNews {
   status: string;
   published_at?: string;
   created_at: string;
+  extra_photos_text?: string;
+  news_photos?: { id: string; url: string; position: number; caption?: string | null }[];
 }
 
 const EMPTY_EVENT: Omit<AdminEvent, 'id'> = {
@@ -790,7 +792,15 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
                 newsList.map(n => (
                   <NewsRow
                     key={n.id} article={n}
-                    onEdit={() => setEditingNews({ ...n })}
+                    onEdit={() => {
+                      const photosText = n.news_photos?.length
+                        ? n.news_photos
+                            .sort((a, b) => a.position - b.position)
+                            .map(p => p.caption ? `${p.url} | ${p.caption}` : p.url)
+                            .join('\n')
+                        : '';
+                      setEditingNews({ ...n, extra_photos_text: photosText });
+                    }}
                     onDelete={() => deleteNews(n.id, n.title)}
                   />
                 ))
@@ -1170,12 +1180,22 @@ function NewsForm({
         </div>
 
         <div>
-          <label style={labelStyle}>Corpo articolo (supporta **grassetto**, *corsivo*, # Titolo, ## Sottotitolo, - liste)</label>
+          <label style={labelStyle}>Corpo articolo (supporta **grassetto**, *corsivo*, # Titolo, ## Sottotitolo, - liste, link YouTube)</label>
           <textarea
             style={{ ...inputStyle, resize: 'vertical', minHeight: 240, lineHeight: 1.6 }}
             value={article.body ?? ''}
             onChange={e => set('body', e.target.value)}
-            placeholder={`# Titolo sezione\n\nTesto del paragrafo qui...\n\n## Sottotitolo\n\n**Parola in grassetto** e *corsivo*.\n\n- Elemento lista\n- Elemento lista`}
+            placeholder={`# Titolo sezione\n\nTesto del paragrafo qui...\n\nhttps://youtube.com/watch?v=...\n\n## Sottotitolo\n\n**Parola in grassetto** e *corsivo*.\n\n- Elemento lista\n- Elemento lista`}
+          />
+        </div>
+
+        <div>
+          <label style={labelStyle}>📸 Foto extra (un URL per riga, opzionale: url | caption)</label>
+          <textarea
+            style={{ ...inputStyle, resize: 'vertical', minHeight: 80, lineHeight: 1.6 }}
+            value={article.extra_photos_text ?? ''}
+            onChange={e => onChange({ ...article, extra_photos_text: e.target.value })}
+            placeholder={`https://example.com/foto1.jpg\nhttps://example.com/foto2.jpg | Didascalia foto`}
           />
         </div>
       </div>

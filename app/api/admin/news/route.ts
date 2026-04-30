@@ -10,7 +10,7 @@ function slugify(str: string) {
 
 export async function GET() {
   if (!isAdminAuthenticated()) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
-  const { data, error } = await supabaseAdmin().from('news').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabaseAdmin().from('news').select('*, news_photos(id, url, position, caption)').order('created_at', { ascending: false });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, data: data ?? [] });
 }
@@ -36,9 +36,33 @@ export async function POST(req: Request) {
 
   const supabase = supabaseAdmin();
 
+  // Parse extra photos from body
+  const extraPhotos: { url: string; caption: string | null }[] = [];
+  if (typeof body.extra_photos_text === 'string') {
+    body.extra_photos_text.split('\n').forEach((line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const [rawUrl, ...captionParts] = trimmed.split('|');
+      const url = rawUrl.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+      const caption = captionParts.join('|').trim().slice(0, 200) || null;
+      extraPhotos.push({ url, caption });
+    });
+  } else if (Array.isArray(body.extra_photos)) {
+    for (const p of body.extra_photos.slice(0, 20)) {
+      if (typeof p.url === 'string' && (p.url.startsWith('http://') || p.url.startsWith('https://'))) {
+        extraPhotos.push({ url: p.url, caption: typeof p.caption === 'string' ? p.caption.slice(0, 200) : null });
+      }
+    }
+  }
+  if (extraPhotos.length > 20) extraPhotos.length = 20;
+
+  let newsId: string | undefined;
+
   if (body.id) {
     // UPDATE
     if (!UUID_RE.test(String(body.id))) return NextResponse.json({ ok: false, error: 'ID non valido' }, { status: 400 });
+    newsId = body.id;
     const updateFields: Record<string, unknown> = {
       title, excerpt, body: content, cover_url, tags, status,
       published_at: status === 'published' ? (body.published_at || new Date().toISOString()) : null,
@@ -52,13 +76,25 @@ export async function POST(req: Request) {
     let slug = slugify(title);
     const { data: ex } = await supabase.from('news').select('id').eq('slug', slug).maybeSingle();
     if (ex) slug = `${slug}-${Date.now()}`;
-    const { error } = await supabase.from('news').insert({
+    const { data: created, error } = await supabase.from('news').insert({
       slug, title, excerpt, body: content, cover_url, tags, status,
       published_at: status === 'published' ? new Date().toISOString() : null,
       moderation_status: status === 'published' ? 'published' : 'pending',
-    });
+    }).select('id').single();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    newsId = created.id;
   }
+
+  // Save extra photos
+  if (newsId) {
+    await supabase.from('news_photos').delete().eq('news_id', newsId);
+    if (extraPhotos.length > 0) {
+      const rows = extraPhotos.map((p, i) => ({ news_id: newsId, url: p.url, caption: p.caption, position: i }));
+      const { error: photoErr } = await supabase.from('news_photos').insert(rows);
+      if (photoErr) console.error('[admin/news] news_photos insert error:', photoErr.message);
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
 

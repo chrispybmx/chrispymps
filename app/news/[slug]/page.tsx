@@ -5,6 +5,13 @@ import { APP_CONFIG } from '@/lib/constants';
 import NewsComments from '@/components/NewsComments';
 import { supabaseServer } from '@/lib/supabase';
 
+interface NewsPhoto {
+  id: string;
+  url: string;
+  position: number;
+  caption?: string | null;
+}
+
 interface NewsArticle {
   id: string;
   slug: string;
@@ -15,13 +22,14 @@ interface NewsArticle {
   tags?: string;
   published_at?: string;
   created_at: string;
+  news_photos?: NewsPhoto[];
 }
 
 async function getArticle(slug: string): Promise<NewsArticle | null> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from('news')
-    .select('id, slug, title, excerpt, body, cover_url, tags, published_at, created_at')
+    .select('id, slug, title, excerpt, body, cover_url, tags, published_at, created_at, news_photos(id, url, position, caption)')
     .eq('slug', slug)
     .eq('status', 'published')
     .maybeSingle();
@@ -31,6 +39,9 @@ async function getArticle(slug: string): Promise<NewsArticle | null> {
     return null;
   }
 
+  if (data?.news_photos) {
+    data.news_photos.sort((a: { position: number }, b: { position: number }) => a.position - b.position);
+  }
   return data as NewsArticle | null;
 }
 
@@ -129,13 +140,36 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     },
   };
 
-  // Parse body — support simple markdown-like: **bold**, *italic*, # headings, - lists, blank lines = paragraphs
+  // YouTube URL → embed video ID extraction
+  const YT_RE = /^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})(?:[&?].*)?$/;
+
+  const getYouTubeId = (url: string): string | null => {
+    const m = url.match(YT_RE);
+    return m ? m[1] : null;
+  };
+
+  // Parse body — support simple markdown-like: **bold**, *italic*, # headings, - lists, blank lines = paragraphs, YouTube embeds
   const renderBody = (text: string) => {
     return text
       .split('\n\n')
       .map((block, i) => {
         const trimmed = block.trim();
         if (!trimmed) return null;
+
+        // YouTube embed — standalone URL on its own block
+        const ytId = getYouTubeId(trimmed);
+        if (ytId) return (
+          <div key={i} style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 8, margin: '0 0 18px' }}>
+            <iframe
+              src={`https://www.youtube.com/embed/${ytId}?rel=0`}
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title="Video"
+              loading="lazy"
+            />
+          </div>
+        );
 
         // Heading
         if (trimmed.startsWith('# ')) return (
@@ -182,7 +216,11 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     escapeHtml(text)
       .replace(/\n/g, '<br/>')
       .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--orange)">$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>');
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/https?:\/\/[^\s<&]+/g, (url) => {
+        const decoded = url.replace(/&amp;/g, '&');
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--orange);text-decoration:underline">${decoded}</a>`;
+      });
 
   return (
     <div style={{ background: 'var(--black)', minHeight: '100dvh' }}>
@@ -267,6 +305,33 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             : <p style={{ color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 15 }}>Nessun contenuto disponibile.</p>
           }
         </div>
+
+        {/* Extra photos */}
+        {article.news_photos && article.news_photos.length > 0 && (
+          <div style={{ margin: '28px 0 24px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: article.news_photos.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 12,
+            }}>
+              {article.news_photos.map(photo => (
+                <div key={photo.id}>
+                  <img
+                    src={photo.url}
+                    alt={photo.caption ?? ''}
+                    style={{ width: '100%', maxHeight: 520, objectFit: 'cover', borderRadius: 8, display: 'block' }}
+                    loading="lazy"
+                  />
+                  {photo.caption && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginTop: 6, textAlign: 'center' }}>
+                      {photo.caption}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Comments */}
         <NewsComments newsId={article.id} newsSlug={article.slug} />
