@@ -9,6 +9,8 @@ const Schema = z.object({
   cover_url:    z.string().url().max(500).optional(),
   tags:         z.string().max(200).optional(),
   link_url:     z.string().url().max(500).optional(), // external link (video, etc)
+  post_type:    z.enum(['post', 'request']).optional(),
+  request_city: z.string().max(100).optional(),
   access_token: z.string().min(1),
 });
 
@@ -54,6 +56,8 @@ export async function POST(req: NextRequest) {
     moderation_status: 'pending',
     submitted_by_user_id: user.id,
     submitted_by_username: username,
+    post_type: body.post_type ?? 'post',
+    request_city: body.request_city?.trim() || null,
   });
 
   if (error) {

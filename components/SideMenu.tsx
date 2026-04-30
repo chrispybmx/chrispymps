@@ -14,7 +14,8 @@ interface SideMenuProps {
 const MENU_ITEMS = [
   { href: '/map',      label: 'Mappa',    emoji: '🗺️' },
   { href: '/events',   label: 'Eventi',   emoji: '📅' },
-  { href: '/news',     label: 'News',     emoji: '📰' },
+  { href: '/news',       label: 'News',       emoji: '📰' },
+  { href: '/cerca-spot', label: 'Cerca Spot', emoji: '📍' },
   { divider: true },
   { href: LINKS.youtube,   label: 'Tutorial',    emoji: '▶️', external: true },
   { href: '/map/support',  label: 'Supporta',    emoji: '☕' },

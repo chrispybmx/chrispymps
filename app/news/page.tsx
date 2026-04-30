@@ -40,6 +40,7 @@ async function getNews(): Promise<NewsItem[]> {
     .from('news')
     .select('id, slug, title, excerpt, cover_url, tags, published_at, created_at, submitted_by_username')
     .eq('status', 'published')
+    .or('post_type.is.null,post_type.eq.post')
     .order('created_at', { ascending: false });
 
   if (error) {

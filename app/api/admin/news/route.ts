@@ -69,6 +69,9 @@ export async function POST(req: Request) {
       moderation_status: status === 'published' ? 'published' : 'pending',
     };
     if (body.moderation_status) updateFields.moderation_status = body.moderation_status;
+    if (body.post_type) updateFields.post_type = body.post_type;
+    if (body.request_city !== undefined) updateFields.request_city = body.request_city || null;
+    if (body.request_resolved !== undefined) updateFields.request_resolved = !!body.request_resolved;
     const { error } = await supabase.from('news').update(updateFields).eq('id', body.id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   } else {

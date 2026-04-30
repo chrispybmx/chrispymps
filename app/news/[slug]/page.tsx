@@ -23,13 +23,16 @@ interface NewsArticle {
   published_at?: string;
   created_at: string;
   news_photos?: NewsPhoto[];
+  post_type?: string;
+  request_city?: string;
+  request_resolved?: boolean;
 }
 
 async function getArticle(slug: string): Promise<NewsArticle | null> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from('news')
-    .select('id, slug, title, excerpt, body, cover_url, tags, published_at, created_at, news_photos(id, url, position, caption)')
+    .select('id, slug, title, excerpt, body, cover_url, tags, published_at, created_at, post_type, request_city, request_resolved, news_photos(id, url, position, caption)')
     .eq('slug', slug)
     .eq('status', 'published')
     .maybeSingle();
@@ -270,6 +273,26 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             </span>
           ))}
         </div>
+
+        {/* Request badge */}
+        {article.post_type === 'request' && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11,
+              background: article.request_resolved ? 'rgba(0,200,81,0.15)' : 'rgba(255,106,0,0.15)',
+              border: `1px solid ${article.request_resolved ? 'rgba(0,200,81,0.4)' : 'rgba(255,106,0,0.4)'}`,
+              color: article.request_resolved ? '#00c851' : 'var(--orange)',
+              padding: '3px 10px', borderRadius: 6, letterSpacing: '0.04em',
+            }}>
+              {article.request_resolved ? '✅ RISOLTO' : '📍 CERCA SPOT'}
+            </span>
+            {article.request_city && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)' }}>
+                📍 {article.request_city}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Title */}
         <h1 style={{

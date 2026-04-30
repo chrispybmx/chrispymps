@@ -68,6 +68,9 @@ interface AdminNews {
   created_at: string;
   extra_photos_text?: string;
   news_photos?: { id: string; url: string; position: number; caption?: string | null }[];
+  post_type?: string;
+  request_city?: string;
+  request_resolved?: boolean;
 }
 
 const EMPTY_EVENT: Omit<AdminEvent, 'id'> = {
@@ -1235,6 +1238,8 @@ function NewsRow({ article: n, onEdit, onDelete }: { article: AdminNews; onEdit:
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>{date}</span>
           <span style={{ color: n.status === 'published' ? '#00c851' : 'var(--gray-400)' }}>{n.status === 'published' ? 'LIVE' : 'BOZZA'}</span>
+          {n.post_type === 'request' && <span style={{ color: '#38bdf8' }}>📍 REQ</span>}
+          {n.request_resolved && <span style={{ color: '#00c851' }}>✅</span>}
           {tags.slice(0, 2).map(t => <span key={t} style={{ color: 'var(--orange)' }}>#{t}</span>)}
         </div>
       </div>
