@@ -530,3 +530,71 @@ select.input-vhs {
 @media (min-width: 768px) {
   .topbar-filter-btn { display: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════
+   DESKTOP-ONLY IMPROVEMENTS (≥900px)
+   Mobile (<900px) is NOT affected by any rule below.
+═══════════════════════════════════════════════════ */
+@media (min-width: 900px) {
+
+  /* ── News cover: contain instead of crop ── */
+  .news-cover-wrap {
+    max-height: 620px !important;
+    background: var(--black);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .news-cover-img {
+    object-fit: contain !important;
+    max-height: 620px;
+  }
+  .news-cover-gradient {
+    background: linear-gradient(to bottom, transparent 70%, var(--black) 100%) !important;
+  }
+
+  /* ── News content wider on desktop ── */
+  .news-content-wrap {
+    max-width: 780px !important;
+  }
+
+  /* ── News extra photos: contain on desktop ── */
+  .news-extra-photo {
+    object-fit: contain !important;
+    background: var(--gray-800);
+    max-height: 560px;
+  }
+
+  /* ── Spot photo carousel: taller, contain ── */
+  .spot-carousel-wrap {
+    max-height: 620px;
+  }
+  .spot-carousel-wrap img {
+    object-fit: contain !important;
+  }
+
+  /* ── Event poster cover: contain for flyers ── */
+  .event-poster-img {
+    object-fit: contain !important;
+    background: var(--gray-800);
+    aspect-ratio: auto !important;
+    max-height: 500px;
+  }
+
+  /* ── Event card cover: taller, contain ── */
+  .event-card-cover-wrap {
+    height: 260px !important;
+    background: var(--gray-800);
+  }
+  .event-card-img {
+    object-fit: contain !important;
+  }
+
+  /* ── Bottom sheet: limit width on desktop ── */
+  .bottom-sheet {
+    max-width: 480px;
+    left: auto;
+    right: 16px;
+    border-radius: 16px 16px 0 0;
+  }
+}

@@ -243,18 +243,19 @@ export default async function ArticlePage({ params }: { params: { slug: string }
 
       {/* Cover */}
       {article.cover_url && (
-        <div style={{ width: '100%', maxHeight: 420, overflow: 'hidden', position: 'relative' }}>
+        <div className="news-cover-wrap" style={{ width: '100%', maxHeight: 420, overflow: 'hidden', position: 'relative' }}>
           <img
+            className="news-cover-img"
             src={article.cover_url}
             alt={article.title}
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, var(--black) 100%)' }} />
+          <div className="news-cover-gradient" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, var(--black) 100%)' }} />
         </div>
       )}
 
       {/* Content */}
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: article.cover_url ? '0 20px 60px' : '32px 20px 60px' }}>
+      <div className="news-content-wrap" style={{ maxWidth: 680, margin: '0 auto', padding: article.cover_url ? '0 20px 60px' : '32px 20px 60px' }}>
 
         {/* Meta */}
         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -317,6 +318,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
               {article.news_photos.map(photo => (
                 <div key={photo.id}>
                   <img
+                    className="news-extra-photo"
                     src={photo.url}
                     alt={photo.caption ?? ''}
                     style={{ width: '100%', maxHeight: 520, objectFit: 'cover', borderRadius: 8, display: 'block' }}

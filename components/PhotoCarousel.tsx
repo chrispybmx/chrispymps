@@ -81,7 +81,7 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
       )}
 
       {/* ── CAROUSEL principale ── */}
-      <div style={{ position: 'relative', background: '#0a0a0a', userSelect: 'none' }}>
+      <div className="spot-carousel-wrap" style={{ position: 'relative', background: '#0a0a0a', userSelect: 'none' }}>
 
         {/* Strip scroll-snap: scorribile con il dito, snap automatico */}
         <div

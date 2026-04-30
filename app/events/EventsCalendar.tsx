@@ -305,6 +305,7 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
       }}>
         {/* Cover image */}
         <img
+          className="event-poster-img"
           src={e.cover_url}
           alt={e.title}
           style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }}
@@ -485,8 +486,9 @@ function EventCard({ event: e, past }: { event: CalendarEvent; past?: boolean })
       opacity: past ? 0.65 : 1,
     }}>
       {e.cover_url && (
-        <div style={{ height: 160, overflow: 'hidden', position: 'relative' }}>
+        <div className="event-card-cover-wrap" style={{ height: 160, overflow: 'hidden', position: 'relative' }}>
           <img
+            className="event-card-img"
             src={e.cover_url} alt={e.title}
             style={{ width: '100%', height: '100%', objectFit: 'cover', filter: past ? 'grayscale(0.5)' : 'none' }}
             loading="lazy"
