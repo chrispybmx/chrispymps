@@ -162,8 +162,16 @@ export default async function ArticlePage({ params }: { params: { slug: string }
       });
   };
 
-  const inlineFormat = (text: string) =>
+  const escapeHtml = (text: string) =>
     text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const inlineFormat = (text: string) =>
+    escapeHtml(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--orange)">$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>');
 

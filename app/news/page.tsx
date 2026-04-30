@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ScriviPostBtn } from '@/components/CommunityActions';
+import { supabaseServer } from '@/lib/supabase';
 
 export const metadata: Metadata = {
   title: 'News BMX Italia — Aggiornamenti Spot e Community | Chrispy Maps',
@@ -34,12 +35,19 @@ interface NewsItem {
 }
 
 async function getNews(): Promise<NewsItem[]> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://chrispybmx.com';
-    const res = await fetch(`${baseUrl}/api/news`, { cache: 'no-store' });
-    const json = await res.json();
-    return json.data ?? [];
-  } catch { return []; }
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from('news')
+    .select('id, slug, title, excerpt, cover_url, tags, published_at, created_at, submitted_by_username')
+    .eq('status', 'published')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[news/page] Supabase error:', error.message);
+    return [];
+  }
+
+  return (data ?? []) as NewsItem[];
 }
 
 export default async function NewsPage() {

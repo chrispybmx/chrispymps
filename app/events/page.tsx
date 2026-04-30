@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import EventsCalendar, { type CalendarEvent } from './EventsCalendar';
 import { ProponiEventoBtn } from '@/components/CommunityActions';
+import { supabaseServer } from '@/lib/supabase';
 
 export const metadata: Metadata = {
   title: 'Eventi BMX Italia — Gare, Jam e Contest | Chrispy Maps',
@@ -23,12 +24,28 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 async function getEvents(): Promise<CalendarEvent[]> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://chrispybmx.com';
-    const res  = await fetch(`${baseUrl}/api/events`, { cache: 'no-store' });
-    const json = await res.json();
-    return json.data ?? [];
-  } catch { return []; }
+  const supabase = supabaseServer();
+
+  let result = await supabase
+    .from('events')
+    .select('*, spot:spots(name, slug)')
+    .eq('status', 'published')
+    .order('event_date', { ascending: true });
+
+  if (result.error) {
+    result = await supabase
+      .from('events')
+      .select('*')
+      .eq('status', 'published')
+      .order('event_date', { ascending: true });
+  }
+
+  if (result.error) {
+    console.error('[events/page] Supabase error:', result.error.message);
+    return [];
+  }
+
+  return (result.data ?? []) as CalendarEvent[];
 }
 
 export default async function EventsPage() {

@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     const updateFields: Record<string, unknown> = {
       title, excerpt, body: content, cover_url, tags, status,
       published_at: status === 'published' ? (body.published_at || new Date().toISOString()) : null,
+      moderation_status: status === 'published' ? 'published' : 'pending',
     };
     if (body.moderation_status) updateFields.moderation_status = body.moderation_status;
     const { error } = await supabase.from('news').update(updateFields).eq('id', body.id);
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
     const { error } = await supabase.from('news').insert({
       slug, title, excerpt, body: content, cover_url, tags, status,
       published_at: status === 'published' ? new Date().toISOString() : null,
+      moderation_status: status === 'published' ? 'published' : 'pending',
     });
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
