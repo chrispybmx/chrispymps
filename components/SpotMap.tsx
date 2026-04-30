@@ -372,8 +372,10 @@ export default function SpotMap({
               <div style="font-size:11px;color:#888;margin-bottom:6px">${tipo.emoji} ${tipo.label}</div>
               <a href="/map/spot/${pin.slug}"
                  style="display:inline-block;font-family:'VT323',monospace;font-size:14px;
-                        color:#000;background:#ff6a00;padding:3px 10px;border-radius:3px;
-                        text-decoration:none;letter-spacing:0.04em">
+                        color:#000;background:#ff6a00;padding:8px 14px;border-radius:4px;
+                        text-decoration:none;letter-spacing:0.04em;
+                        touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+                        cursor:pointer;position:relative;z-index:10">
                 VEDI SPOT →
               </a>
             </div>
@@ -404,11 +406,13 @@ export default function SpotMap({
             onSpotClickRef.current(pin);
           }
         });
-        marker.on('mouseover', () => {
-          /* Mouseover funziona solo su desktop — su mobile non si attiva */
-          marker.openPopup();
+        marker.on('mouseover', () => marker.openPopup());
+        marker.on('mouseout',  (e) => {
+          /* Non chiudere su touch — l'utente deve poter cliccare "VEDI SPOT" */
+          const pe = (e as unknown as { originalEvent?: PointerEvent }).originalEvent;
+          if (pe?.pointerType === 'touch' || pe?.pointerType === '') return;
+          marker.closePopup();
         });
-        marker.on('mouseout',  () => marker.closePopup());
 
         markersRef.current!.addLayer(marker);
         pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2
