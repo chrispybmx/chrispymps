@@ -53,6 +53,7 @@ export interface Spot {
   created_at:           string;
   approved_at?:         string;
   updated_at:           string;
+  likes_count?:         number;
   // join
   spot_photos?:         SpotPhoto[];
 }

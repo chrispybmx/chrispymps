@@ -209,7 +209,7 @@ export default function AdminEditClient({ spot: initial }: Props) {
             <Field label="Livello difficoltà">
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button
-                  onClick={() => update('difficulty', null)}
+                  onClick={() => update('difficulty', undefined)}
                   style={{
                     padding: '5px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
                     border: `1px solid ${!spot.difficulty ? 'var(--orange)' : 'var(--gray-600)'}`,
@@ -236,7 +236,7 @@ export default function AdminEditClient({ spot: initial }: Props) {
             </Field>
 
             <Field label="Superficie">
-              <select className="input-vhs" value={spot.surface ?? ''} onChange={e => update('surface', e.target.value || null)}>
+              <select className="input-vhs" value={spot.surface ?? ''} onChange={e => update('surface', e.target.value || undefined)}>
                 <option value="">—</option>
                 {SUPERFICI.map(s => <option key={s} value={s}>{s}</option>)}
               </select>

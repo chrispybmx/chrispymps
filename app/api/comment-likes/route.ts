@@ -63,12 +63,12 @@ export async function POST(req: NextRequest) {
     // Notifica all'autore del commento (solo se diverso da chi mette like)
     if (comment.user_id && comment.user_id !== user.id) {
       const preview = comment.text.length > 60 ? comment.text.slice(0, 60) + '…' : comment.text;
-      admin.from('notifications').insert({
+      void admin.from('notifications').insert({
         user_id: comment.user_id,
         type:    'comment_like',
         title:   `@${likerUsername} ha messo like al tuo commento`,
         body:    `"${preview}"`,
-      }).then().catch(console.error);
+      }).then(({ error }) => { if (error) console.error(error); });
     }
 
     return NextResponse.json({ ok: true, liked: true, likes_count: newCount });

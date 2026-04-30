@@ -10,7 +10,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * Returns all pending user-submitted photos with spot + user info.
  */
 export async function GET(req: NextRequest) {
-  if (!isAdminAuthenticated(req)) {
+  if (!isAdminAuthenticated()) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
  * Body: { photo_id, action: 'approve' | 'reject' }
  */
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated(req)) {
+  if (!isAdminAuthenticated()) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     // Delete photo from storage + DB
     const { data: photo } = await supabase
       .from('spot_photos')
-      .select('url, contribution_id')
+      .select('url, contribution_id, uploaded_by')
       .eq('id', photo_id)
       .single();
 

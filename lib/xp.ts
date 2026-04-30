@@ -275,10 +275,11 @@ async function checkAndAwardBadges(userId: string) {
 
   // Award badges
   for (const key of badgesToAward) {
-    await sb.from('user_badges').insert({
+    const { error } = await sb.from('user_badges').insert({
       user_id: userId,
       badge_key: key,
-    }).catch(() => {}); // ignore if already exists (UNIQUE constraint)
+    });
+    if (error) { /* ignore duplicate/unique constraint errors */ }
   }
 }
 

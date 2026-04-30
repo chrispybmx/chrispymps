@@ -173,24 +173,24 @@ export async function POST(req: NextRequest, { params }: Props) {
   if (parent_id && parentComment) {
     // Notifica all'autore del commento padre (risposta)
     if (parentComment.user_id && parentComment.user_id !== user.id) {
-      admin.from('notifications').insert({
+      void admin.from('notifications').insert({
         user_id: parentComment.user_id,
         type:    'comment_reply',
         title:   `@${username} ha risposto al tuo commento`,
         body:    `"${preview}"`,
-        spot_slug: spot.slug,
-      }).then().catch(console.error);
+        spot_slug: spot?.slug,
+      }).then(({ error }) => { if (error) console.error(error); });
     }
   } else {
     // Notifica al proprietario dello spot (commento principale)
-    if (spot.submitted_by_user_id && spot.submitted_by_user_id !== user.id) {
-      admin.from('notifications').insert({
+    if (spot?.submitted_by_user_id && spot.submitted_by_user_id !== user.id) {
+      void admin.from('notifications').insert({
         user_id:   spot.submitted_by_user_id,
         type:      'comment_on_spot',
         title:     `Nuovo commento su "${spot.name}"`,
         body:      `@${username}: ${preview}`,
         spot_slug: spot.slug,
-      }).then().catch(console.error);
+      }).then(({ error }) => { if (error) console.error(error); });
     }
   }
 

@@ -36,7 +36,7 @@ export default async function MapPage({
 }: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const params = await (searchParams ?? Promise.resolve({}));
+  const params: { [key: string]: string | string[] | undefined } = searchParams ? await searchParams : {};
   const autoAdd = params['add'] === '1';
 
   // Spots loaded CLIENT-SIDE for instant page render
