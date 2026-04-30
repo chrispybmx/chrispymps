@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { APP_CONFIG } from '@/lib/constants';
 import NewsComments from '@/components/NewsComments';
+import { supabaseServer } from '@/lib/supabase';
 
 interface NewsArticle {
   id: string;
@@ -17,13 +18,20 @@ interface NewsArticle {
 }
 
 async function getArticle(slug: string): Promise<NewsArticle | null> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://chrispybmx.com';
-    const res = await fetch(`${baseUrl}/api/news/${slug}`, { next: { revalidate: 60 } });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.data ?? null;
-  } catch { return null; }
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from('news')
+    .select('id, slug, title, excerpt, body, cover_url, tags, published_at, created_at')
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[news/slug] Supabase error:', error.message);
+    return null;
+  }
+
+  return data as NewsArticle | null;
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
