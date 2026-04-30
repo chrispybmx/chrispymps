@@ -6,7 +6,7 @@ import type { SpotType, SpotCondition } from '@/lib/types';
 import BottomNav from '@/components/BottomNav';
 
 export const metadata: Metadata = {
-  title: 'Classifica Spot e Rider BMX Italia — Chrispy Maps',
+  title: 'Classifica Spot BMX e Rider',
   description: 'I migliori spot BMX, skatepark e park scooter in Italia per qualità e documentazione. Top rider e spot più fotografati.',
   alternates: { canonical: 'https://maps.chrispybmx.com/classifica' },
   keywords: ['classifica spot BMX', 'migliori skatepark Italia', 'top rider BMX', 'spot più fotografati'],

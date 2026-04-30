@@ -4,8 +4,8 @@ import type { SpotMapPin } from '@/lib/types';
 import ScopriClient from './ScopriClient';
 
 export const metadata: Metadata = {
-  title: 'Scopri Spot BMX, Skatepark e Park Scooter — Chrispy Maps',
-  description: 'Esplora e filtra centinaia di spot BMX, skatepark e park scooter in Italia. Cerca per tipo, regione, difficoltà e condizione.',
+  title: 'Scopri Spot BMX, Skatepark e Park Scooter in Italia',
+  description: 'Esplora e filtra centinaia di spot BMX, skatepark e park scooter in Italia. Cerca per tipo, regione, difficoltà, condizione, @rider e zona.',
   alternates: { canonical: 'https://maps.chrispybmx.com/scopri' },
   keywords: ['scopri spot BMX', 'trova skatepark Italia', 'spot scooter freestyle', 'street spot BMX', 'park BMX Italia'],
   openGraph: {

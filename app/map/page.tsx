@@ -3,7 +3,7 @@ import MapClient from './MapClient';
 import { APP_CONFIG } from '@/lib/constants';
 
 export const metadata: Metadata = {
-  title:       'Mappa Spot BMX, Skate & Scooter Italia | Chrispy Maps',
+  title:       'Mappa Spot BMX, Skate & Scooter Italia',
   description: 'Trova spot BMX, skatepark, park scooter e street spot in tutta Italia. Mappa interattiva community-driven con centinaia di spot verificati. Cerca per città, tipo e distanza.',
   alternates: { canonical: APP_CONFIG.url },
   keywords: [
