@@ -38,7 +38,7 @@ const lbl: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6,
 };
 
-/* ── Estrai coordinate da URL Google Maps o da stringa "lat, lon" ── */
+/* ── Estrai coordinate da URL Google Maps, Apple Maps, DMS iPhone o stringa "lat, lon" ── */
 function parseCoordInput(raw: string): { lat: number; lon: number } | null {
   // Rimuovi parentesi, virgolette e spazi extra — gestisce "(lat, lon)", "[lat, lon]" ecc.
   const s = raw.trim().replace(/^[\s([\]"']+|[\s)\]"']+$/g, '').trim();
@@ -51,15 +51,37 @@ function parseCoordInput(raw: string): { lat: number; lon: number } | null {
   const m2 = s.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (m2) return { lat: parseFloat(m2[1]), lon: parseFloat(m2[2]) };
 
-  // ?ll=lat,lon
+  // ?ll=lat,lon (Apple Maps)
   const m3 = s.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (m3) return { lat: parseFloat(m3[1]), lon: parseFloat(m3[2]) };
+
+  // DMS iPhone: 45°27'35.2"N 11°00'42.1"E  oppure  45°27'35"N, 11°0'42"E
+  const dms = parseDMS(s);
+  if (dms) return dms;
 
   // "lat, lon" | "lat lon" | "lat;lon" — con o senza parentesi/spazi
   const m4 = s.match(/^(-?\d+\.?\d*)[,;\s]+(-?\d+\.?\d*)$/);
   if (m4) return { lat: parseFloat(m4[1]), lon: parseFloat(m4[2]) };
 
   return null;
+}
+
+/* ── Parse coordinate in formato DMS (gradi minuti secondi) ── */
+function parseDMS(input: string): { lat: number; lon: number } | null {
+  // Match pattern: 45°27'35.2"N 11°00'42.1"E (with various separators)
+  const re = /(\d+)[°]\s*(\d+)[''′]\s*(\d+(?:\.\d+)?)[""″]?\s*([NSns])\s*[,;\s]+\s*(\d+)[°]\s*(\d+)[''′]\s*(\d+(?:\.\d+)?)[""″]?\s*([EWew])/;
+  const m = input.match(re);
+  if (!m) return null;
+
+  let lat = parseInt(m[1]) + parseInt(m[2]) / 60 + parseFloat(m[3]) / 3600;
+  let lon = parseInt(m[5]) + parseInt(m[6]) / 60 + parseFloat(m[7]) / 3600;
+
+  if (m[4].toUpperCase() === 'S') lat = -lat;
+  if (m[8].toUpperCase() === 'W') lon = -lon;
+
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+
+  return { lat, lon };
 }
 
 /* ── Mappa preview con pin draggabile (Leaflet) ── */
@@ -719,7 +741,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       rows={3}
                       value={coordInput}
                       onChange={e => { setCoordInput(e.target.value); setCoordError(null); }}
-                      placeholder={'https://maps.google.com/?q=...\noppure\n45.4384, 10.9916'}
+                      placeholder={"https://maps.google.com/?q=...\noppure\n45.4384, 10.9916\noppure\n45°26'18.2\"N 10°59'29.8\"E"}
                       autoFocus
                     />
                     {coordError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6a00', marginTop: 4 }}>⚠ {coordError}</div>}
