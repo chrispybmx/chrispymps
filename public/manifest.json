@@ -64,15 +64,6 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/map-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mappa BMX Italia"
-    }
-  ],
   "shortcuts": [
     {
       "name": "Aggiungi Spot",

@@ -4,6 +4,7 @@ import PreferiteClient from './PreferiteClient';
 export const metadata: Metadata = {
   title: 'I miei spot preferiti | Chrispy Maps',
   description: 'I tuoi spot BMX, skate e scooter salvati su Chrispy Maps.',
+  robots: { index: false, follow: false },
 };
 
 export default function PreferitiPage() {

@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow:    '/',
-        disallow: ['/admin/', '/api/', '/_next/'],
+        disallow: ['/admin/', '/api/'],
       },
       /* AI crawlers — accesso esplicito per essere citati nelle risposte AI.
          Questi bot alimentano ChatGPT, Perplexity, Claude, Gemini, Copilot ecc. */

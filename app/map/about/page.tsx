@@ -5,6 +5,17 @@ import { LINKS } from '@/lib/constants';
 export const metadata: Metadata = {
   title:       'Chi siamo — Chrispy Maps',
   description: 'Chrispy Maps è la mappa BMX street italiana, community-driven. Creata da Chrispy per la scene italiana.',
+  alternates: { canonical: 'https://maps.chrispybmx.com/map/about' },
+  openGraph: {
+    title: 'Chi siamo — Chrispy Maps',
+    description: 'Chrispy Maps è la mappa BMX street italiana, community-driven. Creata da Chrispy per la scene italiana.',
+    url: 'https://maps.chrispybmx.com/map/about',
+    siteName: 'Chrispy Maps',
+    locale: 'it_IT',
+    type: 'website',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
+  },
+  twitter: { card: 'summary_large_image', title: 'Chi siamo — Chrispy Maps', description: 'Chrispy Maps è la mappa BMX street italiana, community-driven.' },
 };
 
 export default function AboutPage() {

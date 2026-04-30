@@ -5,6 +5,17 @@ import { LINKS } from '@/lib/constants';
 export const metadata: Metadata = {
   title:       'Supporta Chrispy Maps',
   description: 'Vuoi supportare la mappa BMX italiana? Il modo migliore è aggiungere uno spot. Oppure dona via Revolut o Bitcoin.',
+  alternates: { canonical: 'https://maps.chrispybmx.com/map/support' },
+  openGraph: {
+    title: 'Supporta Chrispy Maps',
+    description: 'Vuoi supportare la mappa BMX italiana? Il modo migliore è aggiungere uno spot. Oppure dona via Revolut o Bitcoin.',
+    url: 'https://maps.chrispybmx.com/map/support',
+    siteName: 'Chrispy Maps',
+    locale: 'it_IT',
+    type: 'website',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
+  },
+  twitter: { card: 'summary_large_image', title: 'Supporta Chrispy Maps', description: 'Vuoi supportare la mappa BMX italiana? Aggiungi uno spot o dona.' },
 };
 
 const DONATE = {

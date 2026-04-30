@@ -47,8 +47,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title, description: desc,
     alternates: { canonical: url },
     keywords: [`spot BMX ${city}`, `${tipo.label} ${city}`, spot.name],
-    openGraph: { title, description: desc, url, images: cover ? [{ url: cover, width: 1200, height: 630 }] : [], type: 'article' },
-    twitter: { card: 'summary_large_image', title, description: desc, images: cover ? [cover] : [] },
+    openGraph: { title, description: desc, url, images: [{ url: cover ?? '/opengraph-image', width: 1200, height: 630 }], type: 'article' },
+    twitter: { card: 'summary_large_image', title, description: desc, images: [cover ?? '/opengraph-image'] },
   };
 }
 
