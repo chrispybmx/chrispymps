@@ -157,7 +157,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         // Regular paragraph
         return (
           <p key={i} style={{ color: 'var(--bone)', fontSize: 16, lineHeight: 1.8, margin: '0 0 18px' }}
-            dangerouslySetInnerHTML={{ __html: inlineFormat(trimmed.replace(/\n/g, '<br/>')) }} />
+            dangerouslySetInnerHTML={{ __html: inlineFormat(trimmed) }} />
         );
       });
   };
@@ -172,6 +172,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
 
   const inlineFormat = (text: string) =>
     escapeHtml(text)
+      .replace(/\n/g, '<br/>')
       .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--orange)">$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>');
 
