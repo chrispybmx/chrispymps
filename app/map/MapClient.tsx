@@ -15,6 +15,7 @@ import { useToast } from '@/components/Toast';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
 import OnboardingHints from '@/components/OnboardingHints';
+import { findNearby } from '@/lib/nearby-radar';
 
 /* ── Haversine ── */
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -235,6 +236,54 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     try { localStorage.setItem('cmaps_dark_map', next ? '1' : '0'); } catch { /* */ }
     return next;
   });
+
+  /* ── Spot Radar — notifica spot vicini ── */
+  useEffect(() => {
+    if (spots.length === 0) return;
+    if (!('geolocation' in navigator)) return;
+
+    const RADAR_KEY     = 'cmaps_radar_enabled';
+    const LAST_CHECK    = 'cmaps_radar_last_check';
+    const LAST_NOTIFY   = 'cmaps_radar_last_notify';
+    const CHECK_MS      = 3 * 60 * 60 * 1000;  // 3h
+    const NOTIFY_MS     = 24 * 60 * 60 * 1000;  // 24h
+
+    const run = () => {
+      try {
+        if (localStorage.getItem(RADAR_KEY) !== '1') return;
+        const now = Date.now();
+        if (now - Number(localStorage.getItem(LAST_CHECK) || 0) < CHECK_MS) return;
+        localStorage.setItem(LAST_CHECK, String(now));
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const result = findNearby(
+              { lat: pos.coords.latitude, lon: pos.coords.longitude },
+              spots,
+              5,
+            );
+            if (result.count === 0) return;
+            if (Date.now() - Number(localStorage.getItem(LAST_NOTIFY) || 0) < NOTIFY_MS) return;
+            localStorage.setItem(LAST_NOTIFY, String(Date.now()));
+
+            const km = result.nearestKm!;
+            const rounded = km < 1 ? km.toFixed(1) : km.toFixed(0);
+            const msg = result.count === 1
+              ? `📡 C'è uno spot a circa ${rounded} km da te.`
+              : `📡 Ci sono ${result.count} spot entro 5 km. Il più vicino è a ${rounded} km.`;
+            toast(msg, 'info');
+          },
+          () => {},
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 30 * 60 * 1000 },
+        );
+      } catch {}
+    };
+
+    run();
+    const onVisible = () => { if (document.visibilityState === 'visible') run(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [spots, toast]);
 
   /* ── Spot attivo (bordo + mappa) e spot espanso (contenuto) — separati ── */
   const [activeListId, setActiveListId] = useState<string | null>(null);

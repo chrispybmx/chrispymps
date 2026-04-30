@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LINKS, APP_CONFIG } from '@/lib/constants';
 import { useUser } from '@/hooks/useUser';
 import { signOut } from '@/lib/auth-client';
@@ -138,6 +138,9 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
           })}
         </ul>
 
+        {/* Spot Radar toggle */}
+        <SpotRadarToggle />
+
         {/* Footer */}
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--gray-700)', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', lineHeight: 1.6 }}>
           <div>Chrispy Maps v1.0 — BETA</div>
@@ -148,5 +151,92 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
         </div>
       </nav>
     </>
+  );
+}
+
+/* ── Spot Radar Toggle ── */
+const RADAR_KEY = 'cmaps_radar_enabled';
+
+function SpotRadarToggle() {
+  const [enabled, setEnabled] = useState(false);
+  const [denied, setDenied] = useState(false);
+
+  useEffect(() => {
+    try { setEnabled(localStorage.getItem(RADAR_KEY) === '1'); } catch {}
+  }, []);
+
+  const toggle = async () => {
+    if (enabled) {
+      // Turn off
+      try { localStorage.setItem(RADAR_KEY, '0'); } catch {}
+      setEnabled(false);
+      return;
+    }
+
+    // Turn on — check geolocation permission
+    if (!('geolocation' in navigator)) {
+      setDenied(true);
+      return;
+    }
+
+    try {
+      await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 30 * 60 * 1000,
+        });
+      });
+      try { localStorage.setItem(RADAR_KEY, '1'); } catch {}
+      setEnabled(true);
+      setDenied(false);
+    } catch {
+      setDenied(true);
+    }
+  };
+
+  const hasGeo = typeof window !== 'undefined' && 'geolocation' in navigator;
+  if (!hasGeo) return null;
+
+  return (
+    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--gray-700)' }}>
+      <button
+        onClick={toggle}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          width: '100%', background: 'none', border: 'none',
+          padding: 0, cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 20, minWidth: 28 }}>📡</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>
+            Spot Radar
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 2 }}>
+            Avvisami quando ci sono spot vicini
+          </div>
+        </div>
+        <div style={{
+          width: 38, height: 20, borderRadius: 10,
+          background: enabled ? 'var(--orange)' : 'var(--gray-600)',
+          position: 'relative', transition: 'background 0.2s',
+          flexShrink: 0,
+        }}>
+          <div style={{
+            width: 16, height: 16, borderRadius: '50%',
+            background: '#fff',
+            position: 'absolute', top: 2,
+            left: enabled ? 20 : 2,
+            transition: 'left 0.2s',
+          }} />
+        </div>
+      </button>
+      {denied && (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ff4444', marginTop: 6 }}>
+          Abilita la posizione nel browser per usare Spot Radar.
+        </div>
+      )}
+    </div>
   );
 }
