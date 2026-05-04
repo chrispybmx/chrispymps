@@ -159,6 +159,24 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         const trimmed = block.trim();
         if (!trimmed) return null;
 
+        // Markdown image: ![alt](url)
+        const imgMatch = trimmed.match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/);
+        if (imgMatch) return (
+          <img key={i} src={imgMatch[2]} alt={imgMatch[1]}
+               style={{ width: '100%', maxWidth: '100%', height: 'auto', display: 'block', margin: '16px auto', borderRadius: 8 }}
+               loading="lazy" />
+        );
+
+        // Markdown linked image: [![alt](img)](link)
+        const imgLinkMatch = trimmed.match(/^\[!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)\]\((https?:\/\/[^\s)]+)\)$/);
+        if (imgLinkMatch) return (
+          <a key={i} href={imgLinkMatch[3]} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+            <img src={imgLinkMatch[2]} alt={imgLinkMatch[1]}
+                 style={{ width: '100%', maxWidth: '100%', height: 'auto', display: 'block', margin: '16px auto', borderRadius: 8 }}
+                 loading="lazy" />
+          </a>
+        );
+
         // YouTube embed — standalone URL on its own block
         const ytId = getYouTubeId(trimmed);
         if (ytId) return (
