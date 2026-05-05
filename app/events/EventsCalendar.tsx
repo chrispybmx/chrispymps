@@ -33,16 +33,21 @@ export interface CalendarEvent {
   lng?: number | null;
 }
 
+/** Estrae solo data YYYY-MM-DD da un campo che può essere TIMESTAMPTZ ('2026-05-04T00:00:00+00:00') */
+function dateOnly(s: string): string {
+  return (s || '').slice(0, 10);
+}
+
 /** Export evento come .ics file scaricabile (Apple/Google Calendar) */
 function downloadICS(e: CalendarEvent) {
-  const fmt = (d: string) => d.replace(/-/g, '');
+  const fmt = (d: string) => dateOnly(d).replace(/-/g, '');
   const now = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
   const dtstart = fmt(e.event_date);
   const dtend = e.date_end ? fmt(e.date_end) : dtstart;
   const uid = `${e.id}@chrispybmx.com`;
   const summary = e.title.replace(/\n/g, ' ').replace(/[,;\\]/g, '\\$&');
   const location = [e.city, e.country].filter(Boolean).join(', ').replace(/[,;\\]/g, '\\$&');
-  const url = e.link_url || `https://maps.chrispybmx.com/events`;
+  const url = `https://maps.chrispybmx.com/events`;
 
   const ics = [
     'BEGIN:VCALENDAR',
@@ -62,14 +67,16 @@ function downloadICS(e: CalendarEvent) {
     'END:VCALENDAR',
   ].join('\r\n');
 
-  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  // Safari friendly: usa data URL invece di blob URL (alcuni Safari bloccano blob download)
+  const filename = `${e.title.slice(0, 50).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`;
+  const dataUrl = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `${e.title.slice(0, 50).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`;
+  link.href = dataUrl;
+  link.download = filename;
+  link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(link.href), 100);
 }
 
 /** Haversine distance in km between two lat/lng */
@@ -272,14 +279,17 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
           HERO — prossimo evento upcoming con countdown
       ═══════════════════════════ */}
       {(() => {
-        const now = new Date();
+        const todayMid = new Date(); todayMid.setHours(0,0,0,0);
         const next = events
-          .filter(e => new Date(e.event_date) >= now)
-          .sort((a, b) => a.event_date.localeCompare(b.event_date))[0];
+          .filter(e => {
+            const d = new Date(dateOnly(e.event_date) + 'T00:00:00');
+            return d.getTime() >= todayMid.getTime();
+          })
+          .sort((a, b) => dateOnly(a.event_date).localeCompare(dateOnly(b.event_date)))[0];
         if (!next) return null;
 
-        const eventDate = new Date(next.event_date + 'T12:00:00');
-        const daysUntil = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const eventDate = new Date(dateOnly(next.event_date) + 'T12:00:00');
+        const daysUntil = Math.round((eventDate.getTime() - todayMid.getTime()) / (1000 * 60 * 60 * 24));
         const flagEmoji = next.country_code && next.country_code.length === 2
           ? String.fromCodePoint(...next.country_code.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
           : '🌍';
