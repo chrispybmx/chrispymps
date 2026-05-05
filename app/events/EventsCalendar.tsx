@@ -17,6 +17,46 @@ export interface CalendarEvent {
   spot?: { name: string; slug: string } | null;
 }
 
+interface EventMetadata {
+  lat?: number | null;
+  lng?: number | null;
+  country?: string | null;
+  country_code?: string | null;
+  discipline?: string | null;
+  level?: string | null;
+  uci_class?: string | null;
+  organizer?: string | null;
+  date_end?: string | null;
+  source_aggregator?: string | null;
+}
+
+/** Parse JSON metadata block embedded in description as <!--META:{...}--> */
+function parseEventMetadata(description?: string): EventMetadata {
+  if (!description) return {};
+  const m = description.match(/<!--META:(\{[^}]*\})-->/);
+  if (!m) return {};
+  try { return JSON.parse(m[1]); } catch { return {}; }
+}
+
+/** Strip metadata block from description for clean display */
+function cleanDescription(description?: string): string {
+  if (!description) return '';
+  return description.replace(/\n*<!--META:\{[^}]*\}-->/, '').trim();
+}
+
+/** Haversine distance in km between two lat/lng */
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
 const MESI = [
   'Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
   'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre',
@@ -54,13 +94,74 @@ const navBtnStyle: React.CSSProperties = {
   lineHeight: 1,
 };
 
-export default function EventsCalendar({ events }: { events: CalendarEvent[] }) {
+export default function EventsCalendar({ events: rawEvents }: { events: CalendarEvent[] }) {
   const today    = new Date();
   const todayStr = toDateStr(today);
 
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selDay,    setSelDay]    = useState<string | null>(null);
+
+  /* ── Filters ── */
+  const [filterCountry,    setFilterCountry]    = useState<string>('all');
+  const [filterDiscipline, setFilterDiscipline] = useState<string>('all');
+  const [filterLevel,      setFilterLevel]      = useState<string>('all');
+  const [userLoc,          setUserLoc]          = useState<{ lat: number; lng: number } | null>(null);
+  const [filterRadiusKm,   setFilterRadiusKm]   = useState<number>(0); // 0 = no radius filter
+
+  /* ── Parse metadata once per event ── */
+  const enrichedEvents = useMemo(() => {
+    return rawEvents.map(e => ({
+      ...e,
+      _meta: parseEventMetadata(e.description),
+      _cleanDesc: cleanDescription(e.description),
+    }));
+  }, [rawEvents]);
+
+  /* ── Apply filters ── */
+  const events = useMemo(() => {
+    return enrichedEvents.filter(e => {
+      const m = e._meta;
+      if (filterCountry !== 'all' && m.country_code !== filterCountry) return false;
+      if (filterDiscipline !== 'all' && m.discipline !== filterDiscipline) return false;
+      if (filterLevel !== 'all') {
+        if (filterLevel === 'uci-wc' && m.uci_class !== 'WC') return false;
+        if (filterLevel === 'uci-c1' && m.uci_class !== 'C1') return false;
+        if (filterLevel === 'uci-c2' && m.uci_class !== 'C2') return false;
+        if (filterLevel === 'national' && m.level !== 'national') return false;
+        if (filterLevel === 'regional' && m.level !== 'regional') return false;
+        if (filterLevel === 'local-jam' && m.level !== 'local-jam') return false;
+      }
+      if (userLoc && filterRadiusKm > 0) {
+        if (m.lat == null || m.lng == null) return false;
+        const d = distanceKm(userLoc.lat, userLoc.lng, m.lat, m.lng);
+        if (d > filterRadiusKm) return false;
+      }
+      return true;
+    });
+  }, [enrichedEvents, filterCountry, filterDiscipline, filterLevel, userLoc, filterRadiusKm]);
+
+  /* ── Build country list dynamically ── */
+  const availableCountries = useMemo(() => {
+    const codes = new Set<string>();
+    for (const e of enrichedEvents) {
+      if (e._meta.country_code) codes.add(e._meta.country_code);
+    }
+    return Array.from(codes).sort();
+  }, [enrichedEvents]);
+
+  /* ── Geolocation request ── */
+  const requestGeo = () => {
+    if (!navigator.geolocation) return alert('Geolocalizzazione non supportata');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        if (filterRadiusKm === 0) setFilterRadiusKm(100);
+      },
+      () => alert('Permesso geolocalizzazione negato'),
+      { timeout: 10000 }
+    );
+  };
 
   /* ── Event lookup by date key ── */
   const byDay = useMemo<Record<string, CalendarEvent[]>>(() => {
@@ -111,8 +212,103 @@ export default function EventsCalendar({ events }: { events: CalendarEvent[] }) 
     .filter(e => new Date(e.event_date) < now)
     .sort((a, b) => b.event_date.localeCompare(a.event_date));
 
+  /* ── Country flags helper ── */
+  const flagEmoji = (cc?: string | null) => {
+    if (!cc || cc.length !== 2) return '🌍';
+    return String.fromCodePoint(...cc.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+  };
+
+  const selectStyle: React.CSSProperties = {
+    background: 'var(--gray-800)',
+    color: 'var(--bone)',
+    border: '1px solid var(--gray-700)',
+    borderRadius: 6,
+    padding: '6px 10px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    cursor: 'pointer',
+  };
+
   return (
     <div>
+      {/* ═══════════════════════════
+          FILTRI
+      ═══════════════════════════ */}
+      <div style={{
+        background: 'var(--gray-800)',
+        border: '1px solid var(--gray-700)',
+        borderRadius: 8,
+        padding: 14,
+        marginBottom: 16,
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 10,
+        alignItems: 'center',
+      }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase' }}>Filtri</span>
+
+        {/* Paese */}
+        <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)} style={selectStyle}>
+          <option value="all">🌍 Tutti i paesi</option>
+          {availableCountries.map(cc => (
+            <option key={cc} value={cc}>{flagEmoji(cc)} {cc}</option>
+          ))}
+        </select>
+
+        {/* Disciplina */}
+        <select value={filterDiscipline} onChange={e => setFilterDiscipline(e.target.value)} style={selectStyle}>
+          <option value="all">🚴 Tutte discipline</option>
+          <option value="park">🛹 Park</option>
+          <option value="street">🏙️ Street</option>
+          <option value="flatland">🌀 Flatland</option>
+          <option value="race">🏁 Race</option>
+          <option value="dirt">🏞️ Dirt</option>
+          <option value="mixed">🎯 Mixed</option>
+        </select>
+
+        {/* Livello / UCI class */}
+        <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} style={selectStyle}>
+          <option value="all">🏆 Tutti livelli</option>
+          <option value="uci-wc">🏆 UCI World Cup</option>
+          <option value="uci-c1">🥇 UCI C1</option>
+          <option value="uci-c2">🥈 UCI C2</option>
+          <option value="national">🥇 Nazionale</option>
+          <option value="regional">🥈 Regionale</option>
+          <option value="local-jam">🎪 Local Jam</option>
+        </select>
+
+        {/* Geolocalizzazione + km */}
+        <button onClick={requestGeo} style={{ ...selectStyle, background: userLoc ? 'var(--orange)' : 'var(--gray-800)', color: userLoc ? 'var(--black)' : 'var(--bone)' }}>
+          {userLoc ? '📍 Posizione attiva' : '📍 Usa posizione'}
+        </button>
+
+        {userLoc && (
+          <select value={filterRadiusKm} onChange={e => setFilterRadiusKm(Number(e.target.value))} style={selectStyle}>
+            <option value="0">∞ Mondo</option>
+            <option value="50">50 km</option>
+            <option value="100">100 km</option>
+            <option value="250">250 km</option>
+            <option value="500">500 km</option>
+            <option value="1000">1.000 km</option>
+            <option value="2500">2.500 km</option>
+          </select>
+        )}
+
+        {/* Reset */}
+        {(filterCountry !== 'all' || filterDiscipline !== 'all' || filterLevel !== 'all' || (userLoc && filterRadiusKm > 0)) && (
+          <button
+            onClick={() => { setFilterCountry('all'); setFilterDiscipline('all'); setFilterLevel('all'); setFilterRadiusKm(0); }}
+            style={{ ...selectStyle, color: 'var(--orange)' }}
+          >
+            ✕ Reset
+          </button>
+        )}
+
+        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>
+          {events.length} di {rawEvents.length} eventi
+        </span>
+      </div>
+
       {/* ═══════════════════════════
           CALENDARIO
       ═══════════════════════════ */}
