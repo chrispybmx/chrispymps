@@ -10,38 +10,24 @@ export interface CalendarEvent {
   location?: string;
   city?: string;
   event_date: string;
+  date_end?: string | null;
   cover_url?: string;
   link_url?: string;
   status: string;
   spot_id?: string | null;
   spot?: { name: string; slug: string } | null;
-}
-
-interface EventMetadata {
-  lat?: number | null;
-  lng?: number | null;
+  // Native columns (post 20260504 migration)
+  slug?: string | null;
   country?: string | null;
   country_code?: string | null;
   discipline?: string | null;
   level?: string | null;
-  uci_class?: string | null;
   organizer?: string | null;
-  date_end?: string | null;
+  registration_url?: string | null;
+  source_url?: string | null;
   source_aggregator?: string | null;
-}
-
-/** Parse JSON metadata block embedded in description as <!--META:{...}--> */
-function parseEventMetadata(description?: string): EventMetadata {
-  if (!description) return {};
-  const m = description.match(/<!--META:(\{[^}]*\})-->/);
-  if (!m) return {};
-  try { return JSON.parse(m[1]); } catch { return {}; }
-}
-
-/** Strip metadata block from description for clean display */
-function cleanDescription(description?: string): string {
-  if (!description) return '';
-  return description.replace(/\n*<!--META:\{[^}]*\}-->/, '').trim();
+  lat?: number | null;
+  lng?: number | null;
 }
 
 /** Haversine distance in km between two lat/lng */
@@ -105,50 +91,31 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
   /* ── Filters ── */
   const [filterCountry,    setFilterCountry]    = useState<string>('all');
   const [filterDiscipline, setFilterDiscipline] = useState<string>('all');
-  const [filterLevel,      setFilterLevel]      = useState<string>('all');
   const [userLoc,          setUserLoc]          = useState<{ lat: number; lng: number } | null>(null);
   const [filterRadiusKm,   setFilterRadiusKm]   = useState<number>(0); // 0 = no radius filter
 
-  /* ── Parse metadata once per event ── */
-  const enrichedEvents = useMemo(() => {
-    return rawEvents.map(e => ({
-      ...e,
-      _meta: parseEventMetadata(e.description),
-      _cleanDesc: cleanDescription(e.description),
-    }));
-  }, [rawEvents]);
-
-  /* ── Apply filters ── */
+  /* ── Apply filters using native columns ── */
   const events = useMemo(() => {
-    return enrichedEvents.filter(e => {
-      const m = e._meta;
-      if (filterCountry !== 'all' && m.country_code !== filterCountry) return false;
-      if (filterDiscipline !== 'all' && m.discipline !== filterDiscipline) return false;
-      if (filterLevel !== 'all') {
-        if (filterLevel === 'uci-wc' && m.uci_class !== 'WC') return false;
-        if (filterLevel === 'uci-c1' && m.uci_class !== 'C1') return false;
-        if (filterLevel === 'uci-c2' && m.uci_class !== 'C2') return false;
-        if (filterLevel === 'national' && m.level !== 'national') return false;
-        if (filterLevel === 'regional' && m.level !== 'regional') return false;
-        if (filterLevel === 'local-jam' && m.level !== 'local-jam') return false;
-      }
+    return rawEvents.filter(e => {
+      if (filterCountry !== 'all' && e.country_code !== filterCountry) return false;
+      if (filterDiscipline !== 'all' && e.discipline !== filterDiscipline) return false;
       if (userLoc && filterRadiusKm > 0) {
-        if (m.lat == null || m.lng == null) return false;
-        const d = distanceKm(userLoc.lat, userLoc.lng, m.lat, m.lng);
+        if (e.lat == null || e.lng == null) return false;
+        const d = distanceKm(userLoc.lat, userLoc.lng, e.lat, e.lng);
         if (d > filterRadiusKm) return false;
       }
       return true;
     });
-  }, [enrichedEvents, filterCountry, filterDiscipline, filterLevel, userLoc, filterRadiusKm]);
+  }, [rawEvents, filterCountry, filterDiscipline, userLoc, filterRadiusKm]);
 
   /* ── Build country list dynamically ── */
   const availableCountries = useMemo(() => {
     const codes = new Set<string>();
-    for (const e of enrichedEvents) {
-      if (e._meta.country_code) codes.add(e._meta.country_code);
+    for (const e of rawEvents) {
+      if (e.country_code) codes.add(e.country_code);
     }
     return Array.from(codes).sort();
-  }, [enrichedEvents]);
+  }, [rawEvents]);
 
   /* ── Geolocation request ── */
   const requestGeo = () => {
