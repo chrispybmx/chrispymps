@@ -33,6 +33,45 @@ export interface CalendarEvent {
   lng?: number | null;
 }
 
+/** Export evento come .ics file scaricabile (Apple/Google Calendar) */
+function downloadICS(e: CalendarEvent) {
+  const fmt = (d: string) => d.replace(/-/g, '');
+  const now = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+  const dtstart = fmt(e.event_date);
+  const dtend = e.date_end ? fmt(e.date_end) : dtstart;
+  const uid = `${e.id}@chrispybmx.com`;
+  const summary = e.title.replace(/\n/g, ' ').replace(/[,;\\]/g, '\\$&');
+  const location = [e.city, e.country].filter(Boolean).join(', ').replace(/[,;\\]/g, '\\$&');
+  const url = e.link_url || `https://maps.chrispybmx.com/events`;
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Chrispy Maps//Events//IT',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${now}`,
+    `DTSTART;VALUE=DATE:${dtstart}`,
+    `DTEND;VALUE=DATE:${dtend}`,
+    `SUMMARY:${summary}`,
+    `LOCATION:${location}`,
+    `URL:${url}`,
+    `DESCRIPTION:Evento BMX su Chrispy Maps. ${url}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${e.title.slice(0, 50).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(link.href), 100);
+}
+
 /** Haversine distance in km between two lat/lng */
 function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -98,15 +137,21 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
   const [filterCountry,    setFilterCountry]    = useState<string>('all');
   const [filterDiscipline, setFilterDiscipline] = useState<string>('all');
   const [filterLevel,      setFilterLevel]      = useState<string>('all');
+  const [filterSearch,     setFilterSearch]     = useState<string>('');
   const [userLoc,          setUserLoc]          = useState<{ lat: number; lng: number } | null>(null);
   const [filterRadiusKm,   setFilterRadiusKm]   = useState<number>(0); // 0 = no radius filter
 
   /* ── Apply filters using native columns ── */
   const events = useMemo(() => {
+    const q = filterSearch.trim().toLowerCase();
     return rawEvents.filter(e => {
       if (filterCountry !== 'all' && e.country_code !== filterCountry) return false;
       if (filterDiscipline !== 'all' && e.discipline !== filterDiscipline) return false;
       if (filterLevel !== 'all' && e.level !== filterLevel) return false;
+      if (q) {
+        const haystack = `${e.title} ${e.city || ''} ${e.country || ''} ${e.organizer || ''}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
       if (userLoc && filterRadiusKm > 0) {
         if (e.lat == null || e.lng == null) return false;
         const d = distanceKm(userLoc.lat, userLoc.lng, e.lat, e.lng);
@@ -114,7 +159,7 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
       }
       return true;
     });
-  }, [rawEvents, filterCountry, filterDiscipline, filterLevel, userLoc, filterRadiusKm]);
+  }, [rawEvents, filterCountry, filterDiscipline, filterLevel, filterSearch, userLoc, filterRadiusKm]);
 
   /* ── Available levels in current selection (post discipline filter) ── */
   const availableLevels = useMemo(() => {
@@ -373,6 +418,19 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
       }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase' }}>Filtri</span>
 
+        {/* Search testuale */}
+        <input
+          type="text"
+          value={filterSearch}
+          onChange={e => setFilterSearch(e.target.value)}
+          placeholder="🔍 Cerca evento, città, organizer..."
+          style={{
+            ...selectStyle,
+            minWidth: 200,
+            background: 'var(--gray-900)',
+          }}
+        />
+
         {/* Paese */}
         <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)} style={selectStyle}>
           <option value="all">🌍 Tutti i paesi</option>
@@ -426,9 +484,9 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
         )}
 
         {/* Reset */}
-        {(filterCountry !== 'all' || filterDiscipline !== 'all' || filterLevel !== 'all' || (userLoc && filterRadiusKm > 0)) && (
+        {(filterCountry !== 'all' || filterDiscipline !== 'all' || filterLevel !== 'all' || filterSearch || (userLoc && filterRadiusKm > 0)) && (
           <button
-            onClick={() => { setFilterCountry('all'); setFilterDiscipline('all'); setFilterLevel('all'); setFilterRadiusKm(0); }}
+            onClick={() => { setFilterCountry('all'); setFilterDiscipline('all'); setFilterLevel('all'); setFilterSearch(''); setFilterRadiusKm(0); }}
             style={{ ...selectStyle, color: 'var(--orange)' }}
           >
             ✕ Reset
@@ -743,6 +801,20 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
                 Info & Iscrizioni ↗
               </a>
             )}
+            <button
+              onClick={() => downloadICS(e)}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 13,
+                color: '#fff', background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                padding: '7px 14px', borderRadius: 8,
+                cursor: 'pointer',
+                backdropFilter: 'blur(4px)',
+              }}
+              title="Aggiungi al tuo calendario (.ics)"
+            >
+              📅 +Calendario
+            </button>
             {e.spot && (
               <Link
                 href={`/spot/${e.spot.slug}`}
