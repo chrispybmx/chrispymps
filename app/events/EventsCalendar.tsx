@@ -323,45 +323,73 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
             const isPast  = new Date(viewYear, viewMonth, day) <
                             new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
+            // Color map per discipline (Apple Calendar style)
+            const discColor: Record<string,string> = {
+              park: '#ff6b00',
+              street: '#06b6d4',
+              flatland: '#a855f7',
+              race: '#10b981',
+              dirt: '#a16207',
+              mixed: '#facc15',
+            };
+
             return (
               <div
                 key={dStr}
                 onClick={() => setSelDay(isSel ? null : dStr)}
+                className="cal-cell"
                 style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  padding: '4px 2px',
+                  position: 'relative',
+                  minHeight: 64,
+                  padding: '6px 6px 4px 6px',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  borderRadius: 10,
+                  background: isSel
+                    ? 'rgba(255,106,0,0.10)'
+                    : 'transparent',
+                  border: isSel
+                    ? '1px solid var(--orange)'
+                    : '1px solid transparent',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  display: 'flex', flexDirection: 'column',
                 }}
               >
+                {/* Numero giorno top-left */}
                 <div style={{
-                  width: 32, height: 32,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  width: 24, height: 24,
                   borderRadius: '50%',
-                  background: isSel
-                    ? hasEv ? 'var(--orange)' : 'var(--gray-600)'
-                    : isToday
-                    ? 'rgba(255,106,0,0.15)'
-                    : 'transparent',
-                  border: isToday && !isSel ? '1px solid rgba(255,106,0,0.6)' : '1px solid transparent',
+                  background: isToday ? 'var(--orange)' : 'transparent',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 13,
-                  fontWeight: isToday ? 700 : 400,
-                  color: isSel ? '#fff' : isPast ? 'var(--gray-500)' : 'var(--bone)',
-                  transition: 'background 0.12s',
+                  fontWeight: isToday ? 700 : 500,
+                  color: isToday ? '#000' : isPast ? 'var(--gray-500)' : 'var(--bone)',
+                  marginBottom: 2,
                 }}>
                   {day}
                 </div>
-                {/* Dot eventi */}
+
+                {/* Barre eventi colorate per discipline (max 3 visibili + counter) */}
                 {hasEv && (
-                  <div style={{ display: 'flex', gap: 3, marginTop: 3, height: 5 }}>
-                    {evs.slice(0, 3).map((_, j) => (
-                      <div key={j} style={{
-                        width: 4, height: 4, borderRadius: '50%',
-                        background: isSel ? 'rgba(255,255,255,0.6)' : 'var(--orange)',
-                        opacity: isPast ? 0.35 : 1,
-                      }} />
-                    ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 'auto' }}>
+                    {evs.slice(0, 3).map((ev, j) => {
+                      const color = discColor[ev.discipline || 'mixed'] || '#999';
+                      return (
+                        <div key={j} style={{
+                          height: 4,
+                          borderRadius: 2,
+                          background: color,
+                          opacity: isPast ? 0.35 : 0.9,
+                        }} />
+                      );
+                    })}
+                    {evs.length > 3 && (
+                      <div style={{ fontSize: 9, color: 'var(--gray-500)', fontFamily: 'var(--font-mono)', textAlign: 'right', lineHeight: 1 }}>
+                        +{evs.length - 3}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
