@@ -582,13 +582,48 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
 
           {(e.location || e.city) && (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginBottom: 3 }}>
-              📍 {[e.location, e.city].filter(Boolean).join(' — ')}
+              {e.country_code && <span style={{ marginRight: 6 }}>{String.fromCodePoint(...e.country_code.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65))}</span>}
+              📍 {[e.location, e.city, e.country].filter(Boolean).join(' — ')}
             </div>
           )}
 
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginBottom: 8 }}>
             🕐 {time}
           </div>
+
+          {/* Tags chips: discipline + level + organizer */}
+          {(e.discipline || e.level || e.organizer) && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              {e.discipline && (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px',
+                  background: 'rgba(255,106,0,0.15)', color: 'var(--orange)',
+                  borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em',
+                }}>
+                  {({park:'🛹 Park',street:'🏙️ Street',flatland:'🌀 Flatland',race:'🏁 Race',mixed:'🎯 Mixed',dirt:'🏞️ Dirt'} as Record<string,string>)[e.discipline] || e.discipline}
+                </span>
+              )}
+              {e.level && (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px',
+                  background: e.level.startsWith('uci-') ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.06)',
+                  color: e.level.startsWith('uci-') ? '#ffd700' : 'var(--gray-300)',
+                  borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em',
+                }}>
+                  {e.level === 'uci-wc' ? '🏆 UCI WC' : e.level === 'uci-c1' ? '🥇 UCI C1' : e.level === 'uci-c2' ? '🥈 UCI C2' : e.level.replace('-',' ')}
+                </span>
+              )}
+              {e.organizer && (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px',
+                  background: 'rgba(255,255,255,0.04)', color: 'var(--gray-400)',
+                  borderRadius: 4,
+                }}>
+                  🏛️ {e.organizer.length > 25 ? e.organizer.slice(0,23) + '…' : e.organizer}
+                </span>
+              )}
+            </div>
+          )}
 
           {e.description && (
             <p style={{ color: 'var(--bone)', fontSize: 13, lineHeight: 1.5, margin: '0 0 10px' }}>
