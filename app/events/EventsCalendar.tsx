@@ -276,103 +276,10 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
   return (
     <div>
       {/* ═══════════════════════════
-          HERO — prossimo evento upcoming con countdown
+          HERO — prossimo evento upcoming con countdown LIVE
       ═══════════════════════════ */}
-      {(() => {
-        const todayMid = new Date(); todayMid.setHours(0,0,0,0);
-        const next = events
-          .filter(e => {
-            const d = new Date(dateOnly(e.event_date) + 'T00:00:00');
-            return d.getTime() >= todayMid.getTime();
-          })
-          .sort((a, b) => dateOnly(a.event_date).localeCompare(dateOnly(b.event_date)))[0];
-        if (!next) return null;
+      <HeroCountdown events={events} />
 
-        const eventDate = new Date(dateOnly(next.event_date) + 'T12:00:00');
-        const daysUntil = Math.round((eventDate.getTime() - todayMid.getTime()) / (1000 * 60 * 60 * 24));
-        const flagEmoji = next.country_code && next.country_code.length === 2
-          ? String.fromCodePoint(...next.country_code.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
-          : '🌍';
-
-        const discColor = ({park:'#ff6b00',street:'#06b6d4',flatland:'#a855f7',race:'#10b981',dirt:'#a16207',mixed:'#facc15'} as Record<string,string>)[next.discipline || 'mixed'] || '#ff6b00';
-
-        return (
-          <div style={{
-            position: 'relative',
-            background: next.cover_url
-              ? `linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 100%), url(${next.cover_url}) center/cover`
-              : `linear-gradient(135deg, ${discColor}22 0%, var(--gray-800) 100%)`,
-            border: `1px solid ${discColor}`,
-            borderRadius: 14,
-            padding: '24px 22px',
-            marginBottom: 16,
-            overflow: 'hidden',
-            minHeight: next.cover_url ? 240 : 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-end',
-          }}>
-            <div style={{
-              fontFamily: 'var(--font-mono)', fontSize: 10, color: discColor,
-              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
-            }}>
-              ⚡ Prossimo evento
-            </div>
-            <h2 style={{
-              fontFamily: 'var(--font-mono)', fontSize: 22,
-              color: '#fff', margin: '0 0 8px', lineHeight: 1.2,
-              textShadow: next.cover_url ? '0 2px 8px rgba(0,0,0,0.8)' : 'none',
-            }}>
-              {next.title}
-            </h2>
-            <div style={{
-              fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
-              marginBottom: 14, opacity: 0.92,
-              textShadow: next.cover_url ? '0 1px 4px rgba(0,0,0,0.8)' : 'none',
-            }}>
-              {flagEmoji} {[next.city, next.country].filter(Boolean).join(', ')}
-              {next.discipline && <> • {({park:'🛹 Park',street:'🏙️ Street',flatland:'🌀 Flatland',race:'🏁 Race',mixed:'🎯 Mixed',dirt:'🏞️ Dirt'} as Record<string,string>)[next.discipline] || next.discipline}</>}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-              <div>
-                <div style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 38, color: discColor,
-                  fontWeight: 700, lineHeight: 1, textShadow: '0 2px 8px rgba(0,0,0,0.6)',
-                }}>
-                  {daysUntil === 0 ? 'OGGI' : daysUntil === 1 ? 'DOMANI' : daysUntil}
-                </div>
-                {daysUntil > 1 && (
-                  <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-300)',
-                    textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
-                  }}>
-                    giorni
-                  </div>
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-300)',
-                  textShadow: next.cover_url ? '0 1px 4px rgba(0,0,0,0.8)' : 'none',
-                }}>
-                  📅 {eventDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </div>
-                <button
-                  onClick={() => downloadICS(next)}
-                  style={{
-                    display: 'inline-block', marginTop: 8,
-                    fontFamily: 'var(--font-mono)', fontSize: 11,
-                    background: discColor, color: '#000',
-                    padding: '6px 14px', borderRadius: 6,
-                    border: 'none', cursor: 'pointer', fontWeight: 600,
-                  }}>
-                  📅 Aggiungi al calendario
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ═══════════════════════════
           VIEW TOGGLE
@@ -1024,6 +931,173 @@ function EventCard({ event: e, past }: { event: CalendarEvent; past?: boolean })
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════
+   HERO COUNTDOWN — live ticking
+   ════════════════════════════════════ */
+function HeroCountdown({ events }: { events: CalendarEvent[] }) {
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Trova prossimo evento (data evento alle 00:00 >= now in stesso fuso)
+  const next = useMemo(() => {
+    const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+    return events
+      .filter(e => {
+        const d = new Date(dateOnly(e.event_date) + 'T00:00:00');
+        return d.getTime() >= todayMid.getTime();
+      })
+      .sort((a, b) => dateOnly(a.event_date).localeCompare(dateOnly(b.event_date)))[0];
+  }, [events]);
+
+  if (!next) return null;
+
+  // Target: evento alle 00:00 ora locale del giorno start
+  const target = new Date(dateOnly(next.event_date) + 'T00:00:00');
+  const diff = Math.max(0, target.getTime() - now.getTime());
+
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+
+  const flagEmoji = next.country_code && next.country_code.length === 2
+    ? String.fromCodePoint(...next.country_code.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
+    : '🌍';
+  const discColor = ({park:'#ff6b00',street:'#06b6d4',flatland:'#a855f7',race:'#10b981',dirt:'#a16207',mixed:'#facc15'} as Record<string,string>)[next.discipline || 'mixed'] || '#ff6b00';
+
+  // Format event date
+  const eventDateStr = new Date(dateOnly(next.event_date) + 'T12:00:00').toLocaleDateString('it-IT', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  });
+
+  const isToday = days === 0 && diff > 0;
+  const hasStarted = diff === 0;
+
+  // 4 unit digital style
+  const TimeBlock = ({ value, label }: { value: number; label: string }) => (
+    <div style={{ textAlign: 'center', minWidth: 56 }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 32,
+        fontWeight: 700,
+        color: discColor,
+        lineHeight: 1,
+        textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+        {String(value).padStart(2, '0')}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 9,
+        color: 'rgba(255,255,255,0.7)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.1em',
+        marginTop: 4,
+        textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: 'relative',
+      background: next.cover_url
+        ? `linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.88) 100%), url(${next.cover_url}) center/cover`
+        : `linear-gradient(135deg, ${discColor}22 0%, var(--gray-800) 100%)`,
+      border: `1px solid ${discColor}`,
+      borderRadius: 14,
+      padding: '22px 22px 20px',
+      marginBottom: 16,
+      overflow: 'hidden',
+      minHeight: next.cover_url ? 280 : 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'flex-end',
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10, color: discColor,
+        textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8,
+      }}>
+        ⚡ Prossimo evento
+      </div>
+      <h2 style={{
+        fontFamily: 'var(--font-mono)', fontSize: 22,
+        color: '#fff', margin: '0 0 6px', lineHeight: 1.2,
+        textShadow: next.cover_url ? '0 2px 8px rgba(0,0,0,0.8)' : 'none',
+      }}>
+        {next.title}
+      </h2>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.85)',
+        marginBottom: 14,
+        textShadow: next.cover_url ? '0 1px 4px rgba(0,0,0,0.8)' : 'none',
+      }}>
+        {flagEmoji} {[next.city, next.country].filter(Boolean).join(', ')}
+        {' • '}📅 {eventDateStr}
+      </div>
+
+      {/* COUNTDOWN BLOCKS */}
+      {hasStarted ? (
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 700,
+          color: discColor, textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+          marginBottom: 12,
+        }}>
+          🔥 IN CORSO
+        </div>
+      ) : isToday ? (
+        <div style={{
+          display: 'flex', gap: 10, marginBottom: 12, alignItems: 'baseline',
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 26, fontWeight: 700,
+            color: discColor, textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+          }}>
+            OGGI →
+          </div>
+          <TimeBlock value={hours} label="ore" />
+          <span style={{ color: discColor, fontSize: 22, fontWeight: 700 }}>:</span>
+          <TimeBlock value={minutes} label="min" />
+          <span style={{ color: discColor, fontSize: 22, fontWeight: 700 }}>:</span>
+          <TimeBlock value={seconds} label="sec" />
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex', gap: 8, marginBottom: 12,
+          flexWrap: 'wrap', alignItems: 'flex-end',
+        }}>
+          <TimeBlock value={days} label="giorni" />
+          <span style={{ color: discColor, fontSize: 22, fontWeight: 700, paddingBottom: 14 }}>:</span>
+          <TimeBlock value={hours} label="ore" />
+          <span style={{ color: discColor, fontSize: 22, fontWeight: 700, paddingBottom: 14 }}>:</span>
+          <TimeBlock value={minutes} label="min" />
+          <span style={{ color: discColor, fontSize: 22, fontWeight: 700, paddingBottom: 14 }}>:</span>
+          <TimeBlock value={seconds} label="sec" />
+        </div>
+      )}
+
+      <button
+        onClick={() => downloadICS(next)}
+        style={{
+          alignSelf: 'flex-start',
+          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+          background: discColor, color: '#000',
+          padding: '8px 16px', borderRadius: 6,
+          border: 'none', cursor: 'pointer',
+        }}>
+        📅 Aggiungi al calendario
+      </button>
     </div>
   );
 }
