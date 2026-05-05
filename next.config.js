@@ -24,8 +24,9 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
       // Font Google + locali
       "font-src 'self' fonts.gstatic.com",
-      // Immagini: Supabase storage, tile mappa (CartoDB + OSM), dati inline
-      "img-src 'self' data: blob: *.supabase.co *.supabase.in *.basemaps.cartocdn.com *.tile.openstreetmap.org unpkg.com",
+      // Immagini: Supabase storage, tile mappa (CartoDB + OSM), eventi worldwide hotlink + dati inline
+      // 'https:' permette hotlink immagini eventi da illuminatebmx, fatbmx, YouTube, IG CDN, ecc
+      "img-src 'self' data: blob: https: *.supabase.co *.supabase.in *.basemaps.cartocdn.com *.tile.openstreetmap.org unpkg.com",
       // Connessioni API: Supabase, Nominatim OSM
       "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co",
       // Worker per Leaflet
