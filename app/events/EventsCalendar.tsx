@@ -266,17 +266,6 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
           <option value="mixed">🎯 Mixed</option>
         </select>
 
-        {/* Livello / UCI class */}
-        <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} style={selectStyle}>
-          <option value="all">🏆 Tutti livelli</option>
-          <option value="uci-wc">🏆 UCI World Cup</option>
-          <option value="uci-c1">🥇 UCI C1</option>
-          <option value="uci-c2">🥈 UCI C2</option>
-          <option value="national">🥇 Nazionale</option>
-          <option value="regional">🥈 Regionale</option>
-          <option value="local-jam">🎪 Local Jam</option>
-        </select>
-
         {/* Geolocalizzazione + km */}
         <button onClick={requestGeo} style={{ ...selectStyle, background: userLoc ? 'var(--orange)' : 'var(--gray-800)', color: userLoc ? 'var(--black)' : 'var(--bone)' }}>
           {userLoc ? '📍 Posizione attiva' : '📍 Usa posizione'}
@@ -295,9 +284,9 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
         )}
 
         {/* Reset */}
-        {(filterCountry !== 'all' || filterDiscipline !== 'all' || filterLevel !== 'all' || (userLoc && filterRadiusKm > 0)) && (
+        {(filterCountry !== 'all' || filterDiscipline !== 'all' || (userLoc && filterRadiusKm > 0)) && (
           <button
-            onClick={() => { setFilterCountry('all'); setFilterDiscipline('all'); setFilterLevel('all'); setFilterRadiusKm(0); }}
+            onClick={() => { setFilterCountry('all'); setFilterDiscipline('all'); setFilterRadiusKm(0); }}
             style={{ ...selectStyle, color: 'var(--orange)' }}
           >
             ✕ Reset
@@ -499,14 +488,16 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
         boxShadow: '0 6px 32px rgba(0,0,0,0.7)',
         border: '1px solid rgba(255,255,255,0.07)',
       }}>
-        {/* Cover image */}
-        <img
-          className="event-poster-img"
-          src={e.cover_url}
-          alt={e.title}
-          style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }}
-          loading="lazy"
-        />
+        {/* Cover image — contain mode preserva flyer verticali integri */}
+        <div style={{ width: '100%', aspectRatio: '4/5', background: '#0a0a0a', position: 'relative', overflow: 'hidden' }}>
+          <img
+            className="event-poster-img"
+            src={e.cover_url}
+            alt={e.title}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            loading="lazy"
+          />
+        </div>
 
         {/* Gradient overlay bottom */}
         <div style={{
@@ -682,11 +673,11 @@ function EventCard({ event: e, past }: { event: CalendarEvent; past?: boolean })
       opacity: past ? 0.65 : 1,
     }}>
       {e.cover_url && (
-        <div className="event-card-cover-wrap" style={{ height: 160, overflow: 'hidden', position: 'relative' }}>
+        <div className="event-card-cover-wrap" style={{ aspectRatio: '4/5', overflow: 'hidden', position: 'relative', background: '#0a0a0a' }}>
           <img
             className="event-card-img"
             src={e.cover_url} alt={e.title}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', filter: past ? 'grayscale(0.5)' : 'none' }}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', filter: past ? 'grayscale(0.5)' : 'none' }}
             loading="lazy"
           />
           {past && (
