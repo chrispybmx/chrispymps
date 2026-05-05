@@ -224,6 +224,102 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
   return (
     <div>
       {/* ═══════════════════════════
+          HERO — prossimo evento upcoming con countdown
+      ═══════════════════════════ */}
+      {(() => {
+        const now = new Date();
+        const next = events
+          .filter(e => new Date(e.event_date) >= now)
+          .sort((a, b) => a.event_date.localeCompare(b.event_date))[0];
+        if (!next) return null;
+
+        const eventDate = new Date(next.event_date + 'T12:00:00');
+        const daysUntil = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const flagEmoji = next.country_code && next.country_code.length === 2
+          ? String.fromCodePoint(...next.country_code.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
+          : '🌍';
+
+        const discColor = ({park:'#ff6b00',street:'#06b6d4',flatland:'#a855f7',race:'#10b981',dirt:'#a16207',mixed:'#facc15'} as Record<string,string>)[next.discipline || 'mixed'] || '#ff6b00';
+
+        return (
+          <div style={{
+            position: 'relative',
+            background: next.cover_url
+              ? `linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 100%), url(${next.cover_url}) center/cover`
+              : `linear-gradient(135deg, ${discColor}22 0%, var(--gray-800) 100%)`,
+            border: `1px solid ${discColor}`,
+            borderRadius: 14,
+            padding: '24px 22px',
+            marginBottom: 16,
+            overflow: 'hidden',
+            minHeight: next.cover_url ? 240 : 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+          }}>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 10, color: discColor,
+              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
+            }}>
+              ⚡ Prossimo evento
+            </div>
+            <h2 style={{
+              fontFamily: 'var(--font-mono)', fontSize: 22,
+              color: '#fff', margin: '0 0 8px', lineHeight: 1.2,
+              textShadow: next.cover_url ? '0 2px 8px rgba(0,0,0,0.8)' : 'none',
+            }}>
+              {next.title}
+            </h2>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)',
+              marginBottom: 14, opacity: 0.92,
+              textShadow: next.cover_url ? '0 1px 4px rgba(0,0,0,0.8)' : 'none',
+            }}>
+              {flagEmoji} {[next.city, next.country].filter(Boolean).join(', ')}
+              {next.discipline && <> • {({park:'🛹 Park',street:'🏙️ Street',flatland:'🌀 Flatland',race:'🏁 Race',mixed:'🎯 Mixed',dirt:'🏞️ Dirt'} as Record<string,string>)[next.discipline] || next.discipline}</>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 38, color: discColor,
+                  fontWeight: 700, lineHeight: 1, textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+                }}>
+                  {daysUntil === 0 ? 'OGGI' : daysUntil === 1 ? 'DOMANI' : daysUntil}
+                </div>
+                {daysUntil > 1 && (
+                  <div style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-300)',
+                    textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
+                  }}>
+                    giorni
+                  </div>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-300)',
+                  textShadow: next.cover_url ? '0 1px 4px rgba(0,0,0,0.8)' : 'none',
+                }}>
+                  📅 {eventDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+                {next.link_url && (
+                  <a href={next.link_url} target="_blank" rel="noopener noreferrer" style={{
+                    display: 'inline-block', marginTop: 8,
+                    fontFamily: 'var(--font-mono)', fontSize: 11,
+                    background: discColor, color: '#000',
+                    padding: '6px 14px', borderRadius: 6,
+                    textDecoration: 'none', fontWeight: 600,
+                  }}>
+                    Info →
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══════════════════════════
           VIEW TOGGLE
       ═══════════════════════════ */}
       <div style={{
