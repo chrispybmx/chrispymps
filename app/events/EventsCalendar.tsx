@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
+
+const EventsMap = dynamic(() => import('./EventsMap'), { ssr: false });
 
 export interface CalendarEvent {
   id: string;
@@ -88,9 +91,13 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selDay,    setSelDay]    = useState<string | null>(null);
 
+  /* ── View toggle (calendar / map) ── */
+  const [view, setView] = useState<'calendar' | 'map'>('calendar');
+
   /* ── Filters ── */
   const [filterCountry,    setFilterCountry]    = useState<string>('all');
   const [filterDiscipline, setFilterDiscipline] = useState<string>('all');
+  const [filterLevel,      setFilterLevel]      = useState<string>('all');
   const [userLoc,          setUserLoc]          = useState<{ lat: number; lng: number } | null>(null);
   const [filterRadiusKm,   setFilterRadiusKm]   = useState<number>(0); // 0 = no radius filter
 
@@ -99,6 +106,7 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
     return rawEvents.filter(e => {
       if (filterCountry !== 'all' && e.country_code !== filterCountry) return false;
       if (filterDiscipline !== 'all' && e.discipline !== filterDiscipline) return false;
+      if (filterLevel !== 'all' && e.level !== filterLevel) return false;
       if (userLoc && filterRadiusKm > 0) {
         if (e.lat == null || e.lng == null) return false;
         const d = distanceKm(userLoc.lat, userLoc.lng, e.lat, e.lng);
@@ -106,7 +114,24 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
       }
       return true;
     });
-  }, [rawEvents, filterCountry, filterDiscipline, userLoc, filterRadiusKm]);
+  }, [rawEvents, filterCountry, filterDiscipline, filterLevel, userLoc, filterRadiusKm]);
+
+  /* ── Available levels in current selection (post discipline filter) ── */
+  const availableLevels = useMemo(() => {
+    const levelSet = new Set<string>();
+    for (const e of rawEvents) {
+      if (filterDiscipline !== 'all' && e.discipline !== filterDiscipline) continue;
+      if (e.level) levelSet.add(e.level);
+    }
+    return Array.from(levelSet).sort();
+  }, [rawEvents, filterDiscipline]);
+
+  /* ── Auto-reset level filter if not in available list (es. cambio discipline) ── */
+  useEffect(() => {
+    if (filterLevel !== 'all' && !availableLevels.includes(filterLevel)) {
+      setFilterLevel('all');
+    }
+  }, [availableLevels, filterLevel]);
 
   /* ── Build country list dynamically ── */
   const availableCountries = useMemo(() => {
@@ -199,6 +224,44 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
   return (
     <div>
       {/* ═══════════════════════════
+          VIEW TOGGLE
+      ═══════════════════════════ */}
+      <div style={{
+        display: 'flex',
+        background: 'var(--gray-800)',
+        border: '1px solid var(--gray-700)',
+        borderRadius: 10,
+        padding: 4,
+        marginBottom: 16,
+        gap: 4,
+      }}>
+        {[
+          { k: 'calendar' as const, label: '📅 Calendario' },
+          { k: 'map'      as const, label: '🗺️ Mappa' },
+        ].map(t => (
+          <button
+            key={t.k}
+            onClick={() => setView(t.k)}
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              background: view === t.k ? 'var(--orange)' : 'transparent',
+              color: view === t.k ? '#000' : 'var(--bone)',
+              border: 'none',
+              borderRadius: 6,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              fontWeight: view === t.k ? 600 : 400,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══════════════════════════
           FILTRI
       ═══════════════════════════ */}
       <div style={{
@@ -233,6 +296,22 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
           <option value="mixed">🎯 Mixed</option>
         </select>
 
+        {/* Level / UCI Class — appare solo se ci sono level disponibili */}
+        {availableLevels.length > 1 && (
+          <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} style={selectStyle}>
+            <option value="all">⚡ Tutti livelli</option>
+            {availableLevels.includes('uci-wc')   && <option value="uci-wc">🏆 UCI World Cup</option>}
+            {availableLevels.includes('uci-wch')  && <option value="uci-wch">🏆 World Champ</option>}
+            {availableLevels.includes('uci-cc')   && <option value="uci-cc">🌍 Continental</option>}
+            {availableLevels.includes('uci-c1')   && <option value="uci-c1">🥇 UCI C1</option>}
+            {availableLevels.includes('uci-c2')   && <option value="uci-c2">🥈 UCI C2</option>}
+            {availableLevels.includes('international') && <option value="international">🏅 Internazionale</option>}
+            {availableLevels.includes('national') && <option value="national">🥇 Nazionale</option>}
+            {availableLevels.includes('regional') && <option value="regional">🥈 Regionale</option>}
+            {availableLevels.includes('local-jam') && <option value="local-jam">🎪 Local Jam</option>}
+          </select>
+        )}
+
         {/* Geolocalizzazione + km */}
         <button onClick={requestGeo} style={{ ...selectStyle, background: userLoc ? 'var(--orange)' : 'var(--gray-800)', color: userLoc ? 'var(--black)' : 'var(--bone)' }}>
           {userLoc ? '📍 Posizione attiva' : '📍 Usa posizione'}
@@ -251,9 +330,9 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
         )}
 
         {/* Reset */}
-        {(filterCountry !== 'all' || filterDiscipline !== 'all' || (userLoc && filterRadiusKm > 0)) && (
+        {(filterCountry !== 'all' || filterDiscipline !== 'all' || filterLevel !== 'all' || (userLoc && filterRadiusKm > 0)) && (
           <button
-            onClick={() => { setFilterCountry('all'); setFilterDiscipline('all'); setFilterRadiusKm(0); }}
+            onClick={() => { setFilterCountry('all'); setFilterDiscipline('all'); setFilterLevel('all'); setFilterRadiusKm(0); }}
             style={{ ...selectStyle, color: 'var(--orange)' }}
           >
             ✕ Reset
@@ -266,8 +345,18 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
       </div>
 
       {/* ═══════════════════════════
+          MAP VIEW
+      ═══════════════════════════ */}
+      {view === 'map' && (
+        <div style={{ marginBottom: 28 }}>
+          <EventsMap events={events} />
+        </div>
+      )}
+
+      {/* ═══════════════════════════
           CALENDARIO
       ═══════════════════════════ */}
+      {view === 'calendar' && (
       <div style={{
         background: 'var(--gray-800)',
         border: '1px solid var(--gray-700)',
@@ -397,6 +486,7 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
           })}
         </div>
       </div>
+      )}
 
       {/* ═══════════════════════════
           GIORNO SELEZIONATO
