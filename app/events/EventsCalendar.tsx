@@ -347,17 +347,17 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
                 }}>
                   📅 {eventDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
-                {next.link_url && (
-                  <a href={next.link_url} target="_blank" rel="noopener noreferrer" style={{
+                <button
+                  onClick={() => downloadICS(next)}
+                  style={{
                     display: 'inline-block', marginTop: 8,
                     fontFamily: 'var(--font-mono)', fontSize: 11,
                     background: discColor, color: '#000',
                     padding: '6px 14px', borderRadius: 6,
-                    textDecoration: 'none', fontWeight: 600,
+                    border: 'none', cursor: 'pointer', fontWeight: 600,
                   }}>
-                    Info →
-                  </a>
-                )}
+                  📅 Aggiungi al calendario
+                </button>
               </div>
             </div>
           </div>
@@ -788,32 +788,17 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
           )}
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {e.link_url && (
-              <a
-                href={e.link_url} target="_blank" rel="noopener noreferrer"
-                style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-                  color: '#000', background: 'var(--orange)',
-                  padding: '8px 18px', borderRadius: 8, textDecoration: 'none',
-                  display: 'inline-block',
-                }}
-              >
-                Info & Iscrizioni ↗
-              </a>
-            )}
             <button
               onClick={() => downloadICS(e)}
               style={{
-                fontFamily: 'var(--font-mono)', fontSize: 13,
-                color: '#fff', background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                padding: '7px 14px', borderRadius: 8,
-                cursor: 'pointer',
-                backdropFilter: 'blur(4px)',
+                fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+                color: '#000', background: 'var(--orange)',
+                padding: '8px 18px', borderRadius: 8,
+                border: 'none', cursor: 'pointer',
               }}
               title="Aggiungi al tuo calendario (.ics)"
             >
-              📅 +Calendario
+              📅 Aggiungi al calendario
             </button>
             {e.spot && (
               <Link
@@ -918,14 +903,13 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
           )}
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {e.link_url && (
-              <a
-                href={e.link_url} target="_blank" rel="noopener noreferrer"
-                style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#000', background: 'var(--orange)', padding: '6px 14px', borderRadius: 6, textDecoration: 'none' }}
-              >
-                Info & Iscrizioni ↗
-              </a>
-            )}
+            <button
+              onClick={() => downloadICS(e)}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: '#000', background: 'var(--orange)', padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+              title="Aggiungi al tuo calendario (.ics)"
+            >
+              📅 Aggiungi al calendario
+            </button>
             {e.spot && (
               <Link
                 href={`/spot/${e.spot.slug}`}
@@ -1013,10 +997,14 @@ function EventCard({ event: e, past }: { event: CalendarEvent; past?: boolean })
           )}
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {e.link_url && !past && (
-              <a href={e.link_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#000', background: 'var(--orange)', padding: '5px 12px', borderRadius: 4, textDecoration: 'none' }}>
-                Info & Iscrizioni ↗
-              </a>
+            {!past && (
+              <button
+                onClick={() => downloadICS(e)}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: '#000', background: 'var(--orange)', padding: '5px 12px', borderRadius: 4, border: 'none', cursor: 'pointer' }}
+                title="Aggiungi al tuo calendario (.ics)"
+              >
+                📅 Aggiungi al calendario
+              </button>
             )}
             {e.spot && (
               <Link href={`/spot/${e.spot.slug}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)', border: '1px solid var(--gray-600)', padding: '4px 10px', borderRadius: 4, textDecoration: 'none' }}>

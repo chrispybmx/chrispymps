@@ -118,7 +118,7 @@ export default function EventsMap({ events }: { events: CalendarEvent[] }) {
               ${ev.discipline ? `<span style="font-size:10px;padding:2px 6px;background:${DISCIPLINE_COLOR[ev.discipline]||'#999'}22;color:${DISCIPLINE_COLOR[ev.discipline]||'#999'};border-radius:3px;text-transform:uppercase">${DISCIPLINE_EMOJI[ev.discipline]||''} ${ev.discipline}</span>` : ''}
               ${ev.level ? `<span style="font-size:10px;padding:2px 6px;background:#facc1522;color:#a16207;border-radius:3px">${LEVEL_LABEL[ev.level] || ev.level}</span>` : ''}
             </div>
-            ${ev.link_url ? `<a href="${ev.link_url}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#ff6b00;text-decoration:none;font-weight:500">Info & Iscrizioni →</a>` : ''}
+            <a href="https://maps.chrispybmx.com/events" style="font-size:12px;color:#ff6b00;text-decoration:none;font-weight:500">Vedi su Chrispy Maps →</a>
           </div>
         `;
 
