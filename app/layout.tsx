@@ -65,6 +65,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon:  [
+      { url: '/favicon.ico',        sizes: '32x32',   type: 'image/x-icon' },
       { url: '/icons/icon-32.png',  sizes: '32x32',   type: 'image/png' },
       { url: '/icons/icon-96.png',  sizes: '96x96',   type: 'image/png' },
     ],
