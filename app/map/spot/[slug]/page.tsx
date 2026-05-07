@@ -232,6 +232,16 @@ export default async function SpotPage({ params, searchParams }: Props) {
           image: photos.map(p => p.url),
         })}}
       />
+      <script type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: safeJsonLd({
+          '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Mappa', item: APP_CONFIG.url },
+            ...(spot.city ? [{ '@type': 'ListItem', position: 2, name: spot.city, item: `${APP_CONFIG.url}/map/${spot.city.toLowerCase().replace(/\s+/g, '-')}` }] : []),
+            { '@type': 'ListItem', position: spot.city ? 3 : 2, name: spot.name, item: `${APP_CONFIG.url}/map/spot/${spot.slug}` },
+          ],
+        })}}
+      />
 
       <BottomNav />
     </main>
