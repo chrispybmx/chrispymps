@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
 interface Profile {
@@ -17,8 +18,10 @@ interface Props {
 }
 
 export default function ProfileClient({ profile, joinDate }: Props) {
+  const router = useRouter();
   const [isOwn,    setIsOwn]    = useState(false);
   const [editing,  setEditing]  = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [bio,      setBio]      = useState(profile.bio ?? '');
   const [insta,    setInsta]    = useState(profile.instagram_handle ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? '');
@@ -77,6 +80,35 @@ export default function ProfileClient({ profile, joinDate }: Props) {
       else { setMsg('❌ ' + (j.error ?? 'Errore')); }
     } catch { setMsg('❌ Errore di rete'); }
     finally { setSaving(false); setTimeout(() => setMsg(''), 3000); }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!token) return;
+    const ok = window.confirm(
+      'Sei sicuro di voler eliminare il tuo account?\n\n' +
+      'Eliminando l\'account cancelleremo il tuo profilo e i tuoi dati personali. ' +
+      'Gli spot già pubblicati resteranno visibili sulla mappa come contributi anonimi della community. ' +
+      'Questa azione è irreversibile.'
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/user/delete', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await res.json();
+      if (j.ok) {
+        await supabaseBrowser().auth.signOut();
+        router.push('/map');
+      } else {
+        alert('Errore: ' + (j.error ?? 'Impossibile eliminare l\'account'));
+      }
+    } catch {
+      alert('Errore di rete. Riprova più tardi.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const instaHandle = insta || profile.instagram_handle;
@@ -206,6 +238,28 @@ export default function ProfileClient({ profile, joinDate }: Props) {
               {saving ? '...' : '💾 Salva'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Cancella profilo — link discreto (solo owner) */}
+      {isOwn && !editing && (
+        <div style={{ marginTop: 32, textAlign: 'right' }}>
+          <button
+            onClick={handleDeleteAccount}
+            disabled={deleting}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11,
+              color: 'var(--gray-600)',
+              background: 'none', border: 'none', padding: 0,
+              cursor: deleting ? 'default' : 'pointer',
+              opacity: deleting ? 0.4 : 1,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-400)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-600)'; }}
+          >
+            {deleting ? 'Eliminazione...' : 'Vuoi cancellare il profilo?'}
+          </button>
         </div>
       )}
     </div>

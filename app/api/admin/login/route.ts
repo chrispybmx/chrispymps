@@ -14,11 +14,16 @@ interface IpEntry { count: number; blockedUntil: number; windowStart: number }
 const ipStore = new Map<string, IpEntry>();
 
 function getIp(req: NextRequest): string {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown'
-  );
+  // Priorità: x-real-ip (impostato da Vercel, non spoofabile) → ultimo x-forwarded-for → fallback
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const parts = forwarded.split(',');
+    const last = parts[parts.length - 1]?.trim();
+    if (last) return last;
+  }
+  return 'unknown';
 }
 
 function checkRateLimit(ip: string): { allowed: boolean; retryAfterSec?: number } {

@@ -13,7 +13,7 @@ const SpotSchema = z.object({
   description:  z.string().max(500).optional(),
   guardians:    z.string().max(200).optional(),
   difficulty:   z.string().max(30).optional(),
-  photo_urls:   z.array(z.string().url()).max(5).optional(),
+  photo_urls:   z.array(z.string().url()).min(1).max(5),
   access_token: z.string().min(1).max(2048),
 });
 

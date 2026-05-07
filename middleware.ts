@@ -172,12 +172,60 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // ── 10. Rate limit newsletter subscribe: 3 / 10 minuti per IP ──
+  if (pathname === '/api/newsletter/subscribe' && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`newsletter:${ip}`, 3, 10 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppe richieste. Riprova tra qualche minuto.' }, { status: 429 });
+    }
+  }
+
+  // ── 11. Rate limit event RSVP: 5 / 10 minuti per IP ──
+  if (pathname === '/api/events/jamroma/rsvp' && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`rsvp:${ip}`, 5, 10 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppe richieste.' }, { status: 429 });
+    }
+  }
+
+  // ── 12. Rate limit event presence: 30 / 5 minuti per IP (heartbeat ogni 30s) ──
+  if (pathname === '/api/events/jamroma/presence' && req.method === 'POST') {
+    const { allowed } = checkRateLimit(`presence:${ip}`, 30, 5 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppe richieste.' }, { status: 429 });
+    }
+  }
+
+  // ── 13. Rate limit account deletion: 3 / 60 minuti per IP ──
+  if (pathname === '/api/user/delete' && req.method === 'DELETE') {
+    const { allowed } = checkRateLimit(`userdel:${ip}`, 3, 60 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'Troppe richieste. Riprova tra qualche minuto.' }, { status: 429 });
+    }
+  }
+
+  // ── 12. Admin routes: verifica cookie sessione admin presente (difesa in profondità) ──
+  // Eccezioni: /api/admin/approve e /api/admin/reject GET con token HMAC (link email)
+  if (pathname.startsWith('/api/admin/') && pathname !== '/api/admin/login') {
+    const isEmailLink =
+      (pathname === '/api/admin/approve' || pathname === '/api/admin/reject') &&
+      req.method === 'GET' &&
+      req.nextUrl.searchParams.has('token');
+
+    if (!isEmailLink) {
+      const adminCookie = req.cookies.get('cmps_admin_session')?.value;
+      if (!adminCookie) {
+        return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
+      }
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    '/api/admin/login',
+    '/api/admin/:path*',
     '/api/flag',
     '/api/submit-spot',
     '/api/comments/:path*',
@@ -187,5 +235,8 @@ export const config = {
     '/api/submit-event',
     '/api/submit-news',
     '/api/status-confirm',
+    '/api/newsletter/subscribe',
+    '/api/user/delete',
+    '/api/events/jamroma/:path*',
   ],
 };

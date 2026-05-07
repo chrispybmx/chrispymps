@@ -12,7 +12,7 @@ export async function GET() {
     .from('spots')
     .select('*, spot_photos(id, url, position)')
     .in('status', ['approved', 'pending'])
-    .order('approved_at', { ascending: false });
+    .order('approved_at', { ascending: false, nullsFirst: false });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 

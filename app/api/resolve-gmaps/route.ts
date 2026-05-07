@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolve4 } from 'dns/promises';
 
 /**
  * GET /api/resolve-gmaps?url=https://maps.app.goo.gl/...
@@ -9,6 +10,22 @@ import { NextRequest, NextResponse } from 'next/server';
  * 2. Cerca @lat,lon nell'URL — se trovato, ritorna subito
  * 3. Se l'URL ha q=indirizzo, geocodifica via Nominatim (OSM, gratuito)
  */
+
+// Host consentiti per ogni hop dei redirect (Google Maps)
+const ALLOWED_HOSTS = [
+  'maps.google.com', 'www.google.com', 'maps.google.it',
+  'www.google.it', 'google.com', 'google.it',
+  'maps.app.goo.gl', 'goo.gl',
+  'consent.google.com',
+];
+
+function isAllowedHost(hostname: string): boolean {
+  return ALLOWED_HOSTS.includes(hostname) ||
+    hostname.endsWith('.google.com') ||
+    hostname.endsWith('.google.it') ||
+    hostname.endsWith('.goo.gl');
+}
+
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url') ?? '';
 
@@ -24,34 +41,72 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 1. Segui i redirect (con timeout 8s per evitare SSRF lenti)
+    const MAX_REDIRECTS = 5;
+
+    // 1. Segui i redirect manualmente (max 5 hop, con validazione DNS + hostname ad ogni hop)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
-    let res: Response;
+    let currentUrl = url;
+    let res: Response | undefined;
+
     try {
-      res = await fetch(url, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChrispyMPS/1.0)' },
-        signal: controller.signal,
-      });
+      for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        const parsed = new URL(currentUrl);
+
+        // Schema: solo HTTPS
+        if (parsed.protocol !== 'https:') {
+          return NextResponse.json({ ok: false, error: 'URL non valido' }, { status: 400 });
+        }
+
+        // Hostname consentito ad ogni hop
+        if (!isAllowedHost(parsed.hostname)) {
+          return NextResponse.json({ ok: false, error: 'URL non valido' }, { status: 400 });
+        }
+
+        // Risolvi DNS e controlla che l'IP non sia privato
+        let ips: string[];
+        try {
+          ips = await resolve4(parsed.hostname);
+        } catch {
+          return NextResponse.json({ ok: false, error: 'DNS resolution failed' }, { status: 400 });
+        }
+        for (const ip of ips) {
+          if (isPrivateIp(ip)) {
+            return NextResponse.json({ ok: false, error: 'URL non valido' }, { status: 400 });
+          }
+        }
+
+        res = await fetch(currentUrl, {
+          method: 'GET',
+          redirect: 'manual',
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChrispyMPS/1.0)' },
+          signal: controller.signal,
+        });
+
+        // Se non è un redirect, abbiamo finito
+        if (!res.status.toString().startsWith('3')) break;
+
+        const location = res.headers.get('location');
+        if (!location) break;
+
+        // Risolvi URL relativi
+        currentUrl = new URL(location, currentUrl).toString();
+
+        if (hop === MAX_REDIRECTS) {
+          return NextResponse.json({ ok: false, error: 'Troppi redirect' }, { status: 400 });
+        }
+      }
     } finally {
       clearTimeout(timeout);
     }
-    const finalUrl = res.url;
 
-    // SSRF guard: l'URL finale (dopo i redirect) deve essere ancora Google Maps
-    const ALLOWED_FINAL_HOSTS = [
-      'maps.google.com', 'www.google.com', 'maps.google.it',
-      'maps.app.goo.gl', 'goo.gl',
-    ];
-    let finalHost: string;
-    try { finalHost = new URL(finalUrl).hostname; } catch { finalHost = ''; }
-    if (!ALLOWED_FINAL_HOSTS.includes(finalHost)) {
-      return NextResponse.json({ ok: false, error: 'URL non valido' }, { status: 400 });
+    if (!res) {
+      return NextResponse.json({ ok: false, error: 'Impossibile risolvere il link' }, { status: 500 });
     }
 
-    // 2. Prova a estrarre @lat,lon dall'URL finale
+    const finalUrl = currentUrl;
+
+    // 2. Prova a estrarre @lat,lon dall'URL finale — se trovato, non serve leggere il body
     const coords = extractCoordsFromUrl(finalUrl);
     if (coords) {
       return NextResponse.json({ ok: true, lat: coords.lat, lon: coords.lon });
@@ -80,6 +135,30 @@ export async function GET(req: NextRequest) {
     console.error('[resolve-gmaps]', err);
     return NextResponse.json({ ok: false, error: 'Impossibile risolvere il link' }, { status: 500 });
   }
+}
+
+// ── SSRF helpers ─────────────────────────────────────────────────────────────
+
+function isPrivateIp(ip: string): boolean {
+  // IPv6 loopback e link-local
+  if (ip === '::1') return true;
+  if (ip.toLowerCase().startsWith('fe80')) return true;
+  // fc00::/7 → fc or fd prefix
+  if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) return true;
+
+  // IPv4
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(p => isNaN(p))) return false;
+
+  const [a, b] = parts;
+  if (a === 10) return true;                       // 10.0.0.0/8
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  if (a === 192 && b === 168) return true;           // 192.168.0.0/16
+  if (a === 127) return true;                        // 127.0.0.0/8
+  if (a === 169 && b === 254) return true;           // 169.254.0.0/16
+  if (a === 0) return true;                          // 0.0.0.0/8
+
+  return false;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

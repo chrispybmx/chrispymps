@@ -268,6 +268,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [loginPassword, setLoginPassword] = useState('');
   const [resetSent,     setResetSent]     = useState(false);
   const [resetLoading,  setResetLoading]  = useState(false);
+  const [ageConfirmed2, setAgeConfirmed2] = useState(false);
 
   /* Nearby spots — duplicate detection */
   interface NearbySpot { id: string; slug: string; name: string; type: SpotType; city?: string; condition: string; distance: number; spot_photos?: { url: string; position: number }[] }
@@ -457,6 +458,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     if (!regUsername || !regEmail || !regPassword) { setAuthError('Compila tutti i campi.'); return; }
     if (regUsername.length < 3) { setAuthError('Username min 3 caratteri.'); return; }
     if (regPassword.length < 6) { setAuthError('Password min 6 caratteri.'); return; }
+    if (!ageConfirmed2) { setAuthError('Devi confermare di avere almeno 14 anni.'); return; }
     setAuthLoading(true); setAuthError(null);
     try { const result = await signUp(regEmail, regPassword, regUsername); setAuthDone(result); }
     catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto'); }
@@ -611,11 +613,23 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     </div>
                     <div><label style={lbl}>Email *</label><input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="la-tua@email.com" /></div>
                     <div><label style={lbl}>Password * (min 6 caratteri)</label><input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} /></div>
+                    <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={ageConfirmed2} onChange={e => setAgeConfirmed2(e.target.checked)}
+                          style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.5 }}>
+                          Confermo di avere almeno 14 anni <span style={{ color: 'var(--orange)' }}>*</span>
+                        </span>
+                      </label>
+                    </div>
                     {authError && <ErrBox msg={authError} />}
                     <button onClick={handleSignUp} disabled={authLoading || usernameOk === false} className="btn-primary"
                       style={{ width: '100%', justifyContent: 'center', opacity: (authLoading || usernameOk === false) ? 0.6 : 1 }}>
                       {authLoading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT'}
                     </button>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6, margin: 0 }}>
+                      Registrandoti accetti la <a href="/privacy" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>.
+                    </p>
                   </div>
                 )}
               </div>
@@ -982,6 +996,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               </div>
 
               {error && <ErrBox msg={error} />}
+
+              <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', lineHeight: 1.6, margin: 0 }}>
+                  Inviando, il tuo @username, le foto e le coordinate GPS saranno visibili sulla mappa dopo approvazione. La tua email resta privata. Le foto non devono contenere volti o targhe.
+                </p>
+              </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => { setStep('foto'); setError(null); }} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
+import { safeJsonLd } from '@/lib/json-ld';
 import type { Spot } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
 import PhotoCarousel from '@/components/PhotoCarousel';
@@ -15,7 +16,7 @@ import BottomNav from '@/components/BottomNav';
 
 export const revalidate = 300;
 
-interface Props { params: { slug: string } }
+interface Props { params: { slug: string }; searchParams: { from?: string } }
 
 async function getSpot(slug: string): Promise<Spot | null> {
   const supabase = supabaseServer();
@@ -52,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SpotPage({ params }: Props) {
+export default async function SpotPage({ params, searchParams }: Props) {
   const spot = await getSpot(params.slug);
   if (!spot) notFound();
 
@@ -81,8 +82,11 @@ export default async function SpotPage({ params }: Props) {
         padding: '12px 16px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <Link href="/" style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-          ← Mappa
+        <Link
+          href={searchParams.from === 'jamroma' ? '/jamroma' : '/'}
+          style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}
+        >
+          {searchParams.from === 'jamroma' ? '← Jam Roma' : '← Mappa'}
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Condition badge */}
@@ -219,7 +223,7 @@ export default async function SpotPage({ params }: Props) {
       <SupportStrip />
 
       <script type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        dangerouslySetInnerHTML={{ __html: safeJsonLd({
           '@context': 'https://schema.org', '@type': ['SportsActivityLocation', 'Place'],
           name: spot.name, description: spot.description ?? `Spot ${tipo.label} a ${spot.city ?? 'Italia'}`,
           url: `${APP_CONFIG.url}/map/spot/${spot.slug}`,

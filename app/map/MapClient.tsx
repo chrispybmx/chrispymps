@@ -966,6 +966,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
 
+      {/* ── JAM ROMA BANNER ── */}
+      <JamBanner />
+
       {/* ── BOTTOM NAV — solo mobile, sostituisce il pulsante +SPOT della topbar ── */}
       <BottomNav onAddSpot={openAddSpot} onOpenAuth={() => setAuthOpen(true)} />
 
@@ -1484,6 +1487,89 @@ function MapBtn({
     >
       {children}
     </button>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   JAM BANNER — floating pill sopra la BottomNav
+   Visibile fino al 6 giugno 2026.
+   Dopo l'evento si nasconde automaticamente.
+════════════════════════════════════════════════════════ */
+function JamBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // Nascondi dopo l'evento
+    if (new Date() > new Date('2026-06-07T00:00:00+02:00')) return;
+    // Nascondi se gia chiuso in questa sessione
+    try {
+      if (sessionStorage.getItem('cmaps_jam_banner_off')) return;
+    } catch {}
+    setVisible(true);
+  }, []);
+
+  if (!visible || dismissed) return null;
+
+  const dismiss = () => {
+    setDismissed(true);
+    try { sessionStorage.setItem('cmaps_jam_banner_off', '1'); } catch {}
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))',
+      left: 12, right: 12,
+      zIndex: 50,
+      animation: 'slideUp 0.35s ease-out',
+    }}>
+      <a
+        href="/jamroma"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: 'linear-gradient(135deg, #2D1F42 0%, #1A1020 100%)',
+          border: '1px solid rgba(123,94,167,0.4)',
+          borderRadius: 14, padding: '10px 14px',
+          textDecoration: 'none', color: '#F2E8D5',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(123,94,167,0.15)',
+        }}
+      >
+        <img
+          src="/events/jamroma/poster.jpg" alt=""
+          style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>
+            Colle del Cemento V4
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#E85D75', marginTop: 1 }}>
+            6 giugno · EUR Fermi · Roma
+          </div>
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+          background: '#F5A623', color: '#1A1020',
+          borderRadius: 6, padding: '6px 12px',
+          whiteSpace: 'nowrap', textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+        }}>
+          ENTRA
+        </div>
+      </a>
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); dismiss(); }}
+        style={{
+          position: 'absolute', top: -6, right: -2,
+          width: 22, height: 22, borderRadius: '50%',
+          background: '#333', border: '1px solid #555', color: '#aaa',
+          fontSize: 11, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        ✕
+      </button>
+    </div>
   );
 }
 

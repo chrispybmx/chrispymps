@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TIPI_SPOT, CITTA_ITALIANE, APP_CONFIG } from '@/lib/constants';
+import { safeJsonLd } from '@/lib/json-ld';
 
 const url = `${APP_CONFIG.url}/skate-maps`;
 
@@ -60,7 +61,7 @@ const TOP_CITIES = CITTA_ITALIANE.slice(0, 16);
 export default function SkateMapPage() {
   return (
     <div style={{ background: 'var(--black)', minHeight: '100dvh' }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }} />
 
       {/* Header */}
       <div style={{ borderBottom: '1px solid var(--gray-700)', background: 'rgba(10,10,10,0.98)' }}>

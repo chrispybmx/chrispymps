@@ -280,6 +280,10 @@ export default function EventsCalendar({ events: rawEvents }: { events: Calendar
       ═══════════════════════════ */}
       <HeroCountdown events={events} />
 
+      {/* ═══════════════════════════
+          JAM ROMA BANNER
+      ═══════════════════════════ */}
+      <JamRomaBanner />
 
       {/* ═══════════════════════════
           VIEW TOGGLE
@@ -1111,5 +1115,50 @@ function SectionLabel({ children, color }: { children: React.ReactNode; color: s
     }}>
       {children}
     </div>
+  );
+}
+
+/** Banner Jam Roma — visibile fino al giorno dopo l'evento */
+function JamRomaBanner() {
+  if (new Date() > new Date('2026-06-07T00:00:00+02:00')) return null;
+
+  return (
+    <Link
+      href="/jamroma"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        background: 'linear-gradient(135deg, #2D1F42 0%, #1A1020 100%)',
+        border: '1px solid rgba(123,94,167,0.4)',
+        borderRadius: 12, padding: '12px 14px',
+        textDecoration: 'none', color: '#F2E8D5',
+        marginBottom: 16,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+      }}
+    >
+      <img
+        src="/events/jamroma/poster.jpg" alt=""
+        style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
+          Colle del Cemento V4
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#E85D75', marginTop: 2 }}>
+          6 giugno · ore 14 · EUR Fermi
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(242,232,213,0.5)', marginTop: 2 }}>
+          Mappa live · Spot · Partecipanti
+        </div>
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+        background: '#F5A623', color: '#1A1020',
+        borderRadius: 6, padding: '6px 12px',
+        whiteSpace: 'nowrap', textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}>
+        INFO
+      </div>
+    </Link>
   );
 }

@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const securityHeaders = [
   // Impedisce il click-jacking (iframe embedding)
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -18,8 +20,8 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // Next.js e React richiedono unsafe-eval in dev; in prod è ridotto
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // Next.js richiede unsafe-eval in dev per React Fast Refresh / hot reload
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
       // Leaflet e stili inline
       "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
       // Font Google + locali
@@ -28,7 +30,7 @@ const securityHeaders = [
       // 'https:' permette hotlink immagini eventi da illuminatebmx, fatbmx, YouTube, IG CDN, ecc
       "img-src 'self' data: blob: https: *.supabase.co *.supabase.in *.basemaps.cartocdn.com *.tile.openstreetmap.org unpkg.com",
       // Connessioni API: Supabase, Nominatim OSM
-      "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co",
+      "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co tiles.stadiamaps.com",
       // Worker per Leaflet
       "worker-src blob:",
       // Frame: OSM per anteprima mappa + YouTube per video spot (SEC-FIX: aggiunto youtube)

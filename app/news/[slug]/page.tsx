@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { APP_CONFIG } from '@/lib/constants';
 import NewsComments from '@/components/NewsComments';
 import { supabaseServer } from '@/lib/supabase';
+import { safeJsonLd } from '@/lib/json-ld';
 
 interface NewsPhoto {
   id: string;
@@ -247,7 +248,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     <div style={{ background: 'var(--black)', minHeight: '100dvh' }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(articleJsonLd) }}
       />
       {/* Header */}
       <div style={{ borderBottom: '1px solid var(--gray-700)', background: 'rgba(10,10,10,0.98)', position: 'sticky', top: 0, zIndex: 10 }}>

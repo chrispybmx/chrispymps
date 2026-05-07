@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { subscribeToNewsletter } from '@/lib/mailerlite';
-
-const SUPABASE_URL         = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!;
+import { isAdminAuthenticated } from '@/lib/auth';
+import { supabaseAdmin } from '@/lib/supabase';
 
 /**
  * POST /api/admin/migrate-mailerlite
@@ -11,19 +9,12 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!;
  * Protetto dal cookie di sessione admin (stesso meccanismo degli altri endpoint admin).
  */
 export async function POST(req: NextRequest) {
-  // Auth admin via cookie (stesso sistema degli altri endpoint admin)
-  const sessionCookie = req.cookies.get('admin_session')?.value;
-  if (!sessionCookie || sessionCookie !== process.env.ADMIN_SESSION_TOKEN) {
+  // Auth admin via cookie HMAC (stesso sistema degli altri endpoint admin)
+  if (!isAdminAuthenticated()) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
   }
 
-  if (!SUPABASE_SERVICE_KEY) {
-    return NextResponse.json({ error: 'SUPABASE_SERVICE_KEY mancante' }, { status: 500 });
-  }
-
-  const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const adminClient = supabaseAdmin();
 
   // Legge tutti gli utenti da auth.users (paginato a 1000 per volta)
   let page = 1;
@@ -33,7 +24,7 @@ export async function POST(req: NextRequest) {
   while (true) {
     const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 1000 });
     if (error) {
-      console.error('[migrate-mailerlite] listUsers error:', error);
+      console.error('[migrate-mailerlite] listUsers error:', error?.message ?? 'unknown');
       break;
     }
     if (!data.users.length) break;

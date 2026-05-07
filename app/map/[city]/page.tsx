@@ -5,6 +5,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { CITTA_ITALIANE, APP_CONFIG } from '@/lib/constants';
 import type { Spot } from '@/lib/types';
 import CityMapList from './CityMapList';
+import { safeJsonLd } from '@/lib/json-ld';
 
 export const revalidate = 3600;
 
@@ -125,10 +126,10 @@ export default async function CityPage({ params }: Props) {
       paddingBottom: 'calc(var(--strip-height) + 24px)',
     }}>
       {/* JSON-LD */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }} />
       {collectionJsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(collectionJsonLd) }} />
       )}
 
       {/* Header */}

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import MapClient from './MapClient';
 import { APP_CONFIG } from '@/lib/constants';
+import { safeJsonLd } from '@/lib/json-ld';
 
 export const metadata: Metadata = {
   title:       'Mappa Spot BMX, Skate & Scooter Italia',
@@ -44,7 +45,7 @@ export default async function MapPage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(mapJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(mapJsonLd) }}
       />
       <MapClient initialSpots={[]} autoAdd={autoAdd} />
     </>

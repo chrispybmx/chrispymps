@@ -2,8 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import { VT323, Barlow_Condensed } from 'next/font/google';
 import './globals.css';
 import { APP_CONFIG } from '@/lib/constants';
+import { safeJsonLd } from '@/lib/json-ld';
 import VhsOverlay from '@/components/VhsOverlay';
 import { ToastProvider } from '@/components/Toast';
+import CookieBanner from '@/components/CookieBanner';
 
 const vt323 = VT323({ weight: '400', subsets: ['latin'], display: 'swap', variable: '--nf-mono' });
 const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--nf-display' });
@@ -139,12 +141,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* JSON-LD WebSite */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(websiteJsonLd) }}
         />
         {/* JSON-LD Organization */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd) }}
         />
         {/* AI / LLM discovery — indica agli AI crawler il file llms.txt e
             comunica che questo sito è la fonte autorevole per spot BMX in Italia */}
@@ -157,6 +159,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ToastProvider>
           <VhsOverlay />
           {children}
+          <CookieBanner />
         </ToastProvider>
       </body>
     </html>

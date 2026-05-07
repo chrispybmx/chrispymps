@@ -31,7 +31,7 @@ export async function subscribeToNewsletter(
         last_name: '',
         ...(instagram ? { instagram } : {}),
       },
-      status: 'active',
+      status: 'unconfirmed',
       ...(groupId ? { groups: [groupId] } : {}),
     };
 
@@ -46,8 +46,7 @@ export async function subscribeToNewsletter(
     });
 
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      console.error('[MailerLite] subscribe error', res.status, txt);
+      console.error('[MailerLite] subscribe error', res.status);
       return false;
     }
     return true;

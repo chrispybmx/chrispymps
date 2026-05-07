@@ -15,7 +15,12 @@ export async function checkUsername(username: string): Promise<boolean> {
 }
 
 /** Registra un nuovo utente */
-export async function signUp(email: string, password: string, username: string): Promise<'ok' | 'confirm_email'> {
+export async function signUp(
+  email: string,
+  password: string,
+  username: string,
+  opts?: { newsletter?: boolean },
+): Promise<'ok' | 'confirm_email'> {
   const sb = supabaseBrowser();
 
   // 1. Username disponibile?
@@ -33,12 +38,14 @@ export async function signUp(email: string, password: string, username: string):
     .insert({ id: data.user.id, username });
   if (profileErr) throw new Error(profileErr.message);
 
-  // 4. Iscrive alla newsletter (fire-and-forget — non blocca la registrazione)
-  fetch('/api/newsletter/subscribe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, username }),
-  }).catch(() => {});
+  // 4. Newsletter — solo se l'utente ha spuntato il consenso esplicito
+  if (opts?.newsletter) {
+    fetch('/api/newsletter/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, username }),
+    }).catch(() => {});
+  }
 
   // Se l'email è già confermata (email confirmation disabled in Supabase) → ok
   // Altrimenti → conferma email necessaria
