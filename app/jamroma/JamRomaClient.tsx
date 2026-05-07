@@ -332,11 +332,26 @@ export default function JamRomaClient() {
             </div>
           )}
 
-          {/* Privacy note presenza */}
+          {/* Condivisione attiva — nota + bottone stop */}
           {jamState !== 'after' && sharing && (
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(242,232,213,0.35)', lineHeight: 1.5, margin: 0 }}>
-              Posizione live finche tieni la pagina aperta. Sparisce dopo 2 minuti se chiudi.
-            </p>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px', borderRadius: 8,
+              background: `${C.coral}12`, border: `1px solid ${C.coral}30`,
+              fontFamily: 'var(--font-mono)',
+            }}>
+              <span style={{ fontSize: 12, color: `${C.cream}60`, lineHeight: 1.4 }}>
+                📍 Posizione condivisa
+              </span>
+              <button onClick={stopSharing}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 12,
+                  color: C.coral, background: 'none', border: 'none',
+                  cursor: 'pointer', padding: 0, whiteSpace: 'nowrap', fontWeight: 600,
+                }}>
+                Interrompi
+              </button>
+            </div>
           )}
 
           {/* After */}
