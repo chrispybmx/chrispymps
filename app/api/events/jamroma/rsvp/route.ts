@@ -88,3 +88,23 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
+
+/** DELETE — "Non posso piu" (solo utenti loggati) */
+export async function DELETE(req: NextRequest) {
+  const sb = supabaseAdmin();
+  const auth = req.headers.get('authorization');
+  if (!auth?.startsWith('Bearer '))
+    return NextResponse.json({ ok: false, error: 'Non autenticato' }, { status: 401 });
+
+  const { data: { user } } = await sb.auth.getUser(auth.slice(7));
+  if (!user)
+    return NextResponse.json({ ok: false, error: 'Sessione scaduta' }, { status: 401 });
+
+  await sb
+    .from('event_rsvps')
+    .delete()
+    .eq('event_slug', SLUG)
+    .eq('user_id', user.id);
+
+  return NextResponse.json({ ok: true });
+}

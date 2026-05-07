@@ -70,20 +70,21 @@ export default function JamRomaClient() {
     return () => clearInterval(iv);
   }, [fetchRsvps]);
 
-  // Fetch rider presence (before + live — per testare e per usare)
+  // Fetch rider presence
+  const fetchRiders = useCallback(async () => {
+    try {
+      const r = await fetch('/api/events/jamroma/presence');
+      const j = await r.json();
+      if (j.ok) setRiders(j.riders);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (jamState === 'after') return;
-    const fetchRiders = async () => {
-      try {
-        const r = await fetch('/api/events/jamroma/presence');
-        const j = await r.json();
-        if (j.ok) setRiders(j.riders);
-      } catch {}
-    };
     fetchRiders();
     const iv = setInterval(fetchRiders, 15_000);
     return () => clearInterval(iv);
-  }, [jamState]);
+  }, [jamState, fetchRiders]);
 
   const handleRsvp = async () => {
     setRsvpLoading(true); setRsvpError('');
@@ -98,6 +99,20 @@ export default function JamRomaClient() {
       if (j.ok) { setRsvpDone(true); fetchRsvps(); }
       else { setRsvpError(j.error ?? 'Errore, riprova.'); }
     } catch { setRsvpError('Errore di rete, riprova.'); }
+    finally { setRsvpLoading(false); }
+  };
+
+  const handleCancelRsvp = async () => {
+    if (!user?.accessToken) return;
+    setRsvpLoading(true);
+    try {
+      const r = await fetch('/api/events/jamroma/rsvp', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${user.accessToken}` },
+      });
+      const j = await r.json();
+      if (j.ok) { setRsvpDone(false); fetchRsvps(); }
+    } catch {}
     finally { setRsvpLoading(false); }
   };
 
@@ -127,6 +142,8 @@ export default function JamRomaClient() {
       (pos) => {
         setSharing(true);
         sendPosition(pos);
+        // Aggiorna mappa subito cosi l'utente si vede
+        setTimeout(fetchRiders, 1500);
         presenceInterval.current = setInterval(() => {
           navigator.geolocation.getCurrentPosition(sendPosition, () => {}, {
             enableHighAccuracy: false, timeout: 10000, maximumAge: 60000,
@@ -291,14 +308,27 @@ export default function JamRomaClient() {
             </div>
           )}
 
-          {/* Conferma RSVP */}
+          {/* Conferma RSVP + annulla */}
           {jamState !== 'after' && rsvpDone && (
             <div style={{
-              textAlign: 'center', padding: '12px', borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 14px', borderRadius: 8,
               background: `${C.green}18`, border: `1px solid ${C.green}50`,
-              fontFamily: 'var(--font-mono)', fontSize: 13, color: C.green,
+              fontFamily: 'var(--font-mono)', fontSize: 13,
             }}>
-              Ci sei! {jamState === 'before' ? 'Ci vediamo il 6 giugno.' : 'Buona jam!'}
+              <span style={{ color: C.green }}>
+                Ci sei! {jamState === 'before' ? 'Ci vediamo il 6 giugno.' : 'Buona jam!'}
+              </span>
+              {user && (
+                <button onClick={handleCancelRsvp} disabled={rsvpLoading}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11,
+                    color: `${C.cream}40`, background: 'none', border: 'none',
+                    cursor: 'pointer', padding: 0, whiteSpace: 'nowrap',
+                  }}>
+                  {rsvpLoading ? '...' : 'Non posso piu'}
+                </button>
+              )}
             </div>
           )}
 
