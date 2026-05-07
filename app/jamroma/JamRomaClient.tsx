@@ -257,8 +257,8 @@ export default function JamRomaClient() {
         {/* ── CTA ── */}
         <div style={{ padding: '20px 0', display: 'grid', gap: 12 }}>
 
-          {/* Nome per anonimi */}
-          {!user && jamState !== 'after' && (
+          {/* Nome per anonimi (solo se confermato non loggato) */}
+          {user === null && jamState !== 'after' && (
             <input type="text" value={anonName}
               onChange={e => setAnonName(e.target.value.slice(0, 40))}
               placeholder="Il tuo nome"
@@ -541,9 +541,8 @@ function EventMap({ spots, riders, sharing, sharingError, onStartSharing, onStop
         attributionControl: false,
       });
 
-      // Stamen Toner Lite — clean dark lines, perfect for color overlay
-      // Hosted on Stadia Maps (free tier)
-      L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}{r}.png', {
+      // OSM tiles con filtro CSS poster (affidabile, no API key)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         className: 'jam-map-tiles',
       }).addTo(map);
