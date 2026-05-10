@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { APP_CONFIG } from '@/lib/constants';
 import NewsComments from '@/components/NewsComments';
+import NewsletterSignup from '@/components/NewsletterSignup';
 import { supabaseServer } from '@/lib/supabase';
 import { safeJsonLd } from '@/lib/json-ld';
 
@@ -376,6 +377,9 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             </div>
           </div>
         )}
+
+        {/* Newsletter Signup — MailerLite form */}
+        <NewsletterSignup />
 
         {/* Comments */}
         <NewsComments newsId={article.id} newsSlug={article.slug} />
