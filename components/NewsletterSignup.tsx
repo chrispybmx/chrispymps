@@ -46,12 +46,13 @@ export default function NewsletterSignup() {
   };
 
   return (
-    <div style={{
+    <div id="newsletter-signup" style={{
       background: 'linear-gradient(135deg, rgba(255,106,0,0.08) 0%, rgba(255,106,0,0.02) 100%)',
       border: '1px solid var(--orange)',
       borderRadius: 14,
       padding: '24px 22px',
       margin: '32px 0',
+      scrollMarginTop: 80,
     }}>
       <div style={{
         fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)',
