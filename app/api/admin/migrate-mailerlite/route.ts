@@ -44,8 +44,12 @@ export async function POST(req: NextRequest) {
   let ok = 0;
   let failed = 0;
   for (const { email, username } of allUsers) {
-    const success = await subscribeToNewsletter(email, username);
-    if (success) ok++; else failed++;
+    const result = await subscribeToNewsletter(email, username);
+    if (result.ok) ok++;
+    else {
+      failed++;
+      console.warn('[migrate-mailerlite] failed for', email, '-', result.error);
+    }
     // Piccola pausa per rispettare i rate limit MailerLite
     await new Promise(r => setTimeout(r, 80));
   }

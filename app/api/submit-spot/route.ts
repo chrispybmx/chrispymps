@@ -146,7 +146,11 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Newsletter + admin notification (fire-and-forget)
-  if (user.email) subscribeToNewsletter(user.email, profile.username).catch(() => {});
+  if (user.email) {
+    subscribeToNewsletter(user.email, profile.username)
+      .then((r) => { if (!r.ok) console.warn('[submit-spot] newsletter skip:', r.error); })
+      .catch(() => {});
+  }
   const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
   sendAdminNotification(spot, contributor as any).catch(() => {});
 

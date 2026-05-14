@@ -269,6 +269,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [resetSent,     setResetSent]     = useState(false);
   const [resetLoading,  setResetLoading]  = useState(false);
   const [ageConfirmed2, setAgeConfirmed2] = useState(false);
+  const [newsletterOptIn2, setNewsletterOptIn2] = useState(true);
 
   /* Nearby spots — duplicate detection */
   interface NearbySpot { id: string; slug: string; name: string; type: SpotType; city?: string; condition: string; distance: number; spot_photos?: { url: string; position: number }[] }
@@ -460,7 +461,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     if (regPassword.length < 6) { setAuthError('Password min 6 caratteri.'); return; }
     if (!ageConfirmed2) { setAuthError('Devi confermare di avere almeno 14 anni.'); return; }
     setAuthLoading(true); setAuthError(null);
-    try { const result = await signUp(regEmail, regPassword, regUsername); setAuthDone(result); }
+    try { const result = await signUp(regEmail, regPassword, regUsername, { newsletter: newsletterOptIn2 }); setAuthDone(result); }
     catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto'); }
     finally { setAuthLoading(false); }
   };
@@ -619,6 +620,15 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                           style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.5 }}>
                           Confermo di avere almeno 14 anni <span style={{ color: 'var(--orange)' }}>*</span>
+                        </span>
+                      </label>
+                    </div>
+                    <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={newsletterOptIn2} onChange={e => setNewsletterOptIn2(e.target.checked)}
+                          style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.5 }}>
+                          Ricevi la newsletter weekly Chrispy BMX <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>(facoltativo, disiscrizione con un click)</span>
                         </span>
                       </label>
                     </div>

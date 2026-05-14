@@ -33,7 +33,7 @@ export default function NewsletterSignup() {
 
       if (data.ok) {
         setStatus('success');
-        setMessage('Iscritto! La prossima domenica ti arriva la newsletter.');
+        setMessage('Iscritto! Lunedì mattina ti arriva la prima newsletter.');
         setEmail('');
       } else {
         setStatus('error');
@@ -65,13 +65,18 @@ export default function NewsletterSignup() {
         fontFamily: 'var(--font-mono)', fontSize: 20,
         color: 'var(--bone)', margin: '0 0 8px 0', lineHeight: 1.3,
       }}>
-        Cinque cose dal mondo BMX — ogni domenica
+        Cinque cose dal mondo BMX — ogni lunedì
       </h3>
 
       <p style={{
-        fontSize: 14, color: 'var(--gray-300)', margin: '0 0 18px 0', lineHeight: 1.5,
+        fontSize: 14, color: 'var(--gray-300)', margin: '0 0 8px 0', lineHeight: 1.5,
       }}>
         Tre minuti di lettura. Cinque cose che valgono dalla settimana di freestyle mondiale, raccontate da uno che ci gira dentro. Niente spam.
+      </p>
+      <p style={{
+        fontSize: 12, color: 'var(--gray-500)', margin: '0 0 18px 0', lineHeight: 1.5,
+      }}>
+        Disiscrizione con un click in fondo a ogni messaggio.
       </p>
 
       <form onSubmit={submit} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
