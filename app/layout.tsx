@@ -98,7 +98,7 @@ const websiteJsonLd = {
     name: 'Christian Ceresato',
     alternateName: 'Chrispy BMX',
     sameAs: [
-      'https://www.instagram.com/chrispy_bmx',
+      'https://www.instagram.com/chriceresato',
       'https://www.youtube.com/@chrispy_bmx',
     ],
   },
@@ -122,7 +122,7 @@ const organizationJsonLd = {
   logo: `${APP_CONFIG.url}/opengraph-image`,
   description: APP_CONFIG.description,
   sameAs: [
-    'https://www.instagram.com/chrispy_bmx',
+    'https://www.instagram.com/chriceresato',
     'https://www.youtube.com/@chrispy_bmx',
   ],
   areaServed: { '@type': 'Country', name: 'IT' },

@@ -324,7 +324,7 @@ export const CITTA_COORDS: Record<string, [number, number]> = {
 // ===== LINK ESTERNI =====
 export const LINKS = {
   kofi:       'https://ko-fi.com/chrispy_bmx',
-  instagram:  'https://www.instagram.com/chrispy_bmx',
+  instagram:  'https://www.instagram.com/chriceresato',
   youtube:    'https://www.youtube.com/@chrispy_bmx',
   sito:       'https://chrispybmx.com',
   mailContact: 'mailto:christian.ceresato@gmail.com',

@@ -38,7 +38,7 @@ const WELCOME_HTML = `<table width="100%" cellpadding="0" cellspacing="0" border
         <ul style="margin:0;padding:0 0 0 18px;color:#d4d4d4;">
           <li style="margin-bottom:8px;"><strong>Mappa spot Italia</strong> — <a href="https://maps.chrispybmx.com" style="color:#ff6a00;text-decoration:underline;">maps.chrispybmx.com</a></li>
           <li style="margin-bottom:8px;"><strong>Canale YouTube</strong> — <a href="https://youtube.com/@chrispy_bmx" style="color:#ff6a00;text-decoration:underline;">@chrispy_bmx</a></li>
-          <li style="margin-bottom:8px;"><strong>Instagram</strong> — <a href="https://instagram.com/chrispy_bmx" style="color:#ff6a00;text-decoration:underline;">@chrispy_bmx</a></li>
+          <li style="margin-bottom:8px;"><strong>Instagram</strong> — <a href="https://instagram.com/chriceresato" style="color:#ff6a00;text-decoration:underline;">@chriceresato</a></li>
         </ul>
       </td></tr>
       <tr><td style="padding:24px 32px 32px;color:#d4d4d4;font-size:16px;line-height:1.65;">

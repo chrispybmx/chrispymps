@@ -122,7 +122,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     author: [{
       '@type': 'Person',
       name:    'Christian Ceresato',
-      url:     'https://www.instagram.com/chrispy_bmx',
+      url:     'https://www.instagram.com/chriceresato',
       alternateName: 'Chrispy BMX',
     }],
     publisher: {

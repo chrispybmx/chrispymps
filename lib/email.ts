@@ -126,7 +126,7 @@ export async function sendContributorConfirmation(
   <p>Grazie per contribuire alla mappa — senza gente come te questo progetto non esisterebbe.</p>
   <div class="sig">
     <p>— Chrispy<br>
-    <a href="https://www.instagram.com/chrispy_bmx" style="color:#ff6a00;">@chrispy_bmx</a> |
+    <a href="https://www.instagram.com/chriceresato" style="color:#ff6a00;">@chriceresato</a> |
     <a href="${APP_CONFIG.mapUrl}" style="color:#ff6a00;">maps.chrispybmx.com</a></p>
   </div>
 </div></body></html>
@@ -168,7 +168,7 @@ export async function sendApprovalEmail(
   <a href="${spotUrl}" class="btn">Vedi il tuo spot →</a>
   <div class="sig">
     <p>— Chrispy<br>
-    <a href="https://www.instagram.com/chrispy_bmx" style="color:#ff6a00;">@chrispy_bmx</a></p>
+    <a href="https://www.instagram.com/chriceresato" style="color:#ff6a00;">@chriceresato</a></p>
   </div>
 </div></body></html>
     `.trim(),
@@ -271,7 +271,7 @@ export async function sendRejectionEmail(
   <p>Puoi riprovare con un altro spot — ogni contributo è benvenuto.</p>
   <div class="sig">
     <p>— Chrispy<br>
-    <a href="https://www.instagram.com/chrispy_bmx" style="color:#ff6a00;">@chrispy_bmx</a></p>
+    <a href="https://www.instagram.com/chriceresato" style="color:#ff6a00;">@chriceresato</a></p>
   </div>
 </div></body></html>
     `.trim(),
