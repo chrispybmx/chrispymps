@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
+import { sendEventSubmissionNotification } from '@/lib/email';
 
 /**
  * Helper: accetta "", null, undefined come "non fornito" e auto-prepend https://
@@ -59,24 +60,42 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await sb.from('profiles').select('username').eq('id', user.id).maybeSingle();
   const username = profile?.username ?? 'anonimo';
 
-  const { error } = await sb.from('events').insert({
-    title: body.title,
-    description: body.description || null,
-    location: body.location || null,
-    city: body.city || null,
-    event_date: body.event_date,
-    link_url: body.link_url || null,
-    cover_url: body.cover_url || null,
-    status: 'draft', // not visible until approved
-    moderation_status: 'pending',
-    submitted_by_user_id: user.id,
-    submitted_by_username: username,
-  });
+  const { data: inserted, error } = await sb
+    .from('events')
+    .insert({
+      title: body.title,
+      description: body.description || null,
+      location: body.location || null,
+      city: body.city || null,
+      event_date: body.event_date,
+      link_url: body.link_url || null,
+      cover_url: body.cover_url || null,
+      status: 'draft', // not visible until approved
+      moderation_status: 'pending',
+      submitted_by_user_id: user.id,
+      submitted_by_username: username,
+    })
+    .select('id')
+    .single();
 
-  if (error) {
+  if (error || !inserted) {
     console.error('[submit-event] DB insert failed:', error);
     return NextResponse.json({ ok: false, error: 'Errore salvataggio.' }, { status: 500 });
   }
+
+  // Notifica admin (fire-and-forget — non bloccare la risposta)
+  sendEventSubmissionNotification({
+    eventId: inserted.id,
+    title: body.title,
+    description: body.description,
+    location: body.location,
+    city: body.city,
+    eventDate: body.event_date,
+    linkUrl: body.link_url,
+    coverUrl: body.cover_url,
+    contributorUsername: username,
+    contributorEmail: user.email ?? '',
+  }).catch((e) => console.error('[submit-event] admin notification failed:', e));
 
   return NextResponse.json({
     ok: true,

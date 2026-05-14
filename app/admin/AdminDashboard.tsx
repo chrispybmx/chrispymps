@@ -45,6 +45,8 @@ interface AdminEvent {
   cover_url?: string;
   link_url?: string;
   status: string;
+  moderation_status?: string;
+  submitted_by_username?: string | null;
   spot_id?: string | null;
   spot?: { name: string; slug: string } | null;
 }
@@ -76,6 +78,20 @@ interface AdminNews {
 const EMPTY_EVENT: Omit<AdminEvent, 'id'> = {
   title: '', description: '', location: '', city: '', event_date: '', cover_url: '', link_url: '', status: 'published', spot_id: null, spot: null,
 };
+
+/**
+ * Ordina gli eventi mettendo in cima quelli proposti dagli utenti
+ * (moderation_status='pending') così l'admin li nota subito.
+ * Dopo, ordina per data crescente come prima.
+ */
+function sortEventsByPriority(list: AdminEvent[]): AdminEvent[] {
+  return [...list].sort((a, b) => {
+    const aPending = a.moderation_status === 'pending' ? 1 : 0;
+    const bPending = b.moderation_status === 'pending' ? 1 : 0;
+    if (aPending !== bPending) return bPending - aPending;
+    return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+  });
+}
 const EMPTY_NEWS: Omit<AdminNews, 'id' | 'created_at'> = {
   title: '', excerpt: '', body: '', cover_url: '', tags: '', status: 'published',
 };
@@ -148,7 +164,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
     setLoadingEvents(true);
     fetch('/api/admin/events')
       .then(r => r.json())
-      .then(j => { if (j.ok) setEvents(j.data); })
+      .then(j => { if (j.ok) setEvents(sortEventsByPriority(j.data as AdminEvent[])); })
       .finally(() => setLoadingEvents(false));
   }, [tab]);
 
@@ -314,7 +330,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       setEvents([]);   // force reload
       setEditingEvent(null);
       setLoadingEvents(true);
-      fetch('/api/admin/events').then(r => r.json()).then(j => { if (j.ok) setEvents(j.data); }).finally(() => setLoadingEvents(false));
+      fetch('/api/admin/events').then(r => r.json()).then(j => { if (j.ok) setEvents(sortEventsByPriority(j.data as AdminEvent[])); }).finally(() => setLoadingEvents(false));
       showMsg(editingEvent.id ? '✅ Evento aggiornato!' : '✅ Evento creato!');
     } else { showMsg('❌ ' + json.error); }
     setSavingEvent(false);
@@ -1113,17 +1129,30 @@ function EventForm({
 function EventRow({ event: e, onEdit, onDelete }: { event: AdminEvent; onEdit: () => void; onDelete: () => void }) {
   const date = e.event_date ? new Date(e.event_date).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   const isPast = e.event_date && new Date(e.event_date) < new Date();
+  const isPending = e.moderation_status === 'pending';
   return (
-    <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, padding: '14px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{
+      background: isPending ? 'rgba(255,170,0,0.06)' : 'var(--gray-800)',
+      border: isPending ? '1px solid rgba(255,170,0,0.45)' : '1px solid var(--gray-700)',
+      borderRadius: 8, padding: '14px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12,
+    }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {e.title}
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {date && <span>📅 {date}</span>}
           {e.city && <span>📍 {e.city}</span>}
           <span style={{ color: isPast ? 'var(--gray-400)' : '#00c851' }}>{isPast ? 'PASSATO' : 'PROSSIMO'}</span>
           <span style={{ color: e.status === 'published' ? 'var(--orange)' : 'var(--gray-400)' }}>{e.status === 'published' ? 'LIVE' : 'BOZZA'}</span>
+          {isPending && (
+            <span style={{
+              background: '#ffaa00', color: '#000', padding: '2px 8px', borderRadius: 999,
+              fontWeight: 700, fontSize: 11, letterSpacing: '0.04em',
+            }}>
+              📥 DA MODERARE{e.submitted_by_username ? ` · @${e.submitted_by_username}` : ''}
+            </span>
+          )}
         </div>
       </div>
       <button onClick={onEdit} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, background: 'transparent', border: '1px solid var(--gray-600)', borderRadius: 4, color: 'var(--bone)', padding: '6px 12px', cursor: 'pointer' }}>✏️</button>

@@ -175,6 +175,69 @@ export async function sendApprovalEmail(
   });
 }
 
+// ===== EMAIL ALL'ADMIN: nuovo evento proposto da utente =====
+export async function sendEventSubmissionNotification(params: {
+  eventId: string;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  city?: string | null;
+  eventDate: string;
+  linkUrl?: string | null;
+  coverUrl?: string | null;
+  contributorUsername: string;
+  contributorEmail: string;
+}): Promise<void> {
+  const eTitle = escapeHtml(params.title);
+  const eDesc = escapeHtml(params.description ?? '');
+  const eLoc = escapeHtml(params.location ?? '');
+  const eCity = escapeHtml(params.city ?? '');
+  const eDate = escapeHtml(params.eventDate);
+  const eLink = escapeHtml(params.linkUrl ?? '');
+  const eCover = escapeHtml(params.coverUrl ?? '');
+  const eUser = escapeHtml(params.contributorUsername);
+  const eUserEmail = escapeHtml(params.contributorEmail);
+
+  const adminUrl = `${APP_CONFIG.url}/admin?tab=events`;
+
+  await resend().emails.send({
+    from:    FROM_EMAIL,
+    to:      APP_CONFIG.adminEmail,
+    subject: `📅 Nuovo evento proposto: ${eTitle}${eCity ? ` (${eCity})` : ''}`,
+    html: `
+<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><style>
+  body { background:#0a0a0a; color:#f3ead8; font-family:'Courier New',monospace; margin:0; padding:20px; }
+  .card { background:#1a1a1a; border:1px solid #ffaa00; border-radius:4px; padding:24px; max-width:560px; margin:0 auto; }
+  h1 { color:#ffaa00; font-size:22px; margin:0 0 16px; }
+  .row { display:flex; gap:8px; margin:6px 0; }
+  .label { color:#888; min-width:120px; }
+  .val { color:#f3ead8; }
+  .btn { display:inline-block; padding:12px 24px; border-radius:2px; text-decoration:none; font-weight:bold; font-size:15px; margin:6px 6px 0 0; background:#ff6a00; color:#000; }
+  .sep { border:none; border-top:1px solid #2a2a2a; margin:20px 0; }
+  .cover { width:100%; max-width:520px; border-radius:4px; margin-top:8px; }
+</style></head>
+<body><div class="card">
+  <h1>📥 NUOVO EVENTO DA MODERARE</h1>
+  <div class="row"><span class="label">Titolo:</span><span class="val">${eTitle}</span></div>
+  <div class="row"><span class="label">Data:</span><span class="val">${eDate}</span></div>
+  ${eCity ? `<div class="row"><span class="label">Città:</span><span class="val">${eCity}</span></div>` : ''}
+  ${eLoc ? `<div class="row"><span class="label">Luogo:</span><span class="val">${eLoc}</span></div>` : ''}
+  ${eDesc ? `<div class="row"><span class="label">Descrizione:</span><span class="val">${eDesc}</span></div>` : ''}
+  ${eLink ? `<div class="row"><span class="label">Link:</span><span class="val"><a href="${eLink}" style="color:#ff6a00;">${eLink}</a></span></div>` : ''}
+  ${eCover ? `<img src="${eCover}" alt="Cover" class="cover">` : ''}
+  <hr class="sep">
+  <div class="row"><span class="label">Da:</span><span class="val">@${eUser} (${eUserEmail})</span></div>
+  <hr class="sep">
+  <a href="${adminUrl}" class="btn">📱 Apri admin per moderare</a>
+  <hr class="sep">
+  <p style="color:#888;font-size:11px;">Event ID: ${params.eventId}</p>
+</div></body></html>
+    `.trim(),
+  });
+}
+
 // ===== EMAIL AL CONTRIBUTOR: spot rifiutato =====
 export async function sendRejectionEmail(
   contributor: Contributor,
