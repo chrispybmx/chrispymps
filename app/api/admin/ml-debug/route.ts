@@ -28,6 +28,13 @@ export async function GET(req: NextRequest) {
   const key = process.env.MAILERLITE_API_KEY;
   if (!key) return NextResponse.json({ ok: false, error: 'MAILERLITE_API_KEY mancante' }, { status: 500 });
 
+  // Modalità "single automation": ?automationId=XYZ → dettaglio completo
+  const automationId = req.nextUrl.searchParams.get('automationId');
+  if (automationId) {
+    const detail = await ml(`/automations/${automationId}`, key);
+    return NextResponse.json({ ok: true, automation: detail.data });
+  }
+
   const groupId = req.nextUrl.searchParams.get('groupId') || process.env.MAILERLITE_GROUP_ID;
   if (!groupId) return NextResponse.json({ ok: false, error: 'groupId mancante' }, { status: 400 });
 
