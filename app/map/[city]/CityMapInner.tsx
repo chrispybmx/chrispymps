@@ -41,6 +41,7 @@ export default function CityMapInner({ spots, activeId, flyTarget, onPinClick }:
   /* ── Init ── */
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
+    const markers = markersRef.current;
 
     import('leaflet').then((leaflet) => {
       L = leaflet;
@@ -74,7 +75,7 @@ export default function CityMapInner({ spots, activeId, flyTarget, onPinClick }:
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
-        markersRef.current.clear();
+        markers.clear();
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

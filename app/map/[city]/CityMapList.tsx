@@ -41,6 +41,7 @@ function CityMiniMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     let cancelled = false;
+    const markers = markersRef.current;
 
     import('leaflet').then((L) => {
       if (cancelled || !containerRef.current) return;
@@ -77,7 +78,7 @@ function CityMiniMap({
       cancelled = true;
       if (flyTimeout.current) clearTimeout(flyTimeout.current);
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-      markersRef.current.clear();
+      markers.clear();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
+import sharp from 'sharp';
 
 // Tipi MIME accettati e corrispondente estensione sicura
 const ALLOWED_MIME: Record<string, string> = {
@@ -72,11 +73,14 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    // Strip EXIF/GPS metadata before upload
+    const stripped = await sharp(buffer).rotate().toBuffer();
+
     const path = `${spotId}/${Date.now()}_${i}.${ext}`;
 
     const { error: uploadErr } = await supabase.storage
       .from('spot-photos')
-      .upload(path, buffer, { contentType: mimeType, upsert: false });
+      .upload(path, stripped, { contentType: mimeType, upsert: false });
 
     if (uploadErr) {
       console.error('[upload-photo] upload error:', uploadErr.message);

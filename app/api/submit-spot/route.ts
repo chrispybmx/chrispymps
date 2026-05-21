@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendAdminNotification } from '@/lib/email';
+import sharp from 'sharp';
 
 const SpotSchema = z.object({
   name:         z.string().min(2).max(100),
@@ -127,8 +128,10 @@ export async function POST(req: NextRequest) {
       const bgUpload = async () => {
         const results = await Promise.all(
           photoBuffers.map(async ({ buffer, mimeType, ext, index }) => {
+            // Strip EXIF/GPS metadata before upload
+            const stripped = await sharp(buffer).rotate().toBuffer();
             const path = `${spot.id}/${index}.${ext}`;
-            const { error } = await supabase.storage.from('spot-photos').upload(path, buffer, { contentType: mimeType, upsert: true });
+            const { error } = await supabase.storage.from('spot-photos').upload(path, stripped, { contentType: mimeType, upsert: true });
             if (error) return null;
             return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
           })

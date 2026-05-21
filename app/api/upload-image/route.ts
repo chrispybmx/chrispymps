@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { detectMime, MIME_EXT } from '@/lib/mime';
+import sharp from 'sharp';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -36,13 +37,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Formato non supportato. Usa JPEG, PNG o WebP.' }, { status: 400 });
   }
 
+  // Strip EXIF/GPS metadata before upload
+  const stripped = await sharp(Buffer.from(buf)).rotate().toBuffer();
+
   const ext = MIME_EXT[mime];
   const folder = purpose === 'event' ? 'events' : purpose === 'news' ? 'news' : 'uploads';
   const filename = `${folder}/${user.id}_${Date.now()}.${ext}`;
 
   const { error: uploadErr } = await sb.storage
     .from('spot-photos') // reuse existing bucket
-    .upload(filename, buf, { contentType: mime, upsert: false });
+    .upload(filename, stripped, { contentType: mime, upsert: false });
 
   if (uploadErr) {
     console.error('[upload-image] error:', uploadErr);

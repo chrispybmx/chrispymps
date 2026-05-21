@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { detectMime, MIME_EXT } from '@/lib/mime';
 import { UUID_RE } from '@/lib/validation';
+import sharp from 'sharp';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_PHOTOS_PER_SPOT_PER_USER = 3;
@@ -128,12 +129,15 @@ export async function POST(req: NextRequest) {
       const mime = detectMime(buf);
       if (!mime || !MIME_EXT[mime]) return null;
 
+      // Strip EXIF/GPS metadata before upload
+      const stripped = await sharp(Buffer.from(buf)).rotate().toBuffer();
+
       const ext = MIME_EXT[mime];
       const filename = `${spotId}/user_${user.id}_${Date.now()}_${i}.${ext}`;
 
       const { error: uploadErr } = await supabase.storage
         .from('spot-photos')
-        .upload(filename, buf, { contentType: mime, upsert: false });
+        .upload(filename, stripped, { contentType: mime, upsert: false });
 
       if (uploadErr) { console.error('[spot-photos] upload error:', uploadErr); return null; }
 
