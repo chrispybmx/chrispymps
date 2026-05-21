@@ -13,7 +13,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import sharp from 'sharp';
-import { supabaseAdmin } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 const BUCKET = 'spot-photos';
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
@@ -45,7 +45,7 @@ function isImageFile(filename: string): boolean {
  * recurse into each subfolder.
  */
 async function listAllFiles(
-  supabase: ReturnType<typeof supabaseAdmin>,
+  supabase: ReturnType<typeof createClient>,
   prefix: string = '',
 ): Promise<string[]> {
   const paths: string[] = [];
@@ -87,7 +87,10 @@ async function main() {
     console.log('=== DRY RUN — no files will be modified ===\n');
   }
 
-  const supabase = supabaseAdmin();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  const supabase = createClient(url, key);
 
   console.log(`Listing all files in bucket "${BUCKET}"...`);
   const allFiles = await listAllFiles(supabase);
