@@ -155,6 +155,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       .then(r => r.json())
       .then(j => { if (j.ok) setAllSpots(j.data); })
       .finally(() => setLoadingAll(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- allSpots.length is a fetch guard, adding it would cause infinite loop
   }, [tab]);
 
   /* ── Load events ── */
@@ -166,6 +167,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       .then(r => r.json())
       .then(j => { if (j.ok) setEvents(sortEventsByPriority(j.data as AdminEvent[])); })
       .finally(() => setLoadingEvents(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- events.length is a fetch guard
   }, [tab]);
 
   /* ── Load news ── */
@@ -177,6 +179,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       .then(r => r.json())
       .then(j => { if (j.ok) setNewsList(j.data); })
       .finally(() => setLoadingNews(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- newsList.length is a fetch guard
   }, [tab]);
 
   /* ── Load comments ── */
@@ -224,6 +227,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       .then(r => r.json())
       .then(j => { if (j.ok) setAdminUsers(j.data); })
       .finally(() => setLoadingUsers(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- adminUsers.length is a fetch guard
   }, [tab]);
 
   /* ── User moderation actions ── */

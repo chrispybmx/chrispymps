@@ -56,7 +56,7 @@ export default async function Image() {
         {/* Logo + Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 36, zIndex: 1 }}>
           {logoSrc ? (
-            <img src={logoSrc} width={140} height={140} style={{ borderRadius: 24 }} />
+            <img src={logoSrc} width={140} height={140} alt="" style={{ borderRadius: 24 }} />
           ) : (
             <div style={{
               width: 140, height: 140, borderRadius: 24,

@@ -166,6 +166,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     } else if (h < PANEL_SNAP)               snapTo(PANEL_MIN);
     else if (h > window.innerHeight * 0.75) snapTo(Math.round(window.innerHeight * 0.92));
     else                                    snapTo(DEFAULT_PANEL_H());
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- panelHeight read intentionally stale (tap detection uses current visual state via ref)
   }, [snapTo]);
 
   /* ── Radius search ── dichiarati PRIMA di filtered che li usa ── */

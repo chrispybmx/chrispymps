@@ -44,7 +44,7 @@ export default function DiscoverStrip({ spots, onSpotClick }: DiscoverStripProps
       setVisible(true);
     }, 4000);
     return () => clearTimeout(t);
-  }, [spots, dismissed]);
+  }, [spots, dismissed, pickRandom]);
 
   // Ciclo ogni 12 secondi
   useEffect(() => {

@@ -493,6 +493,7 @@ export default function SpotMap({
     const offsetPoint  = targetPoint.add(L!.point(0, offset));
     const offsetLatLng = map.unproject(offsetPoint, zoom);
     map.flyTo(offsetLatLng, zoom, { duration: 1.8, easeLinearity: 0.22 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- overlayOffsetPx changes on drag; re-flying mid-drag would be jarring
   }, [flyTarget]);
 
   /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */

@@ -124,12 +124,12 @@ export default function TopBar({
     setTimeout(() => inputRef.current?.focus(), 60);
   };
 
-  const closeSearch = () => {
+  const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setQuery('');
     onSearch('');
     setPlaces([]);
-  };
+  }, [onSearch]);
 
   const pickCity = (cityValue: string) => {
     const coords = CITTA_COORDS[cityValue];
@@ -159,7 +159,7 @@ export default function TopBar({
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && searchOpen) closeSearch(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [searchOpen]);
+  }, [searchOpen, closeSearch]);
 
   const hasResults = places.length > 0 || spotMatches.length > 0 || userMatches.length > 0 || tagMatches.length > 0 || usersLoading;
 

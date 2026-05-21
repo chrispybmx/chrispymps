@@ -51,6 +51,7 @@ export default function SpotSheet({ spot, onClose, onFlag, allSpots, currentIdx,
     setFav(isFav(spot.id));
     // Reset scroll position quando cambia spot
     if (photoStripRef.current) photoStripRef.current.scrollLeft = 0;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- spot object ref changes on every render, only re-run when ID changes
   }, [spot?.id]);
 
   /* ── swipe-to-close (solo verticale) ── */
