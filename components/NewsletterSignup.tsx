@@ -27,7 +27,7 @@ export default function NewsletterSignup() {
       const res = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username: email.split('@')[0] }),
+        body: JSON.stringify({ email, username: email.split('@')[0], source: 'newsletter' }),
       });
       const data = await res.json();
 

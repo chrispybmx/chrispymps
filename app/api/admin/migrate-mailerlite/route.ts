@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   let ok = 0;
   let failed = 0;
   for (const { email, username } of allUsers) {
-    const result = await subscribeToNewsletter(email, username);
+    const result = await subscribeToNewsletter(email, username, { source: 'signup' });
     if (result.ok) ok++;
     else {
       failed++;

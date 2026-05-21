@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
 
   // 5. Newsletter + admin notification (fire-and-forget)
   if (user.email) {
-    subscribeToNewsletter(user.email, profile.username)
+    subscribeToNewsletter(user.email, profile.username, { source: 'submit-spot' })
       .then((r) => { if (!r.ok) console.warn('[submit-spot] newsletter skip:', r.error); })
       .catch(() => {});
   }

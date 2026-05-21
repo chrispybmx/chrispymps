@@ -5,7 +5,7 @@
  *
  * Env vars necessarie:
  *   MAILERLITE_API_KEY  — chiave da Account > Integrations > API
- *   MAILERLITE_GROUP_ID — (opzionale) ID del gruppo a cui aggiungere l'iscritto
+ *   MAILERLITE_GROUP_ID — (opzionale) gruppo di default se non passato in opts.groupId
  *
  * status: 'active' = single opt-in. Subscriber attivo subito.
  * Consenso GDPR coperto da: testo form esplicito + privacy policy + unsubscribe in ogni mail.
@@ -19,18 +19,36 @@ export interface SubscribeResult {
   subscriberId?: string;
 }
 
+export type SubscribeSource = 'newsletter' | 'signup' | 'submit-spot';
+
+export const GROUP_BY_SOURCE: Record<SubscribeSource, string> = {
+  'newsletter':  '186569732865918849', // Newsletter BMX Settimanale
+  'signup':      '188059390435132622', // Account Chrispy Maps
+  'submit-spot': '185532080718873760', // ChrispyMPS — Spot Submission
+};
+
+export interface SubscribeOpts {
+  instagram?: string;
+  groupId?:   string;
+  source?:    SubscribeSource;
+}
+
 export async function subscribeToNewsletter(
   email: string,
   name: string,
-  instagram?: string,
+  opts: SubscribeOpts = {},
 ): Promise<SubscribeResult> {
-  const apiKey  = process.env.MAILERLITE_API_KEY;
-  const groupId = process.env.MAILERLITE_GROUP_ID;
+  const apiKey = process.env.MAILERLITE_API_KEY;
 
   if (!apiKey) {
     console.warn('[MailerLite] MAILERLITE_API_KEY mancante — skip');
     return { ok: false, error: 'Newsletter non configurata' };
   }
+
+  const groupId =
+    opts.groupId ??
+    (opts.source ? GROUP_BY_SOURCE[opts.source] : undefined) ??
+    process.env.MAILERLITE_GROUP_ID;
 
   try {
     const body: Record<string, unknown> = {
@@ -38,7 +56,7 @@ export async function subscribeToNewsletter(
       fields: {
         name,
         last_name: '',
-        ...(instagram ? { instagram } : {}),
+        ...(opts.instagram ? { instagram: opts.instagram } : {}),
       },
       status: 'active', // single opt-in: subscriber attivo subito
       ...(groupId ? { groups: [groupId] } : {}),
