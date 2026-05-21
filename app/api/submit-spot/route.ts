@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendAdminNotification } from '@/lib/email';
-import { subscribeToNewsletter } from '@/lib/mailerlite';
 
 const SpotSchema = z.object({
   name:         z.string().min(2).max(100),
@@ -145,12 +144,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 5. Newsletter + admin notification (fire-and-forget)
-  if (user.email) {
-    subscribeToNewsletter(user.email, profile.username, { source: 'submit-spot' })
-      .then((r) => { if (!r.ok) console.warn('[submit-spot] newsletter skip:', r.error); })
-      .catch(() => {});
-  }
+  // 5. Admin notification (fire-and-forget) — newsletter rimossa: richiede consenso esplicito (GDPR)
   const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
   sendAdminNotification(spot, contributor as any).catch(() => {});
 

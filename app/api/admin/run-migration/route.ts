@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isAdminAuthenticated } from '@/lib/auth';
 
 const MIGRATION_SQL = `
 ALTER TABLE comments
@@ -46,10 +47,8 @@ CREATE TRIGGER trg_comment_likes_count
 `;
 
 export async function POST(req: NextRequest) {
-  // Protezione: solo con la secret admin
-  const secret = req.headers.get('x-admin-secret');
-  if (secret !== process.env.ADMIN_SECRET) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  if (!isAdminAuthenticated()) {
+    return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
   const dbUrl = process.env.SUPABASE_DB_URL;
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
   try {
     // Import dinamico di pg (server-side only)
     const { Client } = await import('pg');
-    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: true } });
     await client.connect();
     await client.query(MIGRATION_SQL);
     await client.end();

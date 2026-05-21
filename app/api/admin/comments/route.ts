@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminAuthenticated } from '@/lib/auth';
+import { UUID_RE } from '@/lib/validation';
 
 /* ── GET: lista tutti i commenti con info spot ── */
 export async function GET(req: NextRequest) {
@@ -22,8 +23,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, data: comments ?? [] });
 }
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /* ── DELETE: elimina un commento per id ── */
 export async function DELETE(req: NextRequest) {

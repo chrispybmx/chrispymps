@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { UUID_RE } from '@/lib/validation';
 
 // Tipi MIME accettati e corrispondente estensione sicura
 const ALLOWED_MIME: Record<string, string> = {
@@ -13,9 +14,6 @@ const ALLOWED_MIME: Record<string, string> = {
 
 // Limite dimensione: 8MB per foto
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
-
-// Validazione UUID v4
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(req: NextRequest) {
   if (!isAdminAuthenticated()) {

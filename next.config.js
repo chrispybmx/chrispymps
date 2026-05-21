@@ -47,9 +47,8 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
-  // Manteniamo ignoreBuildErrors solo per deploy rapidi — da rimuovere a lungo termine
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: false },
+  eslint: { ignoreDuringBuilds: false },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },

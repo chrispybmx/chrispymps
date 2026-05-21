@@ -17,8 +17,9 @@ export async function POST(req: Request) {
     try {
       const urlObj = new URL(url);
       const parts  = urlObj.pathname.split('/spot-photos/');
-      if (parts[1]) {
-        await supabase.storage.from('spot-photos').remove([parts[1]]);
+      const storagePath = parts[1];
+      if (storagePath && !storagePath.includes('..') && !storagePath.startsWith('/')) {
+        await supabase.storage.from('spot-photos').remove([storagePath]);
       }
     } catch {}
   }

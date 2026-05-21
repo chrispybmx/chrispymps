@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase';
 import type { SpotMapPin } from '@/lib/types';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET() {
   const supabase = supabaseServer();
   const { data, error } = await supabase
