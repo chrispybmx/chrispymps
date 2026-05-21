@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 
-const isDev = process.env.NODE_ENV !== 'production';
-
+// Security headers STATICI — non includono CSP perché il CSP è generato
+// dinamicamente nel middleware con un nonce per-request (anti-XSS).
 const securityHeaders = [
   // Impedisce il click-jacking (iframe embedding)
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -15,34 +15,8 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self), payment=()' },
   // XSS Protection per browser legacy
   { key: 'X-XSS-Protection', value: '1; mode=block' },
-  // Content Security Policy
-  {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      // Next.js richiede unsafe-eval in dev per React Fast Refresh / hot reload
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
-      // Leaflet e stili inline
-      "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
-      // Font Google + locali
-      "font-src 'self' fonts.gstatic.com",
-      // Immagini: Supabase storage, tile mappa (CartoDB + OSM), eventi worldwide hotlink + dati inline
-      // 'https:' permette hotlink immagini eventi da illuminatebmx, fatbmx, YouTube, IG CDN, ecc
-      "img-src 'self' data: blob: https: *.supabase.co *.supabase.in *.basemaps.cartocdn.com *.tile.openstreetmap.org unpkg.com",
-      // Connessioni API: Supabase, Nominatim OSM
-      "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co tiles.stadiamaps.com",
-      // Worker per Leaflet
-      "worker-src blob:",
-      // Frame: OSM per anteprima mappa + YouTube per video spot (SEC-FIX: aggiunto youtube)
-      "frame-src https://*.openstreetmap.org https://www.youtube.com https://www.youtube-nocookie.com",
-      // Object: nessuno
-      "object-src 'none'",
-      // Base URI limitata
-      "base-uri 'self'",
-      // Form solo verso se stesso
-      "form-action 'self'",
-    ].join('; '),
-  },
+  // NOTA: Content-Security-Policy è stato spostato in middleware.ts
+  // per supportare nonce-based CSP (rimuove unsafe-inline da script-src).
 ];
 
 const nextConfig = {

@@ -133,12 +133,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="it" className={`${vt323.variable} ${barlow.variable}`}>
       <head>
-        {/* Service Worker */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});})}`,
-          }}
-        />
+        {/* Service Worker — external file per CSP (no unsafe-inline) */}
+        <script src="/register-sw.js" defer />
         {/* JSON-LD WebSite */}
         <script
           type="application/ld+json"

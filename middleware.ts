@@ -2,10 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Middleware centralizzato per:
- * 1. Rate limiting sul login admin (basato su IP)
- * 2. Rate limiting sull'endpoint flag (anti-spam)
- * 3. Header di sicurezza aggiuntivi sulle API
+ * 1. CSP nonce-based (anti-XSS — niente unsafe-inline in script-src)
+ * 2. Rate limiting sul login admin (basato su IP)
+ * 3. Rate limiting sull'endpoint flag (anti-spam)
+ * 4. Header di sicurezza aggiuntivi sulle API
  */
+
+const isDev = process.env.NODE_ENV !== 'production';
+
+// ── CSP nonce-based ──
+// In produzione, script-src usa 'nonce-<random>' al posto di 'unsafe-inline'.
+// Next.js App Router legge il nonce dall'header x-nonce e lo applica
+// automaticamente ai suoi script inline (RSC payload, hydration, ecc.).
+function buildCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    // Nonce per script inline Next.js; 'self' per script esterni (register-sw.js ecc.);
+    // unsafe-eval solo in dev (React Fast Refresh)
+    `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ''}`,
+    // Leaflet e Tailwind usano stili inline — unsafe-inline necessario per style-src
+    "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
+    // Font Google + locali
+    "font-src 'self' fonts.gstatic.com",
+    // Immagini: Supabase storage, tile mappa (CartoDB + OSM), eventi worldwide hotlink + dati inline
+    "img-src 'self' data: blob: https: *.supabase.co *.supabase.in *.basemaps.cartocdn.com *.tile.openstreetmap.org unpkg.com",
+    // Connessioni API: Supabase, Nominatim OSM
+    "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co tiles.stadiamaps.com",
+    // Worker per Leaflet
+    "worker-src blob:",
+    // Frame: OSM per anteprima mappa + YouTube per video spot
+    "frame-src https://*.openstreetmap.org https://www.youtube.com https://www.youtube-nocookie.com",
+    // Object: nessuno
+    "object-src 'none'",
+    // Base URI limitata
+    "base-uri 'self'",
+    // Form solo verso se stesso
+    "form-action 'self'",
+  ].join('; ');
+}
+
+// ── Nonce generation (Edge Runtime — crypto disponibile) ──
+function generateNonce(): string {
+  // crypto.randomUUID() è disponibile nel Edge Runtime di Vercel/Next.js.
+  // Genera un UUID v4 e lo usiamo come nonce (128 bit di entropia).
+  return crypto.randomUUID();
+}
 
 // ── In-memory store per rate limiting (per Lambda instance) ──
 // In produzione con molte istanze, usare Vercel KV / Upstash Redis
@@ -68,6 +109,25 @@ if (typeof setInterval !== 'undefined') {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const ip = getClientIp(req);
+
+  // ── 0. CSP nonce-based per tutte le pagine ──
+  // Genera un nonce crittografico per ogni richiesta di pagina.
+  // Next.js usa il nonce dall'header x-nonce per i suoi script inline.
+  const isPageRequest = !pathname.startsWith('/api/');
+  if (isPageRequest) {
+    const nonce = generateNonce();
+    const csp = buildCsp(nonce);
+
+    // Clona i request headers per aggiungere x-nonce (letto da Next.js durante il rendering)
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set('x-nonce', nonce);
+
+    const response = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+    response.headers.set('Content-Security-Policy', csp);
+    return response;
+  }
 
   // ── 1. Rate limit sul login admin: 10 tentativi / 15 minuti per IP ──
   if (pathname === '/api/admin/login' && req.method === 'POST') {
@@ -225,6 +285,16 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    // Pagine: CSP nonce-based (esclude file statici e immagini ottimizzate)
+    {
+      source: '/((?!_next/static|_next/image|favicon\\.ico|icons/|manifest\\.json|sw\\.js|register-sw\\.js|robots\\.txt|sitemap|opengraph-image|llms\\.txt|offline).*)',
+      // Il middleware non gira su prefetch (migliora performance)
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+    // API: rate limiting + admin auth
     '/api/admin/:path*',
     '/api/flag',
     '/api/submit-spot',
