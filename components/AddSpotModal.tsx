@@ -269,7 +269,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [resetSent,     setResetSent]     = useState(false);
   const [resetLoading,  setResetLoading]  = useState(false);
   const [ageConfirmed2, setAgeConfirmed2] = useState(false);
-  const [newsletterOptIn2, setNewsletterOptIn2] = useState(true);
+  const [newsletterOptIn2, setNewsletterOptIn2] = useState(false);
 
   /* Nearby spots — duplicate detection */
   interface NearbySpot { id: string; slug: string; name: string; type: SpotType; city?: string; condition: string; distance: number; spot_photos?: { url: string; position: number }[] }

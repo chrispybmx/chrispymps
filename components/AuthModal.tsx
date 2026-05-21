@@ -24,7 +24,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [regPassword,  setRegPassword] = useState('');
   const [usernameOk,   setUsernameOk]  = useState<boolean | null>(null);
   const [checkingUn,   setCheckingUn]  = useState(false);
-  const [newsletter,   setNewsletter]  = useState(true);
+  const [newsletter,   setNewsletter]  = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // Accedi
@@ -42,7 +42,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
     setUsernameOk(null); setResetSent(false); setResetting(false);
-    setNewsletter(true); setAgeConfirmed(false);
+    setNewsletter(false); setAgeConfirmed(false);
   };
 
   const handleClose = () => { resetAll(); onClose(); };
