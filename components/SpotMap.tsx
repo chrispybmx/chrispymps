@@ -416,10 +416,12 @@ export default function SpotMap({
           }
         });
 
-        marker.on('click', (e) => {
-          const pe = (e as unknown as { originalEvent: PointerEvent }).originalEvent;
-          const isTouch = pe?.pointerType === 'touch' || pe?.pointerType === '';
-          if (isTouch) {
+        /* Touch vs mouse: 'ontouchstart' in window è il modo più affidabile.
+           pointerType non è sempre settato su tutti i browser mobile. */
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        marker.on('click', () => {
+          if (isTouchDevice) {
             /* Mobile: tap apre/chiude popup */
             if (marker.isPopupOpen()) {
               marker.closePopup();
@@ -432,12 +434,10 @@ export default function SpotMap({
             onSpotClickRef.current(pin);
           }
         });
-        marker.on('mouseover', () => marker.openPopup());
-        marker.on('mouseout',  (e) => {
-          const pe = (e as unknown as { originalEvent?: PointerEvent }).originalEvent;
-          if (pe?.pointerType === 'touch' || pe?.pointerType === '') return;
-          marker.closePopup();
-        });
+        if (!isTouchDevice) {
+          marker.on('mouseover', () => marker.openPopup());
+          marker.on('mouseout',  () => marker.closePopup());
+        }
 
         markersRef.current!.addLayer(marker);
         pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2
