@@ -950,11 +950,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 )}
               </p>
               <PhotoUpload photos={photos} onChange={handlePhotosChange} />
-              {uploading && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textAlign: 'center' }}>
-                  📤 Upload in background — puoi andare avanti
-                </div>
-              )}
               {preUploadedUrls.length > 0 && !uploading && (
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#00c851', textAlign: 'center' }}>
                   ✓ {preUploadedUrls.length} foto pronte
