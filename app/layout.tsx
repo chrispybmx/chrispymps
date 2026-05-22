@@ -7,8 +7,8 @@ import VhsOverlay from '@/components/VhsOverlay';
 import { ToastProvider } from '@/components/Toast';
 import CookieBanner from '@/components/CookieBanner';
 
-const vt323 = VT323({ weight: '400', subsets: ['latin'], display: 'swap', variable: '--nf-mono' });
-const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--nf-display' });
+const vt323 = VT323({ weight: '400', subsets: ['latin'], display: 'swap', variable: '--font-mono' });
+const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--font-display' });
 
 export const metadata: Metadata = {
   title: {

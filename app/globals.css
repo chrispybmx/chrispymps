@@ -14,8 +14,8 @@
   --gray-500: #666666;
   --gray-400: #888888;
 
-  --font-mono:    'VT323', monospace;
-  --font-display: 'Barlow Condensed', sans-serif;
+  /* --font-mono e --font-display sono impostati automaticamente da Next.js
+     via next/font/google (vedi layout.tsx). Non hardcodare qui. */
 
   --topbar-height: 56px;
   --strip-height:  40px;
