@@ -354,8 +354,8 @@ export default function SpotMap({
         // Usa selPinRef (sempre aggiornato) per rendere l'icona corretta
         const isSel = selPinRef.current?.id === pin.id;
         const svg   = pinSvg(pin.type, pin.condition, isSel);
-        const pw    = isSel ? 38 : 30;
-        const ph    = isSel ? 48 : 38;
+        const pw    = isSel ? 48 : 38;
+        const ph    = isSel ? 60 : 48;
         const icon  = L!.divIcon({
           html:        svg,
           className:   'spot-pin',
@@ -476,7 +476,7 @@ export default function SpotMap({
         const pin = filteredRef.current.find(s => s.id === prevSelId);
         if (pin) {
           const svg  = pinSvg(pin.type, pin.condition, false);
-          const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [30, 38], iconAnchor: [15, 38], popupAnchor: [0, -40] });
+          const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
           marker.setIcon(icon);
         }
       }
@@ -487,7 +487,7 @@ export default function SpotMap({
       const marker = pinMarkersRef.current.get(selectedPin.id);
       if (marker) {
         const svg  = pinSvg(selectedPin.type, selectedPin.condition, true);
-        const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
+        const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [48, 60], iconAnchor: [24, 60], popupAnchor: [0, -62] });
         marker.setIcon(icon);
       }
     }
