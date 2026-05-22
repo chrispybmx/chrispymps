@@ -367,21 +367,30 @@ export default function SpotMap({
         const marker = L!.marker([pin.lat, pin.lon], { icon });
         const tipo   = TIPI_SPOT[pin.type];
 
-        /* Popup: foto + nome + info — solo desktop (hover).
-           Su mobile: tap → naviga direttamente alla pagina spot. */
+        /* Popup: foto + nome + info + VEDI SPOT.
+           Desktop: appare al hover. Mobile: appare al tap.
+           Tutto il popup è cliccabile → naviga alla pagina spot. */
         const imgHtml = pin.cover_url
           ? `<img src="${pin.cover_url}"
                style="width:100%;height:100px;object-fit:cover;display:block;border-radius:6px 6px 0 0"
                loading="lazy" />`
           : '';
 
+        const popupId = `popup-${pin.id}`;
         const popupContent = `
-          <div style="font-family:var(--font-display),sans-serif;min-width:180px;padding:0;overflow:hidden;border-radius:6px">
+          <div id="${popupId}" data-slug="${pin.slug}"
+               style="font-family:var(--font-display),sans-serif;min-width:180px;padding:0;
+                      overflow:hidden;border-radius:6px;cursor:pointer">
             ${imgHtml}
             <div style="padding:6px 10px 8px;background:#111">
               <div style="font-family:var(--font-mono),monospace;font-size:18px;color:#ff6a00;line-height:1.2;margin-bottom:3px">${pin.name}</div>
               ${pin.city ? `<div style="font-size:11px;color:#777;margin-bottom:2px">📍 ${pin.city}</div>` : ''}
-              <div style="font-size:11px;color:#888">${tipo.emoji} ${tipo.label}</div>
+              <div style="font-size:11px;color:#888;margin-bottom:6px">${tipo.emoji} ${tipo.label}</div>
+              <div style="font-family:var(--font-mono),monospace;font-size:14px;
+                          color:#000;background:#ff6a00;padding:10px 14px;border-radius:4px;
+                          text-align:center;letter-spacing:0.04em">
+                VEDI SPOT →
+              </div>
             </div>
           </div>
         `;
@@ -390,15 +399,33 @@ export default function SpotMap({
           maxWidth: pin.cover_url ? 210 : 190,
           closeButton: false,
           className: 'spot-hover-popup',
-          autoPan: false,
+          autoPan: true,
+          interactive: true,
+          closeOnClick: false,
+        });
+
+        /* Quando il popup si apre, aggancia click listener al contenuto */
+        marker.on('popupopen', () => {
+          const el = document.getElementById(popupId);
+          if (el) {
+            el.onclick = (evt) => {
+              evt.stopPropagation();
+              evt.preventDefault();
+              window.location.href = `/map/spot/${el.dataset.slug}`;
+            };
+          }
         });
 
         marker.on('click', (e) => {
           const pe = (e as unknown as { originalEvent: PointerEvent }).originalEvent;
           const isTouch = pe?.pointerType === 'touch' || pe?.pointerType === '';
           if (isTouch) {
-            /* Mobile: tap → vai direttamente alla pagina spot */
-            window.location.href = `/map/spot/${pin.slug}`;
+            /* Mobile: tap apre/chiude popup */
+            if (marker.isPopupOpen()) {
+              marker.closePopup();
+            } else {
+              marker.openPopup();
+            }
           } else {
             /* Desktop: click → apri pannello */
             marker.closePopup();
@@ -406,7 +433,11 @@ export default function SpotMap({
           }
         });
         marker.on('mouseover', () => marker.openPopup());
-        marker.on('mouseout',  () => marker.closePopup());
+        marker.on('mouseout',  (e) => {
+          const pe = (e as unknown as { originalEvent?: PointerEvent }).originalEvent;
+          if (pe?.pointerType === 'touch' || pe?.pointerType === '') return;
+          marker.closePopup();
+        });
 
         markersRef.current!.addLayer(marker);
         pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2
