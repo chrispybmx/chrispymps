@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, DIFFICOLTA, APP_CONFIG, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
 import type { SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
 import { geocodeForward, type GeoPlace } from '@/lib/geocoding';
 import { useUser } from '@/hooks/useUser';
@@ -34,7 +34,6 @@ export default function TopBar({
 }: TopBarProps) {
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [searchOpen,      setSearchOpen]      = useState(false);
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [query,           setQuery]           = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -113,12 +112,6 @@ export default function TopBar({
   const topCities = Object.entries(cityCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
   /* ── Handlers ── */
-  const handleTypeToggle = useCallback((type: SpotType) => {
-    onFilterType(activeType === type ? null : type);
-  }, [activeType, onFilterType]);
-
-  const anyFilter = !!(activeType || activeRegion || activeDifficulty);
-
   const openSearch = () => {
     setSearchOpen(true);
     setTimeout(() => inputRef.current?.focus(), 60);
@@ -188,143 +181,18 @@ export default function TopBar({
         <div className="topbar-mobile-actions" style={{ alignItems: 'center', gap: 2 }}>
           {sessionToken && <NotificationBell token={sessionToken} />}
         </div>
-        {/* FILTRI button — mobile only (filter bar hidden on mobile) */}
-        <button
-          onClick={() => setFilterSheetOpen(true)}
-          className="topbar-filter-btn"
-          style={{
-            background: anyFilter ? 'var(--orange)' : 'transparent',
-            border: 'none',
-            borderRadius: 4,
-            width: 40, height: 40,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-            position: 'relative',
-            color: anyFilter ? '#000' : 'var(--gray-400)',
-          }}
-          aria-label="Filtri"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
-          </svg>
-          {anyFilter && (
-            <span style={{
-              position: 'absolute', top: 4, right: 4,
-              width: 8, height: 8, borderRadius: '50%',
-              background: anyFilter ? '#000' : 'var(--orange)',
-            }} />
-          )}
-        </button>
         <button onClick={openSearch} className="btn-ghost" aria-label="Cerca spot" style={{ fontSize: 18 }}>
           🔍
         </button>
         <button onClick={onAddSpot} className="btn-primary topbar-add-btn" style={{ marginLeft: 8, padding: '8px 14px', fontSize: 14 }} aria-label="Aggiungi spot">
           + SPOT
         </button>
-      </header>
-
-      {/* Filter bar */}
-      <div style={{
-        display: 'flex',
-        position: 'fixed',
-        top: 'var(--topbar-height)',
-        left: 0, right: 0,
-        background: 'rgba(10,10,10,0.92)',
-        borderBottom: '1px solid var(--gray-700)',
-        zIndex: 38,
-        alignItems: 'center',
-        padding: '6px 10px',
-        gap: 8,
-      }} className="map-filter-bar">
-
-        {/* Bottone FILTRI */}
-        <button
-          onClick={() => setFilterSheetOpen(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            fontFamily: 'var(--font-mono)', fontSize: 11,
-            padding: '0 14px',
-            height: 36,
-            border: 'none',
-            borderRadius: 8,
-            background: anyFilter ? 'var(--orange)' : 'rgba(255,255,255,0.07)',
-            color: anyFilter ? '#000' : 'var(--gray-300)',
-            cursor: 'pointer', whiteSpace: 'nowrap',
-            letterSpacing: '0.06em',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            flexShrink: 0,
-            fontWeight: anyFilter ? 700 : 400,
-            transition: 'background 0.15s, color 0.15s',
-            boxShadow: anyFilter ? '0 0 12px rgba(255,106,0,0.35)' : 'none',
-          } as React.CSSProperties}
-          aria-label="Apri filtri"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
-          </svg>
-          FILTRI
-          {anyFilter && (
-            <span style={{
-              background: '#000', color: 'var(--orange)',
-              borderRadius: '50%', width: 17, height: 17,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, fontWeight: 700, lineHeight: 1, flexShrink: 0,
-            }}>
-              {[activeType, activeRegion, activeCondition, activeDifficulty].filter(Boolean).length}
-            </span>
-          )}
-        </button>
-
-        {/* Chips filtri attivi — scorribili */}
-        {anyFilter && (
-          <div style={{
-            flex: 1, display: 'flex', gap: 6, overflowX: 'auto',
-            scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
-            alignItems: 'center',
-          } as React.CSSProperties}>
-            {activeType && (
-              <ActiveChip label={`${TIPI_SPOT[activeType].emoji} ${TIPI_SPOT[activeType].label}`} onRemove={() => onFilterType(null)} />
-            )}
-            {activeRegion && (
-              <ActiveChip label={activeRegion} onRemove={() => onFilterRegion(null)} />
-            )}
-            {activeCondition && (
-              <ActiveChip label={activeCondition.toUpperCase()} onRemove={() => onFilterCondition(null)} />
-            )}
-            {activeDifficulty && (
-              <ActiveChip label={`⚡ ${activeDifficulty}`} onRemove={() => onFilterDifficulty(null)} />
-            )}
-          </div>
-        )}
-
-        {/* Reset tutto */}
-        {anyFilter && (
-          <button
-            onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); }}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: 12,
-              padding: '0 10px', height: 36,
-              border: 'none',
-              borderRadius: 8, background: 'rgba(255,255,255,0.07)',
-              color: 'var(--gray-400)', cursor: 'pointer',
-              whiteSpace: 'nowrap', flexShrink: 0,
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-            } as React.CSSProperties}
-            aria-label="Azzera filtri"
-          >
-            ✕
-          </button>
-        )}
-
         {/* Profilo — desktop only */}
-        <div className="map-profile-section" style={{
-          flexShrink: 0, borderLeft: '1px solid var(--gray-700)',
-          paddingLeft: 10, alignItems: 'center', gap: 6,
+        <div className="topbar-profile-section" style={{
+          flexShrink: 0, alignItems: 'center', gap: 6, marginLeft: 'auto',
         }}>
           {sessionToken && (
-            <div className="filterbar-bell">
+            <div className="topbar-desktop-bell">
               <NotificationBell token={sessionToken} />
             </div>
           )}
@@ -350,23 +218,7 @@ export default function TopBar({
             } as React.CSSProperties}>👤</button>
           )}
         </div>
-      </div>
-
-      {/* ══ FILTER SHEET ══ */}
-      {filterSheetOpen && (
-        <FilterSheet
-          activeType={activeType}
-          activeRegion={activeRegion}
-          activeCondition={activeCondition}
-          activeDifficulty={activeDifficulty}
-          onFilterType={onFilterType}
-          onFilterRegion={onFilterRegion}
-          onFilterCondition={onFilterCondition}
-          onFilterDifficulty={onFilterDifficulty}
-          onClose={() => setFilterSheetOpen(false)}
-          filteredCount={filteredCount ?? spots.length}
-        />
-      )}
+      </header>
 
       {/* ══ SEARCH OVERLAY ══ */}
       {searchOpen && (
@@ -699,47 +551,6 @@ function SpotRow({ pin, onPick }: { pin: SpotMapPin; onPick: () => void }) {
   );
 }
 
-function FilterDropdown({ value, onChange, active, placeholder, children }: {
-  value: string;
-  onChange: (v: string) => void;
-  active: boolean;
-  placeholder: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div style={{ position: 'relative', flexShrink: 0 }}>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{
-          fontFamily: 'var(--font-mono)', fontSize: 11,
-          padding: '4px 18px 4px 7px',
-          border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
-          borderRadius: 4,
-          background: active ? 'rgba(255,106,0,0.15)' : 'rgba(26,26,26,0.9)',
-          color: active ? 'var(--orange)' : 'var(--bone)',
-          cursor: 'pointer',
-          appearance: 'none',
-          WebkitAppearance: 'none',
-          minHeight: 44,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-          outline: 'none',
-          minWidth: 72,
-          maxWidth: 110,
-        } as React.CSSProperties}
-      >
-        {children}
-      </select>
-      <span style={{
-        position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
-        fontSize: 8, color: active ? 'var(--orange)' : 'var(--gray-500)',
-        pointerEvents: 'none',
-      }}>▾</span>
-    </div>
-  );
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
@@ -751,211 +562,4 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ── Chip filtro attivo nella filter bar ── */
-function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 5,
-      fontFamily: 'var(--font-mono)', fontSize: 11,
-      padding: '4px 8px 4px 10px',
-      background: 'rgba(255,106,0,0.15)',
-      border: '1px solid rgba(255,106,0,0.4)',
-      borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0,
-      color: 'var(--orange)',
-    }}>
-      {label}
-      <button
-        onClick={onRemove}
-        style={{
-          background: 'none', border: 'none', color: 'var(--orange)',
-          cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0,
-          display: 'flex', alignItems: 'center',
-          touchAction: 'manipulation',
-        }}
-        aria-label={`Rimuovi filtro ${label}`}
-      >✕</button>
-    </div>
-  );
-}
-
-/* ── Filter Sheet (slide-up) ── */
-function FilterSheet({
-  activeType, activeRegion, activeCondition, activeDifficulty,
-  onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty,
-  onClose, filteredCount,
-}: {
-  activeType: SpotType | null;
-  activeRegion: string | null;
-  activeCondition: SpotCondition | null;
-  activeDifficulty: string | null;
-  onFilterType: (t: SpotType | null) => void;
-  onFilterRegion: (r: string | null) => void;
-  onFilterCondition: (c: SpotCondition | null) => void;
-  onFilterDifficulty: (d: string | null) => void;
-  onClose: () => void;
-  filteredCount: number;
-}) {
-  const hasFilters = !!(activeType || activeRegion || activeCondition || activeDifficulty);
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 79, backdropFilter: 'blur(2px)' }}
-      />
-      {/* Sheet */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'var(--gray-800)',
-        borderTop: '2px solid var(--orange)',
-        borderRadius: '16px 16px 0 0',
-        zIndex: 80,
-        maxHeight: '80dvh', overflowY: 'auto',
-        paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
-        animation: 'slideUp 0.25s ease-out',
-      }}>
-        <div className="bottom-sheet-handle" />
-
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 20px 16px',
-          borderBottom: '1px solid var(--gray-700)',
-        }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--orange)' }}>
-            ⚡ FILTRI
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {hasFilters && (
-              <button
-                onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); }}
-                style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 11,
-                  padding: '6px 12px', border: '1px solid var(--gray-600)',
-                  borderRadius: 4, background: 'transparent',
-                  color: 'var(--gray-400)', cursor: 'pointer',
-                  touchAction: 'manipulation',
-                }}
-              >
-                RESET
-              </button>
-            )}
-            <button onClick={onClose} style={{
-              background: 'none', border: 'none', color: 'var(--gray-400)',
-              fontSize: 22, cursor: 'pointer', padding: '0 4px',
-            }} aria-label="Chiudi">✕</button>
-          </div>
-        </div>
-
-        <div style={{ padding: '20px' }}>
-
-          {/* TIPO */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-              Tipo spot
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(Object.entries(TIPI_SPOT) as [SpotType, { label: string; emoji: string; color: string }][]).map(([key, info]) => (
-                <button
-                  key={key}
-                  onClick={() => onFilterType(activeType === key ? null : key)}
-                  style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 13,
-                    padding: '8px 14px',
-                    border: `1px solid ${activeType === key ? info.color : 'var(--gray-600)'}`,
-                    borderRadius: 20,
-                    background: activeType === key ? `${info.color}22` : 'transparent',
-                    color: activeType === key ? info.color : 'var(--gray-400)',
-                    cursor: 'pointer', whiteSpace: 'nowrap',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    transition: 'all 0.15s',
-                  } as React.CSSProperties}
-                >
-                  <span>{info.emoji}</span>
-                  <span>{info.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* DIFFICOLTÀ */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-              Difficoltà
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {DIFFICOLTA.map(d => (
-                <button
-                  key={d.value}
-                  onClick={() => onFilterDifficulty(activeDifficulty === d.value ? null : d.value)}
-                  style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 13,
-                    padding: '8px 16px',
-                    border: `1px solid ${activeDifficulty === d.value ? '#ffce4d' : 'var(--gray-600)'}`,
-                    borderRadius: 20,
-                    background: activeDifficulty === d.value ? 'rgba(255,206,77,0.15)' : 'transparent',
-                    color: activeDifficulty === d.value ? '#ffce4d' : 'var(--gray-400)',
-                    cursor: 'pointer',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    transition: 'all 0.15s',
-                  } as React.CSSProperties}
-                >
-                  ⚡ {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* REGIONE */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-              Regione
-            </div>
-            <div style={{ position: 'relative' }}>
-              <select
-                value={activeRegion ?? ''}
-                onChange={e => onFilterRegion(e.target.value || null)}
-                style={{
-                  width: '100%', fontFamily: 'var(--font-mono)', fontSize: 14,
-                  padding: '12px 36px 12px 14px',
-                  border: `1px solid ${activeRegion ? 'var(--orange)' : 'var(--gray-600)'}`,
-                  borderRadius: 8, background: 'var(--gray-700)',
-                  color: activeRegion ? 'var(--orange)' : 'var(--bone)',
-                  appearance: 'none', WebkitAppearance: 'none', outline: 'none',
-                  cursor: 'pointer',
-                } as React.CSSProperties}
-              >
-                <option value="">Tutte le regioni</option>
-                {REGIONI_ITALIA.map(r => (
-                  <option key={r.label} value={r.label}>{r.emoji} {r.label}</option>
-                ))}
-              </select>
-              <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--gray-400)', pointerEvents: 'none' }}>▾</span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Footer — Vedi risultati */}
-        <div style={{ padding: '0 20px 8px' }}>
-          <button
-            onClick={onClose}
-            style={{
-              width: '100%', fontFamily: 'var(--font-mono)', fontSize: 15,
-              padding: '14px', background: 'var(--orange)', color: '#000',
-              border: 'none', borderRadius: 10, cursor: 'pointer',
-              fontWeight: 700, letterSpacing: '0.04em',
-              touchAction: 'manipulation',
-            }}
-          >
-            VEDI {filteredCount} SPOT
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
+/* FilterSheet removed — filtering now handled by Scopri section */

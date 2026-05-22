@@ -66,8 +66,8 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
 
 interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 
-const topOffset_MOBILE  = 56;  // topbar only (filter bar hidden on mobile)
-const topOffset_DESKTOP = 100; // topbar + filter bar
+const topOffset_MOBILE  = 56;  // topbar only
+const topOffset_DESKTOP = 56;  // topbar only (filter bar removed)
 const PANEL_MIN       = 0;
 const PANEL_SNAP      = 140;
 const EXPANDED_CARD_H = 0; // not used — expanded cards open to 92% viewport
