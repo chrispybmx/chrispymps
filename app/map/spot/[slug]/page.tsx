@@ -12,7 +12,7 @@ import ShareSpotBtn from '@/components/ShareSpotBtn';
 import SpotContributeCTA from '@/components/SpotContributeCTA';
 import SpotLikeBtn from '@/components/SpotLikeBtn';
 import SpotPageActions, { SpotStarRating } from '@/components/SpotPageActions';
-import BottomNav from '@/components/BottomNav';
+import SpotPageShell from './SpotPageShell';
 
 export const revalidate = 300;
 
@@ -243,7 +243,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
         })}}
       />
 
-      <BottomNav />
+      <SpotPageShell />
     </main>
   );
 }
