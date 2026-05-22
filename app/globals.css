@@ -161,13 +161,15 @@ body {
   opacity: 0.5;
 }
 
-/* Pin BMX — ruotato -2° */
+/* Pin BMX — ruotato -2° (no transition — Leaflet usa transform per posizionare i pin,
+   una transition su transform causa tremolio durante flyTo/panTo) */
 .spot-pin {
   transform: rotate(-2deg);
-  transition: transform 0.15s ease;
 }
-.spot-pin:hover, .spot-pin:active {
-  transform: rotate(0deg) scale(1.05);
+@media (hover: hover) {
+  .spot-pin:hover {
+    transform: rotate(0deg) scale(1.05);
+  }
 }
 
 /* Badge condition */

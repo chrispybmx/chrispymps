@@ -328,7 +328,7 @@ export default function SpotMap({
             const targetPoint = mapInstance.current.project([c.lat, c.lon], targetZoom);
             const offsetPoint = targetPoint.add(L!.point(0, overlayOffsetPx));
             const offsetLL    = mapInstance.current.unproject(offsetPoint, targetZoom);
-            mapInstance.current.flyTo(offsetLL, targetZoom, { duration: 1.4, easeLinearity: 0.22 });
+            mapInstance.current.flyTo(offsetLL, targetZoom, { duration: 1.4, easeLinearity: 0.35 });
             onSpotClickRef.current(c.spots[0]);
           } else {
             /* Multi-spot → flyToBounds cinematico, stesso comportamento su mobile e desktop */
@@ -399,7 +399,7 @@ export default function SpotMap({
           maxWidth: pin.cover_url ? 210 : 190,
           closeButton: false,
           className: 'spot-hover-popup',
-          autoPan: true,
+          autoPan: false,
           interactive: true,
           closeOnClick: false,
         });
@@ -517,7 +517,7 @@ export default function SpotMap({
     const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
     const offsetPoint  = targetPoint.add(L!.point(0, offset));
     const offsetLatLng = map.unproject(offsetPoint, zoom);
-    map.flyTo(offsetLatLng, zoom, { duration: 1.8, easeLinearity: 0.22 });
+    map.flyTo(offsetLatLng, zoom, { duration: 1.8, easeLinearity: 0.35 });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- overlayOffsetPx changes on drag; re-flying mid-drag would be jarring
   }, [flyTarget]);
 
@@ -548,7 +548,7 @@ export default function SpotMap({
       const targetPoint  = mapInstance.current.project([p.lat, p.lon], targetZoom);
       const offsetPoint  = targetPoint.add(L!.point(0, overlayOffsetPx));
       const offsetLatLng = mapInstance.current.unproject(offsetPoint, targetZoom);
-      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 1.2, easeLinearity: 0.22 });
+      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 1.2, easeLinearity: 0.35 });
       return;
     }
 
@@ -614,7 +614,7 @@ export default function SpotMap({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.4, easeLinearity: 0.22 });
+        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.4, easeLinearity: 0.35 });
 
         if (L) {
           const dotSvg = `<div style="
