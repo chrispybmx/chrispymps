@@ -310,15 +310,6 @@ select.input-vhs {
 .spot-hover-popup .leaflet-popup-content-wrapper {
   border-radius: 8px !important;
 }
-/* Link nel popup tappabile su mobile — min 44px touch target */
-.spot-hover-popup .leaflet-popup-content a {
-  pointer-events: auto !important;
-  touch-action: manipulation !important;
-  min-height: 44px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
 .leaflet-popup-tip {
   background: var(--orange) !important;
 }

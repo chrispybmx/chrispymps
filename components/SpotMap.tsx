@@ -367,8 +367,8 @@ export default function SpotMap({
         const marker = L!.marker([pin.lat, pin.lon], { icon });
         const tipo   = TIPI_SPOT[pin.type];
 
-        /* Popup: foto + nome + info + link VEDI SPOT
-           Su desktop appare al hover; su mobile appare al tap (al posto di aprire il pannello) */
+        /* Popup: foto + nome + info — solo desktop (hover).
+           Su mobile: tap → naviga direttamente alla pagina spot. */
         const imgHtml = pin.cover_url
           ? `<img src="${pin.cover_url}"
                style="width:100%;height:100px;object-fit:cover;display:block;border-radius:6px 6px 0 0"
@@ -376,22 +376,12 @@ export default function SpotMap({
           : '';
 
         const popupContent = `
-          <div style="font-family:'Barlow Condensed',sans-serif;min-width:180px;padding:0;overflow:hidden;border-radius:6px">
+          <div style="font-family:var(--font-display),sans-serif;min-width:180px;padding:0;overflow:hidden;border-radius:6px">
             ${imgHtml}
             <div style="padding:6px 10px 8px;background:#111">
-              <div style="font-family:'VT323',monospace;font-size:18px;color:#ff6a00;line-height:1.2;margin-bottom:3px">${pin.name}</div>
+              <div style="font-family:var(--font-mono),monospace;font-size:18px;color:#ff6a00;line-height:1.2;margin-bottom:3px">${pin.name}</div>
               ${pin.city ? `<div style="font-size:11px;color:#777;margin-bottom:2px">📍 ${pin.city}</div>` : ''}
-              <div style="font-size:11px;color:#888;margin-bottom:6px">${tipo.emoji} ${tipo.label}</div>
-              <a href="/map/spot/${pin.slug}"
-                 onclick="event.stopPropagation()"
-                 style="display:block;font-family:'VT323',monospace;font-size:16px;
-                        color:#000;background:#ff6a00;padding:12px 14px;border-radius:4px;
-                        text-decoration:none;letter-spacing:0.04em;text-align:center;
-                        touch-action:manipulation;-webkit-tap-highlight-color:transparent;
-                        cursor:pointer;position:relative;z-index:9999;
-                        pointer-events:auto">
-                VEDI SPOT →
-              </a>
+              <div style="font-size:11px;color:#888">${tipo.emoji} ${tipo.label}</div>
             </div>
           </div>
         `;
@@ -400,34 +390,23 @@ export default function SpotMap({
           maxWidth: pin.cover_url ? 210 : 190,
           closeButton: false,
           className: 'spot-hover-popup',
-          autoPan: true,
-          interactive: true,
-          closeOnClick: false,
+          autoPan: false,
         });
 
         marker.on('click', (e) => {
-          /* Su touch/mobile: apri/chiudi il popup (non aprire il pannello) */
           const pe = (e as unknown as { originalEvent: PointerEvent }).originalEvent;
           const isTouch = pe?.pointerType === 'touch' || pe?.pointerType === '';
           if (isTouch) {
-            if (marker.isPopupOpen()) {
-              marker.closePopup();
-            } else {
-              marker.openPopup();
-            }
+            /* Mobile: tap → vai direttamente alla pagina spot */
+            window.location.href = `/map/spot/${pin.slug}`;
           } else {
-            /* Desktop: il popup era già aperto dal mouseover → chiudilo e apri il pannello */
+            /* Desktop: click → apri pannello */
             marker.closePopup();
             onSpotClickRef.current(pin);
           }
         });
         marker.on('mouseover', () => marker.openPopup());
-        marker.on('mouseout',  (e) => {
-          /* Non chiudere su touch — l'utente deve poter cliccare "VEDI SPOT" */
-          const pe = (e as unknown as { originalEvent?: PointerEvent }).originalEvent;
-          if (pe?.pointerType === 'touch' || pe?.pointerType === '') return;
-          marker.closePopup();
-        });
+        marker.on('mouseout',  () => marker.closePopup());
 
         markersRef.current!.addLayer(marker);
         pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2
