@@ -215,6 +215,36 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [preUploadedUrls, setPreUploadedUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  /* Compress image client-side before upload (5MB → ~300KB) */
+  const compressImage = useCallback(async (file: File): Promise<Blob> => {
+    const MAX_DIM = 1920;
+    const QUALITY = 0.8;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => resolve(blob ?? file),
+          'image/jpeg',
+          QUALITY
+        );
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => resolve(file); // fallback: send original
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
   /* Pre-upload photos as soon as selected — runs in background while user fills step 3 */
   const handlePhotosChange = useCallback(async (files: File[]) => {
     setPhotos(files);
@@ -227,8 +257,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
       const urls = await Promise.all(
         files.map(async (file) => {
+          const compressed = await compressImage(file);
           const fd = new FormData();
-          fd.append('file', file);
+          fd.append('file', new File([compressed], file.name, { type: 'image/jpeg' }));
           fd.append('access_token', session.access_token);
           fd.append('purpose', 'general');
           try {
@@ -241,7 +272,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       setPreUploadedUrls(urls.filter((u): u is string => u !== null));
     } catch {}
     finally { setUploading(false); }
-  }, [user]);
+  }, [user, compressImage]);
 
   /* Step 3 */
   const [name,        setName]        = useState('');
@@ -920,8 +951,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               </p>
               <PhotoUpload photos={photos} onChange={handlePhotosChange} />
               {uploading && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--orange)', textAlign: 'center' }}>
-                  ⏳ Caricamento foto in corso...
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textAlign: 'center' }}>
+                  📤 Upload in background — puoi andare avanti
                 </div>
               )}
               {preUploadedUrls.length > 0 && !uploading && (
