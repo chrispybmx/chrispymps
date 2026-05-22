@@ -13,7 +13,7 @@ const SpotSchema = z.object({
   description:  z.string().max(500).optional(),
   guardians:    z.string().max(200).optional(),
   difficulty:   z.string().max(30).optional(),
-  photo_urls:   z.array(z.string().url()).min(1).max(5),
+  photo_urls:   z.array(z.string().url()).min(1).max(5).optional(),
   access_token: z.string().min(1).max(2048),
 });
 
@@ -56,6 +56,13 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ ok: false, error: 'Dati non validi. Controlla tutti i campi.' }, { status: 422 });
     }
+  }
+
+  // Verifica che ci sia almeno una foto (pre-uploaded URLs o FormData files)
+  const hasUrls = parsed.photo_urls && parsed.photo_urls.length > 0;
+  const hasFiles = formData ? Array.from({ length: 5 }, (_, i) => formData!.get(`photo_${i}`)).some(f => f instanceof Blob) : false;
+  if (!hasUrls && !hasFiles) {
+    return NextResponse.json({ ok: false, error: 'Almeno una foto è richiesta.' }, { status: 422 });
   }
 
   const supabase = supabaseAdmin();
