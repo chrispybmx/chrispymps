@@ -167,9 +167,9 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // ── 3. Rate limit sullo submit-spot: 3 spot / 10 minuti per IP ──
+  // ── 3. Rate limit sullo submit-spot: 10 spot / 5 minuti per IP ──
   if (pathname === '/api/submit-spot' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`submit:${ip}`, 3, 10 * 60 * 1000);
+    const { allowed } = checkRateLimit(`submit:${ip}`, 10, 5 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json(
         { ok: false, error: 'Troppi invii. Riprova tra qualche minuto.' },

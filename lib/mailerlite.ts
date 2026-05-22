@@ -87,6 +87,3 @@ export async function subscribeToNewsletter(
     return { ok: false, error: 'Errore rete MailerLite' };
   }
 }
-
-/** @deprecated usa subscribeToNewsletter */
-export const subscribeToMappe = subscribeToNewsletter;

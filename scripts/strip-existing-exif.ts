@@ -45,7 +45,6 @@ function isImageFile(filename: string): boolean {
  * recurse into each subfolder.
  */
 async function listAllFiles(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   prefix: string = '',
 ): Promise<string[]> {

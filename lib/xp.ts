@@ -33,7 +33,7 @@ export const LEVELS: { threshold: number; name: string; key: string; image: stri
   { threshold: 0,    name: 'Rookie',          key: 'rookie',          image: '/badges/level-1-rookie.png' },
 ];
 
-export function calculateLevel(xp: number): string {
+function calculateLevel(xp: number): string {
   for (const level of LEVELS) {
     if (xp >= level.threshold) return level.name;
   }
