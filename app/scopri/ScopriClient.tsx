@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, REGIONI_ITALIA, DIFFICOLTA } from '@/lib/constants';
@@ -21,6 +21,23 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
   const { toast } = useToast();
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [likedSpots, setLikedSpots] = useState<Set<string>>(new Set());
+
+  /* Ricerca utenti via API */
+  interface UserResult { id: string; username: string; bio?: string | null; spotCount: number }
+  const [userResults, setUserResults] = useState<UserResult[]>([]);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setUserResults([]); return; }
+    const needle = q.startsWith('@') ? q.slice(1) : q;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users?q=${encodeURIComponent(needle)}`);
+        const j = await res.json();
+        if (j.ok) setUserResults(j.data ?? []);
+      } catch { setUserResults([]); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const handleLike = (e: React.MouseEvent, spotId: string) => {
     e.preventDefault(); e.stopPropagation();
@@ -195,12 +212,48 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
         paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px) + 8px)',
       } as React.CSSProperties}>
 
-        {filtered.length === 0 ? (
+        {/* Risultati utenti */}
+        {userResults.length > 0 && (
+          <div style={{ padding: '8px 12px 4px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              👤 RIDER
+            </div>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 } as React.CSSProperties}>
+              {userResults.map(u => (
+                <Link key={u.id} href={`/u/${u.username}`} style={{
+                  textDecoration: 'none', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 12px',
+                  background: 'var(--gray-800)', border: '1px solid var(--gray-700)',
+                  borderRadius: 8, minWidth: 140,
+                }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%', background: 'var(--orange)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-mono)', fontSize: 16, color: '#000', fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {u.username[0].toUpperCase()}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      @{u.username}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)' }}>
+                      {u.spotCount} spot
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filtered.length === 0 && userResults.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14 }}>
             Nessuno spot trovato.<br/>
             <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>Prova a cambiare filtro.</span>
           </div>
-        ) : (
+        ) : filtered.length === 0 ? null : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 12px' }}>
           {filtered.map(spot => {
             const tipo = TIPI_SPOT[spot.type];
