@@ -29,6 +29,8 @@ interface SpotMapProps {
   // GPS locate triggered from MapClient
   locateTrigger?: number;
   onLocatingChange?: (v: boolean) => void;
+  // Viewport bounds callback — emitted on moveend/zoomend
+  onBoundsChanged?: (bounds: { south: number; west: number; north: number; east: number }) => void;
   // Stile mappa
   darkMap?: boolean;
 }
@@ -99,7 +101,7 @@ function computeGridClusters(spots: SpotMapPin[], zoom: number) {
 export default function SpotMap({
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
-  locateTrigger, onLocatingChange, darkMap: darkMapProp,
+  locateTrigger, onLocatingChange, onBoundsChanged, darkMap: darkMapProp,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
@@ -108,8 +110,9 @@ export default function SpotMap({
   const circleRef        = useRef<import('leaflet').Circle | null>(null);
   const centerMarkerRef  = useRef<import('leaflet').Marker | null>(null);
   const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
-  const onMapClickRef    = useRef(onMapClick);
-  const onSpotClickRef   = useRef(onSpotClick);
+  const onMapClickRef      = useRef(onMapClick);
+  const onSpotClickRef     = useRef(onSpotClick);
+  const onBoundsChangedRef = useRef(onBoundsChanged);
   /* Memoization: refs dichiarati qui ma inizializzati dopo filtered/clusters */
   const pinMarkersRef    = useRef<Map<string, import('leaflet').Marker>>(new Map());
   const prevSelIdRef     = useRef<string | null>(null);
@@ -125,6 +128,7 @@ export default function SpotMap({
 
   useEffect(() => { onMapClickRef.current       = onMapClick; });
   useEffect(() => { onSpotClickRef.current      = onSpotClick; });
+  useEffect(() => { onBoundsChangedRef.current  = onBoundsChanged; });
   useEffect(() => { filterRegionBboxRef.current = filterRegionBbox; });
   useEffect(() => { searchQueryRef.current      = searchQuery; });
 
@@ -186,8 +190,16 @@ export default function SpotMap({
       markersRef.current  = L.layerGroup().addTo(map);
       mapInstance.current = map;
 
-      /* Aggiorna stato zoom React */
-      map.on('zoomend', () => setZoom(map.getZoom()));
+      /* Aggiorna stato zoom React + emetti bounds */
+      const emitBounds = () => {
+        const b = map.getBounds();
+        onBoundsChangedRef.current?.({
+          south: b.getSouth(), west: b.getWest(),
+          north: b.getNorth(), east: b.getEast(),
+        });
+      };
+      map.on('zoomend', () => { setZoom(map.getZoom()); emitBounds(); });
+      map.on('moveend', emitBounds);
 
       /* ── Vista iniziale: l'Italia nello spazio visibile sopra il pannello ──
          paddingBottomRight bottom = overlayOffsetPx (= panelHeight/2) + handle:

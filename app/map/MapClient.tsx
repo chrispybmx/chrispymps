@@ -84,6 +84,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [spots, setSpots]    = useState<SpotMapPin[]>(initialSpots);
   const [spotsLoading, setSpotsLoading] = useState(initialSpots.length === 0);
 
+  // Stable random seed per session — shuffle order changes per visit, not per render
+  const shuffleSeed = useRef(Math.random());
+
   // Fetch spots client-side for instant page load
   useEffect(() => {
     if (initialSpots.length > 0) return; // already have server data
@@ -100,6 +103,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [filterRegion,    setFilterRegion]    = useState<typeof REGIONI_ITALIA[0] | null>(null);
   const [filterCondition, setFilterCondition] = useState<SpotCondition | null>(null);
   const [filterDifficulty,setFilterDifficulty]= useState<string | null>(null);
+  const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [addOpen,            setAddOpen]            = useState(false);
   const [addLat,             setAddLat]             = useState<number | undefined>();
@@ -341,6 +345,27 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     return result;
   }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, radiusKm, distanceMap]);
 
+  /* Spot visibili nel pannello: filtrati per viewport della mappa + ordine casuale.
+     Se l'utente è in radius mode o ha una ricerca attiva, non filtrare per viewport. */
+  const panelSpots = useMemo(() => {
+    let list = filtered;
+    // Filtra per viewport solo quando non c'è ricerca/radius attivo e abbiamo bounds
+    const hasActiveFilter = !!(searchQuery || (radiusMode && radiusCenter && !radiusPanelOpen));
+    if (mapBounds && !hasActiveFilter) {
+      list = list.filter(s =>
+        s.lat >= mapBounds.south && s.lat <= mapBounds.north &&
+        s.lon >= mapBounds.west && s.lon <= mapBounds.east
+      );
+    }
+    // Shuffle con seed stabile (ordine casuale per sessione, non per render)
+    const seed = shuffleSeed.current;
+    return [...list].sort((a, b) => {
+      const ha = Math.sin(seed * 10000 + a.id.charCodeAt(0) * 9973) * 10000;
+      const hb = Math.sin(seed * 10000 + b.id.charCodeAt(0) * 9973) * 10000;
+      return (ha - Math.floor(ha)) - (hb - Math.floor(hb));
+    });
+  }, [filtered, mapBounds, searchQuery, radiusMode, radiusCenter, radiusPanelOpen]);
+
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
     filtered.find(s => s.id === activeListId) ?? null,
@@ -516,6 +541,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onMapClick={handleMapClick}
           locateTrigger={locateTrigger}
           onLocatingChange={setIsLocating}
+          onBoundsChanged={setMapBounds}
           darkMap={darkMap}
         />
         {/* Toast solo quando raggio attivo e nessun centro ancora */}
@@ -847,7 +873,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           color: 'var(--orange)', letterSpacing: '0.05em',
           textTransform: 'uppercase',
         }}>
-          {filtered.length} spot
+          {panelSpots.length} spot
         </span>
       </div>
 
@@ -937,7 +963,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           {panelHeight > 90 && (
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <SpotListPanel
-                spots={filtered}
+                spots={panelSpots}
                 activeId={activeListId}
                 expandedId={expandedId}
                 onActivate={handleActivateFromScroll}
