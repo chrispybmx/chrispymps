@@ -383,11 +383,13 @@ export default function SpotMap({
               ${pin.city ? `<div style="font-size:11px;color:#777;margin-bottom:2px">📍 ${pin.city}</div>` : ''}
               <div style="font-size:11px;color:#888;margin-bottom:6px">${tipo.emoji} ${tipo.label}</div>
               <a href="/map/spot/${pin.slug}"
-                 style="display:inline-block;font-family:'VT323',monospace;font-size:14px;
-                        color:#000;background:#ff6a00;padding:8px 14px;border-radius:4px;
-                        text-decoration:none;letter-spacing:0.04em;
+                 onclick="event.stopPropagation()"
+                 style="display:block;font-family:'VT323',monospace;font-size:16px;
+                        color:#000;background:#ff6a00;padding:12px 14px;border-radius:4px;
+                        text-decoration:none;letter-spacing:0.04em;text-align:center;
                         touch-action:manipulation;-webkit-tap-highlight-color:transparent;
-                        cursor:pointer;position:relative;z-index:10">
+                        cursor:pointer;position:relative;z-index:9999;
+                        pointer-events:auto">
                 VEDI SPOT →
               </a>
             </div>
@@ -398,8 +400,9 @@ export default function SpotMap({
           maxWidth: pin.cover_url ? 210 : 190,
           closeButton: false,
           className: 'spot-hover-popup',
-          autoPan: false,
-          interactive: true, // allows clicking links inside popup
+          autoPan: true,
+          interactive: true,
+          closeOnClick: false,
         });
 
         marker.on('click', (e) => {
