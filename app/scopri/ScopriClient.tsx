@@ -57,8 +57,11 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
       }).catch(() => {});
   };
 
+  // Seed random per shuffle — cambia ad ogni mount (apertura pagina)
+  const [shuffleSeed] = useState(() => Math.random());
+
   const filtered = useMemo(() => {
-    return spots.filter(s => {
+    const result = spots.filter(s => {
       if (filterType && s.type !== filterType) return false;
       if (filterDiff && s.difficulty !== filterDiff) return false;
       if (filterRegion) {
@@ -78,7 +81,13 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
       }
       return true;
     });
-  }, [spots, filterType, filterDiff, filterRegion, query]);
+    // Ordine casuale — stabile per sessione, diverso ad ogni apertura
+    return [...result].sort((a, b) => {
+      const ha = hashCode(a.id + shuffleSeed);
+      const hb = hashCode(b.id + shuffleSeed);
+      return ha - hb;
+    });
+  }, [spots, filterType, filterDiff, filterRegion, query, shuffleSeed]);
 
   const anyFilter = !!(filterType || filterDiff || filterRegion || query);
 
@@ -335,6 +344,15 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
       <BottomNav />
     </div>
   );
+}
+
+/* ── Hash per shuffle deterministico ── */
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return h;
 }
 
 /* ── Dropdown helper ── */

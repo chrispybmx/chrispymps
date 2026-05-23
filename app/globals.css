@@ -163,9 +163,12 @@ body {
 
 /* Pin BMX — ruotato -2° (no transition — Leaflet usa transform per posizionare i pin,
    una transition su transform causa tremolio durante flyTo/panTo) */
-.spot-pin {
+.spot-pin, .spot-cluster {
   transform: rotate(-2deg);
+  pointer-events: all !important;
+  cursor: pointer !important;
 }
+.spot-cluster { transform: none; }
 @media (hover: hover) {
   .spot-pin:hover {
     transform: rotate(0deg) scale(1.05);
@@ -294,6 +297,13 @@ select.input-vhs {
 .leaflet-container {
   background: var(--gray-800) !important;
   font-family: var(--font-display) !important;
+}
+.leaflet-marker-icon, .leaflet-marker-shadow {
+  pointer-events: all !important;
+}
+.leaflet-marker-pane {
+  z-index: 600 !important;
+  pointer-events: all !important;
 }
 .leaflet-popup-content-wrapper {
   background: var(--gray-800) !important;

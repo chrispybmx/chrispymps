@@ -174,6 +174,9 @@ export default function SpotMap({
         zoom:   APP_CONFIG.mapZoom,
         zoomControl: false,
         attributionControl: false,   // gestiamo noi l'attribution nel frame VHS
+        maxBounds: L.latLngBounds([-85, -180], [85, 180]),
+        maxBoundsViscosity: 1.0,     // blocco rigido ai bordi del mondo
+        minZoom: 3,
       });
 
       const isDark = darkMapProp ?? false;
@@ -182,8 +185,8 @@ export default function SpotMap({
           ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
           : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         isDark
-          ? { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19, className: 'osm-tiles' }
-          : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, className: 'osm-tiles' }
+          ? { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19, noWrap: true, className: 'osm-tiles' }
+          : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, noWrap: true, className: 'osm-tiles' }
       ).addTo(map);
 
       L.control.zoom({ position: 'bottomleft' }).addTo(map);
@@ -372,7 +375,7 @@ export default function SpotMap({
            Tutto il popup è cliccabile → naviga alla pagina spot. */
         const imgHtml = pin.cover_url
           ? `<img src="${pin.cover_url}"
-               style="width:100%;height:100px;object-fit:cover;display:block;border-radius:6px 6px 0 0"
+               style="width:100%;height:140px;object-fit:cover;display:block;border-radius:6px 6px 0 0"
                loading="lazy" />`
           : '';
 
@@ -396,48 +399,38 @@ export default function SpotMap({
         `;
 
         marker.bindPopup(popupContent, {
-          maxWidth: pin.cover_url ? 210 : 190,
+          maxWidth: pin.cover_url ? 260 : 220,
           closeButton: false,
           className: 'spot-hover-popup',
-          autoPan: false,
+          autoPan: true,
           interactive: true,
           closeOnClick: false,
         });
 
-        /* Quando il popup si apre, aggancia click listener al contenuto */
+        /* Quando il popup si apre, aggancia click listener al contenuto.
+           setTimeout: Leaflet potrebbe non aver inserito il DOM ancora. */
         marker.on('popupopen', () => {
-          const el = document.getElementById(popupId);
-          if (el) {
+          requestAnimationFrame(() => {
+            const el = document.getElementById(popupId);
+            if (!el) return;
             el.onclick = (evt) => {
               evt.stopPropagation();
               evt.preventDefault();
+              marker.closePopup();
               window.location.href = `/map/spot/${el.dataset.slug}`;
             };
-          }
+          });
         });
 
-        /* Touch vs mouse: 'ontouchstart' in window è il modo più affidabile.
-           pointerType non è sempre settato su tutti i browser mobile. */
-        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
+        /* Click unificato: mobile e desktop → toggle popup. */
         marker.on('click', () => {
-          if (isTouchDevice) {
-            /* Mobile: tap apre/chiude popup */
-            if (marker.isPopupOpen()) {
-              marker.closePopup();
-            } else {
-              marker.openPopup();
-            }
-          } else {
-            /* Desktop: click → apri pannello */
+          if (marker.isPopupOpen()) {
             marker.closePopup();
+          } else {
+            marker.openPopup();
             onSpotClickRef.current(pin);
           }
         });
-        if (!isTouchDevice) {
-          marker.on('mouseover', () => marker.openPopup());
-          marker.on('mouseout',  () => marker.closePopup());
-        }
 
         markersRef.current!.addLayer(marker);
         pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2

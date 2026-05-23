@@ -522,7 +522,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       <div style={{
         position: 'fixed',
         top: topOffset, left: 0, right: 0, bottom: 0,
-        zIndex: 1,
+        zIndex: 5,
       }}>
         <SpotMap
           spots={spots}
@@ -823,13 +823,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         {/* Striscia bottom — copre attribution OSM */}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
-          height: 46,
+          height: 46, pointerEvents: 'none',
           background: 'linear-gradient(to top, rgba(10,10,10,0.92) 0%, transparent 100%)',
         }} />
 
         {/* Attribution OSM stilizzata */}
         <div style={{
-          position: 'absolute', bottom: 10, left: 14,
+          position: 'absolute', bottom: 10, left: 14, pointerEvents: 'none',
         }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
             © OpenStreetMap contributors
@@ -838,7 +838,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
         {/* Scanline sottile su tutto lo schermo */}
         <div style={{
-          position: 'absolute', inset: 0,
+          position: 'absolute', inset: 0, pointerEvents: 'none',
           background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px)',
         }} />
       </div>
@@ -1199,22 +1199,24 @@ function SpotListPanel({
         .photo-nav-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       `}</style>
 
-      {/* Header + horizontal strip — when NOT expanded */}
+      {/* Header */}
+      <div style={{
+        padding: '7px 14px 5px',
+        fontFamily: 'var(--font-mono)', fontSize: 11,
+        color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span>{spots.length} spot</span>
+        {radiusCenter && (
+          <span style={{ color: 'var(--orange)', fontSize: 10 }}>
+            🎯 per distanza
+          </span>
+        )}
+      </div>
+
+      {/* Grid — sempre visibile */}
       {!expandedId && (
         <>
-          <div style={{
-            padding: '7px 14px 5px',
-            fontFamily: 'var(--font-mono)', fontSize: 11,
-            color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <span>{spots.length} spot</span>
-            {radiusCenter && (
-              <span style={{ color: 'var(--orange)', fontSize: 10 }}>
-                🎯 per distanza
-              </span>
-            )}
-          </div>
 
           {/* ══ 2-COLUMN VERTICAL GRID ══ */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 10px 12px' }}>
@@ -1476,6 +1478,53 @@ function SpotListPanel({
           </div>
         );
       })}
+
+      {/* Griglia altri spot sotto il card espanso */}
+      {expandedId && (
+        <div style={{ padding: '8px 10px 0' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 4px 8px' }}>
+            ALTRI SPOT NELLA ZONA
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, paddingBottom: 12 }}>
+            {spots.filter(s => s.id !== expandedId).map(spot => {
+              const tipo = TIPI_SPOT[spot.type];
+              const cover = spot.cover_url || (spot.photo_urls?.[0]);
+              const isAct = activeId === spot.id;
+              return (
+                <div
+                  key={spot.id}
+                  ref={(el) => setRef(spot.id, el)}
+                  data-spot-id={spot.id}
+                  className="spot-card-wrap"
+                  onClick={() => onSpotClick(spot)}
+                  style={{
+                    borderRadius: 10, overflow: 'hidden',
+                    background: 'var(--gray-800)',
+                    border: `1.5px solid ${isAct ? 'var(--orange)' : 'var(--gray-700)'}`,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ height: 100, background: '#111', position: 'relative', overflow: 'hidden' }}>
+                    {cover ? (
+                      <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 28, opacity: 0.2 }}>{tipo.emoji}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: '6px 8px' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {spot.name}
+                    </div>
+                    {spot.city && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)' }}>📍 {spot.city}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={{ height: 'calc(48px + env(safe-area-inset-bottom, 0px))' }} />
     </div>
