@@ -298,6 +298,10 @@ select.input-vhs {
   background: var(--gray-800) !important;
   font-family: var(--font-display) !important;
 }
+/* Stile vintage saturato */
+.leaflet-tile-pane {
+  filter: saturate(1.5) contrast(1.15) sepia(0.12) brightness(1.05);
+}
 .leaflet-marker-icon, .leaflet-marker-shadow {
   pointer-events: all !important;
 }
