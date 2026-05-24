@@ -428,6 +428,19 @@ export default function SpotMap({
 
     prevSelIdRef.current = selPinRef.current?.id ?? null;
 
+    /* ── Riapri popup dopo rebuild marker (flyTo cambia zoom → clearLayers → popup perso) ── */
+    if (pendingPopupRef.current && zoom >= CLUSTER_ZOOM) {
+      const pid = pendingPopupRef.current;
+      const pm = pinMarkersRef.current.get(pid);
+      if (pm) {
+        setTimeout(() => {
+          const m2 = pinMarkersRef.current.get(pid);
+          if (m2) m2.openPopup();
+          pendingPopupRef.current = null;
+        }, 300);
+      }
+    }
+
     /* ── Auto-fit al primo render con spot ── */
     if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
       const bounds  = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));

@@ -357,6 +357,12 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         s.lon >= mapBounds.west && s.lon <= mapBounds.east
       );
     }
+    // Garantisci che lo spot espanso/attivo sia sempre incluso (anche durante flyTo
+    // quando il viewport non lo contiene ancora)
+    if (expandedId && !list.find(s => s.id === expandedId)) {
+      const expandedSpot = filtered.find(s => s.id === expandedId);
+      if (expandedSpot) list = [expandedSpot, ...list];
+    }
     // Shuffle con seed stabile (ordine casuale per sessione, non per render)
     const seed = shuffleSeed.current;
     return [...list].sort((a, b) => {
@@ -364,7 +370,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       const hb = Math.sin(seed * 10000 + b.id.charCodeAt(0) * 9973) * 10000;
       return (ha - Math.floor(ha)) - (hb - Math.floor(hb));
     });
-  }, [filtered, mapBounds, searchQuery, radiusMode, radiusCenter, radiusPanelOpen]);
+  }, [filtered, mapBounds, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, expandedId]);
 
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
