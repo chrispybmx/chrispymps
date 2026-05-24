@@ -522,7 +522,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       <div style={{
         position: 'fixed',
         top: topOffset, left: 0, right: 0, bottom: 0,
-        zIndex: 5,
+        zIndex: 10,
       }}>
         <SpotMap
           spots={spots}
@@ -806,7 +806,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
       {/* ── CORNICE VHS — visibile quando il pannello è chiuso ── */}
       <div style={{
-        position: 'fixed', inset: 0, zIndex: 9,
+        position: 'fixed', inset: 0, zIndex: 8,
         pointerEvents: 'none',
         opacity: panelHeight <= PANEL_MIN + 10 ? 1 : 0,
         transition: 'opacity 0.3s ease',
@@ -851,7 +851,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           position: 'fixed',
           bottom: 0, left: '50%',
           transform: 'translateX(-50%)',
-          zIndex: 11,
+          zIndex: 16,
           padding: '8px 20px 12px',
           background: 'rgba(10,10,10,0.95)',
           backdropFilter: 'blur(12px)',
@@ -881,7 +881,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       <div className="map-panel-wrap" style={{
         position: 'fixed',
         bottom: 0, left: 0, right: 0,
-        zIndex: 10,
+        zIndex: 15,
         height: panelHeight,
         display: 'flex', flexDirection: 'column',
         pointerEvents: 'none',

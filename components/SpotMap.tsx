@@ -118,6 +118,7 @@ export default function SpotMap({
   const prevSelIdRef     = useRef<string | null>(null);
   const filteredRef      = useRef<SpotMapPin[]>([]);
   const selPinRef        = useRef<SpotMapPin | null>(null);
+  const pendingPopupRef  = useRef<string | null>(null); // pin id da aprire come popup dopo rebuild
   /* Refs per il fitAllTrigger effect — evita di aggiungere filterRegionBbox/searchQuery
      come dependency (causerebbero re-run ad ogni render) */
   const filterRegionBboxRef = useRef(filterRegionBbox);
@@ -379,11 +380,12 @@ export default function SpotMap({
                loading="lazy" />`
           : '';
 
-        const popupId = `popup-${pin.id}`;
+        const spotUrl = `/map/spot/${pin.slug}`;
         const popupContent = `
-          <div id="${popupId}" data-slug="${pin.slug}"
-               style="font-family:var(--font-display),sans-serif;min-width:180px;padding:0;
-                      overflow:hidden;border-radius:6px;cursor:pointer">
+          <a href="${spotUrl}"
+             style="font-family:var(--font-display),sans-serif;min-width:180px;padding:0;
+                    overflow:hidden;border-radius:6px;cursor:pointer;display:block;
+                    text-decoration:none;color:inherit;-webkit-tap-highlight-color:transparent">
             ${imgHtml}
             <div style="padding:6px 10px 8px;background:#111">
               <div style="font-family:var(--font-mono),monospace;font-size:18px;color:#ff6a00;line-height:1.2;margin-bottom:3px">${pin.name}</div>
@@ -395,7 +397,7 @@ export default function SpotMap({
                 VEDI SPOT →
               </div>
             </div>
-          </div>
+          </a>
         `;
 
         marker.bindPopup(popupContent, {
@@ -407,27 +409,14 @@ export default function SpotMap({
           closeOnClick: false,
         });
 
-        /* Quando il popup si apre, aggancia click listener al contenuto.
-           setTimeout: Leaflet potrebbe non aver inserito il DOM ancora. */
-        marker.on('popupopen', () => {
-          requestAnimationFrame(() => {
-            const el = document.getElementById(popupId);
-            if (!el) return;
-            el.onclick = (evt) => {
-              evt.stopPropagation();
-              evt.preventDefault();
-              marker.closePopup();
-              window.location.href = `/map/spot/${el.dataset.slug}`;
-            };
-          });
-        });
-
         /* Click unificato: mobile e desktop → toggle popup. */
         marker.on('click', () => {
           if (marker.isPopupOpen()) {
             marker.closePopup();
+            pendingPopupRef.current = null;
           } else {
             marker.openPopup();
+            pendingPopupRef.current = pin.id; // segna per riaprire se flyTo ricrea i marker
             onSpotClickRef.current(pin);
           }
         });
@@ -511,6 +500,20 @@ export default function SpotMap({
     const offsetPoint  = targetPoint.add(L!.point(0, offset));
     const offsetLatLng = map.unproject(offsetPoint, zoom);
     map.flyTo(offsetLatLng, zoom, { duration: 1.8, easeLinearity: 0.35 });
+
+    /* Dopo flyTo: riapri il popup se un pin era stato cliccato.
+       Il cambio di zoom durante flyTo ricrea i marker (clearLayers),
+       distruggendo il popup aperto. Lo riapriamo sul nuovo marker. */
+    if (pendingPopupRef.current) {
+      const pendingId = pendingPopupRef.current;
+      map.once('moveend', () => {
+        const m = pinMarkersRef.current.get(pendingId);
+        if (m) {
+          requestAnimationFrame(() => m.openPopup());
+        }
+        pendingPopupRef.current = null;
+      });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- overlayOffsetPx changes on drag; re-flying mid-drag would be jarring
   }, [flyTarget]);
 
