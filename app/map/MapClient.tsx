@@ -476,7 +476,6 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       }
       return isClosing ? null : pin.id;
     });
-    setFlyTarget({ lat: pin.lat, lon: pin.lon, zoom: 12 });
   }, [snapTo]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const activateDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
