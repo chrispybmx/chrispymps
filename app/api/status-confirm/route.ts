@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
-import { onStatusConfirmed } from '@/lib/xp';
+import { onStatusConfirmed, getXPSummary } from '@/lib/xp';
 import { UUID_RE } from '@/lib/validation';
 
 const MAX_CONFIRMATIONS_PER_WEEK = 5;
@@ -111,12 +111,15 @@ export async function POST(req: NextRequest) {
       .update({ condition_updated_at: new Date().toISOString() })
       .eq('id', body.spot_id);
 
-    // Award XP (fire-and-forget)
-    onStatusConfirmed(user.id, body.spot_id, contribution?.id).catch(console.error);
+    // Award XP (await so we can read summary after)
+    const xpBefore = await getXPSummary(user.id);
+    await onStatusConfirmed(user.id, body.spot_id, contribution?.id);
+    const xpAfter = await getXPSummary(user.id);
 
     return NextResponse.json({
       ok: true,
       message: 'Stato confermato! Grazie per tenere la mappa aggiornata. +5 XP',
+      xp: { awarded: 5, total: xpAfter.lifetime_xp, level: xpAfter.current_level, leveledUp: xpAfter.current_level !== xpBefore.current_level },
     });
   }
 
@@ -142,19 +145,25 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', body.spot_id);
 
-    onStatusConfirmed(user.id, body.spot_id, contribution?.id).catch(console.error);
+    const xpBefore2 = await getXPSummary(user.id);
+    await onStatusConfirmed(user.id, body.spot_id, contribution?.id);
+    const xpAfter2 = await getXPSummary(user.id);
 
     return NextResponse.json({
       ok: true,
       message: `Stato aggiornato a "${body.condition}"! Confermato da ${totalAgree} utenti. +5 XP`,
+      xp: { awarded: 5, total: xpAfter2.lifetime_xp, level: xpAfter2.current_level, leveledUp: xpAfter2.current_level !== xpBefore2.current_level },
     });
   }
 
   // First report of different condition → don't change yet, award XP anyway
-  onStatusConfirmed(user.id, body.spot_id, contribution?.id).catch(console.error);
+  const xpBefore3 = await getXPSummary(user.id);
+  await onStatusConfirmed(user.id, body.spot_id, contribution?.id);
+  const xpAfter3 = await getXPSummary(user.id);
 
   return NextResponse.json({
     ok: true,
     message: `Segnalazione "${body.condition}" registrata. Serve un'altra conferma per aggiornare lo stato. +5 XP`,
+    xp: { awarded: 5, total: xpAfter3.lifetime_xp, level: xpAfter3.current_level, leveledUp: xpAfter3.current_level !== xpBefore3.current_level },
   });
 }

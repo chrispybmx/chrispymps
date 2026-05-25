@@ -45,6 +45,18 @@ export default function StatusConfirmModal({ open, onClose, spotId, spotName, cu
 
       if (json.ok) {
         toast(json.message, 'success');
+
+        // XP toast after a short delay
+        if (json.xp) {
+          setTimeout(() => {
+            if (json.xp.leveledUp) {
+              toast(`\ud83c\udf89 LEVEL UP! Sei ora ${json.xp.level}!`, 'success');
+            } else {
+              toast(`\u26a1 +${json.xp.awarded} XP \u2014 Livello: ${json.xp.level} (${json.xp.total} XP)`, 'success');
+            }
+          }, 400);
+        }
+
         setSelected(null);
         setNote('');
         onClose();

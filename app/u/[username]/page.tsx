@@ -38,7 +38,7 @@ async function getData(username: string) {
     .maybeSingle();
   if (!profile) return null;
 
-  const [{ data: spots }, { data: riddenRaw }, { count: photosCount }, { count: statusCount }] = await Promise.all([
+  const [{ data: spots }, { data: riddenRaw }, { count: photosCount }, { count: statusCount }, { data: userStats }] = await Promise.all([
     sb
       .from('spots')
       .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
@@ -62,6 +62,12 @@ async function getData(username: string) {
       .from('spot_status_updates')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', profile.id),
+    /* Streak from user_stats */
+    sb
+      .from('user_stats')
+      .select('current_streak_weeks')
+      .eq('user_id', profile.id)
+      .maybeSingle(),
   ]);
 
   /* Estrae i dati annidati da spot_riders → spots (Supabase returns array) */
@@ -84,6 +90,7 @@ async function getData(username: string) {
     citiesCount,
     photosCount: photosCount ?? 0,
     statusCount: statusCount ?? 0,
+    streakWeeks: userStats?.current_streak_weeks ?? 0,
   };
 }
 
@@ -148,7 +155,7 @@ export async function generateMetadata({ params }: { params: { username: string 
 export default async function UserProfilePage({ params }: { params: { username: string } }) {
   const data = await getData(params.username);
   if (!data) notFound();
-  const { profile, spots, ridden, citiesCount, photosCount, statusCount } = data;
+  const { profile, spots, ridden, citiesCount, photosCount, statusCount, streakWeeks } = data;
   const joinDate = new Date(profile.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   return (
@@ -184,6 +191,7 @@ export default async function UserProfilePage({ params }: { params: { username: 
           {photosCount > 0 && <span><strong style={{ color: 'var(--bone)' }}>{photosCount}</strong> foto</span>}
           {ridden.length > 0 && <span><strong style={{ color: 'var(--bone)' }}>{ridden.length}</strong> girati</span>}
           {citiesCount > 0 && <span><strong style={{ color: 'var(--bone)' }}>{citiesCount}</strong> città</span>}
+          {streakWeeks > 0 && <span><strong style={{ color: streakWeeks >= 12 ? 'var(--orange)' : streakWeeks >= 4 ? '#f5c542' : 'var(--bone)' }}>🔥 {streakWeeks}w</strong> streak</span>}
         </div>
 
         {/* Spot pubblicati */}

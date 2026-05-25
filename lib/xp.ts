@@ -82,13 +82,21 @@ interface AwardXPParams {
   metadata?: Record<string, unknown>;
 }
 
+interface AwardXPResult {
+  leveledUp: boolean;
+  newLevel?: string;
+  xpAwarded: number;
+  totalXp: number;
+}
+
 /**
  * Award XP to a user. Creates point_event + updates user_stats.
  * Idempotent: checks for duplicate events before inserting.
+ * Returns level-up info so callers can react (toast, animation, etc.).
  */
 export async function awardXP({
   userId, spotId, contributionId, eventType, xpAmount, reason, metadata,
-}: AwardXPParams): Promise<boolean> {
+}: AwardXPParams): Promise<AwardXPResult | false> {
   if (xpAmount === 0) return false;
 
   const sb = supabaseAdmin();
@@ -103,6 +111,15 @@ export async function awardXP({
 
     if ((count ?? 0) > 0) return false; // already awarded
   }
+
+  // Capture old level before update
+  const { data: oldStats } = await sb
+    .from('user_stats')
+    .select('current_level, lifetime_xp')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const oldLevel = oldStats?.current_level ?? 'Rookie';
 
   // 1. Insert point_event
   const { error: eventErr } = await sb.from('point_events').insert({
@@ -120,18 +137,93 @@ export async function awardXP({
     return false;
   }
 
-  // 2. Update user_stats (upsert)
+  // 2. Update user_stats (upsert) — includes streak calculation
   await updateUserStats(userId);
 
   // 3. Check badges
   await checkAndAwardBadges(userId);
 
-  return true;
+  // 4. Detect level-up
+  const { data: newStats } = await sb
+    .from('user_stats')
+    .select('current_level, lifetime_xp')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const newLevel = newStats?.current_level ?? 'Rookie';
+  const totalXp = newStats?.lifetime_xp ?? 0;
+
+  return {
+    leveledUp: newLevel !== oldLevel,
+    newLevel: newLevel !== oldLevel ? newLevel : undefined,
+    xpAwarded: xpAmount,
+    totalXp,
+  };
 }
 
 /* ══════════════════════════════════════════
    Update user_stats from point_events
 ══════════════════════════════════════════ */
+
+/**
+ * Get the ISO week number (Mon-Sun) for a given date.
+ * Returns a string key "YYYY-WXX" for deduplication.
+ */
+function getISOWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // Set to nearest Thursday: current date + 4 - current day number (Mon=1, Sun=7)
+  const dayNum = d.getUTCDay() || 7; // Convert Sun=0 to 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+/**
+ * Calculate streak: consecutive calendar weeks (Mon-Sun) with >= 1 point_event.
+ * Current week is always included (grace period: week doesn't need to be complete).
+ * Walks backwards from current week; streak breaks at first missing week.
+ */
+function calculateStreak(events: { created_at: string }[]): number {
+  if (!events.length) return 0;
+
+  // Collect unique week keys that have activity
+  const activeWeeks = new Set<string>();
+  for (const e of events) {
+    activeWeeks.add(getISOWeekKey(new Date(e.created_at)));
+  }
+
+  // Walk backwards from current week
+  const now = new Date();
+  let streak = 0;
+  let checkDate = new Date(now);
+
+  while (true) {
+    const weekKey = getISOWeekKey(checkDate);
+    if (activeWeeks.has(weekKey)) {
+      streak++;
+      // Move back 7 days to previous week
+      checkDate.setDate(checkDate.getDate() - 7);
+    } else {
+      // If we're on the very first check (current week) and it has no activity,
+      // that's fine — the grace period means we don't break the streak yet.
+      // Instead, check the previous week as the potential streak start.
+      if (streak === 0) {
+        // Current week has no activity — check if previous week starts a streak
+        checkDate.setDate(checkDate.getDate() - 7);
+        const prevWeekKey = getISOWeekKey(checkDate);
+        if (activeWeeks.has(prevWeekKey)) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 7);
+          continue;
+        }
+      }
+      break;
+    }
+  }
+
+  return streak;
+}
 
 async function updateUserStats(userId: string) {
   const sb = supabaseAdmin();
@@ -153,6 +245,9 @@ async function updateUserStats(userId: string) {
   const monthlyXp = events
     .filter(e => new Date(e.created_at) >= monthStart)
     .reduce((sum, e) => sum + e.xp_amount, 0);
+
+  // Streak: consecutive weeks with activity
+  const streakWeeks = calculateStreak(events);
 
   // Count contributions by type
   const { count: spotsCount } = await sb
@@ -185,12 +280,35 @@ async function updateUserStats(userId: string) {
     monthly_xp: monthlyXp,
     monthly_xp_reset_at: monthStart.toISOString(),
     current_level: level,
+    current_streak_weeks: streakWeeks,
     approved_spots_count: spotsCount ?? 0,
     approved_photos_count: photosCount ?? 0,
     status_confirmations_count: statusCount ?? 0,
     last_active_contribution_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id' });
+}
+
+/* ══════════════════════════════════════════
+   Public read helpers
+══════════════════════════════════════════ */
+
+/**
+ * Returns a lightweight XP summary for a user.
+ * Reads from user_stats (no recalculation).
+ */
+export async function getXPSummary(userId: string): Promise<{ lifetime_xp: number; current_level: string }> {
+  const sb = supabaseAdmin();
+  const { data } = await sb
+    .from('user_stats')
+    .select('lifetime_xp, current_level')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return {
+    lifetime_xp: data?.lifetime_xp ?? 0,
+    current_level: data?.current_level ?? 'Rookie',
+  };
 }
 
 /* ══════════════════════════════════════════

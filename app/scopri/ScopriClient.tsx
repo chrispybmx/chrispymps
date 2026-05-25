@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, REGIONI_ITALIA, DIFFICOLTA } from '@/lib/constants';
 import BottomNav from '@/components/BottomNav';
+import ActivityFeed from '@/components/ActivityFeed';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
 import { useToast } from '@/components/Toast';
@@ -256,6 +257,9 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
             </div>
           </div>
         )}
+
+        {/* Activity Feed — solo senza filtri attivi */}
+        {!anyFilter && <ActivityFeed />}
 
         {filtered.length === 0 && userResults.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', fontFamily: 'var(--font-mono)', color: 'var(--gray-500)', fontSize: 14 }}>

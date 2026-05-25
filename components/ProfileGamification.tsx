@@ -32,6 +32,7 @@ function getLevelInfo(xp: number) {
 interface Stats {
   lifetime_xp: number;
   current_level: string;
+  current_streak_weeks?: number;
 }
 
 interface Props {
@@ -57,6 +58,11 @@ export default function ProfileGamification({ username }: Props) {
   if (loading || !stats) return null;
 
   const level = getLevelInfo(stats.lifetime_xp);
+  const isMaxLevel = !level.next;
+  const streak = stats.current_streak_weeks ?? 0;
+
+  // Streak color: >=12w orange, >=4w yellow, else gray
+  const streakColor = streak >= 12 ? 'var(--orange)' : streak >= 4 ? '#f5c542' : 'var(--gray-500)';
 
   return (
     <div style={{
@@ -83,6 +89,43 @@ export default function ProfileGamification({ username }: Props) {
       }}>
         {stats.lifetime_xp} XP
       </div>
+
+      {/* Progress bar to next level */}
+      <div style={{
+        width: '100%', height: 3, borderRadius: 2,
+        background: 'var(--gray-700)', marginTop: 3,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%', borderRadius: 2,
+          width: `${level.progress}%`,
+          background: 'var(--orange)',
+          transition: 'width 0.3s ease',
+        }} />
+      </div>
+
+      {/* Progress text */}
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 8,
+        color: 'var(--gray-500)', textAlign: 'center',
+        marginTop: 1, lineHeight: 1.3,
+      }}>
+        {isMaxLevel
+          ? 'MAX'
+          : `${stats.lifetime_xp}/${level.nextThreshold} → ${level.next!.name}`
+        }
+      </div>
+
+      {/* Streak display */}
+      {streak > 0 && (
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9,
+          color: streakColor, marginTop: 2,
+          textAlign: 'center',
+        }}>
+          🔥 {streak}w streak
+        </div>
+      )}
     </div>
   );
 }

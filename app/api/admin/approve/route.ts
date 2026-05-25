@@ -73,7 +73,7 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
       user_id:   spot.submitted_by_user_id,
       type:      'spot_approved',
       title:     `"${spot.name}" è stato approvato! 🎉`,
-      body:      'Il tuo spot è ora visibile sulla mappa. Grazie per il contributo!',
+      body:      'Il tuo spot è ora visibile sulla mappa! +10 XP \ud83c\udf89',
       spot_slug: spot.slug,
     }).then(({ error }) => { if (error) console.error(error); });
   }
