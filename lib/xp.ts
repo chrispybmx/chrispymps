@@ -22,14 +22,14 @@ export const XP = {
   CORRECT_REPORT:           5,
 } as const;
 
-/* ── 7 Level thresholds (descending order for lookup) ── */
+/* ── 7 Level thresholds (Fibonacci ×10 scaling, descending order for lookup) ── */
 export const LEVELS: { threshold: number; name: string; key: string; image: string }[] = [
-  { threshold: 2500, name: 'Chrispy Scout',  key: 'chrispy-scout',  image: '/badges/level-7-chrispy-scout.png' },
-  { threshold: 1000, name: 'City Legend',     key: 'city-legend',     image: '/badges/level-6-city-legend.png' },
-  { threshold: 500,  name: 'Verified Rider',  key: 'verified-rider',  image: '/badges/level-5-verified-rider.png' },
-  { threshold: 200,  name: 'Local Scout',     key: 'local-scout',     image: '/badges/level-4-local-scout.png' },
-  { threshold: 75,   name: 'Spot Hunter',     key: 'spot-hunter',     image: '/badges/level-3-spot-hunter.png' },
-  { threshold: 25,   name: 'Local Rider',     key: 'local-rider',     image: '/badges/level-2-local-rider.png' },
+  { threshold: 6100, name: 'Chrispy Scout',  key: 'chrispy-scout',  image: '/badges/level-7-chrispy-scout.png' },
+  { threshold: 2330, name: 'City Legend',     key: 'city-legend',     image: '/badges/level-6-city-legend.png' },
+  { threshold: 890,  name: 'Verified Rider',  key: 'verified-rider',  image: '/badges/level-5-verified-rider.png' },
+  { threshold: 340,  name: 'Local Scout',     key: 'local-scout',     image: '/badges/level-4-local-scout.png' },
+  { threshold: 130,  name: 'Spot Hunter',     key: 'spot-hunter',     image: '/badges/level-3-spot-hunter.png' },
+  { threshold: 50,   name: 'Local Rider',     key: 'local-rider',     image: '/badges/level-2-local-rider.png' },
   { threshold: 0,    name: 'Rookie',          key: 'rookie',          image: '/badges/level-1-rookie.png' },
 ];
 

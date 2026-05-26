@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 
-/* ── 7 Levels (must match lib/xp.ts) ── */
+/* ── 7 Levels (must match lib/xp.ts — Fibonacci ×10 scaling) ── */
 const LEVELS = [
-  { threshold: 2500, name: 'Chrispy Scout',  image: '/badges/level-7-chrispy-scout.png' },
-  { threshold: 1000, name: 'City Legend',     image: '/badges/level-6-city-legend.png' },
-  { threshold: 500,  name: 'Verified Rider',  image: '/badges/level-5-verified-rider.png' },
-  { threshold: 200,  name: 'Local Scout',     image: '/badges/level-4-local-scout.png' },
-  { threshold: 75,   name: 'Spot Hunter',     image: '/badges/level-3-spot-hunter.png' },
-  { threshold: 25,   name: 'Local Rider',     image: '/badges/level-2-local-rider.png' },
+  { threshold: 6100, name: 'Chrispy Scout',  image: '/badges/level-7-chrispy-scout.png' },
+  { threshold: 2330, name: 'City Legend',     image: '/badges/level-6-city-legend.png' },
+  { threshold: 890,  name: 'Verified Rider',  image: '/badges/level-5-verified-rider.png' },
+  { threshold: 340,  name: 'Local Scout',     image: '/badges/level-4-local-scout.png' },
+  { threshold: 130,  name: 'Spot Hunter',     image: '/badges/level-3-spot-hunter.png' },
+  { threshold: 50,   name: 'Local Rider',     image: '/badges/level-2-local-rider.png' },
   { threshold: 0,    name: 'Rookie',          image: '/badges/level-1-rookie.png' },
 ];
 
