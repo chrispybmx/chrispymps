@@ -241,24 +241,24 @@ export default function ProfileClient({ profile, joinDate }: Props) {
         </div>
       )}
 
-      {/* Cancella profilo — link discreto (solo owner) */}
+      {/* Cancella profilo — nascosto in fondo, solo owner */}
       {isOwn && !editing && (
-        <div style={{ marginTop: 32, textAlign: 'right' }}>
+        <div style={{ marginTop: 80, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
           <button
             onClick={handleDeleteAccount}
             disabled={deleting}
             style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11,
-              color: 'var(--gray-600)',
+              fontFamily: 'var(--font-mono)', fontSize: 9,
+              color: 'var(--gray-700)',
               background: 'none', border: 'none', padding: 0,
               cursor: deleting ? 'default' : 'pointer',
               opacity: deleting ? 0.4 : 1,
               transition: 'color 0.15s',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-400)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-600)'; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-500)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-700)'; }}
           >
-            {deleting ? 'Eliminazione...' : 'Vuoi cancellare il profilo?'}
+            {deleting ? 'Eliminazione...' : 'Cancella profilo'}
           </button>
         </div>
       )}
