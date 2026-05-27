@@ -1,17 +1,15 @@
-'use client';
-
-import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
-
 const ERROR_MESSAGES: Record<string, string> = {
   wrong: 'Password errata.',
   rate: 'Troppi tentativi. Riprova tra qualche minuto.',
   missing: 'Password mancante.',
 };
 
-function LoginForm() {
-  const params = useSearchParams();
-  const errorKey = params.get('error');
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error: errorKey } = await searchParams;
   const error = errorKey ? ERROR_MESSAGES[errorKey] ?? 'Errore sconosciuto.' : '';
 
   return (
@@ -76,13 +74,5 @@ function LoginForm() {
         </form>
       </div>
     </div>
-  );
-}
-
-export default function AdminLoginPage() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
   );
 }
