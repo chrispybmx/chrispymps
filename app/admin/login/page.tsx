@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
@@ -21,8 +19,8 @@ export default function AdminLoginPage() {
       });
       const json = await res.json();
       if (json.ok) {
-        router.push('/admin');
-        router.refresh();
+        window.location.href = '/admin';
+        return;
       } else {
         setError('Password errata.');
       }
