@@ -58,25 +58,53 @@ export async function POST(req: NextRequest) {
   const ip = getIp(req);
   const { allowed, retryAfterSec } = checkRateLimit(ip);
 
+  const contentType = req.headers.get('content-type') ?? '';
+  const isFormPost = contentType.includes('application/x-www-form-urlencoded');
+  const baseUrl = req.nextUrl.origin;
+
   if (!allowed) {
     const minutes = Math.ceil((retryAfterSec ?? BLOCK_MS / 1000) / 60);
+    if (isFormPost) {
+      return NextResponse.redirect(`${baseUrl}/admin/login?error=rate`, { status: 303 });
+    }
     return NextResponse.json(
       { ok: false, error: `Troppi tentativi. Riprova tra ${minutes} minuti.` },
       { status: 429, headers: { 'Retry-After': String(retryAfterSec ?? 1800) } }
     );
   }
 
-  const { password } = await req.json().catch(() => ({ password: '' }));
+  let password = '';
+  if (isFormPost) {
+    const formData = await req.formData();
+    password = (formData.get('password') as string) ?? '';
+  } else {
+    const json = await req.json().catch(() => ({ password: '' }));
+    password = json.password ?? '';
+  }
+
   if (!password) {
+    if (isFormPost) {
+      return NextResponse.redirect(`${baseUrl}/admin/login?error=missing`, { status: 303 });
+    }
     return NextResponse.json({ ok: false, error: 'Password mancante' }, { status: 400 });
   }
 
   const { success, token } = loginAdmin(password);
   if (!success || !token) {
+    if (isFormPost) {
+      return NextResponse.redirect(`${baseUrl}/admin/login?error=wrong`, { status: 303 });
+    }
     return NextResponse.json({ ok: false, error: 'Password errata' }, { status: 401 });
   }
 
-  clearAttempts(ip); // login ok → azzera il contatore
+  clearAttempts(ip);
+
+  if (isFormPost) {
+    const res = NextResponse.redirect(`${baseUrl}/admin`, { status: 303 });
+    res.headers.set('Set-Cookie', adminSessionCookieHeader(token));
+    return res;
+  }
+
   const res = NextResponse.json({ ok: true });
   res.headers.set('Set-Cookie', adminSessionCookieHeader(token));
   return res;

@@ -1,36 +1,18 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function AdminLoginPage() {
-  const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+const ERROR_MESSAGES: Record<string, string> = {
+  wrong: 'Password errata.',
+  rate: 'Troppi tentativi. Riprova tra qualche minuto.',
+  missing: 'Password mancante.',
+};
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const json = await res.json();
-      if (json.ok) {
-        window.location.href = '/admin';
-        return;
-      } else {
-        setError('Password errata.');
-      }
-    } catch {
-      setError('Errore di rete.');
-    } finally {
-      setLoading(false);
-    }
-  };
+function LoginForm() {
+  const params = useSearchParams();
+  const errorKey = params.get('error');
+  const error = errorKey ? ERROR_MESSAGES[errorKey] ?? 'Errore sconosciuto.' : '';
 
   return (
     <div style={{
@@ -53,7 +35,7 @@ export default function AdminLoginPage() {
           <span style={{ fontSize: 14, color: 'var(--gray-400)' }}>CHRISPYMPS</span>
         </div>
 
-        <form onSubmit={handleSubmit} className="vhs-card" style={{ padding: 24 }}>
+        <form action="/api/admin/login" method="POST" className="vhs-card" style={{ padding: 24 }}>
           <div style={{ marginBottom: 16 }}>
             <label style={{
               display: 'block',
@@ -66,9 +48,8 @@ export default function AdminLoginPage() {
             </label>
             <input
               type="password"
+              name="password"
               className="input-vhs"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
               required
@@ -87,14 +68,21 @@ export default function AdminLoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
             className="btn-primary"
-            style={{ width: '100%', justifyContent: 'center', opacity: loading ? 0.6 : 1 }}
+            style={{ width: '100%', justifyContent: 'center' }}
           >
-            {loading ? 'ACCESSO...' : 'ACCEDI'}
+            ACCEDI
           </button>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

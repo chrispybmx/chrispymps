@@ -50,9 +50,10 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Non intercettare richieste non-GET o verso Supabase API
+  // Non intercettare richieste non-GET, Supabase, o admin routes
   if (request.method !== 'GET') return;
   if (url.hostname.includes('supabase.co')) return;
+  if (url.pathname.startsWith('/admin')) return;
 
   // Tile OSM → cache-first con TTL 7 giorni
   if (OSM_TILE_ORIGINS.some((origin) => request.url.startsWith(origin))) {
