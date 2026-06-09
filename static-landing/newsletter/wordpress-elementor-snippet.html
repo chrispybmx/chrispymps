@@ -1,0 +1,194 @@
+<!--
+  ChrispyBMX — Newsletter landing per WordPress + Elementor
+  ============================================================
+  COME USARLO:
+  1. WP Admin → Pagine → Aggiungi nuova → titolo "Newsletter", slug "newsletter".
+  2. Template pagina: "Elementor Canvas" (a tutto schermo, niente header/footer del tema).
+  3. Modifica con Elementor → trascina il widget "HTML" → incolla TUTTO il contenuto qui sotto.
+  4. Pubblica. URL: https://chrispybmx.com/newsletter
+  NOTE:
+  - Tutto il CSS è scoped sotto .cbmx-nl → non tocca il resto del sito.
+  - Il form invia a maps.chrispybmx.com/api/newsletter/subscribe (CORS già abilitato).
+  - Per title/description SEO usa le impostazioni pagina / plugin SEO.
+-->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Barlow+Condensed:wght@400;600;700&display=swap');
+
+.cbmx-nl {
+  --cb-orange: #ff6a00; --cb-black: #0a0a0a; --cb-bone: #f3ead8; --cb-coffee: #ffce4d;
+  --cb-g800: #1a1a1a; --cb-g700: #2a2a2a; --cb-g600: #3a3a3a; --cb-g400: #888; --cb-g200: #ccc;
+  --cb-mono: 'VT323', monospace; --cb-disp: 'Barlow Condensed', sans-serif;
+  background: var(--cb-black); color: var(--cb-bone); font-family: var(--cb-disp);
+  line-height: 1.4; margin: 0; overflow-x: hidden; position: relative;
+  min-height: 100vh; min-height: 100dvh;
+}
+.cbmx-nl *, .cbmx-nl *::before, .cbmx-nl *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.cbmx-nl a { color: inherit; text-decoration: none; }
+
+.cbmx-nl .cb-vhs {
+  pointer-events: none; position: absolute; inset: 0; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 4px);
+  mix-blend-mode: multiply;
+}
+.cbmx-nl .cb-content { position: relative; z-index: 2; }
+
+.cbmx-nl .cb-wrap { margin: 0 auto; padding-left: 20px; padding-right: 20px; }
+.cbmx-nl .cb-hero { max-width: 680px; text-align: center; padding-top: 80px; padding-bottom: 64px; }
+@media (min-width: 640px) { .cbmx-nl .cb-hero { padding-top: 112px; } }
+
+.cbmx-nl .cb-kicker {
+  display: inline-block; border: 1px solid rgba(255,106,0,.4); border-radius: 999px;
+  padding: 5px 16px; margin-bottom: 20px;
+  font-family: var(--cb-mono); font-size: 13px; text-transform: uppercase; letter-spacing: .18em; color: var(--cb-orange);
+}
+.cbmx-nl h1 { font-family: var(--cb-mono); font-weight: 400; color: var(--cb-bone); font-size: 40px; line-height: 1.0; }
+@media (min-width: 640px) { .cbmx-nl h1 { font-size: 56px; } }
+
+.cbmx-nl .cb-glitch { position: relative; display: inline-block; }
+.cbmx-nl .cb-glitch::before, .cbmx-nl .cb-glitch::after { content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.cbmx-nl .cb-glitch::before { color: var(--cb-orange); animation: cbGb 2.5s infinite; clip-path: polygon(0 0,100% 0,100% 35%,0 35%); }
+.cbmx-nl .cb-glitch::after  { color: var(--cb-coffee); animation: cbGa 2.5s infinite; clip-path: polygon(0 65%,100% 65%,100% 100%,0 100%); }
+@keyframes cbGb { 0%,90%,100%{transform:translate(0)} 92%{transform:translate(-2px,1px)} 94%{transform:translate(2px,-1px)} 96%{transform:translate(-1px,0)} }
+@keyframes cbGa { 0%,90%,100%{transform:translate(0)} 92%{transform:translate(2px,-1px)} 94%{transform:translate(-2px,1px)} 96%{transform:translate(1px,0)} }
+@media (prefers-reduced-motion: reduce) { .cbmx-nl .cb-glitch::before, .cbmx-nl .cb-glitch::after { animation: none; } }
+
+.cbmx-nl .cb-lead { margin: 24px auto 0; max-width: 560px; font-size: 20px; color: var(--cb-g200); }
+
+.cbmx-nl .cb-form { margin: 36px auto 0; max-width: 460px; }
+.cbmx-nl .cb-row { display: flex; flex-direction: column; gap: 12px; }
+@media (min-width: 640px) { .cbmx-nl .cb-row { flex-direction: row; } }
+.cbmx-nl input[type=email] {
+  flex: 1; min-width: 0; border: 1px solid var(--cb-g600); background: var(--cb-g800);
+  border-radius: 8px; padding: 13px 16px; color: var(--cb-bone); font-family: var(--cb-disp); font-size: 16px; outline: none; transition: border-color .15s;
+}
+.cbmx-nl input[type=email]::placeholder { color: var(--cb-g400); }
+.cbmx-nl input[type=email]:focus { border-color: var(--cb-orange); }
+.cbmx-nl button {
+  white-space: nowrap; border: none; border-radius: 8px; padding: 13px 26px; cursor: pointer;
+  background: var(--cb-orange); color: #000; box-shadow: 0 0 20px rgba(255,106,0,.3);
+  font-family: var(--cb-mono); font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; transition: box-shadow .15s, transform .05s;
+}
+.cbmx-nl button:hover:not(:disabled) { box-shadow: 0 0 40px rgba(255,106,0,.45); }
+.cbmx-nl button:active:not(:disabled) { transform: scale(.96); }
+.cbmx-nl button:disabled { opacity: .75; cursor: default; }
+.cbmx-nl button.cb-done { background: var(--cb-g700); color: var(--cb-g400); box-shadow: none; }
+.cbmx-nl .cb-msg { margin-top: 12px; min-height: 20px; font-family: var(--cb-mono); font-size: 14px; color: var(--cb-g400); }
+.cbmx-nl .cb-msg.cb-ok { color: var(--cb-coffee); }
+.cbmx-nl .cb-msg.cb-err { color: var(--cb-orange); }
+
+.cbmx-nl .cb-band { border-top: 1px solid var(--cb-g800); background: rgba(26,26,26,.4); }
+.cbmx-nl .cb-sec { padding-top: 64px; padding-bottom: 64px; }
+.cbmx-nl h2 { font-family: var(--cb-mono); font-weight: 400; text-transform: uppercase; letter-spacing: .03em; color: var(--cb-orange); font-size: 28px; text-align: center; margin-bottom: 40px; }
+
+.cbmx-nl .cb-grid { margin: 0 auto; max-width: 760px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 640px) { .cbmx-nl .cb-grid { grid-template-columns: 1fr 1fr; } }
+.cbmx-nl .cb-card { border: 1px solid var(--cb-g700); background: rgba(10,10,10,.4); border-radius: 12px; padding: 20px; transition: border-color .15s; }
+.cbmx-nl .cb-card:hover { border-color: rgba(255,106,0,.5); }
+.cbmx-nl .cb-card .cb-ic { font-size: 26px; }
+.cbmx-nl .cb-card h3 { font-family: var(--cb-mono); font-weight: 400; font-size: 20px; color: var(--cb-bone); margin-top: 12px; }
+.cbmx-nl .cb-card p { font-size: 16px; color: var(--cb-g200); margin-top: 4px; }
+
+.cbmx-nl .cb-center { max-width: 560px; margin: 0 auto; text-align: center; }
+.cbmx-nl .cb-center p { font-size: 20px; color: var(--cb-g200); }
+.cbmx-nl .cb-social { margin-top: 24px; display: flex; gap: 20px; justify-content: center; font-family: var(--cb-mono); font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
+.cbmx-nl .cb-social a:hover { color: var(--cb-orange); }
+
+.cbmx-nl .cb-foot { padding: 40px 20px; text-align: center; font-family: var(--cb-mono); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--cb-g400); }
+.cbmx-nl .cb-foot .cb-links { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: center; }
+.cbmx-nl .cb-foot a:hover { color: var(--cb-orange); }
+.cbmx-nl .cb-foot .cb-copy { margin-top: 16px; color: var(--cb-g600); }
+</style>
+
+<div class="cbmx-nl">
+  <div class="cb-vhs" aria-hidden="true"></div>
+  <div class="cb-content">
+
+    <section class="cb-wrap cb-hero" id="cb-iscriviti">
+      <span class="cb-kicker">📬 Newsletter settimanale</span>
+      <h1><span class="cb-glitch" data-text="Cinque cose dal mondo BMX">Cinque cose dal mondo BMX</span></h1>
+      <p class="cb-lead">Ogni lunedì mattina. Le cinque cose che valgono dalla settimana di freestyle mondiale — spot, trick, scena italiana, il video da non perdere. Raccontate da uno che ci gira dentro.</p>
+
+      <form class="cb-form" id="cb-form" novalidate>
+        <div class="cb-row">
+          <label for="cb-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">La tua email</label>
+          <input id="cb-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="la tua email" required />
+          <button type="submit" id="cb-btn">Iscriviti</button>
+        </div>
+        <p class="cb-msg" id="cb-msg" aria-live="polite">Tre minuti di lettura. Zero spam. Disiscrizione con un click.</p>
+      </form>
+    </section>
+
+    <section class="cb-band">
+      <div class="cb-wrap cb-sec">
+        <h2>Cosa trovi dentro</h2>
+        <div class="cb-grid">
+          <div class="cb-card"><span class="cb-ic">🛹</span><h3>Spot nuovi</h3><p>I posti dove girano i rider, spesso prima che li trovi su Google.</p></div>
+          <div class="cb-card"><span class="cb-ic">🎬</span><h3>Video della settimana</h3><p>L'edit che vale i tuoi tre minuti, scelto a mano. Niente algoritmo.</p></div>
+          <div class="cb-card"><span class="cb-ic">🇮🇹</span><h3>Scena italiana</h3><p>Contest, jam e gente da seguire — anche vicino a te.</p></div>
+          <div class="cb-card"><span class="cb-ic">🔧</span><h3>Trick &amp; setup</h3><p>Un consiglio pratico a settimana per la bici e per i tuoi trick.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cb-wrap cb-sec">
+      <div class="cb-center">
+        <h2>Chi scrive</h2>
+        <p>Sono Chrispy. Giro in BMX, filmo, e ogni settimana metto insieme le cose che mi hanno acceso. Niente fuffa, niente sponsor mascherati — solo quello che guarderei io.</p>
+        <div class="cb-social">
+          <a href="https://www.youtube.com/@chrispy_bmx" target="_blank" rel="noopener noreferrer">YouTube ↗</a>
+          <a href="https://www.instagram.com/chriceresato" target="_blank" rel="noopener noreferrer">Instagram ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="cb-band">
+      <div class="cb-wrap cb-sec">
+        <div class="cb-center">
+          <h2 style="color:var(--cb-bone)">Niente impegno. Un click per uscire.</h2>
+          <p style="font-size:16px">Unisciti ai rider che ogni lunedì leggono prima di salire in sella.</p>
+          <p style="margin-top:24px"><a href="#cb-iscriviti" style="font-family:var(--cb-mono);font-size:18px;text-transform:uppercase;letter-spacing:.06em;color:var(--cb-orange)">↑ Iscriviti ora</a></p>
+        </div>
+      </div>
+    </section>
+
+    <div class="cb-foot">
+      <div class="cb-links">
+        <a href="https://maps.chrispybmx.com/map" target="_blank" rel="noopener">Mappa spot ↗</a>
+        <a href="https://maps.chrispybmx.com/privacy" target="_blank" rel="noopener">Privacy</a>
+      </div>
+      <p class="cb-copy">© <span id="cb-yr"></span> Chrispy BMX</p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  var API = 'https://maps.chrispybmx.com/api/newsletter/subscribe';
+  var root = document.querySelector('.cbmx-nl');
+  if (!root) return;
+  var yr = root.querySelector('#cb-yr'); if (yr) yr.textContent = new Date().getFullYear();
+  var form = root.querySelector('#cb-form');
+  var input = root.querySelector('#cb-email');
+  var btn = root.querySelector('#cb-btn');
+  var msg = root.querySelector('#cb-msg');
+  var sent = false;
+  function setMsg(t, k) { msg.textContent = t; msg.className = 'cb-msg' + (k ? ' ' + k : ''); }
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (sent) return;
+    var email = (input.value || '').trim();
+    if (!email || email.indexOf('@') === -1) { setMsg('Email non valida.', 'cb-err'); return; }
+    btn.disabled = true; btn.textContent = '...'; setMsg('', '');
+    fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, username: email.split('@')[0], source: 'newsletter' }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        if (d && d.ok) { sent = true; btn.textContent = '✓ Iscritto'; btn.className = 'cb-done'; input.disabled = true;
+          setMsg('Iscritto! Lunedì mattina ti arriva la prima newsletter.', 'cb-ok'); }
+        else { btn.disabled = false; btn.textContent = 'Iscriviti'; setMsg((d && d.error) || 'Qualcosa non ha funzionato. Riprova.', 'cb-err'); }
+      })
+      .catch(function () { btn.disabled = false; btn.textContent = 'Iscriviti'; setMsg('Errore di rete. Riprova.', 'cb-err'); });
+  });
+})();
+</script>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Newsletter — Cinque cose dal mondo BMX | Chrispy BMX</title>
+<meta name="description" content="Ogni lunedì cinque cose dal mondo BMX: spot nuovi, il video della settimana, la scena italiana e un consiglio pratico. Tre minuti di lettura, zero spam." />
+<link rel="canonical" href="https://chrispybmx.com/newsletter" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="it_IT" />
+<meta property="og:url" content="https://chrispybmx.com/newsletter" />
+<meta property="og:title" content="Newsletter — Cinque cose dal mondo BMX" />
+<meta property="og:description" content="Ogni lunedì cinque cose dal mondo BMX. Spot, video, scena italiana. Tre minuti, zero spam." />
+<meta name="theme-color" content="#ff6a00" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --orange: #ff6a00;
+    --black:  #0a0a0a;
+    --bone:   #f3ead8;
+    --coffee: #ffce4d;
+    --gray-800: #1a1a1a;
+    --gray-700: #2a2a2a;
+    --gray-600: #3a3a3a;
+    --gray-400: #888;
+    --gray-200: #ccc;
+    --mono: 'VT323', monospace;
+    --display: 'Barlow Condensed', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--black);
+    color: var(--bone);
+    font-family: var(--display);
+    line-height: 1.4;
+    overflow-x: hidden;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a { color: inherit; }
+
+  /* Scanlines overlay VHS */
+  .vhs {
+    pointer-events: none; position: fixed; inset: 0; z-index: 9999;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 4px);
+    mix-blend-mode: multiply;
+  }
+
+  .wrap { margin: 0 auto; padding-left: 20px; padding-right: 20px; }
+  .hero  { max-width: 680px; text-align: center; padding-top: 80px; padding-bottom: 64px; }
+  @media (min-width: 640px) { .hero { padding-top: 112px; } }
+
+  .kicker {
+    display: inline-block; border: 1px solid rgba(255,106,0,.4); border-radius: 999px;
+    padding: 5px 16px; margin-bottom: 20px;
+    font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: .18em;
+    color: var(--orange);
+  }
+
+  h1 {
+    font-family: var(--mono); font-weight: 400; color: var(--bone);
+    font-size: 40px; line-height: 1.0;
+  }
+  @media (min-width: 640px) { h1 { font-size: 56px; } }
+
+  /* Glitch */
+  .glitch { position: relative; display: inline-block; }
+  .glitch::before, .glitch::after {
+    content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  }
+  .glitch::before { color: var(--orange); animation: gb 2.5s infinite; clip-path: polygon(0 0,100% 0,100% 35%,0 35%); }
+  .glitch::after  { color: var(--coffee); animation: ga 2.5s infinite; clip-path: polygon(0 65%,100% 65%,100% 100%,0 100%); }
+  @keyframes gb { 0%,90%,100%{transform:translate(0)} 92%{transform:translate(-2px,1px)} 94%{transform:translate(2px,-1px)} 96%{transform:translate(-1px,0)} }
+  @keyframes ga { 0%,90%,100%{transform:translate(0)} 92%{transform:translate(2px,-1px)} 94%{transform:translate(-2px,1px)} 96%{transform:translate(1px,0)} }
+  @media (prefers-reduced-motion: reduce) { .glitch::before, .glitch::after { animation: none; } }
+
+  .lead { margin: 24px auto 0; max-width: 560px; font-size: 20px; color: var(--gray-200); }
+
+  /* Form */
+  .form { margin: 36px auto 0; max-width: 460px; }
+  .row { display: flex; flex-direction: column; gap: 12px; }
+  @media (min-width: 640px) { .row { flex-direction: row; } }
+  input[type=email] {
+    flex: 1; min-width: 0; border: 1px solid var(--gray-600); background: var(--gray-800);
+    border-radius: 8px; padding: 13px 16px; color: var(--bone); font: inherit; font-size: 16px; outline: none;
+    transition: border-color .15s;
+  }
+  input[type=email]::placeholder { color: var(--gray-400); }
+  input[type=email]:focus { border-color: var(--orange); }
+  button {
+    white-space: nowrap; border: none; border-radius: 8px; padding: 13px 26px; cursor: pointer;
+    background: var(--orange); color: #000; box-shadow: 0 0 20px rgba(255,106,0,.3);
+    font-family: var(--mono); font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    transition: box-shadow .15s, transform .05s;
+  }
+  button:hover:not(:disabled) { box-shadow: 0 0 40px rgba(255,106,0,.45); }
+  button:active:not(:disabled) { transform: scale(.96); }
+  button:disabled { opacity: .75; cursor: default; }
+  button.done { background: var(--gray-700); color: var(--gray-400); box-shadow: none; }
+  .msg { margin-top: 12px; min-height: 20px; font-family: var(--mono); font-size: 14px; color: var(--gray-400); }
+  .msg.ok  { color: var(--coffee); }
+  .msg.err { color: var(--orange); }
+
+  /* Sections */
+  section.band { border-top: 1px solid var(--gray-800); background: rgba(26,26,26,.4); }
+  .sec { padding-top: 64px; padding-bottom: 64px; }
+  h2 { font-family: var(--mono); font-weight: 400; text-transform: uppercase; letter-spacing: .03em; }
+  .h2-orange { color: var(--orange); font-size: 28px; text-align: center; margin-bottom: 40px; }
+
+  .grid { margin: 0 auto; max-width: 760px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
+  .card { border: 1px solid var(--gray-700); background: rgba(10,10,10,.4); border-radius: 12px; padding: 20px; transition: border-color .15s; }
+  .card:hover { border-color: rgba(255,106,0,.5); }
+  .card .ic { font-size: 26px; }
+  .card h3 { font-family: var(--mono); font-weight: 400; font-size: 20px; color: var(--bone); margin-top: 12px; }
+  .card p { font-size: 16px; color: var(--gray-200); margin-top: 4px; }
+
+  .center { max-width: 560px; margin: 0 auto; text-align: center; }
+  .center p { font-size: 20px; color: var(--gray-200); }
+  .social { margin-top: 24px; display: flex; gap: 20px; justify-content: center; font-family: var(--mono); font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
+  .social a { text-decoration: none; transition: color .15s; }
+  .social a:hover { color: var(--orange); }
+
+  footer { padding: 40px 20px; text-align: center; font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-400); }
+  footer .links { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: center; }
+  footer a { text-decoration: none; transition: color .15s; }
+  footer a:hover { color: var(--orange); }
+  footer .copy { margin-top: 16px; color: var(--gray-600); }
+</style>
+</head>
+<body>
+<div class="vhs" aria-hidden="true"></div>
+
+<main>
+  <!-- HERO -->
+  <section class="wrap hero" id="iscriviti">
+    <span class="kicker">📬 Newsletter settimanale</span>
+    <h1><span class="glitch" data-text="Cinque cose dal mondo BMX">Cinque cose dal mondo BMX</span></h1>
+    <p class="lead">
+      Ogni lunedì mattina. Le cinque cose che valgono dalla settimana di freestyle mondiale —
+      spot, trick, scena italiana, il video da non perdere. Raccontate da uno che ci gira dentro.
+    </p>
+
+    <form class="form" id="nl-form" novalidate>
+      <div class="row">
+        <label for="nl-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">La tua email</label>
+        <input id="nl-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="la tua email" required />
+        <button type="submit" id="nl-btn">Iscriviti</button>
+      </div>
+      <p class="msg" id="nl-msg" aria-live="polite">Tre minuti di lettura. Zero spam. Disiscrizione con un click.</p>
+    </form>
+  </section>
+
+  <!-- COSA TROVI -->
+  <section class="band">
+    <div class="wrap sec">
+      <h2 class="h2-orange">Cosa trovi dentro</h2>
+      <div class="grid">
+        <div class="card"><span class="ic">🛹</span><h3>Spot nuovi</h3><p>I posti dove girano i rider, spesso prima che li trovi su Google.</p></div>
+        <div class="card"><span class="ic">🎬</span><h3>Video della settimana</h3><p>L'edit che vale i tuoi tre minuti, scelto a mano. Niente algoritmo.</p></div>
+        <div class="card"><span class="ic">🇮🇹</span><h3>Scena italiana</h3><p>Contest, jam e gente da seguire — anche vicino a te.</p></div>
+        <div class="card"><span class="ic">🔧</span><h3>Trick &amp; setup</h3><p>Un consiglio pratico a settimana per la bici e per i tuoi trick.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHI SCRIVE -->
+  <section class="wrap sec">
+    <div class="center">
+      <h2 class="h2-orange">Chi scrive</h2>
+      <p>Sono Chrispy. Giro in BMX, filmo, e ogni settimana metto insieme le cose che mi hanno acceso. Niente fuffa, niente sponsor mascherati — solo quello che guarderei io.</p>
+      <div class="social">
+        <a href="https://www.youtube.com/@chrispy_bmx" target="_blank" rel="noopener noreferrer">YouTube ↗</a>
+        <a href="https://www.instagram.com/chriceresato" target="_blank" rel="noopener noreferrer">Instagram ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINALE -->
+  <section class="band">
+    <div class="wrap sec">
+      <div class="center">
+        <h2 style="font-size:28px;color:var(--bone)">Niente impegno. Un click per uscire.</h2>
+        <p style="margin-top:12px;font-size:16px">Unisciti ai rider che ogni lunedì leggono prima di salire in sella.</p>
+        <p style="margin-top:24px"><a href="#iscriviti" style="font-family:var(--mono);font-size:18px;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);text-decoration:none">↑ Iscriviti ora</a></p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="links">
+      <a href="https://maps.chrispybmx.com/map">Mappa spot ↗</a>
+      <a href="https://maps.chrispybmx.com/privacy">Privacy</a>
+      <a href="https://chrispybmx.com">chrispybmx.com</a>
+    </div>
+    <p class="copy">© <span id="yr"></span> Chrispy BMX</p>
+  </footer>
+</main>
+
+<script>
+  // Endpoint backend (app Next su Vercel). CORS abilitato per https://chrispybmx.com
+  var API = 'https://maps.chrispybmx.com/api/newsletter/subscribe';
+
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  var form = document.getElementById('nl-form');
+  var input = document.getElementById('nl-email');
+  var btn = document.getElementById('nl-btn');
+  var msg = document.getElementById('nl-msg');
+  var sent = false;
+
+  function setMsg(text, kind) {
+    msg.textContent = text;
+    msg.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (sent) return;
+    var email = input.value.trim();
+    if (!email || email.indexOf('@') === -1) { setMsg('Email non valida.', 'err'); return; }
+
+    btn.disabled = true; btn.textContent = '...';
+    setMsg('', '');
+
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, username: email.split('@')[0], source: 'newsletter' }),
+    })
+    .then(function (r) { return r.json().catch(function () { return {}; }); })
+    .then(function (data) {
+      if (data && data.ok) {
+        sent = true;
+        btn.textContent = '✓ Iscritto'; btn.className = 'done';
+        input.disabled = true;
+        setMsg('Iscritto! Lunedì mattina ti arriva la prima newsletter.', 'ok');
+      } else {
+        btn.disabled = false; btn.textContent = 'Iscriviti';
+        setMsg((data && data.error) || 'Qualcosa non ha funzionato. Riprova.', 'err');
+      }
+    })
+    .catch(function () {
+      btn.disabled = false; btn.textContent = 'Iscriviti';
+      setMsg('Errore di rete. Riprova.', 'err');
+    });
+  });
+</script>
+</body>
+</html>
