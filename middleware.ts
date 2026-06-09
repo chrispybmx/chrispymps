@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * Middleware centralizzato per:
@@ -6,6 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
  * 2. Rate limiting sul login admin (basato su IP)
  * 3. Rate limiting sull'endpoint flag (anti-spam)
  * 4. Header di sicurezza aggiuntivi sulle API
+ *
+ * Il rate limiting è in lib/rate-limit.ts: usa Upstash Redis se configurato
+ * (limite condiviso fra istanze), altrimenti fallback in-memory per-istanza.
  */
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -48,12 +52,6 @@ function generateNonce(): string {
   return crypto.randomUUID();
 }
 
-// ── In-memory store per rate limiting (per Lambda instance) ──
-// In produzione con molte istanze, usare Vercel KV / Upstash Redis
-// Questo limita comunque gli attacchi rapidi sulla stessa istanza
-interface RateLimitEntry { count: number; resetAt: number }
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
 function getClientIp(req: NextRequest): string {
   // Su Vercel, x-real-ip è impostato dall'infrastruttura e non può essere
   // falsificato dall'utente. x-forwarded-for invece può essere spoofato
@@ -74,39 +72,7 @@ function getClientIp(req: NextRequest): string {
   return 'unknown';
 }
 
-function checkRateLimit(
-  key: string,
-  maxRequests: number,
-  windowMs: number
-): { allowed: boolean; remaining: number; resetAt: number } {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-
-  if (!entry || now > entry.resetAt) {
-    // Prima richiesta o finestra scaduta
-    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, remaining: maxRequests - 1, resetAt: now + windowMs };
-  }
-
-  if (entry.count >= maxRequests) {
-    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
-  }
-
-  entry.count++;
-  return { allowed: true, remaining: maxRequests - entry.count, resetAt: entry.resetAt };
-}
-
-// Pulizia periodica del store (evita memory leak)
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitStore.entries()) {
-      if (now > entry.resetAt) rateLimitStore.delete(key);
-    }
-  }, 60_000);
-}
-
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const ip = getClientIp(req);
 
@@ -131,7 +97,7 @@ export function middleware(req: NextRequest) {
 
   // ── 1. Rate limit sul login admin: 10 tentativi / 15 minuti per IP ──
   if (pathname === '/api/admin/login' && req.method === 'POST') {
-    const { allowed, remaining, resetAt } = checkRateLimit(
+    const { allowed, remaining, resetAt } = await checkRateLimit(
       `login:${ip}`,
       10,
       15 * 60 * 1000 // 15 minuti
@@ -158,7 +124,7 @@ export function middleware(req: NextRequest) {
 
   // ── 2. Rate limit sul flag: 5 segnalazioni / 10 minuti per IP ──
   if (pathname === '/api/flag' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`flag:${ip}`, 5, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`flag:${ip}`, 5, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json(
         { ok: false, error: 'Troppe segnalazioni. Riprova più tardi.' },
@@ -169,7 +135,7 @@ export function middleware(req: NextRequest) {
 
   // ── 3. Rate limit sullo submit-spot: 10 spot / 5 minuti per IP ──
   if (pathname === '/api/submit-spot' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`submit:${ip}`, 10, 5 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`submit:${ip}`, 10, 5 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json(
         { ok: false, error: 'Troppi invii. Riprova tra qualche minuto.' },
@@ -180,7 +146,7 @@ export function middleware(req: NextRequest) {
 
   // ── 4. Rate limit sui commenti: 10 commenti / 5 minuti per IP ──
   if (pathname.startsWith('/api/comments/') && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`comment:${ip}`, 10, 5 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`comment:${ip}`, 10, 5 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json(
         { ok: false, error: 'Troppi commenti. Riprova tra qualche minuto.' },
@@ -191,7 +157,7 @@ export function middleware(req: NextRequest) {
 
   // ── 5. Rate limit su resolve-gmaps: 20 richieste / 10 minuti per IP ──
   if (pathname === '/api/resolve-gmaps' && req.method === 'GET') {
-    const { allowed } = checkRateLimit(`gmaps:${ip}`, 20, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`gmaps:${ip}`, 20, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json(
         { ok: false, error: 'Troppe richieste. Riprova tra qualche minuto.' },
@@ -202,7 +168,7 @@ export function middleware(req: NextRequest) {
 
   // ── 6. Rate limit su upload immagini: 10 / 10 minuti per IP ──
   if (pathname === '/api/upload-image' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`upload:${ip}`, 10, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`upload:${ip}`, 10, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppi upload. Riprova tra qualche minuto.' }, { status: 429 });
     }
@@ -210,7 +176,7 @@ export function middleware(req: NextRequest) {
 
   // ── 7. Rate limit su photo upload spot: 5 / 10 minuti per IP ──
   if (pathname === '/api/spot-photos' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`spotphoto:${ip}`, 5, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`spotphoto:${ip}`, 5, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppi upload foto. Riprova tra qualche minuto.' }, { status: 429 });
     }
@@ -218,7 +184,7 @@ export function middleware(req: NextRequest) {
 
   // ── 8. Rate limit su submit event/news: 3 / 10 minuti per IP ──
   if ((pathname === '/api/submit-event' || pathname === '/api/submit-news') && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`community:${ip}`, 3, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`community:${ip}`, 3, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppi invii. Riprova tra qualche minuto.' }, { status: 429 });
     }
@@ -226,7 +192,7 @@ export function middleware(req: NextRequest) {
 
   // ── 9. Rate limit su status confirm: 10 / 10 minuti per IP ──
   if (pathname === '/api/status-confirm' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`status:${ip}`, 10, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`status:${ip}`, 10, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppe conferme. Riprova tra qualche minuto.' }, { status: 429 });
     }
@@ -234,7 +200,7 @@ export function middleware(req: NextRequest) {
 
   // ── 10. Rate limit newsletter subscribe: 3 / 10 minuti per IP ──
   if (pathname === '/api/newsletter/subscribe' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`newsletter:${ip}`, 3, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`newsletter:${ip}`, 3, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppe richieste. Riprova tra qualche minuto.' }, { status: 429 });
     }
@@ -242,7 +208,7 @@ export function middleware(req: NextRequest) {
 
   // ── 11. Rate limit event RSVP: 5 / 10 minuti per IP ──
   if (pathname === '/api/events/jamroma/rsvp' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`rsvp:${ip}`, 5, 10 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`rsvp:${ip}`, 5, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppe richieste.' }, { status: 429 });
     }
@@ -250,7 +216,7 @@ export function middleware(req: NextRequest) {
 
   // ── 12. Rate limit event presence: 30 / 5 minuti per IP (heartbeat ogni 30s) ──
   if (pathname === '/api/events/jamroma/presence' && req.method === 'POST') {
-    const { allowed } = checkRateLimit(`presence:${ip}`, 30, 5 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`presence:${ip}`, 30, 5 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppe richieste.' }, { status: 429 });
     }
@@ -258,7 +224,7 @@ export function middleware(req: NextRequest) {
 
   // ── 13. Rate limit account deletion: 3 / 60 minuti per IP ──
   if (pathname === '/api/user/delete' && req.method === 'DELETE') {
-    const { allowed } = checkRateLimit(`userdel:${ip}`, 3, 60 * 60 * 1000);
+    const { allowed } = await checkRateLimit(`userdel:${ip}`, 3, 60 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppe richieste. Riprova tra qualche minuto.' }, { status: 429 });
     }

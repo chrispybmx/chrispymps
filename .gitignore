@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+.env*.bak
+*.bak
 
 # Next.js
 .next/
@@ -17,6 +19,10 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# Scratch / generated assets (non parte del sito)
+ChatGPT Image*.png
+.agents/
 
 # Output temporanei
 tmp/
