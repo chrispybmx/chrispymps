@@ -32,7 +32,7 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
     setMessage('');
 
     try {
-      const res = await fetch('/api/newsletter/subscribe', {
+      const res = await fetch('https://maps.chrispybmx.com/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, username: email.split('@')[0], source: 'newsletter' }),
@@ -45,7 +45,8 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
         setStatus('error');
         setMessage(data.error || 'Qualcosa non ha funzionato. Riprova.');
       }
-    } catch {
+    } catch (err) {
+      console.error('Newsletter subscribe error:', err);
       setStatus('error');
       setMessage('Errore di rete. Riprova.');
     }
