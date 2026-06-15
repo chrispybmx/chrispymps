@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 /**
- * Form iscrizione newsletter ottimizzato per la landing /newsletter.
- * Stessa logica di NewsletterSignup ma layout grande, conversion-first.
- * Endpoint: POST /api/newsletter/subscribe (source: 'newsletter')
+ * Newsletter landing form — GDPR compliant subscription.
+ * Source: 'newsletter' (all users → Newsletter BMX Settimanale group)
+ * Requires explicit GDPR consent checkbox before submit.
  */
 export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string }) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
-  const [alsoNewsletter, setAlsoNewsletter] = useState(true);
+  const [consentGDPR, setConsentGDPR] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
@@ -20,6 +22,11 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
       setMessage('Email non valida.');
       return;
     }
+    if (!consentGDPR) {
+      setStatus('error');
+      setMessage('Devi accettare per iscriverti.');
+      return;
+    }
 
     setStatus('loading');
     setMessage('');
@@ -28,14 +35,12 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
       const res = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username: email.split('@')[0], alsoNewsletter }),
+        body: JSON.stringify({ email, username: email.split('@')[0], source: 'newsletter' }),
       });
       const data = await res.json();
 
       if (data.ok) {
-        setStatus('success');
-        setMessage('Iscritto! Riceverai gli aggiornamenti da Chrispy Maps.');
-        setEmail('');
+        setTimeout(() => router.push('/newsletter-grazie/'), 500);
       } else {
         setStatus('error');
         setMessage(data.error || 'Qualcosa non ha funzionato. Riprova.');
@@ -51,7 +56,7 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
 
   return (
     <div className="w-full max-w-md">
-      <form onSubmit={submit} className="flex flex-col gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <label htmlFor={id} className="sr-only">La tua email</label>
           <input
@@ -68,37 +73,47 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
           />
           <button
             type="submit"
-            disabled={busy || done}
+            disabled={busy || done || !consentGDPR}
             className={`whitespace-nowrap rounded-lg px-6 py-3 font-mono text-vhs-base font-bold uppercase tracking-wider transition-all ${
               done
                 ? 'cursor-default bg-gray-700 text-gray-400'
                 : 'bg-orange text-black shadow-vhs hover:shadow-vhs-lg active:scale-95'
-            } ${busy ? 'cursor-wait opacity-80' : ''}`}
+            } ${busy ? 'cursor-wait opacity-80' : ''} ${!consentGDPR ? 'opacity-60' : ''}`}
           >
             {busy ? '...' : done ? '✓ Iscritto' : 'Iscriviti'}
           </button>
         </div>
 
-        <label className="flex items-center gap-2 cursor-pointer text-vhs-sm text-gray-300">
+        <div className="text-vhs-xs text-gray-400 space-y-2">
+          <p>
+            Iscrivendoti accetti di ricevere la newsletter di ChrispyBMX. Useremo la tua email solo per inviarti aggiornamenti BMX. Puoi disiscriverti in qualsiasi momento tramite il link presente in ogni email. Leggi la{' '}
+            <a href="https://chrispybmx.com/privacy/" target="_blank" rel="noopener" className="text-orange hover:underline">
+              Privacy Policy
+            </a>
+            .
+          </p>
+        </div>
+
+        <label className="flex items-start gap-2 cursor-pointer text-vhs-sm text-gray-300">
           <input
             type="checkbox"
-            checked={alsoNewsletter}
-            onChange={(e) => setAlsoNewsletter(e.target.checked)}
+            checked={consentGDPR}
+            onChange={(e) => setConsentGDPR(e.target.checked)}
             disabled={busy || done}
-            className="w-4 h-4 rounded border-gray-500 bg-gray-800 cursor-pointer accent-orange disabled:opacity-60"
+            className="w-4 h-4 mt-0.5 rounded border-gray-500 bg-gray-800 cursor-pointer accent-orange disabled:opacity-60 flex-shrink-0"
           />
-          <span>Desideri anche ricevere la newsletter settimanale?</span>
+          <span>Acconsento a ricevere la newsletter di ChrispyBMX secondo la Privacy Policy.</span>
         </label>
       </form>
 
-      <p
-        aria-live="polite"
-        className={`mt-3 min-h-[1.25rem] font-mono text-vhs-sm ${
-          done ? 'text-coffee' : status === 'error' ? 'text-orange' : 'text-gray-400'
-        }`}
-      >
-        {message || 'Tre minuti di lettura. Zero spam. Disiscrizione con un click.'}
-      </p>
+      {message && (
+        <p
+          aria-live="polite"
+          className={`mt-3 font-mono text-vhs-sm ${status === 'error' ? 'text-orange' : 'text-gray-400'}`}
+        >
+          {message}
+        </p>
+      )}
     </div>
   );
 }

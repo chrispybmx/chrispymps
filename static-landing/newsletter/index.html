@@ -153,9 +153,10 @@
         <input id="nl-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="la tua email" required />
         <button type="submit" id="nl-btn">Iscriviti</button>
       </div>
+      <p style="font-size:12px;color:var(--gray-400);margin-top:12px;line-height:1.5">Iscrivendoti accetti di ricevere la newsletter di ChrispyBMX. Useremo la tua email solo per inviarti aggiornamenti BMX. Puoi disiscriverti in qualsiasi momento tramite il link presente in ogni email. Leggi la <a href="https://chrispybmx.com/privacy/" target="_blank" rel="noopener" style="color:var(--orange)">Privacy Policy</a>.</p>
       <label class="checkbox">
-        <input id="nl-also-nl" type="checkbox" checked />
-        <span>Desideri anche ricevere la newsletter settimanale?</span>
+        <input id="nl-consent" type="checkbox" />
+        <span>Acconsento a ricevere la newsletter di ChrispyBMX secondo la Privacy Policy.</span>
       </label>
       <p class="msg" id="nl-msg" aria-live="polite">Tre minuti di lettura. Zero spam. Disiscrizione con un click.</p>
     </form>
@@ -215,7 +216,7 @@
 
   var form = document.getElementById('nl-form');
   var input = document.getElementById('nl-email');
-  var chk = document.getElementById('nl-also-nl');
+  var consent = document.getElementById('nl-consent');
   var btn = document.getElementById('nl-btn');
   var msg = document.getElementById('nl-msg');
   var sent = false;
@@ -225,19 +226,21 @@
     msg.className = 'msg' + (kind ? ' ' + kind : '');
   }
 
+  consent.addEventListener('change', function () { btn.disabled = !consent.checked; });
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    if (sent) return;
+    if (sent || !consent.checked) return;
     var email = input.value.trim();
     if (!email || email.indexOf('@') === -1) { setMsg('Email non valida.', 'err'); return; }
 
-    btn.disabled = true; chk.disabled = true; btn.textContent = '...';
+    btn.disabled = true; consent.disabled = true; btn.textContent = '...';
     setMsg('', '');
 
     fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, username: email.split('@')[0], alsoNewsletter: chk.checked }),
+      body: JSON.stringify({ email: email, username: email.split('@')[0], source: 'newsletter' }),
     })
     .then(function (r) { return r.json().catch(function () { return {}; }); })
     .then(function (data) {
@@ -245,14 +248,14 @@
         sent = true;
         btn.textContent = '✓ Iscritto'; btn.className = 'done';
         input.disabled = true;
-        setMsg('Iscritto! Riceverai gli aggiornamenti da Chrispy Maps.', 'ok');
+        setTimeout(function () { window.location.href = 'https://chrispybmx.com/newsletter-grazie/'; }, 500);
       } else {
-        btn.disabled = false; chk.disabled = false; btn.textContent = 'Iscriviti';
+        btn.disabled = false; consent.disabled = false; btn.textContent = 'Iscriviti';
         setMsg((data && data.error) || 'Qualcosa non ha funzionato. Riprova.', 'err');
       }
     })
     .catch(function () {
-      btn.disabled = false; chk.disabled = false; btn.textContent = 'Iscriviti';
+      btn.disabled = false; consent.disabled = false; btn.textContent = 'Iscriviti';
       setMsg('Errore di rete. Riprova.', 'err');
     });
   });
