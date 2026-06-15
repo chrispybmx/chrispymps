@@ -1,0 +1,265 @@
+<!--
+  ChrispyBMX — Consulenza 1:1 v2 (PRO) — WordPress page id 179
+  Stile prima-bmx, struttura long-form ad alta conversione:
+  hero+trust → pain → deliverables → chi sono → proof → prezzo(garanzia+scarsità) → 3 step → FAQ → CTA finale → sticky mobile.
+  CSS scoped .cbmx-cons2. Il box #cal-slot verrà sostituito dall'embed Cal.com.
+-->
+<style>
+.cbmx-cons2{--y:#f0c33c;--y2:#f5d35e;--bg:#0c0e11;--panel:#14171c;--line:rgba(255,255,255,.08);--mut:#9aa3ad;--txt:#e9ecef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;color:var(--txt);background:var(--bg);margin:0;line-height:1.55}
+.cbmx-cons2 *,.cbmx-cons2 *::before,.cbmx-cons2 *::after{box-sizing:border-box;margin:0;padding:0}
+.cbmx-cons2 a{color:inherit;text-decoration:none}
+.cbmx-cons2 .wrap{max-width:1140px;margin:0 auto;padding:0 5%}
+.cbmx-cons2 .eyebrow{color:var(--y);font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:10px}
+.cbmx-cons2 h2{font-size:clamp(26px,3.4vw,38px);font-weight:800;letter-spacing:-.02em;text-align:center}
+.cbmx-cons2 h2 em{color:var(--y);font-style:italic}
+
+/* HERO */
+.cbmx-cons2 .hero{position:relative;background:linear-gradient(rgba(9,10,13,.82),rgba(9,10,13,.94)),url('https://chrispybmx.com/wp-content/uploads/2026/03/IMG_3148-1.jpg') center/cover no-repeat;padding:26px 5% 70px}
+.cbmx-cons2 .logo{height:40px;display:block;margin-bottom:44px}
+.cbmx-cons2 .hero-grid{display:flex;gap:52px;max-width:1140px;margin:0 auto;align-items:center;flex-wrap:wrap}
+.cbmx-cons2 .hl{flex:1.25;min-width:300px}
+.cbmx-cons2 .hr{flex:.85;min-width:300px}
+.cbmx-cons2 .pill{display:inline-flex;align-items:center;gap:8px;background:var(--y);color:#111;font-weight:800;font-size:12.5px;letter-spacing:.08em;border-radius:999px;padding:7px 16px;margin-bottom:20px;text-transform:uppercase}
+.cbmx-cons2 h1{font-size:clamp(36px,5.2vw,62px);font-weight:800;line-height:1.03;letter-spacing:-.025em;color:#fff}
+.cbmx-cons2 h1 em{color:var(--y);font-style:italic}
+.cbmx-cons2 .lead{margin-top:18px;font-size:19px;color:#cfd5da;max-width:540px}
+.cbmx-cons2 .trustrow{display:flex;gap:22px;align-items:center;margin-top:24px;flex-wrap:wrap;color:#c8cdd3;font-size:14px}
+.cbmx-cons2 .trustrow .stars{color:var(--y);letter-spacing:2px;font-size:15px}
+.cbmx-cons2 .trustrow b{color:#fff}
+.cbmx-cons2 .cta{display:inline-block;background:var(--y);color:#111;font-weight:800;font-size:17px;border-radius:12px;padding:16px 30px;margin-top:28px;box-shadow:0 10px 34px rgba(240,195,60,.35);transition:transform .12s,box-shadow .12s}
+.cbmx-cons2 .cta:hover{transform:translateY(-2px);box-shadow:0 14px 44px rgba(240,195,60,.5)}
+.cbmx-cons2 .cta-sub{display:block;margin-top:12px;color:#8d96a0;font-size:13px}
+
+/* hero booking card */
+.cbmx-cons2 .bookcard{background:#fff;color:#15181c;border-radius:20px;padding:26px;box-shadow:0 36px 90px rgba(0,0,0,.55)}
+.cbmx-cons2 .bookcard h3{font-size:21px;font-weight:800;text-align:center}
+.cbmx-cons2 .bk-price{display:flex;justify-content:center;align-items:baseline;gap:8px;margin:14px 0 2px}
+.cbmx-cons2 .bk-price b{font-size:52px;font-weight:800;letter-spacing:-.03em}
+.cbmx-cons2 .bk-price span{color:#5b636d;font-size:15px}
+.cbmx-cons2 .bk-anchor{text-align:center;color:#7a828c;font-size:13px;text-decoration:line-through}
+.cbmx-cons2 .bk-feats{margin:16px 0;display:grid;gap:9px}
+.cbmx-cons2 .bk-feats div{display:flex;gap:9px;font-size:14.5px;color:#2c333b;align-items:flex-start}
+.cbmx-cons2 .bk-feats div::before{content:'✔';flex:none;width:19px;height:19px;border-radius:50%;background:#22a55a;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.cbmx-cons2 .bk-slots{text-align:center;background:#fff7e0;border:1px solid #f0d58a;color:#7a5c00;font-size:13px;font-weight:700;border-radius:9px;padding:9px;margin-bottom:14px}
+.cbmx-cons2 #cal-slot{border:2px dashed #cfd5dc;border-radius:12px;padding:22px 14px;text-align:center;color:#6b7480;font-size:14px}
+.cbmx-cons2 #cal-slot a{color:#0d6efd;font-weight:700}
+.cbmx-cons2 .bk-guarantee{display:flex;gap:10px;align-items:center;margin-top:14px;background:#eefaf2;border:1px solid #bfe8cd;border-radius:10px;padding:11px 13px;font-size:13px;color:#14532d}
+.cbmx-cons2 .bk-pay{display:flex;justify-content:center;gap:10px;margin-top:13px;color:#8a93a0;font-size:12px;align-items:center}
+
+/* PAIN */
+.cbmx-cons2 .sec{padding:74px 0}
+.cbmx-cons2 .panel{background:var(--panel)}
+.cbmx-cons2 .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:38px}
+.cbmx-cons2 .pcard{background:#191d23;border:1px solid var(--line);border-radius:16px;padding:26px;transition:border-color .15s}
+.cbmx-cons2 .pcard:hover{border-color:rgba(240,195,60,.45)}
+.cbmx-cons2 .pcard .ic{font-size:30px}
+.cbmx-cons2 .pcard b{display:block;font-size:18px;margin-top:12px;color:#fff}
+.cbmx-cons2 .pcard p{color:var(--mut);font-size:15px;margin-top:7px}
+
+/* DELIVERABLES */
+.cbmx-cons2 .deliv{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:38px}
+.cbmx-cons2 .dcard{background:linear-gradient(180deg,#191d23,#14171c);border:1px solid var(--line);border-radius:16px;padding:26px;position:relative}
+.cbmx-cons2 .dcard .n{position:absolute;top:18px;right:20px;font-size:42px;font-weight:800;color:rgba(240,195,60,.16)}
+.cbmx-cons2 .dcard .ic{font-size:28px}
+.cbmx-cons2 .dcard b{display:block;font-size:17.5px;margin-top:12px;color:#fff}
+.cbmx-cons2 .dcard p{color:var(--mut);font-size:14.5px;margin-top:7px}
+
+/* WHO */
+.cbmx-cons2 .who{display:flex;gap:44px;align-items:center;margin-top:38px;flex-wrap:wrap}
+.cbmx-cons2 .who-img{flex:.9;min-width:280px}
+.cbmx-cons2 .who-img img{width:100%;border-radius:18px;object-fit:cover;aspect-ratio:4/3;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.cbmx-cons2 .who-txt{flex:1.1;min-width:300px}
+.cbmx-cons2 .who-txt h3{font-size:26px;font-weight:800;color:#fff}
+.cbmx-cons2 .who-txt .role{color:var(--y);font-weight:700;font-size:14px;margin-top:4px}
+.cbmx-cons2 .who-txt p{color:#c3c9d0;font-size:16px;margin-top:14px}
+.cbmx-cons2 .who-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:22px}
+.cbmx-cons2 .ws{background:#191d23;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+.cbmx-cons2 .ws b{display:block;font-size:20px;color:var(--y)}
+.cbmx-cons2 .ws span{font-size:12.5px;color:var(--mut)}
+
+/* PROOF */
+.cbmx-cons2 .proof{max-width:760px;margin:38px auto 0;text-align:center;background:#191d23;border:1px solid var(--line);border-radius:18px;padding:34px 28px}
+.cbmx-cons2 .proof .stars{color:var(--y);font-size:22px;letter-spacing:3px}
+.cbmx-cons2 .proof p{font-size:18px;color:#dfe3e7;margin-top:14px;font-style:italic}
+.cbmx-cons2 .proof .src{color:var(--mut);font-size:13.5px;margin-top:12px;font-style:normal}
+
+/* STEPS */
+.cbmx-cons2 .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:38px}
+.cbmx-cons2 .step{background:#191d23;border:1px solid var(--line);border-radius:16px;padding:26px;text-align:center}
+.cbmx-cons2 .step .n{width:40px;height:40px;border-radius:50%;background:var(--y);color:#111;font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.cbmx-cons2 .step b{font-size:17.5px;color:#fff}
+.cbmx-cons2 .step p{color:var(--mut);font-size:14.5px;margin-top:7px}
+
+/* FAQ */
+.cbmx-cons2 .faq{max-width:780px;margin:38px auto 0}
+.cbmx-cons2 details{background:#191d23;border:1px solid var(--line);border-radius:13px;padding:18px 22px;margin-bottom:11px}
+.cbmx-cons2 summary{font-weight:700;cursor:pointer;font-size:16px;color:#fff}
+.cbmx-cons2 details p{color:var(--mut);font-size:15px;margin-top:11px}
+
+/* FINAL CTA */
+.cbmx-cons2 .final{background:linear-gradient(135deg,rgba(240,195,60,.14),rgba(240,195,60,.04));border-top:1px solid rgba(240,195,60,.25);border-bottom:1px solid rgba(240,195,60,.25);text-align:center;padding:64px 5%}
+.cbmx-cons2 .final h2{margin-bottom:8px}
+.cbmx-cons2 .final p{color:#c3c9d0;font-size:16.5px}
+
+/* FOOTER */
+.cbmx-cons2 .foot{padding:30px 5% 110px;display:flex;justify-content:center;gap:28px;flex-wrap:wrap;color:#c3c9d0;font-size:14.5px}
+.cbmx-cons2 .foot a:hover{color:var(--y)}
+
+/* STICKY MOBILE CTA */
+.cbmx-cons2 .sticky{position:fixed;left:0;right:0;bottom:0;z-index:99;background:rgba(12,14,17,.92);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cbmx-cons2 .sticky .sp b{font-size:18px;color:#fff}
+.cbmx-cons2 .sticky .sp span{display:block;font-size:11.5px;color:var(--mut)}
+.cbmx-cons2 .sticky a{background:var(--y);color:#111;font-weight:800;font-size:15px;border-radius:10px;padding:12px 22px;white-space:nowrap}
+@media(min-width:761px){.cbmx-cons2 .sticky{display:none}.cbmx-cons2 .foot{padding-bottom:36px}}
+</style>
+
+<div class="cbmx-cons2">
+
+<!-- HERO -->
+<section class="hero">
+  <img class="logo" src="https://chrispybmx.com/wp-content/uploads/2026/03/chrispy_logo_transparent_512.png" alt="Chrispy BMX"/>
+  <div class="hero-grid">
+    <div class="hl">
+      <span class="pill">🔧 Consulenza 1:1 in videocall · 30 min</span>
+      <h1>La tua BMX, sistemata. <em>In 30 minuti.</em></h1>
+      <p class="lead">Mi fai vedere la bici in call: ti dico cosa va, cosa cambiare e come settarla per il tuo riding. Esci con un piano scritto — niente più soldi buttati a caso.</p>
+      <div class="trustrow">
+        <span><span class="stars">★★★★★</span> <b>4.9/5</b></span>
+        <span><b>1.000+</b> rider aiutati con la guida</span>
+        <span><b>Canale YouTube</b> @chrispy_bmx</span>
+      </div>
+      <a class="cta" href="#prenota">Prenota la tua consulenza →</a>
+      <span class="cta-sub">Conferma immediata · Garanzia soddisfatto o rimborsato</span>
+    </div>
+    <div class="hr" id="prenota">
+      <div class="bookcard">
+        <h3>Consulenza Bike-Check 1:1</h3>
+        <div class="bk-price"><b>19€</b><span>· 30 minuti</span></div>
+        <p class="bk-anchor">Un componente sbagliato: 80–200€</p>
+        <div class="bk-feats">
+          <div>Check completo: taglia, geometrie, componenti</div>
+          <div>Setup su misura: pressioni, sella, leve, tensioni</div>
+          <div>Lista upgrade col tuo budget — scritta, con link</div>
+          <div>Consiglio pre-acquisto se la bici devi ancora comprarla</div>
+        </div>
+        <div class="bk-slots">⚡ Solo 5 slot a settimana — prendi il tuo</div>
+        <div id="cal-slot">📅 Il calendario sta per aprire.<br/>Intanto scrivimi su <a href="https://t.me/+P0azWWKuYz0wYTQ8" target="_blank" rel="noopener">Telegram</a> e ti riservo il primo slot.</div>
+        <div class="bk-guarantee">🛡️ <span><b>Garanzia totale:</b> se la call non ti è utile, ti rimborso i 19€. Senza domande.</span></div>
+        <div class="bk-pay">🔒 Pagamento sicuro con carta — Stripe</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PAIN -->
+<section class="sec panel">
+  <div class="wrap">
+    <div class="eyebrow">Ti ci ritrovi?</div>
+    <h2>Tre modi classici di <em>buttare soldi</em> in BMX</h2>
+    <div class="grid3">
+      <div class="pcard"><span class="ic">📏</span><b>Taglia sbagliata</b><p>Top tube troppo corto o troppo lungo: la bici ti frena e nessun upgrade lo sistema. Lo paghi in progressi.</p></div>
+      <div class="pcard"><span class="ic">🔩</span><b>Upgrade a caso</b><p>Pezzi nuovi dove non serviva, mentre il vero problema era un setup da 0€. Classico da 150€ buttati.</p></div>
+      <div class="pcard"><span class="ic">⚙️</span><b>Setup da fabbrica</b><p>Sella, leve, pressioni e tensioni come escono dal negozio: mai adattate a te. E ogni trick costa il doppio.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- DELIVERABLES -->
+<section class="sec">
+  <div class="wrap">
+    <div class="eyebrow">Niente chiacchiere</div>
+    <h2>Esci dalla call <em>con queste 4 cose</em></h2>
+    <div class="deliv">
+      <div class="dcard"><span class="n">01</span><span class="ic">📋</span><b>Verdetto sulla bici</b><p>Taglia giusta o no, cosa tenere, cosa è da cambiare. Chiaro e motivato.</p></div>
+      <div class="dcard"><span class="n">02</span><span class="ic">🔧</span><b>Setup scritto</b><p>Pressioni, altezza sella, posizione leve, tensione catena: i TUOI numeri, da riapplicare sempre.</p></div>
+      <div class="dcard"><span class="n">03</span><span class="ic">💶</span><b>Lista upgrade col budget</b><p>Cosa comprare, in che ordine, con link — dentro la cifra che mi dici tu.</p></div>
+      <div class="dcard"><span class="n">04</span><span class="ic">🗺️</span><b>Piano prossimi 30 giorni</b><p>Su cosa lavorare subito (riding e bici) per sbloccarti più in fretta.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- WHO -->
+<section class="sec panel">
+  <div class="wrap">
+    <div class="eyebrow">Chi c'è dall'altra parte</div>
+    <h2>Ciao, sono <em>Chrispy</em></h2>
+    <div class="who">
+      <div class="who-img"><img src="https://chrispybmx.com/wp-content/uploads/2026/03/IMG_3148-1.jpg" alt="Chrispy in sessione BMX"/></div>
+      <div class="who-txt">
+        <h3>Christian "Chrispy"</h3>
+        <div class="role">Rider professionista · Istruttore BMX freestyle</div>
+        <p>Giro in BMX da anni, insegno freestyle e racconto la scena italiana ogni settimana: canale YouTube, newsletter "Cinque cose dal mondo BMX" e Chrispy Maps — la mappa community degli spot italiani.</p>
+        <p>Le bici dei rider le vedo tutti i giorni: so dove si butta tempo e dove si buttano soldi. In 30 minuti ti faccio saltare mesi di tentativi.</p>
+        <div class="who-stats">
+          <div class="ws"><b>YouTube</b><span>@chrispy_bmx</span></div>
+          <div class="ws"><b>100+ città</b><span>Chrispy Maps</span></div>
+          <div class="ws"><b>Ogni lunedì</b><span>newsletter BMX</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROOF -->
+<section class="sec">
+  <div class="wrap">
+    <div class="eyebrow">La community</div>
+    <h2>Già <em>1.000+ rider</em> hanno scelto col mio metodo</h2>
+    <div class="proof">
+      <div class="stars">★★★★★</div>
+      <p>"La guida gratuita 'La tua prima BMX' ha già aiutato più di mille rider a comprare la bici giusta. La consulenza è il passo dopo: la TUA bici, guardata davvero."</p>
+      <div class="src">— valutazione guida 4.9/5 · community ChrispyBMX</div>
+    </div>
+  </div>
+</section>
+
+<!-- STEPS -->
+<section class="sec panel">
+  <div class="wrap">
+    <div class="eyebrow">Semplicissimo</div>
+    <h2>Come funziona — <em>tre passi</em></h2>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><b>Scegli lo slot</b><p>Dal calendario, l'orario che ti torna comodo. Conferma immediata via email.</p></div>
+      <div class="step"><div class="n">2</div><b>Paghi 19€</b><p>Con carta, in modo sicuro (Stripe). Ricevuta automatica.</p></div>
+      <div class="step"><div class="n">3</div><b>Ci vediamo in call</b><p>Clicchi il link Google Meet che ti è arrivato. Tu, io e la tua bici davanti alla camera.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="sec">
+  <div class="wrap">
+    <div class="eyebrow">Domande veloci</div>
+    <h2>Prima che me lo chiedi</h2>
+    <div class="faq">
+      <details><summary>Non ho ancora la bici: ha senso per me?</summary><p>È il momento MIGLIORE. Ti aiuto a scegliere quella giusta prima di spendere — la consulenza si ripaga al primo errore evitato.</p></details>
+      <details><summary>Sono principiante, mi vergogno un po'…</summary><p>Tranquillo: la call è 1:1, niente pubblico. E i principianti sono quelli a cui faccio risparmiare di più.</p></details>
+      <details><summary>Come avviene la videocall?</summary><p>Google Meet — il link arriva nell'email di conferma. Basta il telefono e la bici a portata di mano.</p></details>
+      <details><summary>E se poi non posso?</summary><p>Dall'email di conferma riprogrammi lo slot quando vuoi, senza costi.</p></details>
+      <details><summary>Se la call non mi è utile?</summary><p>Ti rimborso i 19€. Senza domande. Il rischio me lo prendo io.</p></details>
+      <details><summary>Il pagamento è sicuro?</summary><p>Sì: gestito da Stripe (lo standard dei pagamenti online). I dati della carta non passano mai da questo sito.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final">
+  <h2>Il prossimo upgrade sbagliato <em>costa più di 19€</em></h2>
+  <p>30 minuti, piano scritto, garanzia rimborso. Decidi tu se è il miglior investimento sulla tua bici.</p>
+  <a class="cta" href="#prenota">Prenota ora — 19€ →</a>
+</section>
+
+<div class="foot">
+  <a href="https://www.instagram.com/chriceresato" target="_blank" rel="noopener">📷 @chriceresato</a>
+  <a href="https://www.youtube.com/@chrispy_bmx" target="_blank" rel="noopener">▶ @chrispy_bmx</a>
+  <a href="https://t.me/+P0azWWKuYz0wYTQ8" target="_blank" rel="noopener">✈ Gruppo Telegram</a>
+  <a href="https://chrispybmx.com/prima-bmx/">📘 Guida gratuita</a>
+</div>
+
+<!-- STICKY MOBILE -->
+<div class="sticky">
+  <div class="sp"><b>19€ · 30 min</b><span>Garanzia rimborso totale</span></div>
+  <a href="#prenota">Prenota →</a>
+</div>
+
+</div>

@@ -103,6 +103,9 @@
   .msg { margin-top: 12px; min-height: 20px; font-family: var(--mono); font-size: 14px; color: var(--gray-400); }
   .msg.ok  { color: var(--coffee); }
   .msg.err { color: var(--orange); }
+  .checkbox { margin-top: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: var(--gray-200); }
+  .checkbox input[type=checkbox] { width: 16px; height: 16px; border: 1px solid var(--gray-600); border-radius: 4px; background: var(--gray-800); cursor: pointer; accent-color: var(--orange); }
+  .checkbox input[type=checkbox]:disabled { opacity: 0.6; }
 
   /* Sections */
   section.band { border-top: 1px solid var(--gray-800); background: rgba(26,26,26,.4); }
@@ -150,6 +153,10 @@
         <input id="nl-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="la tua email" required />
         <button type="submit" id="nl-btn">Iscriviti</button>
       </div>
+      <label class="checkbox">
+        <input id="nl-also-nl" type="checkbox" checked />
+        <span>Desideri anche ricevere la newsletter settimanale?</span>
+      </label>
       <p class="msg" id="nl-msg" aria-live="polite">Tre minuti di lettura. Zero spam. Disiscrizione con un click.</p>
     </form>
   </section>
@@ -208,6 +215,7 @@
 
   var form = document.getElementById('nl-form');
   var input = document.getElementById('nl-email');
+  var chk = document.getElementById('nl-also-nl');
   var btn = document.getElementById('nl-btn');
   var msg = document.getElementById('nl-msg');
   var sent = false;
@@ -223,13 +231,13 @@
     var email = input.value.trim();
     if (!email || email.indexOf('@') === -1) { setMsg('Email non valida.', 'err'); return; }
 
-    btn.disabled = true; btn.textContent = '...';
+    btn.disabled = true; chk.disabled = true; btn.textContent = '...';
     setMsg('', '');
 
     fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, username: email.split('@')[0], source: 'newsletter' }),
+      body: JSON.stringify({ email: email, username: email.split('@')[0], alsoNewsletter: chk.checked }),
     })
     .then(function (r) { return r.json().catch(function () { return {}; }); })
     .then(function (data) {
@@ -237,14 +245,14 @@
         sent = true;
         btn.textContent = '✓ Iscritto'; btn.className = 'done';
         input.disabled = true;
-        setMsg('Iscritto! Lunedì mattina ti arriva la prima newsletter.', 'ok');
+        setMsg('Iscritto! Riceverai gli aggiornamenti da Chrispy Maps.', 'ok');
       } else {
-        btn.disabled = false; btn.textContent = 'Iscriviti';
+        btn.disabled = false; chk.disabled = false; btn.textContent = 'Iscriviti';
         setMsg((data && data.error) || 'Qualcosa non ha funzionato. Riprova.', 'err');
       }
     })
     .catch(function () {
-      btn.disabled = false; btn.textContent = 'Iscriviti';
+      btn.disabled = false; chk.disabled = false; btn.textContent = 'Iscriviti';
       setMsg('Errore di rete. Riprova.', 'err');
     });
   });

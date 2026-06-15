@@ -1,0 +1,672 @@
+'use client';
+
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import type { SpotMapPin, SpotType } from '@/lib/types';
+import { TIPI_SPOT, APP_CONFIG, PALETTE } from '@/lib/constants';
+import 'leaflet/dist/leaflet.css';
+
+let L: typeof import('leaflet') | null = null;
+
+/* Zoom sotto il quale mostriamo i cluster invece dei pin individuali. */
+const CLUSTER_ZOOM = 12;
+
+interface SpotMapProps {
+  spots:             SpotMapPin[];
+  filterType:        SpotType | null;
+  filterRegionBbox?: [number, number, number, number] | null;
+  searchQuery:       string;
+  onSpotClick:        (pin: SpotMapPin) => void;
+  onAddSpotAt:        (lat: number, lon: number) => void;
+  flyTarget?:         { lat: number; lon: number; zoom?: number } | null;
+  selectedPin?:       SpotMapPin | null;
+  overlayOffsetPx?:   number;
+  fitAllTrigger?:     number;
+  // Radius search
+  radiusMode?:   boolean;
+  radiusCenter?: { lat: number; lon: number } | null;
+  radiusKm?:     number;
+  onMapClick?:   (lat: number, lon: number) => void;
+  // GPS locate triggered from MapClient
+  locateTrigger?: number;
+  onLocatingChange?: (v: boolean) => void;
+  // Viewport bounds callback — emitted on moveend/zoomend
+  onBoundsChanged?: (bounds: { south: number; west: number; north: number; east: number }) => void;
+  // Stile mappa
+  darkMap?: boolean;
+}
+
+/* ── SVG pin individuale ── */
+function pinSvg(type: SpotType, condition: string, isSelected = false): string {
+  const info  = TIPI_SPOT[type];
+  const color = condition === 'alive'   ? info.color
+              : condition === 'bustato' ? '#888'
+              : '#444';
+  const cross = condition !== 'alive' ? `
+    <line x1="9" y1="9" x2="21" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
+    <line x1="21" y1="9" x2="9" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
+  ` : '';
+  const glow = condition === 'alive' ? `<circle cx="15" cy="15" r="13" fill="${color}" opacity="0.12"/>` : '';
+  const strokeColor = isSelected ? '#ff6a00' : '#0a0a0a';
+  const strokeWidth = isSelected ? 2.5 : 1.5;
+  const w = isSelected ? 38 : 30;
+  const h = isSelected ? 48 : 38;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 30 38">
+    ${glow}
+    <path d="M15 0C6.72 0 0 6.72 0 15c0 8.28 15 23 15 23S30 23.28 30 15C30 6.72 23.28 0 15 0z"
+          fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
+    <circle cx="15" cy="15" r="9" fill="rgba(0,0,0,0.22)"/>
+    <text x="15" y="15.5" text-anchor="middle" font-size="12" dominant-baseline="middle">${info.emoji}</text>
+    ${cross}
+  </svg>`;
+}
+
+
+/* ── Clustering geografico a griglia adattiva allo zoom ──
+   Celle più piccole = cluster più granulari e precisi. */
+function computeGridClusters(spots: SpotMapPin[], zoom: number) {
+  /* Dimensione cella in gradi geografici — ottimizzata per distribuzione mondiale */
+  const cellDeg =
+    zoom < 4  ? 5    :   // vista mondo: ~550 km per cella
+    zoom < 5  ? 2.5  :   // ~280 km
+    zoom < 6  ? 1.2  :   // ~130 km — continente (Europa intera)
+    zoom < 7  ? 0.6  :   // ~65 km  — paese (Italia = ~18 cluster)
+    zoom < 8  ? 0.3  :   // ~33 km  — regione
+    zoom < 9  ? 0.15 :   // ~17 km  — area metropolitana
+    zoom < 10 ? 0.07 :   // ~8 km   — città grande
+    zoom < 11 ? 0.03 :   // ~3 km   — quartiere
+                0.01;    // ~1 km   — pin quasi individuali
+
+  const cellMap = new Map<string, SpotMapPin[]>();
+  for (const s of spots) {
+    const key = `${Math.floor(s.lat / cellDeg)}_${Math.floor(s.lon / cellDeg)}`;
+    if (!cellMap.has(key)) cellMap.set(key, []);
+    cellMap.get(key)!.push(s);
+  }
+
+  return Array.from(cellMap.values()).map((pins) => {
+    /* Usa la città del primo spot come label (se disponibile) */
+    const city = pins.find(p => p.city)?.city ?? null;
+    return {
+      key:   `${pins[0].lat.toFixed(4)}_${pins[0].lon.toFixed(4)}`,
+      city,
+      lat:   pins.reduce((s, p) => s + p.lat, 0) / pins.length,
+      lon:   pins.reduce((s, p) => s + p.lon, 0) / pins.length,
+      count: pins.length,
+      spots: pins,
+    };
+  });
+}
+
+export default function SpotMap({
+  spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
+  selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
+  locateTrigger, onLocatingChange, onBoundsChanged, darkMap: darkMapProp,
+}: SpotMapProps) {
+  const mapRef           = useRef<HTMLDivElement>(null);
+  const mapInstance      = useRef<import('leaflet').Map | null>(null);
+  const markersRef       = useRef<import('leaflet').LayerGroup | null>(null);
+  const hasInitialFit    = useRef(false);
+  const circleRef        = useRef<import('leaflet').Circle | null>(null);
+  const centerMarkerRef  = useRef<import('leaflet').Marker | null>(null);
+  const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
+  const onMapClickRef      = useRef(onMapClick);
+  const onSpotClickRef     = useRef(onSpotClick);
+  const onBoundsChangedRef = useRef(onBoundsChanged);
+  /* Memoization: refs dichiarati qui ma inizializzati dopo filtered/clusters */
+  const pinMarkersRef    = useRef<Map<string, import('leaflet').Marker>>(new Map());
+  const prevSelIdRef     = useRef<string | null>(null);
+  const filteredRef      = useRef<SpotMapPin[]>([]);
+  const selPinRef        = useRef<SpotMapPin | null>(null);
+  /* Refs per il fitAllTrigger effect — evita di aggiungere filterRegionBbox/searchQuery
+     come dependency (causerebbero re-run ad ogni render) */
+  const filterRegionBboxRef = useRef(filterRegionBbox);
+  const searchQueryRef      = useRef(searchQuery);
+  const [locating, setLocating] = useState(false);
+  const [zoom, setZoom]         = useState<number>(APP_CONFIG.mapZoom ?? 6);
+  const tileLayerRef = useRef<import('leaflet').TileLayer | null>(null);
+
+  useEffect(() => { onMapClickRef.current       = onMapClick; });
+  useEffect(() => { onSpotClickRef.current      = onSpotClick; });
+  useEffect(() => { onBoundsChangedRef.current  = onBoundsChanged; });
+  useEffect(() => { filterRegionBboxRef.current = filterRegionBbox; });
+  useEffect(() => { searchQueryRef.current      = searchQuery; });
+
+  const filtered = useMemo(() => spots.filter((s) => {
+    if (filterType && s.type !== filterType) return false;
+    if (filterRegionBbox) {
+      const [latMin, lonMin, latMax, lonMax] = filterRegionBbox;
+      if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().replace(/^@/, '');
+      return (
+        s.name.toLowerCase().includes(q) ||
+        (s.city ?? '').toLowerCase().includes(q) ||
+        (s.submitted_by_username ?? '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  }), [spots, filterType, filterRegionBbox, searchQuery]);
+
+  /* Clusters calcolati in base al zoom corrente — la griglia adattiva gestisce 500+ spot */
+  const clusters = useMemo(() => computeGridClusters(filtered, zoom), [filtered, zoom]);
+
+  // Sincronizza ref mutabili col valore corrente del render (dopo filtered/clusters)
+  filteredRef.current = filtered;
+  selPinRef.current   = selectedPin ?? null;
+
+  /* ── Init mappa ── */
+  useEffect(() => {
+    if (!mapRef.current || mapInstance.current) return;
+
+    import('leaflet').then((leaflet) => {
+      L = leaflet;
+      delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      const map = L.map(mapRef.current!, {
+        center: APP_CONFIG.mapCenter,
+        zoom:   APP_CONFIG.mapZoom,
+        zoomControl: false,
+        attributionControl: false,   // gestiamo noi l'attribution nel frame VHS
+        maxBounds: L.latLngBounds([-85, -180], [85, 180]),
+        maxBoundsViscosity: 1.0,     // blocco rigido ai bordi del mondo
+        minZoom: 3,
+      });
+
+      const isDark = darkMapProp ?? false;
+      tileLayerRef.current = L.tileLayer(
+        isDark
+          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        isDark
+          ? { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19, noWrap: true, className: 'osm-tiles' }
+          : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, noWrap: true, className: 'osm-tiles' }
+      ).addTo(map);
+
+      L.control.zoom({ position: 'bottomleft' }).addTo(map);
+      markersRef.current  = L.layerGroup().addTo(map);
+      mapInstance.current = map;
+
+      /* Aggiorna stato zoom React + emetti bounds */
+      const emitBounds = () => {
+        const b = map.getBounds();
+        onBoundsChangedRef.current?.({
+          south: b.getSouth(), west: b.getWest(),
+          north: b.getNorth(), east: b.getEast(),
+        });
+      };
+      map.on('zoomend', () => { setZoom(map.getZoom()); emitBounds(); });
+      map.on('moveend', emitBounds);
+
+      /* ── Vista iniziale: l'Italia nello spazio visibile sopra il pannello ──
+         paddingBottomRight bottom = overlayOffsetPx (= panelHeight/2) + handle:
+         il pannello occupa overlayOffsetPx px al di sotto del centro visibile.
+         NON moltiplichiamo per 2: overlayOffsetPx è già metà pannello, non tutto. */
+      const handleH = 82; // gradiente (36) + drag handle (46)
+      const ITALY   = L.latLngBounds([36.0, 6.0], [47.5, 19.0]);
+      map.fitBounds(ITALY, {
+        paddingTopLeft:     [20, 10],
+        paddingBottomRight: [20, overlayOffsetPx + handleH],
+        maxZoom: 7,
+        animate: false,
+      });
+      hasInitialFit.current = true;
+
+      /* ── Geolocalizzazione automatica all'avvio ──
+         Se il browser conosce la posizione dell'utente, centra sulla sua zona
+         rimanendo a zoom paese (~5) — l'utente vede il suo Paese nello spazio
+         visibile sopra il pannello, non zoomato a livello città. */
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!mapInstance.current || !L) return;
+            const { latitude, longitude } = pos.coords;
+
+            /* Zoom 5 = paese intero visibile; poi offsettiamo verso il basso
+               di metà altezza pannello così il centro cade nell'area visibile */
+            const COUNTRY_ZOOM = 5;
+            mapInstance.current.setView([latitude, longitude], COUNTRY_ZOOM, { animate: false });
+            mapInstance.current.panBy([0, overlayOffsetPx], { animate: false });
+            hasInitialFit.current = true;
+
+            /* Dot blu "Sei qui" */
+            const dotSvg = `<div style="
+              width:14px;height:14px;
+              background:#4285f4;border:3px solid #fff;border-radius:50%;
+              box-shadow:0 0 0 2px #4285f4,0 2px 8px rgba(0,0,0,0.55);
+            "></div>`;
+            const icon = L!.divIcon({
+              html: dotSvg, className: '',
+              iconSize: [14, 14], iconAnchor: [7, 7],
+            });
+            if (!userMarkerRef.current) {
+              userMarkerRef.current = L!.marker([latitude, longitude], { icon, zIndexOffset: 2000 })
+                .addTo(mapInstance.current!)
+                .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
+            } else {
+              userMarkerRef.current.setLatLng([latitude, longitude]);
+            }
+          },
+          () => { /* permesso negato → nessuna azione */ },
+          { timeout: 6000, maximumAge: 300_000 }
+        );
+      }
+
+      /* Click sulla mappa → radius mode */
+      map.on('click', (e) => {
+        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+      });
+    });
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        markersRef.current  = null;
+        userMarkerRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── Render marker al cambio di zoom / filtri ── */
+  /* selectedPin NON è nelle deps: gestito separatamente in Effect 2 per evitare
+     il full-rebuild ad ogni click su uno spot (potenzialmente centinaia di marker) */
+  useEffect(() => {
+    if (!mapInstance.current || !markersRef.current || !L) return;
+    markersRef.current.clearLayers();
+    pinMarkersRef.current.clear();
+
+    if (zoom < CLUSTER_ZOOM) {
+      /* ── CLUSTER VIEW: un cerchio per città ── */
+      clusters.forEach((c) => {
+        if (!L || !markersRef.current) return;
+
+        /* Pallino arancione uniforme — sempre, anche per singoli spot */
+        const radius = Math.min(6 + Math.sqrt(c.count) * 1.6, 15);
+        const label  = c.count === 1 ? '' : String(c.count);
+        const fontSize = Math.max(9, 13 - String(c.count).length);
+        const html = `<div style="
+          width:${radius * 2}px; height:${radius * 2}px;
+          background: rgba(255,106,0,0.9);
+          border: 1.5px solid rgba(255,255,255,0.9);
+          border-radius: 50%;
+          display:flex; align-items:center; justify-content:center;
+          font-family:'VT323',monospace;
+          font-size:${fontSize}px;
+          color:#000; font-weight:700;
+          box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+          cursor: pointer;
+        ">${label}</div>`;
+
+        const icon = L!.divIcon({
+          html,
+          className: 'spot-cluster',
+          iconSize:  [radius * 2, radius * 2],
+          iconAnchor:[radius, radius],
+        });
+
+        const marker = L!.marker([c.lat, c.lon], { icon });
+        const cityName = c.city
+          ? c.city.charAt(0).toUpperCase() + c.city.slice(1)
+          : 'Zona';
+
+        marker.bindTooltip(
+          `<span style="font-family:monospace;font-size:12px"><b>${cityName}</b> · ${c.count} spot</span>`,
+          { permanent: false, direction: 'top', offset: [0, -radius - 2] }
+        );
+
+        marker.on('click', () => {
+          if (!mapInstance.current || !L) return;
+
+          if (c.count === 1) {
+            /* Spot singolo → vola diretto + apri la card — stessa animazione su mobile e desktop */
+            const targetZoom  = 17;
+            const targetPoint = mapInstance.current.project([c.lat, c.lon], targetZoom);
+            const offsetPoint = targetPoint.add(L!.point(0, overlayOffsetPx));
+            const offsetLL    = mapInstance.current.unproject(offsetPoint, targetZoom);
+            mapInstance.current.flyTo(offsetLL, targetZoom, { duration: 1.4, easeLinearity: 0.35 });
+            onSpotClickRef.current(c.spots[0]);
+          } else {
+            /* Multi-spot → flyToBounds cinematico, stesso comportamento su mobile e desktop */
+            const bounds    = L!.latLngBounds(c.spots.map(s => [s.lat, s.lon] as [number, number]));
+            const padBottom = overlayOffsetPx * 2 + 20;
+            mapInstance.current.flyToBounds(bounds, {
+              paddingTopLeft:     [24, 24],
+              paddingBottomRight: [24, padBottom],
+              maxZoom: 16,
+              duration: 1.2,
+            });
+          }
+        });
+
+        markersRef.current!.addLayer(marker);
+      });
+
+    } else {
+      /* ── PIN VIEW: pin individuali ── */
+      filtered.forEach((pin) => {
+        if (!L || !markersRef.current) return;
+
+        // Usa selPinRef (sempre aggiornato) per rendere l'icona corretta
+        const isSel = selPinRef.current?.id === pin.id;
+        const svg   = pinSvg(pin.type, pin.condition, isSel);
+        const pw    = isSel ? 48 : 38;
+        const ph    = isSel ? 60 : 48;
+        const icon  = L!.divIcon({
+          html:        svg,
+          className:   'spot-pin',
+          iconSize:    [pw, ph],
+          iconAnchor:  [pw / 2, ph],
+          popupAnchor: [0, -(ph + 2)],
+        });
+
+        const marker = L!.marker([pin.lat, pin.lon], { icon });
+        const tipo   = TIPI_SPOT[pin.type];
+
+        /* Popup: foto + nome + info + VEDI SPOT.
+           Desktop: appare al hover. Mobile: appare al tap.
+           Tutto il popup è cliccabile → naviga alla pagina spot. */
+        const imgHtml = pin.cover_url
+          ? `<img src="${pin.cover_url}"
+               style="width:100%;height:100px;object-fit:cover;display:block;border-radius:6px 6px 0 0"
+               loading="lazy" />`
+          : '';
+
+        const popupId = `popup-${pin.id}`;
+        const popupContent = `
+          <div id="${popupId}" data-slug="${pin.slug}"
+               style="font-family:var(--font-display),sans-serif;min-width:180px;padding:0;
+                      overflow:hidden;border-radius:6px;cursor:pointer">
+            ${imgHtml}
+            <div style="padding:6px 10px 8px;background:#111">
+              <div style="font-family:var(--font-mono),monospace;font-size:18px;color:#ff6a00;line-height:1.2;margin-bottom:3px">${pin.name}</div>
+              ${pin.city ? `<div style="font-size:11px;color:#777;margin-bottom:2px">📍 ${pin.city}</div>` : ''}
+              <div style="font-size:11px;color:#888;margin-bottom:6px">${tipo.emoji} ${tipo.label}</div>
+              <div style="font-family:var(--font-mono),monospace;font-size:14px;
+                          color:#000;background:#ff6a00;padding:10px 14px;border-radius:4px;
+                          text-align:center;letter-spacing:0.04em">
+                VEDI SPOT →
+              </div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent, {
+          maxWidth: pin.cover_url ? 210 : 190,
+          closeButton: false,
+          className: 'spot-hover-popup',
+          autoPan: false,
+          interactive: true,
+          closeOnClick: false,
+        });
+
+        /* Quando il popup si apre, aggancia click listener al contenuto.
+           setTimeout: Leaflet potrebbe non aver inserito il DOM ancora. */
+        marker.on('popupopen', () => {
+          requestAnimationFrame(() => {
+            const el = document.getElementById(popupId);
+            if (!el) return;
+            el.onclick = (evt) => {
+              evt.stopPropagation();
+              evt.preventDefault();
+              marker.closePopup();
+              window.location.href = `/map/spot/${el.dataset.slug}`;
+            };
+          });
+        });
+
+        /* Click unificato: mobile e desktop → toggle popup.
+           Niente più split touch/mouse — stessa UX ovunque. */
+        marker.on('click', () => {
+          if (marker.isPopupOpen()) {
+            marker.closePopup();
+          } else {
+            marker.openPopup();
+            onSpotClickRef.current(pin);
+          }
+        });
+
+        markersRef.current!.addLayer(marker);
+        pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2
+      });
+    }
+
+    prevSelIdRef.current = selPinRef.current?.id ?? null;
+
+    /* ── Auto-fit al primo render con spot ── */
+    if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
+      const bounds  = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
+      const padBot  = overlayOffsetPx * 2 + 32;
+      mapInstance.current.fitBounds(bounds, {
+        paddingTopLeft:     [32, 32],
+        paddingBottomRight: [32, padBot],
+        maxZoom: 15,
+        animate: false,   // primo render: nessuna animazione
+      });
+      hasInitialFit.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, clusters, zoom]); // selectedPin gestito in Effect 2
+
+  /* ── Effect 2: aggiorna SOLO l'icona del pin selezionato/deselezionato ── */
+  /* Evita di ricreare tutti i marker ad ogni click: O(1) invece di O(n) */
+  useEffect(() => {
+    if (!L || !mapInstance.current || zoom < CLUSTER_ZOOM) return;
+
+    const newSelId  = selectedPin?.id ?? null;
+    const prevSelId = prevSelIdRef.current;
+
+    // Ripristina icona precedente
+    if (prevSelId && prevSelId !== newSelId) {
+      const marker = pinMarkersRef.current.get(prevSelId);
+      if (marker) {
+        const pin = filteredRef.current.find(s => s.id === prevSelId);
+        if (pin) {
+          const svg  = pinSvg(pin.type, pin.condition, false);
+          const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
+          marker.setIcon(icon);
+        }
+      }
+    }
+
+    // Applica icona selezionata al nuovo pin (bordo arancione, più grande)
+    if (selectedPin) {
+      const marker = pinMarkersRef.current.get(selectedPin.id);
+      if (marker) {
+        const svg  = pinSvg(selectedPin.type, selectedPin.condition, true);
+        const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [48, 60], iconAnchor: [24, 60], popupAnchor: [0, -62] });
+        marker.setIcon(icon);
+      }
+    }
+
+    prevSelIdRef.current = newSelId;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPin, zoom]);
+
+  /* ── Fly-to: centrato nello spazio visibile sopra il pannello ── */
+  useEffect(() => {
+    if (!mapInstance.current || !flyTarget || !L) return;
+    const map  = mapInstance.current;
+    const zoom = flyTarget.zoom ?? APP_CONFIG.mapZoomCity;
+    const isMobile = window.innerWidth < 768;
+
+    /* Calcola offset dinamico: panel_height / 2
+       Logica: proiettiamo il pin in pixel, poi AGGIUNGIAMO l'offset a Y (spostiamo
+       il "centro virtuale" più a sud). Leaflet centra la mappa su quel punto sud,
+       quindi il pin appare panel_height/2 px SOPRA il centro → al centro dello
+       spazio visibile sopra il pannello. Sottrarre (vecchio codice) faceva l'opposto.
+       overlayOffsetPx viene passato da MapClient come Math.round(panelHeight / 2),
+       quindi traccia l'altezza reale del pannello anche quando l'utente lo trascina. */
+    const offset = overlayOffsetPx;
+
+    // Stessa animazione su mobile e desktop — lenta abbastanza da
+    // permettere di seguire visivamente il percorso verso lo spot
+    const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
+    const offsetPoint  = targetPoint.add(L!.point(0, offset));
+    const offsetLatLng = map.unproject(offsetPoint, zoom);
+    map.flyTo(offsetLatLng, zoom, { duration: 1.8, easeLinearity: 0.35 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- overlayOffsetPx changes on drag; re-flying mid-drag would be jarring
+  }, [flyTarget]);
+
+  /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */
+  useEffect(() => {
+    if (!fitAllTrigger || !hasInitialFit.current || !mapInstance.current || !L) return;
+    const pins    = filteredRef.current;
+    const hasRegion = !!filterRegionBboxRef.current;
+    const hasSearch = !!searchQueryRef.current;
+    /* overlayOffsetPx = panelHeight / 2 → panelHeight = overlayOffsetPx * 2.
+       Usiamo il valore dinamico passato da MapClient invece della stima statica. */
+    const padBot = overlayOffsetPx * 2 + 32;
+    const pad    = { paddingTopLeft: [32, 32] as [number, number], paddingBottomRight: [32, padBot] as [number, number] };
+
+    /* Caso 0: nessun risultato */
+    if (pins.length === 0) {
+      if (hasRegion) {
+        const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
+        mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 1.2 });
+      }
+      return;
+    }
+
+    /* Caso 1: singolo risultato → flyTo con offset pannello */
+    if (pins.length === 1) {
+      const p            = pins[0];
+      const targetZoom   = 15;
+      const targetPoint  = mapInstance.current.project([p.lat, p.lon], targetZoom);
+      const offsetPoint  = targetPoint.add(L!.point(0, overlayOffsetPx));
+      const offsetLatLng = mapInstance.current.unproject(offsetPoint, targetZoom);
+      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 1.2, easeLinearity: 0.35 });
+      return;
+    }
+
+    /* Caso 2: filtro regione attivo */
+    if (hasRegion) {
+      const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
+      mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 1.2 });
+      return;
+    }
+
+    /* Caso 3: ricerca testuale */
+    if (hasSearch) {
+      const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
+      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 14, duration: 1.2 });
+      return;
+    }
+
+    /* Caso 4: solo filtro categoria */
+    {
+      const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
+      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 12, duration: 1.2 });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitAllTrigger]);
+
+  /* ── Radius cursor ── */
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    mapInstance.current.getContainer().style.cursor = radiusMode ? 'crosshair' : '';
+  }, [radiusMode]);
+
+  /* ── Radius circle ── */
+  useEffect(() => {
+    if (!L) return;
+    const tryDraw = () => {
+      if (!mapInstance.current || !L) return;
+      circleRef.current?.remove(); circleRef.current = null;
+      centerMarkerRef.current?.remove(); centerMarkerRef.current = null;
+
+      if (radiusCenter && radiusKm) {
+        circleRef.current = L!.circle(
+          [radiusCenter.lat, radiusCenter.lon],
+          { radius: radiusKm * 1000, color: '#ff6a00', fillColor: '#ff6a00', fillOpacity: 0.05, weight: 2, dashArray: '10 6' }
+        ).addTo(mapInstance.current);
+
+        const svg = `<div style="width:16px;height:16px;background:#ff6a00;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #ff6a00,0 2px 8px rgba(0,0,0,0.6)"></div>`;
+        const icon = L!.divIcon({ html: svg, className: '', iconSize: [16, 16], iconAnchor: [8, 8] });
+        centerMarkerRef.current = L!.marker([radiusCenter.lat, radiusCenter.lon], { icon, zIndexOffset: 1000 }).addTo(mapInstance.current);
+
+        mapInstance.current.fitBounds(circleRef.current.getBounds(), { padding: [40, 40], maxZoom: 13 });
+      }
+    };
+    if (mapInstance.current) tryDraw();
+    else { const t = setTimeout(tryDraw, 300); return () => clearTimeout(t); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radiusCenter, radiusKm]);
+
+  /* ── Geolocalizzazione con dot persistente ── */
+  const locateMe = useCallback(() => {
+    if (!mapInstance.current || !navigator.geolocation) return;
+    setLocating(true);
+    onLocatingChange?.(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.4, easeLinearity: 0.35 });
+
+        if (L) {
+          const dotSvg = `<div style="
+            width:14px;height:14px;
+            background:#4285f4;border:3px solid #fff;border-radius:50%;
+            box-shadow:0 0 0 2px #4285f4,0 2px 8px rgba(0,0,0,0.55);
+          "></div>`;
+          const icon = L.divIcon({ html: dotSvg, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
+
+          if (userMarkerRef.current) {
+            userMarkerRef.current.setLatLng([latitude, longitude]);
+          } else {
+            userMarkerRef.current = L.marker([latitude, longitude], { icon, zIndexOffset: 2000 })
+              .addTo(mapInstance.current!)
+              .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
+          }
+        }
+        setLocating(false);
+        onLocatingChange?.(false);
+      },
+      () => { setLocating(false); onLocatingChange?.(false); },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, [onLocatingChange]);
+
+  /* Cambia tile layer quando darkMapProp cambia */
+  useEffect(() => {
+    if (!mapInstance.current || !tileLayerRef.current || !L) return;
+    tileLayerRef.current.remove();
+    tileLayerRef.current = L.tileLayer(
+      darkMapProp
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      darkMapProp
+        ? { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19, className: 'osm-tiles' }
+        : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, className: 'osm-tiles' }
+    ).addTo(mapInstance.current);
+  }, [darkMapProp]);
+
+  /* Esegui locateMe quando il trigger esterno cambia */
+  const prevLocateTriggerRef = useRef(0);
+  useEffect(() => {
+    if (locateTrigger && locateTrigger !== prevLocateTriggerRef.current) {
+      prevLocateTriggerRef.current = locateTrigger;
+      locateMe();
+    }
+  }, [locateTrigger, locateMe]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        ref={mapRef}
+        style={{ width: '100%', height: '100%' }}
+        aria-label="Mappa spot BMX Italia"
+        role="application"
+      />
+
+      {/* Bottoni ora gestiti da MapClient */}
+    </div>
+  );
+}

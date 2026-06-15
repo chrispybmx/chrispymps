@@ -75,6 +75,9 @@
 .cbmx-nl .cb-msg { margin-top: 12px; min-height: 20px; font-family: var(--cb-mono); font-size: 14px; color: var(--cb-g400); }
 .cbmx-nl .cb-msg.cb-ok { color: var(--cb-coffee); }
 .cbmx-nl .cb-msg.cb-err { color: var(--cb-orange); }
+.cbmx-nl .cb-checkbox { margin-top: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: var(--cb-g200); }
+.cbmx-nl .cb-checkbox input[type=checkbox] { width: 16px; height: 16px; border: 1px solid var(--cb-g600); border-radius: 4px; background: var(--cb-g800); cursor: pointer; accent-color: var(--cb-orange); }
+.cbmx-nl .cb-checkbox input[type=checkbox]:disabled { opacity: 0.6; }
 
 .cbmx-nl .cb-band { border-top: 1px solid var(--cb-g800); background: rgba(26,26,26,.4); }
 .cbmx-nl .cb-sec { padding-top: 64px; padding-bottom: 64px; }
@@ -114,6 +117,10 @@
           <input id="cb-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="la tua email" required />
           <button type="submit" id="cb-btn">Iscriviti</button>
         </div>
+        <label class="cb-checkbox">
+          <input id="cb-also-nl" type="checkbox" checked />
+          <span>Desideri anche ricevere la newsletter settimanale?</span>
+        </label>
         <p class="cb-msg" id="cb-msg" aria-live="polite">Tre minuti di lettura. Zero spam. Disiscrizione con un click.</p>
       </form>
     </section>
@@ -170,6 +177,7 @@
   var yr = root.querySelector('#cb-yr'); if (yr) yr.textContent = new Date().getFullYear();
   var form = root.querySelector('#cb-form');
   var input = root.querySelector('#cb-email');
+  var chk = root.querySelector('#cb-also-nl');
   var btn = root.querySelector('#cb-btn');
   var msg = root.querySelector('#cb-msg');
   var sent = false;
@@ -179,16 +187,16 @@
     if (sent) return;
     var email = (input.value || '').trim();
     if (!email || email.indexOf('@') === -1) { setMsg('Email non valida.', 'cb-err'); return; }
-    btn.disabled = true; btn.textContent = '...'; setMsg('', '');
+    btn.disabled = true; chk.disabled = true; btn.textContent = '...'; setMsg('', '');
     fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, username: email.split('@')[0], source: 'newsletter' }) })
+      body: JSON.stringify({ email: email, username: email.split('@')[0], alsoNewsletter: chk.checked }) })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (d) {
         if (d && d.ok) { sent = true; btn.textContent = '✓ Iscritto'; btn.className = 'cb-done'; input.disabled = true;
-          setMsg('Iscritto! Lunedì mattina ti arriva la prima newsletter.', 'cb-ok'); }
-        else { btn.disabled = false; btn.textContent = 'Iscriviti'; setMsg((d && d.error) || 'Qualcosa non ha funzionato. Riprova.', 'cb-err'); }
+          setMsg('Iscritto! Riceverai gli aggiornamenti da Chrispy Maps.', 'cb-ok'); }
+        else { btn.disabled = false; chk.disabled = false; btn.textContent = 'Iscriviti'; setMsg((d && d.error) || 'Qualcosa non ha funzionato. Riprova.', 'cb-err'); }
       })
-      .catch(function () { btn.disabled = false; btn.textContent = 'Iscriviti'; setMsg('Errore di rete. Riprova.', 'cb-err'); });
+      .catch(function () { btn.disabled = false; chk.disabled = false; btn.textContent = 'Iscriviti'; setMsg('Errore di rete. Riprova.', 'cb-err'); });
   });
 })();
 </script>

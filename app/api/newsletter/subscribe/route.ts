@@ -3,9 +3,10 @@ import { subscribeToNewsletter } from '@/lib/mailerlite';
 import { z } from 'zod';
 
 const Schema = z.object({
-  email:    z.string().email().max(254),
-  username: z.string().max(50).optional(),
-  source:   z.enum(['newsletter', 'signup', 'submit-spot']).optional(),
+  email:           z.string().email().max(254),
+  username:        z.string().max(50).optional(),
+  source:          z.enum(['newsletter', 'signup', 'submit-spot']).optional(),
+  alsoNewsletter:  z.boolean().optional(),
 });
 
 // Origini autorizzate a chiamare l'endpoint cross-origin (landing statica su chrispybmx.com).
@@ -35,13 +36,10 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * POST /api/newsletter/subscribe
- * Iscrive un utente a MailerLite. Il body accetta `source` per routare al gruppo corretto:
- *   - 'newsletter'  → group Newsletter BMX Settimanale (form embed su /news/[slug] e landing)
- *   - 'signup'      → group Account Chrispy Maps (registrazione sito)
- *   - 'submit-spot' → group ChrispyMPS — Spot Submission
- * Default (source mancante) usa MAILERLITE_GROUP_ID dell'env.
- *
- * Risposta sempre 200 per non bloccare il flusso UX. Include `error` se MailerLite fallisce.
+ * Iscrive un utente a MailerLite.
+ * Default: sempre 'submit-spot' (ChrispyMPS — Spot Submission).
+ * Se alsoNewsletter=true: iscrive ANCHE a 'newsletter' (Newsletter BMX Settimanale).
+ * Risposta sempre 200 per non bloccare il flusso UX.
  */
 export async function POST(req: NextRequest) {
   const cors = corsHeaders(req.headers.get('origin'));
@@ -54,12 +52,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { email, username, source } = result.data;
-  const { ok, error, subscriberId } = await subscribeToNewsletter(
-    email,
-    username ?? email.split('@')[0],
-    { source },
-  );
+  const { email, username, source, alsoNewsletter } = result.data;
+  const name = username ?? email.split('@')[0];
+  const mainSource = source ?? 'submit-spot';
+
+  const { ok, error, subscriberId } = await subscribeToNewsletter(email, name, { source: mainSource });
+
+  if (alsoNewsletter && ok) {
+    await subscribeToNewsletter(email, name, { source: 'newsletter' });
+  }
 
   return NextResponse.json({ ok, error, subscriberId }, { headers: cors });
 }
