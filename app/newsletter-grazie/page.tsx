@@ -56,7 +56,7 @@ export default function NewsletterThankYouPage() {
             <div>
               <h2 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-2">🔒 I tuoi dati</h2>
               <p className="text-zinc-300">
-                La tua email è protetta. Leggi la nostra <a href="https://chrispybmx.com/privacy/" target="_blank" rel="noopener" className="text-orange-400 hover:underline">Privacy Policy</a> per i dettagli.
+                La tua email è protetta. Leggi la nostra <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" className="text-orange-400 hover:underline">Privacy Policy</a> per i dettagli.
               </p>
             </div>
           </div>
@@ -82,7 +82,7 @@ export default function NewsletterThankYouPage() {
       {/* Footer links */}
       <footer className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950 to-transparent p-4 text-center text-xs text-zinc-500 space-y-2">
         <div className="flex flex-wrap gap-4 justify-center">
-          <a href="https://chrispybmx.com/privacy/" target="_blank" rel="noopener" className="hover:text-orange-400">Privacy Policy</a>
+          <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" className="hover:text-orange-400">Privacy Policy</a>
           <span>•</span>
           <a href="https://chrispybmx.com/cookie-policy/" target="_blank" rel="noopener" className="hover:text-orange-400">Cookie Policy</a>
           <span>•</span>

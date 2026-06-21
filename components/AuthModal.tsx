@@ -24,8 +24,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [regPassword,  setRegPassword] = useState('');
   const [usernameOk,   setUsernameOk]  = useState<boolean | null>(null);
   const [checkingUn,   setCheckingUn]  = useState(false);
-  const [newsletter,   setNewsletter]  = useState(false);
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [newsletter, setNewsletter] = useState(false);
 
   // Accedi
   const [loginEmail,    setLoginEmail]    = useState('');
@@ -42,7 +41,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
     setUsernameOk(null); setResetSent(false); setResetting(false);
-    setNewsletter(false); setAgeConfirmed(false);
+    setNewsletter(false);
   };
 
   const handleClose = () => { resetAll(); onClose(); };
@@ -66,7 +65,6 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     if (!regUsername || !regEmail || !regPassword) { setError('Compila tutti i campi.'); return; }
     if (regUsername.length < 3) { setError('Username troppo corto (min 3 caratteri).'); return; }
     if (regPassword.length < 6) { setError('Password troppo corta (min 6 caratteri).'); return; }
-    if (!ageConfirmed) { setError('Devi confermare di avere almeno 14 anni.'); return; }
     setLoading(true); setError(null);
     try {
       const result = await signUp(regEmail, regPassword, regUsername, { newsletter });
@@ -263,30 +261,22 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                   <label style={lbl}>Password * (min 6 caratteri)</label>
                   <input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
                 </div>
-                {/* Conferma eta 14+ e consensi */}
-                <div style={{ display: 'grid', gap: 10, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={ageConfirmed} onChange={e => setAgeConfirmed(e.target.checked)}
-                      style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.5 }}>
-                      Confermo di avere almeno 14 anni <span style={{ color: 'var(--orange)' }}>*</span>
-                    </span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={newsletter} onChange={e => setNewsletter(e.target.checked)}
-                      style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', lineHeight: 1.5 }}>
-                      Ricevi la newsletter di Chrispy Maps <span style={{ fontSize: 11 }}>(facoltativo)</span>
-                    </span>
-                  </label>
-                </div>
+                {/* Newsletter opt-in */}
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
+                  <input type="checkbox" checked={newsletter} onChange={e => setNewsletter(e.target.checked)}
+                    style={{ marginTop: 2, accentColor: 'var(--orange)', width: 16, height: 16, flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', lineHeight: 1.5 }}>
+                    Voglio ricevere la newsletter BMX di Chrispy Maps
+                  </span>
+                </label>
                 {error && <Err msg={error} />}
                 <button onClick={handleSignUp} disabled={loading || usernameOk === false} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: (loading || usernameOk === false) ? 0.6 : 1 }}>
                   {loading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT'}
                 </button>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6 }}>
-                  Registrandoti accetti la <a href="/privacy" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>.
-                  <br />I tuoi dati saranno trattati per la gestione account e pubblicazione spot.
+                  Cliccando su "Crea Account" accetti la nostra{' '}
+                  <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>
+                  {' '}e dichiari di avere almeno 14 anni.
                 </p>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
                   Hai già un account?{' '}

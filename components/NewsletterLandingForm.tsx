@@ -88,7 +88,7 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
         <div className="text-vhs-xs text-gray-400 space-y-2">
           <p>
             Iscrivendoti accetti di ricevere la newsletter di ChrispyBMX. Useremo la tua email solo per inviarti aggiornamenti BMX. Puoi disiscriverti in qualsiasi momento tramite il link presente in ogni email. Leggi la{' '}
-            <a href="https://chrispybmx.com/privacy/" target="_blank" rel="noopener" className="text-orange hover:underline">
+            <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" className="text-orange hover:underline">
               Privacy Policy
             </a>
             .

@@ -38,14 +38,18 @@ export async function signUp(
     .insert({ id: data.user.id, username });
   if (profileErr) throw new Error(profileErr.message);
 
-  // 4. Newsletter — solo se l'utente ha spuntato il consenso esplicito
-  if (opts?.newsletter) {
-    fetch('/api/newsletter/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, username, source: 'signup' }),
-    }).catch(() => {});
-  }
+  // 4. MailerLite — Spot Submission = email benvenuto + regolamento mappa (legittimo interesse,
+  //    dichiarato nella Privacy Policy). Newsletter = opt-in esplicito via checkbox.
+  fetch('/api/newsletter/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      username,
+      source: 'submit-spot',
+      alsoNewsletter: !!opts?.newsletter,
+    }),
+  }).catch(() => {});
 
   // Se l'email è già confermata (email confirmation disabled in Supabase) → ok
   // Altrimenti → conferma email necessaria

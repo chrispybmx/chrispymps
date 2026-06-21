@@ -117,7 +117,7 @@
           <input id="cb-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="la tua email" required />
           <button type="submit" id="cb-btn">Iscriviti</button>
         </div>
-        <p style="font-size:12px;color:var(--cb-g400);margin-top:12px;line-height:1.5">Iscrivendoti accetti di ricevere la newsletter di ChrispyBMX. Useremo la tua email solo per inviarti aggiornamenti BMX. Puoi disiscriverti in qualsiasi momento tramite il link presente in ogni email. Leggi la <a href="https://chrispybmx.com/privacy/" target="_blank" rel="noopener" style="color:var(--cb-orange)">Privacy Policy</a>.</p>
+        <p style="font-size:12px;color:var(--cb-g400);margin-top:12px;line-height:1.5">Iscrivendoti accetti di ricevere la newsletter di ChrispyBMX. Useremo la tua email solo per inviarti aggiornamenti BMX. Puoi disiscriverti in qualsiasi momento tramite il link presente in ogni email. Leggi la <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" style="color:var(--cb-orange)">Privacy Policy</a>.</p>
         <label class="cb-checkbox">
           <input id="cb-consent" type="checkbox" />
           <span>Acconsento a ricevere la newsletter di ChrispyBMX secondo la Privacy Policy.</span>
@@ -161,8 +161,10 @@
 
     <div class="cb-foot">
       <div class="cb-links">
+        <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener">Privacy Policy</a>
+        <a href="https://www.iubenda.com/privacy-policy/84160410/cookie-policy" target="_blank" rel="noopener">Cookie Policy</a>
+        <a href="mailto:christian.ceresato@gmail.com">Contatti</a>
         <a href="https://maps.chrispybmx.com/map" target="_blank" rel="noopener">Mappa spot ↗</a>
-        <a href="https://maps.chrispybmx.com/privacy" target="_blank" rel="noopener">Privacy</a>
       </div>
       <p class="cb-copy">© <span id="cb-yr"></span> Chrispy BMX</p>
     </div>
@@ -176,6 +178,9 @@
   var root = document.querySelector('.cbmx-nl');
   if (!root) return;
   var yr = root.querySelector('#cb-yr'); if (yr) yr.textContent = new Date().getFullYear();
+  // Warm-up: sveglia la funzione serverless al caricamento (OPTIONS, nessun effetto/rate-limit).
+  // Quando l'utente invia (secondi dopo) la funzione è già calda → niente cold-start percepito.
+  try { fetch(API, { method: 'OPTIONS' }).catch(function () {}); } catch (e) {}
   var form = root.querySelector('#cb-form');
   var input = root.querySelector('#cb-email');
   var consent = root.querySelector('#cb-consent');
@@ -189,13 +194,15 @@
     if (sent || !consent.checked) return;
     var email = (input.value || '').trim();
     if (!email || email.indexOf('@') === -1) { setMsg('Email non valida.', 'cb-err'); return; }
-    btn.disabled = true; consent.disabled = true; btn.textContent = '...'; setMsg('', '');
-    fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    btn.disabled = true; consent.disabled = true; btn.textContent = '...'; setMsg('Iscrizione in corso…', '');
+    // Aspetta la conferma prima del redirect → l'iscrizione è garantita (no email perse).
+    // keepalive:true: se l'utente chiude/naviga, la richiesta si completa lo stesso.
+    fetch(API, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email, username: email.split('@')[0], source: 'newsletter' }) })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (d) {
         if (d && d.ok) { sent = true; btn.textContent = '✓ Iscritto'; btn.className = 'cb-done'; input.disabled = true;
-          setTimeout(function () { window.location.href = 'https://chrispybmx.com/newsletter-grazie/'; }, 500); }
+          window.location.href = 'https://chrispybmx.com/newsletter-grazie/'; }
         else { btn.disabled = false; consent.disabled = false; btn.textContent = 'Iscriviti'; setMsg((d && d.error) || 'Qualcosa non ha funzionato. Riprova.', 'cb-err'); }
       })
       .catch(function () { btn.disabled = false; consent.disabled = false; btn.textContent = 'Iscriviti'; setMsg('Errore di rete. Riprova.', 'cb-err'); });
