@@ -95,6 +95,17 @@ export async function setupGoogleUsername(userId: string, username: string, acce
     throw new Error(data.error ?? 'Errore aggiornamento username');
   }
 
+  // 3. MailerLite — come per il signup email/password: ogni nuovo account (qui: Google OAuth)
+  //    entra nel gruppo "Spot Submission" e riceve l'email di benvenuto + regolamento.
+  //    Niente newsletter: in questo flusso non c'è checkbox di consenso.
+  const { data: { user } } = await sb.auth.getUser();
+  if (user?.email) {
+    fetch('/api/newsletter/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email, username, source: 'submit-spot' }),
+    }).catch(() => {});
+  }
 }
 
 /** Reset password — invia email con link (scade in 1 ora) */
