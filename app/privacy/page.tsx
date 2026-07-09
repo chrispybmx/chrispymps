@@ -192,9 +192,15 @@ const dataRows = [
   },
   {
     trattamento: 'Invio spot',
-    dati: '@username, coordinate GPS, foto, descrizione',
+    dati: '@username, coordinate GPS dello spot, citta e paese, foto (metadati EXIF/GPS rimossi automaticamente al caricamento), descrizione',
     base: 'Art. 6(1)(b) — esecuzione contratto',
     durata: 'Durata pubblicazione dello spot',
+  },
+  {
+    trattamento: 'Comunicazioni di servizio',
+    dati: 'Email, username (benvenuto, regolamento d’uso, avvisi account — tramite MailerLite)',
+    base: 'Art. 6(1)(b) — esecuzione contratto',
+    durata: 'Durata account',
   },
   {
     trattamento: 'Newsletter',
@@ -333,7 +339,15 @@ export default function PrivacyPage() {
               (moderazione, reset password)
             </li>
             <li style={styles.li}>
-              <strong>MailerLite UAB</strong> (Lituania) — invio newsletter
+              <strong>MailerLite UAB</strong> (Lituania) — invio newsletter e
+              comunicazioni di servizio relative all&apos;account
+            </li>
+            <li style={styles.li}>
+              <strong>OpenStreetMap Foundation</strong> (Regno Unito) — servizio
+              di geocoding Nominatim: quando cerchi un luogo o selezioni una
+              posizione, le relative coordinate vengono inviate a
+              nominatim.openstreetmap.org per ottenere il nome di citta e paese.
+              Nessun dato identificativo (email, username) viene trasmesso.
             </li>
           </ul>
           <p style={styles.p}>
@@ -519,7 +533,7 @@ export default function PrivacyPage() {
           <h2 style={styles.h2}>9. ULTIMO AGGIORNAMENTO</h2>
           <p style={styles.p}>
             La presente informativa e stata aggiornata l&apos;ultima volta a{' '}
-            <strong>maggio 2026</strong>.
+            <strong>luglio 2026</strong>.
           </p>
           <p style={styles.p}>
             Il titolare si riserva il diritto di modificare la presente
