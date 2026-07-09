@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
+import { signIn, signUp, signInWithGoogle, checkUsername, resetPassword } from '@/lib/auth-client';
 
 interface AuthModalProps {
   open:          boolean;
@@ -85,6 +85,17 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore sconosciuto');
     } finally { setLoading(false); }
+  };
+
+  // Redirect flow: parte verso Google, al ritorno /auth/callback gestisce sessione e profilo
+  const handleGoogle = async () => {
+    setLoading(true); setError(null);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore accesso Google');
+      setLoading(false);
+    }
   };
 
   if (!open) return null;
@@ -220,6 +231,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                 <button onClick={handleSignIn} disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: loading ? 0.6 : 1 }}>
                   {loading ? '⏳ Accesso...' : '🔑 ENTRA'}
                 </button>
+                <GoogleButton onClick={handleGoogle} disabled={loading} />
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
                   Non hai un account?{' '}
                   <button onClick={() => { setTab('registrati'); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
@@ -273,6 +285,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                 <button onClick={handleSignUp} disabled={loading || usernameOk === false} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: (loading || usernameOk === false) ? 0.6 : 1 }}>
                   {loading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT'}
                 </button>
+                <GoogleButton onClick={handleGoogle} disabled={loading} />
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6 }}>
                   Cliccando su "Crea Account" accetti la nostra{' '}
                   <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>
@@ -298,6 +311,38 @@ function Err({ msg }: { msg: string }) {
     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '8px 12px' }}>
       ⚠ {msg}
     </div>
+  );
+}
+
+/** Divider "oppure" + bottone Google (redirect OAuth via Supabase) */
+function GoogleButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>oppure</span>
+        <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
+      </div>
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: 6,
+          padding: '12px 16px', cursor: disabled ? 'default' : 'pointer',
+          fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600,
+          opacity: disabled ? 0.6 : 1,
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.78.43 3.45 1.18 4.94l3.66-2.84z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.16-3.16C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        Continua con Google
+      </button>
+    </>
   );
 }
 
