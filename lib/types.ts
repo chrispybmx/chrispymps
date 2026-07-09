@@ -37,6 +37,8 @@ export interface Spot {
   lon:                  number;
   city?:                string;
   region?:              string;
+  country?:             string;
+  country_code?:        string; // ISO 3166-1 alpha-2 (IT, FR, US, ...)
   description?:         string;
   condition:            SpotCondition;
   condition_updated_at: string;

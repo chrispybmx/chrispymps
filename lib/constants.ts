@@ -333,8 +333,8 @@ export const LINKS = {
 // ===== CONFIG =====
 export const APP_CONFIG = {
   siteName:    'Chrispy Maps',
-  tagline:     'Mappa Spot BMX, Skate & Scooter Italia',
-  description: 'La mappa community-driven per trovare spot BMX, skatepark, spot scooter e street spot in tutta Italia. Oltre 100 città, aggiornata dalla community.',
+  tagline:     'Mappa Spot BMX, Skate & Scooter',
+  description: 'La mappa community-driven per trovare spot BMX, skatepark, spot scooter e street spot. Nata in Italia, aperta al mondo — aggiornata dalla community.',
   url:         'https://maps.chrispybmx.com',
   mapUrl:      'https://maps.chrispybmx.com', // home = mappa, /map reindirizza qui
   mapCenter:   [42.5, 12.5] as [number, number], // Centro Italia

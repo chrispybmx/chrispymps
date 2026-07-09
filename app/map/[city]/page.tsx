@@ -11,8 +11,26 @@ export const revalidate = 3600;
 
 interface Props { params: { city: string } }
 
+/** Slug URL valido (evita input arbitrari nelle query). */
+const CITY_SLUG_RE = /^[a-z0-9-]{1,60}$/;
+
+function slugifyCity(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // rimuove accenti
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Label leggibile: lista curata italiana, altrimenti de-slug Title Case
+    (world-wide: le città estere arrivano dai dati, non da una lista). */
 function getCityLabel(slug: string): string {
-  return CITTA_ITALIANE.find((c) => c.value === slug)?.label ?? slug;
+  const curated = CITTA_ITALIANE.find((c) => c.value === slug)?.label;
+  if (curated) return curated;
+  return slug
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -47,25 +65,45 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
-  return CITTA_ITALIANE.map((c) => ({ city: c.value }));
+  // Lista curata italiana (SEO storico) + città reali dai dati (world-wide)
+  const params = new Map(CITTA_ITALIANE.map((c) => [c.value, { city: c.value }]));
+  try {
+    const supabase = supabaseServer();
+    const { data } = await supabase
+      .from('spots')
+      .select('city')
+      .eq('status', 'approved')
+      .not('city', 'is', null);
+    for (const row of data ?? []) {
+      const slug = slugifyCity(String(row.city));
+      if (slug && !params.has(slug)) params.set(slug, { city: slug });
+    }
+  } catch { /* build resiliente: se il DB non risponde, restano le città curate */ }
+  return Array.from(params.values());
 }
 
-async function getCitySpots(city: string): Promise<Spot[]> {
+async function getCitySpots(citySlug: string): Promise<Spot[]> {
   const supabase = supabaseServer();
+  // Il DB può contenere la città come slug ('reggio-emilia') o come nome ('Reggio Emilia'):
+  // matcha entrambe le forme.
+  const asName = citySlug.replace(/-/g, ' ');
   const { data } = await supabase
     .from('spots')
     .select('*, spot_photos(url, position)')
     .eq('status', 'approved')
-    .eq('city', city)
+    .or(`city.ilike.${citySlug},city.ilike.${asName}`)
     .order('approved_at', { ascending: false });
   return (data ?? []) as Spot[];
 }
 
 export default async function CityPage({ params }: Props) {
+  if (!CITY_SLUG_RE.test(params.city)) notFound();
   const cityLabel = getCityLabel(params.city);
-  if (!CITTA_ITALIANE.find((c) => c.value === params.city)) notFound();
 
   const spots = await getCitySpots(params.city);
+  // Pagina valida se: città curata (SEO, anche a 0 spot) oppure ha spot reali (world-wide)
+  const isCurated = CITTA_ITALIANE.some((c) => c.value === params.city);
+  if (!isCurated && spots.length === 0) notFound();
   const url = `${APP_CONFIG.url}/map/${params.city}`;
 
   // JSON-LD: BreadcrumbList + CollectionPage con FAQ

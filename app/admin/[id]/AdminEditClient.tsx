@@ -192,10 +192,17 @@ export default function AdminEditClient({ spot: initial }: Props) {
             </Field>
 
             <Field label="Città">
-              <select className="input-vhs" value={spot.city ?? ''} onChange={e => update('city', e.target.value)}>
-                <option value="">—</option>
+              {/* Input libero (world-wide): le città italiane restano come suggerimenti */}
+              <input
+                className="input-vhs"
+                list="admin-city-suggestions"
+                value={spot.city ?? ''}
+                onChange={e => update('city', e.target.value)}
+                placeholder="es. verona, paris, barcelona…"
+              />
+              <datalist id="admin-city-suggestions">
                 {CITTA_ITALIANE.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
+              </datalist>
             </Field>
 
             <Field label="Descrizione">

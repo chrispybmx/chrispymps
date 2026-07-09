@@ -23,15 +23,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/map/support`,  lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
   ];
 
-  // Pagine città — alta priorità per SEO locale
-  const cityPages: MetadataRoute.Sitemap = CITTA_ITALIANE.map((c) => ({
-    url:             `${base}/map/${c.value}`,
+  const supabase = supabaseServer();
+
+  // Pagine città — lista curata italiana (SEO storico) + città reali dai dati (world-wide)
+  const citySlugs = new Set(CITTA_ITALIANE.map((c) => c.value));
+  const { data: spotCities } = await supabase
+    .from('spots')
+    .select('city')
+    .eq('status', 'approved')
+    .not('city', 'is', null);
+  for (const row of spotCities ?? []) {
+    const slug = String(row.city)
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (slug) citySlugs.add(slug);
+  }
+  const cityPages: MetadataRoute.Sitemap = Array.from(citySlugs).map((slug) => ({
+    url:             `${base}/map/${slug}`,
     lastModified:    new Date(),
     changeFrequency: 'weekly' as const,
     priority:        0.85,
   }));
-
-  const supabase = supabaseServer();
 
   // Pagine spot dinamiche
   const { data: spots } = await supabase

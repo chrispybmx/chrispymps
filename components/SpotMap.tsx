@@ -205,19 +205,23 @@ export default function SpotMap({
       map.on('zoomend', () => { setZoom(map.getZoom()); emitBounds(); });
       map.on('moveend', emitBounds);
 
-      /* ── Vista iniziale: l'Italia nello spazio visibile sopra il pannello ──
-         paddingBottomRight bottom = overlayOffsetPx (= panelHeight/2) + handle:
-         il pannello occupa overlayOffsetPx px al di sotto del centro visibile.
-         NON moltiplichiamo per 2: overlayOffsetPx è già metà pannello, non tutto. */
+      /* ── Vista iniziale provvisoria (placeholder finché non arrivano gli spot) ──
+         Mostriamo l'area storica della community come segnaposto visivo, ma NON
+         marchiamo hasInitialFit: appena gli spot sono caricati, l'auto-fit
+         data-driven (più sotto) inquadra DOVE SONO gli spot — oggi Italia,
+         domani il mondo — senza nulla di hardcoded.
+         paddingBottomRight bottom = overlayOffsetPx (= panelHeight/2) + handle. */
       const handleH = 82; // gradiente (36) + drag handle (46)
-      const ITALY   = L.latLngBounds([36.0, 6.0], [47.5, 19.0]);
-      map.fitBounds(ITALY, {
+      const PLACEHOLDER_BOUNDS = L.latLngBounds([36.0, 6.0], [47.5, 19.0]);
+      map.fitBounds(PLACEHOLDER_BOUNDS, {
         paddingTopLeft:     [20, 10],
         paddingBottomRight: [20, overlayOffsetPx + handleH],
         maxZoom: 7,
         animate: false,
       });
-      hasInitialFit.current = true;
+      /* Se l'utente interagisce prima che arrivino gli spot, l'auto-fit non deve
+         scavalcare la sua vista. */
+      map.once('dragstart', () => { hasInitialFit.current = true; });
 
       /* ── Geolocalizzazione automatica all'avvio ──
          Se il browser conosce la posizione dell'utente, centra sulla sua zona

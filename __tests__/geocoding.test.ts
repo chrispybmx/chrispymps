@@ -47,14 +47,32 @@ describe('geocodeForward', () => {
     expect(calledUrl).toContain('featuretype=city%2Ctown');
   });
 
-  it('URL default: limit=5, countrycodes=it', async () => {
+  it('URL default: limit=5, ricerca world-wide senza filtro paese', async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => [] });
 
     await geocodeForward('Roma');
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).toContain('limit=5');
-    expect(calledUrl).toContain('countrycodes=it');
+    expect(calledUrl).not.toContain('countrycodes');
+    expect(calledUrl).toContain('accept-language=');
+  });
+
+  it('displayExtra mostra contesto + paese per luoghi esteri', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: async () => [
+        {
+          name:         'Barcelona',
+          lat:          '41.3874',
+          lon:          '2.1686',
+          type:         'city',
+          display_name: 'Barcelona, Barcelonès, Catalunya, España',
+        },
+      ],
+    });
+
+    const results = await geocodeForward('Barcelona');
+    expect(results[0].displayExtra).toBe('Barcelonès, España');
   });
 
   it('restituisce [] se Nominatim risponde con array vuoto', async () => {
@@ -83,15 +101,17 @@ describe('geocodeForward', () => {
 });
 
 describe('reverseGeocode', () => {
-  it('ritorna nome città da address.city', async () => {
+  it('ritorna città + paese da address', async () => {
     mockFetch.mockResolvedValueOnce({
       json: async () => ({
-        address: { city: 'Verona', country: 'Italia' },
+        address: { city: 'Verona', country: 'Italia', country_code: 'it' },
       }),
     });
 
-    const city = await reverseGeocode(45.4384, 10.9916);
-    expect(city).toBe('Verona');
+    const geo = await reverseGeocode(45.4384, 10.9916);
+    expect(geo.city).toBe('Verona');
+    expect(geo.country).toBe('Italia');
+    expect(geo.countryCode).toBe('IT'); // normalizzato maiuscolo
   });
 
   it('fallback su town se city manca', async () => {
@@ -101,8 +121,8 @@ describe('reverseGeocode', () => {
       }),
     });
 
-    const city = await reverseGeocode(45.55, 10.88);
-    expect(city).toBe('Bardolino');
+    const geo = await reverseGeocode(45.55, 10.88);
+    expect(geo.city).toBe('Bardolino');
   });
 
   it('fallback su village se city e town mancano', async () => {
@@ -112,8 +132,20 @@ describe('reverseGeocode', () => {
       }),
     });
 
-    const city = await reverseGeocode(45.6, 10.7);
-    expect(city).toBe('Costermano');
+    const geo = await reverseGeocode(45.6, 10.7);
+    expect(geo.city).toBe('Costermano');
+  });
+
+  it('città estera: ritorna nome locale + country code', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        address: { city: 'Paris', country: 'France', country_code: 'fr' },
+      }),
+    });
+
+    const geo = await reverseGeocode(48.8566, 2.3522);
+    expect(geo.city).toBe('Paris');
+    expect(geo.countryCode).toBe('FR');
   });
 
   it('ritorna null se address è vuoto', async () => {
@@ -121,8 +153,10 @@ describe('reverseGeocode', () => {
       json: async () => ({ address: {} }),
     });
 
-    const city = await reverseGeocode(0, 0);
-    expect(city).toBeNull();
+    const geo = await reverseGeocode(0, 0);
+    expect(geo.city).toBeNull();
+    expect(geo.country).toBeNull();
+    expect(geo.countryCode).toBeNull();
   });
 
   it('include lat/lon nella URL', async () => {

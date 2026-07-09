@@ -1,0 +1,121 @@
+<!--
+  ChrispyBMX — Pagina ringraziamento newsletter per WordPress + Elementor
+  ============================================================
+  COME USARLO:
+  1. WP Admin → Pagine → Aggiungi nuova → titolo "Grazie", slug "newsletter-grazie".
+  2. Template pagina: "Elementor Canvas" (a tutto schermo, niente header/footer del tema).
+  3. Modifica con Elementor → trascina il widget "HTML" → incolla TUTTO il contenuto qui sotto.
+  4. Pubblica. URL: https://chrispybmx.com/newsletter-grazie/
+  NOTE:
+  - Tutto il CSS è scoped sotto .cbmx-ty → non tocca il resto del sito.
+  - Stesso stile della landing /newsletter (dark, arancione, VHS).
+-->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Barlow+Condensed:wght@400;600;700&display=swap');
+
+.cbmx-ty {
+  --cb-orange: #ff6a00; --cb-black: #0a0a0a; --cb-bone: #f3ead8; --cb-coffee: #ffce4d;
+  --cb-g800: #1a1a1a; --cb-g700: #2a2a2a; --cb-g600: #3a3a3a; --cb-g400: #888; --cb-g200: #ccc;
+  --cb-mono: 'VT323', monospace; --cb-disp: 'Barlow Condensed', sans-serif;
+  background: var(--cb-black); color: var(--cb-bone); font-family: var(--cb-disp);
+  line-height: 1.4; margin: 0; overflow-x: hidden; position: relative;
+  min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
+}
+.cbmx-ty *, .cbmx-ty *::before, .cbmx-ty *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.cbmx-ty a { color: inherit; text-decoration: none; }
+
+.cbmx-ty .cb-vhs {
+  pointer-events: none; position: absolute; inset: 0; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 4px);
+  mix-blend-mode: multiply;
+}
+.cbmx-ty .cb-glow {
+  pointer-events: none; position: absolute; top: -10%; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 600px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,106,0,.12), transparent 70%); z-index: 0;
+}
+.cbmx-ty .cb-content { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 20px 40px; }
+
+.cbmx-ty .cb-check {
+  width: 88px; height: 88px; border-radius: 50%; background: var(--cb-orange); color: #000;
+  display: flex; align-items: center; justify-content: center; font-size: 44px; font-weight: 700;
+  margin: 0 auto 28px; box-shadow: 0 0 40px rgba(255,106,0,.4); animation: cbPop .5s ease-out;
+}
+@keyframes cbPop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cbmx-ty .cb-check { animation: none; } }
+
+.cbmx-ty h1 { font-family: var(--cb-mono); font-weight: 400; color: var(--cb-bone); font-size: 48px; line-height: 1.0; margin-bottom: 12px; }
+@media (min-width: 640px) { .cbmx-ty h1 { font-size: 64px; } }
+.cbmx-ty .cb-sub { font-size: 22px; color: var(--cb-g200); max-width: 520px; margin: 0 auto 32px; }
+.cbmx-ty .cb-sub b { color: var(--cb-orange); }
+
+.cbmx-ty .cb-info { max-width: 520px; width: 100%; margin: 0 auto 32px; display: grid; gap: 14px; text-align: left; }
+.cbmx-ty .cb-row { border: 1px solid var(--cb-g700); background: rgba(26,26,26,.5); border-radius: 12px; padding: 16px 20px; }
+.cbmx-ty .cb-row h2 { font-family: var(--cb-mono); font-weight: 400; text-transform: uppercase; letter-spacing: .04em; color: var(--cb-orange); font-size: 17px; margin-bottom: 4px; }
+.cbmx-ty .cb-row p { font-size: 16px; color: var(--cb-g200); }
+.cbmx-ty .cb-row p b { color: var(--cb-bone); }
+.cbmx-ty .cb-row a { color: var(--cb-orange); }
+.cbmx-ty .cb-row a:hover { text-decoration: underline; }
+
+.cbmx-ty .cb-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.cbmx-ty .cb-btn {
+  font-family: var(--cb-mono); font-size: 18px; text-transform: uppercase; letter-spacing: .06em;
+  border-radius: 8px; padding: 13px 28px; transition: all .15s; cursor: pointer;
+}
+.cbmx-ty .cb-btn-primary { background: var(--cb-orange); color: #000; box-shadow: 0 0 20px rgba(255,106,0,.3); }
+.cbmx-ty .cb-btn-primary:hover { box-shadow: 0 0 40px rgba(255,106,0,.45); }
+.cbmx-ty .cb-btn-outline { border: 1px solid var(--cb-orange); color: var(--cb-orange); }
+.cbmx-ty .cb-btn-outline:hover { background: rgba(255,106,0,.1); }
+
+.cbmx-ty .cb-foot { position: relative; z-index: 2; padding: 24px 20px 32px; text-align: center; font-family: var(--cb-mono); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--cb-g400); }
+.cbmx-ty .cb-foot .cb-links { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center; }
+.cbmx-ty .cb-foot a:hover { color: var(--cb-orange); }
+.cbmx-ty .cb-foot .cb-copy { margin-top: 14px; color: var(--cb-g600); }
+</style>
+
+<div class="cbmx-ty">
+  <div class="cb-vhs" aria-hidden="true"></div>
+  <div class="cb-glow" aria-hidden="true"></div>
+
+  <div class="cb-content">
+    <div class="cb-check">✓</div>
+    <h1>Iscritto!</h1>
+    <p class="cb-sub">La tua iscrizione a <b>Cinque cose dal mondo BMX</b> è confermata.</p>
+
+    <div class="cb-info">
+      <div class="cb-row">
+        <h2>📧 Quando arriva</h2>
+        <p>La prima newsletter ti arriverà <b>lunedì mattina</b>. Non ne perderai una più.</p>
+      </div>
+      <div class="cb-row">
+        <h2>📨 Gestisci l'iscrizione</h2>
+        <p>In fondo a ogni email trovi un link per <b>disiscriverti</b> in qualsiasi momento, senza domande.</p>
+      </div>
+      <div class="cb-row">
+        <h2>🔒 I tuoi dati</h2>
+        <p>La tua email è al sicuro. Leggi la <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener">Privacy Policy</a> per i dettagli.</p>
+      </div>
+    </div>
+
+    <div class="cb-cta">
+      <a class="cb-btn cb-btn-primary" href="https://chrispybmx.com/">← Torna al sito</a>
+      <a class="cb-btn cb-btn-outline" href="https://maps.chrispybmx.com/map" target="_blank" rel="noopener">Guarda la mappa spot →</a>
+    </div>
+  </div>
+
+  <div class="cb-foot">
+    <div class="cb-links">
+      <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener">Privacy Policy</a>
+      <a href="https://www.iubenda.com/privacy-policy/84160410/cookie-policy" target="_blank" rel="noopener">Cookie Policy</a>
+      <a href="mailto:christian.ceresato@gmail.com">Contatti</a>
+    </div>
+    <p class="cb-copy">© <span id="cb-ty-yr"></span> Chrispy BMX</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var yr = document.getElementById('cb-ty-yr');
+  if (yr) yr.textContent = new Date().getFullYear();
+})();
+</script>

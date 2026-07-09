@@ -125,8 +125,9 @@ function LocationMapPicker({
         shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
-      const center: [number, number] = lat != null ? [lat, lon!] : [42.5, 12.5];
-      const zoom = lat != null ? 15 : 6;
+      // Senza coordinate note: vista mondo (world-wide, niente Italy-first)
+      const center: [number, number] = lat != null ? [lat, lon!] : [20, 0];
+      const zoom = lat != null ? 15 : 2;
 
       const map = L.map(containerRef.current!, { center, zoom, zoomControl: true });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -308,12 +309,16 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyDismissed, setNearbyDismissed] = useState(false);
 
-  /* Reverse geocode → auto-popola città */
+  /* Reverse geocode → auto-popola città + paese */
   const [city, setCity] = useState('');
+  const [country, setCountry] = useState('');
+  const [countryCode, setCountryCode] = useState('');
   const fetchCity = useCallback(async (eLat: number, eLon: number) => {
     try {
-      const cn = await reverseGeocode(eLat, eLon);
-      if (cn) setCity(cn);
+      const geo = await reverseGeocode(eLat, eLon);
+      if (geo.city) setCity(geo.city);
+      setCountry(geo.country ?? '');
+      setCountryCode(geo.countryCode ?? '');
     } catch { /* silent */ }
   }, []);
 
@@ -340,7 +345,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   /* Reset */
   const handleClose = useCallback(() => {
     setStep('posizione');
-    setLat(initialLat ?? null); setLon(initialLon ?? null); setCity('');
+    setLat(initialLat ?? null); setLon(initialLon ?? null); setCity(''); setCountry(''); setCountryCode('');
     setLocMode(null);
     setCoordInput(''); setCoordError(null);
     setGpsState('idle');
@@ -442,6 +447,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           body: JSON.stringify({
             name: name.trim(), type, lat, lon,
             city: city || undefined,
+            country: country || undefined,
+            country_code: countryCode || undefined,
             description: description || undefined,
             guardians: notes || undefined,
             difficulty: difficulty || undefined,
@@ -455,6 +462,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         fd.append('data', JSON.stringify({
           name: name.trim(), type, lat, lon,
           city: city || undefined,
+          country: country || undefined,
+          country_code: countryCode || undefined,
           description: description || undefined,
           guardians: notes || undefined,
           difficulty: difficulty || undefined,
