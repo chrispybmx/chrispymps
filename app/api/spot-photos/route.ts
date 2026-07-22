@@ -121,13 +121,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Errore creazione contributo.' }, { status: 500 });
   }
 
-  // Upload all photos in PARALLEL
+  // Upload all photos in PARALLEL.
+  // Si tiene traccia del filename anche quando la riga DB fallisce: serve a
+  // ripulire lo storage invece di lasciare file orfani impossibili da collegare.
   const uploadResults = await Promise.all(
-    photos.map(async (file, i) => {
-      if (file.size > MAX_PHOTO_SIZE) return null;
+    photos.map(async (file, i): Promise<{ url: string | null; filename: string | null }> => {
+      if (file.size > MAX_PHOTO_SIZE) return { url: null, filename: null };
       const buf = await file.arrayBuffer();
       const mime = detectMime(buf);
-      if (!mime || !MIME_EXT[mime]) return null;
+      if (!mime || !MIME_EXT[mime]) return { url: null, filename: null };
 
       // Strip EXIF/GPS metadata before upload
       const stripped = await sharp(Buffer.from(buf)).rotate().toBuffer();
@@ -139,7 +141,7 @@ export async function POST(req: NextRequest) {
         .from('spot-photos')
         .upload(filename, stripped, { contentType: mime, upsert: false });
 
-      if (uploadErr) { console.error('[spot-photos] upload error:', uploadErr); return null; }
+      if (uploadErr) { console.error('[spot-photos] upload error:', uploadErr); return { url: null, filename: null }; }
 
       const url = supabase.storage.from('spot-photos').getPublicUrl(filename).data.publicUrl;
 
@@ -149,13 +151,28 @@ export async function POST(req: NextRequest) {
         contribution_id: contribution.id,
       });
 
-      return insertErr ? null : url;
+      // Loggare SEMPRE: un insert fallito silenziosamente ha tenuto nascosta per
+      // mesi una violazione di FK che rompeva del tutto l'upload foto.
+      if (insertErr) {
+        console.error('[spot-photos] insert error:', insertErr.code, insertErr.message, insertErr.details);
+        return { url: null, filename };
+      }
+
+      return { url, filename };
     })
   );
 
-  const uploadedUrls = uploadResults.filter((u): u is string => u !== null);
+  const uploadedUrls = uploadResults.map(r => r.url).filter((u): u is string => u !== null);
 
   if (uploadedUrls.length === 0) {
+    // Niente è finito a DB: rimuovi contributo e file caricati, così non restano
+    // voci fantasma in coda di moderazione né blob scollegati nel bucket.
+    const orphans = uploadResults.map(r => r.filename).filter((f): f is string => f !== null);
+    if (orphans.length > 0) {
+      await supabase.storage.from('spot-photos').remove(orphans);
+    }
+    await supabase.from('spot_contributions').delete().eq('id', contribution.id);
+
     return NextResponse.json({ ok: false, error: 'Errore durante il caricamento. Riprova.' }, { status: 500 });
   }
 
