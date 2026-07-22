@@ -182,3 +182,38 @@ export function verifyRejectToken(token: string, maxHours = 72): string | null {
     return null;
   }
 }
+
+/**
+ * Token di moderazione EVENTI (link email, stessa firma HMAC degli spot).
+ * Prefix distinto per azione così un token approve non vale come reject e
+ * nessuno dei due collide con i token spot. Scadenza più lunga (default 7gg):
+ * gli eventi vengono proposti anche settimane prima della data.
+ */
+export function generateEventActionToken(eventId: string, action: 'approve' | 'reject'): string {
+  const timestamp = Date.now().toString();
+  const payload = `event-${action}|${eventId}|${timestamp}`;
+  const sig = createHmac('sha256', getSecret()).update(payload).digest('hex');
+  return Buffer.from(`${payload}|${sig}`).toString('base64url');
+}
+
+/** Verifica un token evento. Restituisce l'eventId se valido, null altrimenti. */
+export function verifyEventActionToken(token: string, action: 'approve' | 'reject', maxHours = 24 * 7): string | null {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString();
+    const parts = decoded.split('|');
+    if (parts.length !== 4) return null;
+    const [prefix, eventId, timestamp, sig] = parts;
+    if (prefix !== `event-${action}`) return null;
+
+    const age = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
+    if (age > maxHours) return null;
+
+    const payload = `event-${action}|${eventId}|${timestamp}`;
+    const expected = createHmac('sha256', getSecret()).update(payload).digest('hex');
+    if (!timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
+
+    return eventId;
+  } catch {
+    return null;
+  }
+}

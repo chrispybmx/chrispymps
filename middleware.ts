@@ -234,7 +234,9 @@ export async function middleware(req: NextRequest) {
   // Eccezioni: /api/admin/approve e /api/admin/reject GET con token HMAC (link email)
   if (pathname.startsWith('/api/admin/') && pathname !== '/api/admin/login') {
     const isEmailLink =
-      (pathname === '/api/admin/approve' || pathname === '/api/admin/reject') &&
+      (pathname === '/api/admin/approve' ||
+       pathname === '/api/admin/reject' ||
+       pathname === '/api/admin/events/moderate') &&
       req.method === 'GET' &&
       req.nextUrl.searchParams.has('token');
 

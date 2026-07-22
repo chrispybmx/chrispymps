@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { generateApproveToken, generateRejectToken } from './auth';
+import { generateApproveToken, generateRejectToken, generateEventActionToken } from './auth';
 import { APP_CONFIG } from './constants';
 import type { Spot, Contributor } from './types';
 
@@ -199,6 +199,9 @@ export async function sendEventSubmissionNotification(params: {
   const eUserEmail = escapeHtml(params.contributorEmail);
 
   const adminUrl = `${APP_CONFIG.url}/admin?tab=events`;
+  // Moderazione one-click via token HMAC (7 giorni) — stesso pattern dei link spot
+  const approveUrl = `${APP_CONFIG.url}/api/admin/events/moderate?action=approve&token=${generateEventActionToken(params.eventId, 'approve')}`;
+  const rejectUrl  = `${APP_CONFIG.url}/api/admin/events/moderate?action=reject&token=${generateEventActionToken(params.eventId, 'reject')}`;
 
   await resend().emails.send({
     from:    FROM_EMAIL,
@@ -230,7 +233,11 @@ export async function sendEventSubmissionNotification(params: {
   <hr class="sep">
   <div class="row"><span class="label">Da:</span><span class="val">@${eUser} (${eUserEmail})</span></div>
   <hr class="sep">
-  <a href="${adminUrl}" class="btn">📱 Apri admin per moderare</a>
+  <a href="${approveUrl}" class="btn" style="background:#00c851;">✅ PUBBLICA</a>
+  <a href="${rejectUrl}" class="btn" style="background:#ff4444;color:#fff;">❌ RIFIUTA</a>
+  <p style="color:#888;font-size:12px;margin-top:8px;">Un click e basta — link validi 7 giorni, nessun login richiesto.</p>
+  <hr class="sep">
+  <a href="${adminUrl}" style="color:#ff6a00;font-size:13px;">📱 oppure apri la dashboard admin</a>
   <hr class="sep">
   <p style="color:#888;font-size:11px;">Event ID: ${params.eventId}</p>
 </div></body></html>
