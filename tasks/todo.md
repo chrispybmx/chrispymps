@@ -55,10 +55,12 @@ permalink: ai/antigravity/tasks/todo
 - [x] Soft-delete via enum: migration `20260722_spot_status_deleted.sql` (`ALTER TYPE spot_status ADD VALUE 'deleted'`)
 - [x] Moderazione eventi via link email (token HMAC): `generateEventActionToken`, `/api/admin/events/moderate`, bottoni in mail
 - [x] 3 commit locali (cdf3842 events, 8ddfd1f photos, 181fe79 spots) — typecheck verde
-- [ ] ⚠️ DA INCOLLARE nel SQL Editor: fix FK + enum 'deleted' (poi cleanup orfani opz.)
-- [ ] ⚠️ PUSH → deploy (in attesa OK utente)
-- [ ] Verifica live post-migration: upload foto ok + delete spot ok
+- [x] SQL applicato al DB prod (fix FK + enum 'deleted') via SQL Editor (2026-07-23) — verificato live: insert foto passa, PATCH deleted passa
+- [x] CONFLITTO ROUTING: `[id]` vs `[slug]` rompeva build Vercel (tsc non lo cattura) → PATCH/DELETE spostati in `[slug]/route.ts`, `next build` 171/171 ok (vedi lessons.md)
+- [x] PUSH → deploy live (8902992): endpoint /api/spots/[id] PATCH/DELETE attivo, auth 401 su token fasullo, 400 su id non-UUID
+- [ ] cleanup 4 contributi fantasma (distruttivo, opzionale) — `20260721_cleanup_orphan_photo_contributions.sql`, in attesa OK
 - [ ] Routine scraping eventi ogni 2 settimane (UCI dataride vuoto; worldrookietour WP REST viable) — DA FARE
+- [ ] Verifica UI reale (opz.): loggarsi come owner e provare Modifica/Elimina dal vivo sulla pagina spot
 
 ## Prossimi passi (aperti)
 - [ ] Mostrare country nella UI (filtro paese su mappa/cerca-spot, bandierine) — fase 2 del world-wide

@@ -29,6 +29,22 @@ invalid input value for enum`. Per il soft-delete è servito `ALTER TYPE spot_st
 Test sicuro del CHECK/enum: PATCH su una riga **non pubblica** (es. status=rejected) e ripristino
 immediato — un PATCH su 0 righe non fa scattare il vincolo, quindi non prova nulla.
 
+## 2026-07-23 — `tsc` verde NON garantisce che il build Next passi
+Ho creato `app/api/spots/[id]/route.ts` accanto a `[slug]` già esistente. Next.js vieta due
+slug dinamici diversi allo stesso livello (`You cannot use different slug names for the same
+dynamic path`). `tsc --noEmit` passava, ma `next build` sarebbe fallito → il deploy Vercel si è
+rotto e il sito è rimasto al deploy vecchio (405 sull'endpoint nuovo). **Pattern:** prima di
+dichiarare fatta una modifica che tocca route/file structure Next, girare `next build`, non solo
+`tsc`. Fix: PATCH/DELETE spostati in `[slug]/route.ts`, `params.slug` usato come UUID (UUID_RE
+distingue id da slug). Verificato con endpoint live: PATCH/DELETE token fasullo → 401, id non-UUID → 400.
+
+## 2026-07-23 — La clipboard di sistema è inaffidabile per incollare nel browser
+Durante l'applicazione SQL via Chrome, `pbcopy` + `Cmd+V` ha incollato testo di un'ALTRA app
+(l'utente lavorava in parallelo e la clipboard è stata sovrascritta tra copy e paste). Rischio di
+eseguire testo sbagliato su un DB di produzione. **Pattern:** per testo breve ASCII usare `type`
+diretto (attenzione all'auto-close delle virgolette di CodeMirror — verificare con screenshot
+prima di eseguire). Non premere mai Run senza aver riletto ciò che c'è davvero nell'editor.
+
 ## Ricorrente — questo progetto non ha CLI/psql per il DB
 DDL solo via Supabase SQL Editor (browser). Nessun `DATABASE_URL`, nessun Personal Access Token
 Management, `supabase` CLI non installato. Il service-role key fa solo PostgREST (no DDL).
