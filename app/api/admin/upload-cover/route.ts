@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
-import sharp from 'sharp';
+import { optimizeImage } from '@/lib/image';
 
 const ALLOWED_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -64,15 +64,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'File non valido' }, { status: 400 });
   }
 
-  // Strip EXIF/GPS metadata before upload
-  const stripped = await sharp(buffer).rotate().toBuffer();
+  // Ottimizza (resize+JPEG) e strip EXIF/GPS prima dell'upload
+  const { buffer: optimized, contentType, ext: outExt } = await optimizeImage(buffer);
 
-  const path = `covers/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const path = `covers/${Date.now()}_${Math.random().toString(36).slice(2)}.${outExt}`;
   const supabase = supabaseAdmin();
 
   const { error: uploadErr } = await supabase.storage
     .from('spot-photos')
-    .upload(path, stripped, { contentType: mimeType, upsert: false });
+    .upload(path, optimized, { contentType, upsert: false });
 
   if (uploadErr) {
     console.error('[upload-cover]', uploadErr.message);
