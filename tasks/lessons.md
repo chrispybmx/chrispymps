@@ -45,6 +45,24 @@ eseguire testo sbagliato su un DB di produzione. **Pattern:** per testo breve AS
 diretto (attenzione all'auto-close delle virgolette di CodeMirror — verificare con screenshot
 prima di eseguire). Non premere mai Run senza aver riletto ciò che c'è davvero nell'editor.
 
+## 2026-07-23 — Egress Supabase FREE: comprimere le foto LATO SERVER, non fidarsi del client
+Il banner "Grace period is over" era causato dall'egress (5GB/mese FREE) bruciato da foto a piena
+risoluzione. I 5 path di upload facevano solo `sharp().rotate()` (strip EXIF) — nessun resize/compress.
+Il client (AddSpotModal) comprimeva prima dell'upload, ma i path che NON passano dal client (o path
+diversi) salvavano PNG da 1-3.5MB. **Pattern:** la compressione immagini va SEMPRE garantita lato
+server (resize entro ~1600px + JPEG q85 via sharp mozjpeg) — il client è un'ottimizzazione, non la
+difesa. Utility unica `lib/image.ts optimizeImage()`. Foto identiche su schermo, -85% peso.
+Diagnosi: NON assumere che il consumo FREE sia MAU/DB — misurare. Qui 44 utenti, DB piccolo; il
+driver era l'egress delle foto. Campionare `curl -o /dev/null -w %{size_download}` su qualche URL
+pubblico dà subito il peso reale.
+
+## 2026-07-23 — Sovrascrivere foto in-place mantiene gli URL nel DB
+Per ricomprimere le foto esistenti senza toccare `spot_photos.url`: PUT sullo stesso storage path
+con `x-upsert: true` + `Content-Type: image/jpeg`. Il path resta `.png` ma il contenuto/He header
+è JPEG — il browser usa il content-type, non l'estensione. Attenzione: il CDN Supabase cachea la
+versione pubblica (~1h), quindi un ri-listing subito dopo può ancora vedere le dimensioni vecchie;
+verificare la validità via storage backend o sharp sul download, non fidarsi della cache CDN.
+
 ## Ricorrente — questo progetto non ha CLI/psql per il DB
 DDL solo via Supabase SQL Editor (browser). Nessun `DATABASE_URL`, nessun Personal Access Token
 Management, `supabase` CLI non installato. Il service-role key fa solo PostgREST (no DDL).

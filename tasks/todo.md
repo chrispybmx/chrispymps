@@ -66,4 +66,8 @@ permalink: ai/antigravity/tasks/todo
 - [ ] Mostrare country nella UI (filtro paese su mappa/cerca-spot, bandierine) — fase 2 del world-wide
 - [ ] Lingua/i18n (decisione aperta: en default / i18n / resta it)
 - [ ] Soft-404 sito-wide: notFound() risponde HTTP 200 con body 404 su TUTTE le route dinamiche (pre-esistente, non regressione) — indagare middleware/CSP
-- [ ] ⚠️ Supabase FREE: banner "Grace period is over" — rivedere quota/billing prima che blocchi le richieste
+- [x] Supabase FREE "Grace period is over" — CAUSA: foto salvate a piena risoluzione (solo .rotate(), niente resize), PNG 1-3.5MB servite pubbliche → egress 5GB/mese esaurito. NON era MAU/DB (44 utenti). RISOLTO alla radice:
+  - [x] lib/image.ts optimizeImage() applicata ai 5 path upload → foto nuove ottimizzate (resize 1600 + JPEG q85, -85%)
+  - [x] scripts/compress-existing-photos.mjs eseguito su prod: 94 foto 113MB→30MB (-74%, PNG legacy -91%), 0 errori, URL invariati. Verificato: content-type image/jpeg, immagini valide
+  - [x] commit 2f3d31c pushato → deploy
+  - [ ] monitorare che il banner sparisca nei prossimi giorni (egress si resetta a ciclo)
