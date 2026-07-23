@@ -12,6 +12,7 @@ import ShareSpotBtn from '@/components/ShareSpotBtn';
 import SpotContributeCTA from '@/components/SpotContributeCTA';
 import SpotLikeBtn from '@/components/SpotLikeBtn';
 import SpotPageActions, { SpotStarRating } from '@/components/SpotPageActions';
+import SpotOwnerActions from '@/components/SpotOwnerActions';
 import SpotPageShell from './SpotPageShell';
 
 export const revalidate = 300;
@@ -199,6 +200,17 @@ export default async function SpotPage({ params, searchParams }: Props) {
           currentCondition={spot.condition}
           photoCount={photos.length}
           lastConfirmedAt={spot.condition_updated_at}
+        />
+
+        {/* ── AZIONI PROPRIETARIO (modifica/elimina) — visibile solo all'owner ── */}
+        <SpotOwnerActions
+          spotId={spot.id}
+          ownerId={spot.submitted_by_user_id ?? null}
+          name={spot.name}
+          type={spot.type}
+          description={spot.description ?? null}
+          guardians={spot.guardians ?? null}
+          difficulty={spot.difficulty ?? null}
         />
 
         {/* ── VIDEO ── */}
