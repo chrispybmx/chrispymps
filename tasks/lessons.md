@@ -63,6 +63,17 @@ con `x-upsert: true` + `Content-Type: image/jpeg`. Il path resta `.png` ma il co
 versione pubblica (~1h), quindi un ri-listing subito dopo può ancora vedere le dimensioni vecchie;
 verificare la validità via storage backend o sharp sul download, non fidarsi della cache CDN.
 
+## 2026-07-24 — Fire-and-forget NON funziona su serverless (Vercel)
+`bgUpload().catch(...)` in submit-spot avviava l'upload foto SENZA await, per rispondere veloce.
+Su serverless il container viene congelato/terminato subito dopo il `return` della risposta: il
+lavoro non-awaited non completa. Risultato: spot creati SENZA foto ("Rail sinigo in salita": 0
+righe in spot_photos, 0 file in storage). **Pattern:** su Vercel/Lambda tutto il lavoro critico
+va awaited PRIMA di rispondere. Per lavoro davvero async servono queue/cron/waitUntil, non
+promise orfane. Inoltre: controllare SEMPRE l'errore degli insert (erano `await x.insert()` senza
+check) e non lasciare risorse a metà — se le foto falliscono del tutto, cancellare lo spot appena
+creato invece di lasciare un fantasma. Diagnosi: uno spot con 0 foto E 0 file storage sotto la sua
+cartella = upload mai completato (non "foto cancellate").
+
 ## Ricorrente — questo progetto non ha CLI/psql per il DB
 DDL solo via Supabase SQL Editor (browser). Nessun `DATABASE_URL`, nessun Personal Access Token
 Management, `supabase` CLI non installato. Il service-role key fa solo PostgREST (no DDL).
