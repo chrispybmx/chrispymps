@@ -113,49 +113,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Errore interno. Riprova più tardi.' }, { status: 500 });
   }
 
-  // 4. Handle photos — either pre-uploaded URLs or FormData files
+  // 4. Handle photos — SINCRONO e controllato prima di rispondere.
+  //    Prima il legacy path usava bgUpload() fire-and-forget: su serverless il
+  //    container si congela dopo il return, quindi l'upload non completava e lo
+  //    spot restava senza foto (bug: spot fantasma senza immagini). Inoltre gli
+  //    insert non erano controllati. Ora tutto e awaited e verificato.
+  let photosInserted = 0;
+
   if (parsed.photo_urls && parsed.photo_urls.length > 0) {
-    // FAST PATH: photos already uploaded, just create records
-    await supabase.from('spot_photos').insert(
+    // FAST PATH: foto gia caricate (pre-upload), crea solo i record
+    const { error: photoErr } = await supabase.from('spot_photos').insert(
       parsed.photo_urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
     );
+    if (photoErr) console.error('[submit-spot] fast-path photo insert:', photoErr.message);
+    else photosInserted = parsed.photo_urls.length;
   } else if (formData) {
-    // LEGACY PATH: read buffers + upload in background
-    const photoBuffers: { buffer: Buffer; mimeType: string; ext: string; index: number }[] = [];
+    // FALLBACK: file nel FormData -> ottimizza, carica e inserisci (tutto awaited)
+    const photoBuffers: { buffer: Buffer; index: number }[] = [];
     for (let i = 0; i < 5; i++) {
       const file = formData.get(`photo_${i}`);
       if (!file || !(file instanceof Blob)) continue;
       if (file.size > MAX_PHOTO_SIZE) continue;
       const mimeType = file.type.toLowerCase();
-      const ext = ALLOWED_MIME[mimeType];
-      if (!ext) continue;
+      if (!ALLOWED_MIME[mimeType]) continue;
       const buffer = Buffer.from(await file.arrayBuffer());
       if (!isValidImageMagicBytes(buffer, mimeType)) continue;
-      photoBuffers.push({ buffer, mimeType, ext, index: i });
+      photoBuffers.push({ buffer, index: i });
     }
 
-    // Upload in background after responding
-    if (photoBuffers.length > 0) {
-      const bgUpload = async () => {
-        const results = await Promise.all(
-          photoBuffers.map(async ({ buffer, index }) => {
-            // Ottimizza (resize+JPEG) e strip EXIF/GPS prima dell'upload
-            const { buffer: optimized, contentType, ext } = await optimizeImage(buffer);
-            const path = `${spot.id}/${index}.${ext}`;
-            const { error } = await supabase.storage.from('spot-photos').upload(path, optimized, { contentType, upsert: true });
-            if (error) return null;
-            return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
-          })
-        );
-        const urls = results.filter((u): u is string => u !== null);
-        if (urls.length > 0) {
-          await supabase.from('spot_photos').insert(
-            urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
-          );
-        }
-      };
-      bgUpload().catch(err => console.error('[submit-spot] bg upload error:', err));
+    const results = await Promise.all(
+      photoBuffers.map(async ({ buffer, index }) => {
+        try {
+          const { buffer: optimized, contentType, ext } = await optimizeImage(buffer);
+          const path = `${spot.id}/${index}.${ext}`;
+          const { error } = await supabase.storage.from('spot-photos').upload(path, optimized, { contentType, upsert: true });
+          if (error) { console.error('[submit-spot] upload:', error.message); return null; }
+          return supabase.storage.from('spot-photos').getPublicUrl(path).data.publicUrl;
+        } catch (e) { console.error('[submit-spot] optimize/upload:', e); return null; }
+      })
+    );
+    const urls = results.filter((u): u is string => u !== null);
+    if (urls.length > 0) {
+      const { error: photoErr } = await supabase.from('spot_photos').insert(
+        urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
+      );
+      if (photoErr) console.error('[submit-spot] legacy photo insert:', photoErr.message);
+      else photosInserted = urls.length;
     }
+  }
+
+  // Uno spot senza foto non deve esistere: se il caricamento e fallito del tutto,
+  // rimuovi lo spot appena creato cosi l'utente puo riprovare (niente spot fantasma).
+  if (photosInserted === 0) {
+    await supabase.from('spots').delete().eq('id', spot.id);
+    return NextResponse.json({ ok: false, error: 'Le foto non sono state caricate. Riprova.' }, { status: 500 });
   }
 
   // 5. Admin notification (fire-and-forget) — newsletter rimossa: richiede consenso esplicito (GDPR)
