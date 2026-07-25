@@ -68,6 +68,11 @@ permalink: ai/antigravity/tasks/todo
 - [x] Analisi: bundle JS ok (max chunk 180KB), /api/spots ok (107 spot, 44KB), 0 spot 'deleted' residui dai test
 - Note ottimizzazioni NON fatte (basso ROI): icon-512.png PNG 304KB (icona PWA, servita raramente); bundle JS gia snello
 
+## 2026-07-25 — UX mobile: lightbox foto swipeable
+- [x] Foto a schermo intero ora swipeable col dito (era solo frecce). Swipe orizz = cambia foto (snap per distanza O velocità, damping ai bordi), swipe giù = chiude (iOS-like, sfondo dissolve). Pointer events + capture + lock asse. Anima solo transform/opacity, ref durante drag. Frecce nascoste su touch. Indice sync col carousel. Commit f9ca8aa
+- [x] Verificato in viewport mobile locale: apertura, swipe 1/3->2/3, swipe-giu chiude, sync carousel. 0 errori console. Deploy live
+- [ ] Feel finale da testare su telefono vero (le gesture si sentono solo lì) — Christian
+
 ## Prossimi passi (aperti)
 - [ ] Mostrare country nella UI (filtro paese su mappa/cerca-spot, bandierine) — fase 2 del world-wide
 - [ ] Lingua/i18n (decisione aperta: en default / i18n / resta it)
