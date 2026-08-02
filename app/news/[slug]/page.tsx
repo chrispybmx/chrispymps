@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { APP_CONFIG } from '@/lib/constants';
@@ -30,7 +31,9 @@ interface NewsArticle {
   request_resolved?: boolean;
 }
 
-async function getArticle(slug: string): Promise<NewsArticle | null> {
+/** cache(): la query gira una volta sola per richiesta, condivisa tra
+    generateMetadata (dove sta il check di esistenza) e il componente. */
+const getArticle = cache(async (slug: string): Promise<NewsArticle | null> => {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from('news')
@@ -48,11 +51,16 @@ async function getArticle(slug: string): Promise<NewsArticle | null> {
     data.news_photos.sort((a: { position: number }, b: { position: number }) => a.position - b.position);
   }
   return data as NewsArticle | null;
-}
+});
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  // notFound() QUI (oltre che nel componente) contro il soft-404: serve la 404
+  // page con noindex/nofollow invece di metadata su articoli inesistenti.
+  // NOTA VERIFICATA: lo status resta 200 finché esiste app/news/loading.tsx —
+  // il suo Suspense boundary fa flushare lo shell prima che notFound() possa
+  // impostare il 404. Prova: rimuovendo quel file /news/non-esiste torna 404.
   const article = await getArticle(params.slug);
-  if (!article) return { title: 'Non trovato — Chrispy Maps' };
+  if (!article) notFound();
 
   const url         = `${APP_CONFIG.url}/news/${article.slug}`;
   const title       = `${article.title} | Chrispy Maps`;

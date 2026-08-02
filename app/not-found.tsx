@@ -1,4 +1,15 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+/**
+ * La 404 non deve essere indicizzabile, e non deve ereditare dal root layout il
+ * canonical verso la homepage: un canonical self-referencing sbagliato dice ai
+ * motori che quella URL È la home. canonical: null rimuove l'ereditarietà.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  alternates: { canonical: null },
+};
 
 export default function NotFound() {
   return (

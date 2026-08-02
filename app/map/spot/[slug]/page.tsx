@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
@@ -19,7 +20,9 @@ export const revalidate = 300;
 
 interface Props { params: { slug: string }; searchParams: { from?: string } }
 
-async function getSpot(slug: string): Promise<Spot | null> {
+/** cache(): la query gira una volta sola per richiesta, condivisa tra
+    generateMetadata (dove sta il check di esistenza) e il componente. */
+const getSpot = cache(async (slug: string): Promise<Spot | null> => {
   const supabase = supabaseServer();
   const { data } = await supabase
     .from('spots')
@@ -32,11 +35,16 @@ async function getSpot(slug: string): Promise<Spot | null> {
     data.spot_photos.sort((a: { position: number }, b: { position: number }) => a.position - b.position);
   }
   return data as Spot;
-}
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // notFound() QUI (oltre che nel componente) contro il soft-404: serve la 404
+  // page con noindex/nofollow invece di metadata inventati su slug inesistenti.
+  // NOTA VERIFICATA: lo status resta 200 finché esiste
+  // app/map/spot/[slug]/loading.tsx — il suo Suspense boundary fa flushare lo
+  // shell prima che notFound() possa impostare il 404 (misurato su Next 14.2.35).
   const spot = await getSpot(params.slug);
-  if (!spot) return { title: 'Spot non trovato' };
+  if (!spot) notFound();
   const tipo  = TIPI_SPOT[spot.type];
   const cover = spot.spot_photos?.[0]?.url;
   const city  = spot.city ?? 'Italia';

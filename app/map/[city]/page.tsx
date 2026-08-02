@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
@@ -34,6 +35,21 @@ function getCityLabel(slug: string): string {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // Check di esistenza QUI (oltre che nel componente) contro il soft-404: uno
+  // slug inventato generava un <title> SEO dallo slug + canonical self-
+  // referencing => doorway page indicizzabile su URL infinite. Con notFound()
+  // qui viene servita la 404 page (noindex, nofollow, nessun canonical).
+  //
+  // NOTA VERIFICATA: questo NON porta lo status a 404 finché app/map/loading.tsx
+  // esiste. Quel loading.tsx crea un Suspense boundary e Next flusha lo shell
+  // con 200 prima che notFound() possa cambiare lo status — misurato su Next
+  // 14.2.35: rimuovendo il loading.tsx la stessa route risponde 404, tenendolo
+  // resta 200. Per il 404 vero serve spostare il fallback in un <Suspense>
+  // interno alla pagina (dopo il check) invece del loading.tsx di segmento.
+  if (!CITY_SLUG_RE.test(params.city)) notFound();
+  const isCuratedCity = CITTA_ITALIANE.some((c) => c.value === params.city);
+  if (!isCuratedCity && (await getCitySpots(params.city)).length === 0) notFound();
+
   const cityLabel = getCityLabel(params.city);
   const title       = `Spot BMX ${cityLabel} — Skatepark & Park Scooter`;
   const description = `Trova i migliori spot BMX, skatepark e park scooter a ${cityLabel}. Mappa interattiva con spot street, bowl, rail e park verificati dalla community.`;
@@ -82,7 +98,9 @@ export async function generateStaticParams() {
   return Array.from(params.values());
 }
 
-async function getCitySpots(citySlug: string): Promise<Spot[]> {
+/** cache(): la query gira una volta sola per richiesta, condivisa tra
+    generateMetadata (dove sta il check di esistenza) e il componente. */
+const getCitySpots = cache(async (citySlug: string): Promise<Spot[]> => {
   const supabase = supabaseServer();
   // Il DB può contenere la città come slug ('reggio-emilia') o come nome ('Reggio Emilia'):
   // matcha entrambe le forme.
@@ -94,7 +112,7 @@ async function getCitySpots(citySlug: string): Promise<Spot[]> {
     .or(`city.ilike.${citySlug},city.ilike.${asName}`)
     .order('approved_at', { ascending: false });
   return (data ?? []) as Spot[];
-}
+});
 
 export default async function CityPage({ params }: Props) {
   if (!CITY_SLUG_RE.test(params.city)) notFound();
