@@ -14,7 +14,9 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
   const [copied, setCopied] = useState(false);
 
   const url   = `${APP_CONFIG.url}/map/spot/${spotSlug}`;
-  const text  = `${spotName}${city ? ` a ${city}` : ''} 🛹`;
+  // La firma serve a far capire da dove arriva il link: in chat si vede solo il
+  // dominio, che da solo non dice nulla a chi non conosce il progetto.
+  const text  = `${spotName}${city ? ` a ${city}` : ''} 🛹\n${APP_CONFIG.shareTagline}`;
   const waUrl = `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`;
 
   const handleShare = async () => {

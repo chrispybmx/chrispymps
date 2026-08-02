@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 export const runtime     = 'edge';
-export const alt         = 'Chrispy Maps — Mappa Spot BMX, Skate & Scooter Italia';
+export const alt         = 'Chrispy Maps — la mappa freestyle: spot BMX, skate e scooter';
 export const size        = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -86,7 +86,7 @@ export default async function Image() {
               letterSpacing: '4px',
               textTransform: 'uppercase',
             }}>
-              Mappa Spot BMX Italia
+              La mappa freestyle
             </div>
           </div>
         </div>

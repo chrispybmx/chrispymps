@@ -45,20 +45,23 @@ export const metadata: Metadata = {
     locale:      'it_IT',
     url:         APP_CONFIG.mapUrl,
     siteName:    'Chrispy Maps',
-    title:       'Chrispy Maps — Mappa Spot BMX, Skate & Scooter Italia',
+    // Titolo dell'anteprima quando il sito viene condiviso in chat (WhatsApp,
+    // Telegram, Instagram): e' la riga piu' visibile della card, quindi porta la
+    // firma del progetto invece della descrizione tecnica.
+    title:       APP_CONFIG.shareTagline,
     description: APP_CONFIG.description,
     images: [{
       url:    '/opengraph-image',
       width:  1200,
       height: 630,
-      alt:    'Chrispy Maps — Trova spot BMX, skatepark e spot scooter in Italia',
+      alt:    'Chrispy Maps — la mappa freestyle: spot BMX, skatepark e spot scooter',
     }],
   },
   twitter: {
     card:        'summary_large_image',
     site:        '@chrispy_bmx',
     creator:     '@chrispy_bmx',
-    title:       'Chrispy Maps — Mappa Spot BMX Italia',
+    title:       APP_CONFIG.shareTagline,
     description: APP_CONFIG.description,
     images:      ['/opengraph-image'],
   },

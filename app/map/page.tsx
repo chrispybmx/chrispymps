@@ -12,11 +12,20 @@ export const metadata: Metadata = {
     'trovare skatepark', 'BMX spot map Italy', 'park scooter vicino',
     'mappa skate Italia', 'spot street BMX', 'bowl skate Italia',
   ],
+  // NB: la home "/" fa rewrite su "/map" (next.config.js), quindi QUESTI sono i
+  // metadata dell'anteprima quando si condivide il sito — non quelli del layout.
   openGraph: {
-    title:       'Chrispy Maps — Mappa Spot BMX, Skate & Scooter Italia',
-    description: 'La mappa community italiana per trovare spot BMX, skatepark e park scooter. Centinaia di spot verificati in tutta Italia.',
+    title:       APP_CONFIG.shareTagline,
+    description: 'La mappa community per trovare spot BMX, skatepark e park scooter. Centinaia di spot verificati, aggiornati dai rider.',
     url:         APP_CONFIG.url,
-    images:      [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Mappa spot BMX e skatepark Italia' }],
+    images:      [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Chrispy Maps — la mappa freestyle' }],
+  },
+  twitter: {
+    card:        'summary_large_image',
+    site:        '@chrispy_bmx',
+    title:       APP_CONFIG.shareTagline,
+    description: 'La mappa community per trovare spot BMX, skatepark e park scooter.',
+    images:      ['/opengraph-image'],
   },
 };
 

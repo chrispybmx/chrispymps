@@ -334,6 +334,10 @@ export const LINKS = {
 export const APP_CONFIG = {
   siteName:    'Chrispy Maps',
   tagline:     'Mappa Spot BMX, Skate & Scooter',
+  // Firma usata OVUNQUE si condivide: testo del messaggio (share nativo,
+  // WhatsApp) e anteprima del link (OG/Twitter card). Serve a far riconoscere
+  // il progetto quando il link gira nelle chat, dove il dominio da solo non dice nulla.
+  shareTagline: 'Chrispy Maps — la mappa freestyle',
   description: 'La mappa community-driven per trovare spot BMX, skatepark, spot scooter e street spot. Nata in Italia, aperta al mondo — aggiornata dalla community.',
   url:         'https://maps.chrispybmx.com',
   mapUrl:      'https://maps.chrispybmx.com', // home = mappa, /map reindirizza qui
