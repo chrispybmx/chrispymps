@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { supabaseServer, supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
+
+/**
+ * Invalida le pagine che mostrano uno spot. Senza questo la pagina spot (ISR,
+ * revalidate=300) e la home continuano a servire la versione vecchia per 5
+ * minuti: l'utente salva una modifica, vede "aggiornato", ricarica e trova i
+ * dati di prima — sembra rotto. Stesso problema dopo l'eliminazione.
+ */
+function revalidateSpot(slug?: string | null, city?: string | null) {
+  try {
+    if (slug) revalidatePath(`/map/spot/${slug}`);
+    revalidatePath('/');
+    revalidatePath('/scopri');
+    if (city) revalidatePath(`/map/${city.toLowerCase().replace(/\s+/g, '-')}`);
+  } catch (e) {
+    console.error('[spots] revalidate:', e);
+  }
+}
 
 /**
  * GET    /api/spots/[slug]  — dettaglio spot per slug (pubblico, solo approvati)
@@ -63,7 +81,7 @@ async function authorizeOwner(spotId: string, token: string) {
 
   const { data: spot } = await supabase
     .from('spots')
-    .select('id, submitted_by_user_id, status')
+    .select('id, submitted_by_user_id, status, slug, city')
     .eq('id', spotId)
     .single();
 
@@ -120,6 +138,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     return NextResponse.json({ ok: false, error: 'Errore durante il salvataggio. Riprova.' }, { status: 500 });
   }
 
+  revalidateSpot(updated?.slug ?? auth.spot.slug, auth.spot.city);
   return NextResponse.json({ ok: true, slug: updated?.slug });
 }
 
@@ -145,7 +164,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { slug: str
     return NextResponse.json({ ok: true }); // gia cancellato, idempotente
   }
 
-  // Soft-delete: sparisce da mappa/pagina (filtrano status='approved'), reversibile da admin
+  // Soft-delete: sparisce da mappa/pagina (filtrano status='approved').
+  // Ripristinabile solo via SQL (l'admin elenca solo i 'pending') — vedi
+  // supabase/migrations/20260722_spot_status_deleted.sql
   const { error: delErr } = await auth.supabase
     .from('spots')
     .update({ status: 'deleted', updated_at: new Date().toISOString() })
@@ -156,5 +177,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { slug: str
     return NextResponse.json({ ok: false, error: 'Errore durante l\'eliminazione. Riprova.' }, { status: 500 });
   }
 
+  revalidateSpot(auth.spot.slug, auth.spot.city);
   return NextResponse.json({ ok: true });
 }

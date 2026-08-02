@@ -5,7 +5,14 @@
 -- potrebbero non avere ON DELETE CASCADE -> errore o righe orfane) si usa un
 -- soft-delete: status = 'deleted'. Lo spot sparisce ovunque perche mappa,
 -- API /api/spots e la pagina /map/spot/[slug] filtrano gia status = 'approved'.
--- Reversibile: basta rimettere lo status precedente dal pannello admin.
+-- Reversibile, MA solo via SQL: il pannello admin elenca unicamente gli spot
+-- con status='pending' (app/admin/page.tsx), quindi uno spot 'deleted' non e
+-- visibile da nessuna parte nella UI. Per ripristinarne uno:
+--   UPDATE spots SET status = 'approved' WHERE slug = '<slug>';
+-- Per elencare i cancellati:
+--   SELECT slug, name, submitted_by_username, updated_at
+--   FROM spots WHERE status = 'deleted' ORDER BY updated_at DESC;
+-- (TODO: una sezione "eliminati" in admin renderebbe il ripristino self-service)
 --
 -- status e un ENUM Postgres (spot_status): serve aggiungere il valore.
 -- ALTER TYPE ... ADD VALUE va eseguito come statement isolato (non dentro una

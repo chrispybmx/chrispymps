@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyApproveToken, isAdminAuthenticated } from '@/lib/auth';
 import { sendApprovalEmail } from '@/lib/email';
 import { onSpotApproved } from '@/lib/xp';
+import { submitToIndexNow } from '@/lib/indexnow';
+import { APP_CONFIG } from '@/lib/constants';
 
 export async function GET(req: NextRequest) {
   // Approvazione via link email (token HMAC nel query string)
@@ -62,26 +65,48 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
     return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
   }
 
-  // Email al contributor (fire-and-forget)
+  // Effetti collaterali AWAITED. Non possono essere fire-and-forget: su
+  // serverless il container si congela dopo il return e le promise non attese
+  // non completano (email mai inviata, notifica mai inserita, XP mai assegnati).
+  // Ognuno e isolato: un fallimento non deve annullare l'approvazione.
   if (spot.contributors) {
-    sendApprovalEmail(spot.contributors, spot).catch(console.error);
+    try { await sendApprovalEmail(spot.contributors, spot); }
+    catch (e) { console.error('[approve] email:', e); }
   }
 
-  // Notifica in-app all'utente autenticato che ha inviato lo spot (fire-and-forget)
   if (spot.submitted_by_user_id) {
-    void supabase.from('notifications').insert({
+    const { error: notifErr } = await supabase.from('notifications').insert({
       user_id:   spot.submitted_by_user_id,
       type:      'spot_approved',
       title:     `"${spot.name}" è stato approvato! 🎉`,
       body:      'Il tuo spot è ora visibile sulla mappa! +10 XP \ud83c\udf89',
       spot_slug: spot.slug,
-    }).then(({ error }) => { if (error) console.error(error); });
+    });
+    if (notifErr) console.error('[approve] notifica:', notifErr.message);
+
+    try { await onSpotApproved(spot.submitted_by_user_id, spotId, undefined, spot.city); }
+    catch (e) { console.error('[approve] XP:', e); }
   }
 
-  // Award XP to contributor (fire-and-forget)
-  if (spot.submitted_by_user_id) {
-    onSpotApproved(spot.submitted_by_user_id, spotId, undefined, spot.city).catch(console.error);
+  // Invalida le pagine cachate: senza questo un nuovo spot approvato non appare
+  // su mappa/home per un massimo di 5 minuti (ISR revalidate=300) e sembra che
+  // l'approvazione non abbia funzionato.
+  const cityPath = spot.city ? `/map/${spot.city.toLowerCase().replace(/\s+/g, '-')}` : null;
+  try {
+    revalidatePath(`/map/spot/${spot.slug}`);
+    revalidatePath('/');
+    revalidatePath('/scopri');
+    if (cityPath) revalidatePath(cityPath);
+  } catch (e) {
+    console.error('[approve] revalidate:', e);
   }
+
+  // Segnala la pagina appena pubblicata ai motori (Bing/Copilot): il sottodominio
+  // ha pochi backlink, quindi senza ping i crawler ci mettono settimane.
+  await submitToIndexNow([
+    `${APP_CONFIG.url}/map/spot/${spot.slug}`,
+    ...(cityPath ? [`${APP_CONFIG.url}${cityPath}`] : []),
+  ]);
 
   if (req.method === 'GET') {
     // SEC-FIX: encodeURIComponent per evitare che caratteri speciali rompano la URL

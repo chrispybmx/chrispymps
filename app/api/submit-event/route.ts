@@ -83,19 +83,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Errore salvataggio.' }, { status: 500 });
   }
 
-  // Notifica admin (fire-and-forget — non bloccare la risposta)
-  sendEventSubmissionNotification({
-    eventId: inserted.id,
-    title: body.title,
-    description: body.description,
-    location: body.location,
-    city: body.city,
-    eventDate: body.event_date,
-    linkUrl: body.link_url,
-    coverUrl: body.cover_url,
-    contributorUsername: username,
-    contributorEmail: user.email ?? '',
-  }).catch((e) => console.error('[submit-event] admin notification failed:', e));
+  // Notifica admin — AWAITED: su serverless il container si congela dopo il
+  // return e una promise non attesa non completa, quindi questa mail (che
+  // contiene i link di approva/rifiuta) non partiva e l'evento restava in coda
+  // senza che nessuno lo sapesse. Un errore email non fa fallire la submit.
+  try {
+    await sendEventSubmissionNotification({
+      eventId: inserted.id,
+      title: body.title,
+      description: body.description,
+      location: body.location,
+      city: body.city,
+      eventDate: body.event_date,
+      linkUrl: body.link_url,
+      coverUrl: body.cover_url,
+      contributorUsername: username,
+      contributorEmail: user.email ?? '',
+    });
+  } catch (e) {
+    console.error('[submit-event] admin notification failed:', e);
+  }
 
   return NextResponse.json({
     ok: true,

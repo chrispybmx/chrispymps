@@ -4,6 +4,25 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { sendAdminNotification } from '@/lib/email';
 import { optimizeImage } from '@/lib/image';
 
+/**
+ * Le foto pre-caricate devono vivere nel NOSTRO storage: senza questo controllo
+ * z.string().url() accetta qualunque dominio, e un client modificato potrebbe
+ * creare spot con immagini hotlinkate da siti terzi (o con contenuti arbitrari
+ * serviti dalla mappa). Fail-closed: se l'env manca, nessun URL passa.
+ */
+const STORAGE_PREFIX = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/`
+  : null;
+
+const isOwnStorageUrl = (u: string) => STORAGE_PREFIX !== null && u.startsWith(STORAGE_PREFIX);
+
+/** Path dentro il bucket a partire dall'URL pubblico (per la pulizia in rollback) */
+function storagePath(url: string, bucket = 'spot-photos'): string | null {
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const i = url.indexOf(marker);
+  return i === -1 ? null : url.slice(i + marker.length);
+}
+
 const SpotSchema = z.object({
   name:         z.string().min(2).max(100),
   type:         z.enum(['street','park','diy','rail','ledge','trail','plaza','gap','bowl','pumptrack']),
@@ -15,7 +34,7 @@ const SpotSchema = z.object({
   description:  z.string().max(500).optional(),
   guardians:    z.string().max(200).optional(),
   difficulty:   z.string().max(30).optional(),
-  photo_urls:   z.array(z.string().url()).min(1).max(5).optional(),
+  photo_urls:   z.array(z.string().url().refine(isOwnStorageUrl, 'URL foto non ammesso')).min(1).max(5).optional(),
   access_token: z.string().min(1).max(2048),
 });
 
@@ -119,9 +138,11 @@ export async function POST(req: NextRequest) {
   //    spot restava senza foto (bug: spot fantasma senza immagini). Inoltre gli
   //    insert non erano controllati. Ora tutto e awaited e verificato.
   let photosInserted = 0;
+  const uploadedUrls: string[] = []; // per la pulizia se poi il DB fallisce
 
   if (parsed.photo_urls && parsed.photo_urls.length > 0) {
     // FAST PATH: foto gia caricate (pre-upload), crea solo i record
+    uploadedUrls.push(...parsed.photo_urls);
     const { error: photoErr } = await supabase.from('spot_photos').insert(
       parsed.photo_urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
     );
@@ -153,6 +174,7 @@ export async function POST(req: NextRequest) {
       })
     );
     const urls = results.filter((u): u is string => u !== null);
+    uploadedUrls.push(...urls);
     if (urls.length > 0) {
       const { error: photoErr } = await supabase.from('spot_photos').insert(
         urls.map((url, position) => ({ spot_id: spot.id, url, position, credit_name: profile.username }))
@@ -164,14 +186,25 @@ export async function POST(req: NextRequest) {
 
   // Uno spot senza foto non deve esistere: se il caricamento e fallito del tutto,
   // rimuovi lo spot appena creato cosi l'utente puo riprovare (niente spot fantasma).
+  // Ripulisce anche i file gia finiti nello storage, altrimenti resterebbero
+  // orfani nel bucket senza nessuna riga che li referenzia.
   if (photosInserted === 0) {
+    const paths = uploadedUrls.map(u => storagePath(u)).filter((p): p is string => p !== null);
+    if (paths.length > 0) await supabase.storage.from('spot-photos').remove(paths);
     await supabase.from('spots').delete().eq('id', spot.id);
     return NextResponse.json({ ok: false, error: 'Le foto non sono state caricate. Riprova.' }, { status: 500 });
   }
 
-  // 5. Admin notification (fire-and-forget) — newsletter rimossa: richiede consenso esplicito (GDPR)
+  // 5. Notifica admin — AWAITED, non fire-and-forget: su serverless il container
+  //    si congela dopo il return e la promise non completa, quindi la mail non
+  //    partiva e lo spot restava in coda senza che nessuno lo sapesse.
+  //    Un errore email non deve far fallire una submit andata a buon fine.
   const contributor = { id: user.id, name: profile.username, email: user.email ?? '', instagram_handle: null };
-  sendAdminNotification(spot, contributor as any).catch(() => {});
+  try {
+    await sendAdminNotification(spot, contributor as any);
+  } catch (e) {
+    console.error('[submit-spot] admin notification:', e);
+  }
 
   return NextResponse.json({ ok: true, data: { id: spot.id, slug: spot.slug } }, { status: 201 });
 }

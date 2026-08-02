@@ -50,21 +50,23 @@ async function rejectSpot(spotId: string, req: NextRequest, reason?: string): Pr
     return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
   }
 
-  // Email al contributor (fire-and-forget)
+  // Effetti collaterali AWAITED (vedi approve/route.ts): su serverless una
+  // promise non attesa dopo il return non completa -> email e notifica perse.
   if (spot.contributors) {
-    sendRejectionEmail(spot.contributors, spot, reason).catch(console.error);
+    try { await sendRejectionEmail(spot.contributors, spot, reason); }
+    catch (e) { console.error('[reject] email:', e); }
   }
 
-  // Notifica in-app all'utente autenticato che ha inviato lo spot (fire-and-forget)
   if (spot.submitted_by_user_id) {
     const reasonNote = reason ? ` Motivo: ${reason.slice(0, 100)}` : '';
-    void supabase.from('notifications').insert({
+    const { error: notifErr } = await supabase.from('notifications').insert({
       user_id:   spot.submitted_by_user_id,
       type:      'spot_rejected',
       title:     `"${spot.name}" non è stato approvato`,
       body:      `Il tuo spot non soddisfa i requisiti della mappa.${reasonNote}`,
       spot_slug: spot.slug,
-    }).then(({ error }) => { if (error) console.error(error); });
+    });
+    if (notifErr) console.error('[reject] notifica:', notifErr.message);
   }
 
   if (req.method === 'GET') {

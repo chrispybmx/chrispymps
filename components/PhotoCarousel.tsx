@@ -185,6 +185,7 @@ function Lightbox({
     startX: 0, startY: 0, dx: 0, dy: 0,
     axis: '' as '' | 'x' | 'y',
     startT: 0, w: 0,
+    onImage: false, // tap iniziato sulla foto o sullo sfondo?
   });
 
   const commitIdx = useCallback((i: number) => {
@@ -201,7 +202,9 @@ function Lightbox({
     t.style.transform = `translate3d(${-i * 100}%, 0, 0)`;
     const o = overlayRef.current;
     if (o) {
-      o.style.transition = animate ? `opacity 0.32s ${MOVE_EASE}` : 'none';
+      // transizione su background-color, non opacity: e' il background che
+      // cambia durante lo swipe-giu, quindi dev'essere lui a tornare in dissolvenza
+      o.style.transition = animate ? `background-color 0.32s ${MOVE_EASE}` : 'none';
       o.style.background = 'rgba(0,0,0,0.97)';
     }
   }, []);
@@ -226,6 +229,7 @@ function Lightbox({
     d.startX = e.clientX; d.startY = e.clientY;
     d.dx = 0; d.dy = 0; d.axis = ''; d.startT = Date.now();
     d.w = overlayRef.current?.offsetWidth || window.innerWidth;
+    d.onImage = (e.target as HTMLElement)?.tagName === 'IMG';
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     if (trackRef.current) trackRef.current.style.transition = 'none';
     if (overlayRef.current) overlayRef.current.style.transition = 'none';
@@ -276,6 +280,12 @@ function Lightbox({
       const n = goNext ? idxRef.current + 1 : goPrev ? idxRef.current - 1 : idxRef.current;
       if (n !== idxRef.current) commitIdx(n);
       place(n, true);
+    } else if (!d.onImage) {
+      // Tap secco sullo sfondo (nessun drag) = chiudi, come da abitudine
+      // consolidata sui lightbox (e come faceva la versione precedente).
+      d.active = false; d.pointerId = -1;
+      onClose();
+      return;
     }
     d.active = false; d.pointerId = -1; d.axis = '';
   };
@@ -316,7 +326,7 @@ function Lightbox({
         {photos.map((p) => (
           <div key={p.url} style={{ flexShrink: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img src={p.url} alt="" draggable={false}
-              style={{ maxWidth: '96vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 6, pointerEvents: 'none', userSelect: 'none' }} />
+              style={{ maxWidth: '96vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 6, userSelect: 'none' }} />
           </div>
         ))}
       </div>
