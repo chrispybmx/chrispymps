@@ -73,6 +73,17 @@ permalink: ai/antigravity/tasks/todo
 - [x] Verificato in viewport mobile locale: apertura, swipe 1/3->2/3, swipe-giu chiude, sync carousel. 0 errori console. Deploy live
 - [ ] Feel finale da testare su telefono vero (le gesture si sentono solo lì) — Christian
 
+## 2026-08-02/03 — Code review, SEO, indicizzazione
+- [x] 7 fix dal code review deployati (commit e28ffba): email awaited x4 (submit-spot, submit-event, approve, reject) + notifiche in-app + XP — su serverless le promise non attese non completavano; revalidatePath dopo PATCH/DELETE/approve (prima 5 min di dati stale); alpha->WebP (flyer/loghi PNG diventavano neri); tap-per-chiudere lightbox; photo_urls solo storage nostro; rollback pulisce storage; commento migration corretto
+- [x] Soft-404 (commit 7f965ba): check esistenza in generateMetadata + React cache() su map/[city], map/spot/[slug], news/[slug]; not-found noindex+canonical:null. VERIFICATO LIVE: slug inventati -> noindex,nofollow, nessun canonical; pagine vere index,follow
+- [ ] LIMITE: status HTTP resta 200. Causa provata (A/B su Next 14.2.35): i loading.tsx di segmento flushano lo shell prima di notFound(). Fix = spostare il fallback in <Suspense> interno alla pagina dopo il check. Serve OK di Christian (aveva chiesto di non toccare i loading.tsx)
+- [x] Tagline condivisione (commit a214c82): "Chrispy Maps — la mappa freestyle" in og:title, twitter:title, immagine OG e testo share. NB: "/" fa rewrite su "/map", i metadata veri stanno in app/map/page.tsx
+- [x] IndexNow: lib/indexnow.ts + chiave pubblica + ping automatico su approvazione spot. 263 URL della sitemap inviate (HTTP 200 OK). Prima submit dava SiteVerificationNotCompleted: normale, serve attendere la verifica della chiave
+- [x] DIAGNOSI INDICIZZAZIONE: nessun blocco tecnico (robots.txt aperto, sitemap 263 URL, canonical ok, contenuto server-rendered — verificato H1/H2/testo su /map/verona). Il sito NON compare nelle ricerche perche' il sottodominio e' ORFANO: chrispybmx.com non lo linka (0 occorrenze) e l'autorita' del dominio principale non si eredita
+- [ ] ⚡ LEVA PRINCIPALE: link da chrispybmx.com -> maps.chrispybmx.com (menu + home). Bloccato: estensione Chrome non connessa
+- [ ] Google Search Console: aggiungere proprieta', verificare, inviare sitemap, richiedere indicizzazione — azione di Christian (serve il suo account)
+- [ ] Backlink dai canali propri: descrizione YouTube, bio Instagram, canale Telegram
+
 ## Prossimi passi (aperti)
 - [ ] Mostrare country nella UI (filtro paese su mappa/cerca-spot, bandierine) — fase 2 del world-wide
 - [ ] Lingua/i18n (decisione aperta: en default / i18n / resta it)
