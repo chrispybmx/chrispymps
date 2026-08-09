@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import AdminCard from '@/components/AdminCard';
 import { compressImage } from '@/lib/compress-image';
 import AdminImportKML from '@/components/AdminImportKML';
@@ -418,7 +419,17 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)' }}>
             🏴 CHRISPY MAPS — ADMIN
           </div>
-          <button onClick={handleLogout} className="btn-ghost" style={{ fontSize: 13 }}>Logout</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Strumento contenuti: descrizioni + video sugli spot (peso SEO) */}
+            <Link href="/admin/arricchisci" style={{
+              fontFamily: 'var(--font-mono)', fontSize: 12, textDecoration: 'none',
+              color: 'var(--orange)', border: '1px solid rgba(255,106,0,0.4)',
+              borderRadius: 4, padding: '5px 10px', whiteSpace: 'nowrap',
+            }}>
+              ✍️ Arricchisci
+            </Link>
+            <button onClick={handleLogout} className="btn-ghost" style={{ fontSize: 13 }}>Logout</button>
+          </div>
         </div>
 
         {/* Tab bar */}
