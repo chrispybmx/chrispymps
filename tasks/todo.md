@@ -84,6 +84,25 @@ permalink: ai/antigravity/tasks/todo
 - [ ] Google Search Console: aggiungere proprieta', verificare, inviare sitemap, richiedere indicizzazione — azione di Christian (serve il suo account)
 - [ ] Backlink dai canali propri: descrizione YouTube, bio Instagram, canale Telegram
 
+## 2026-08-16 — SiteGround + chrispybmx.com (sessione browser)
+- [x] CDN SiteGround attivata (piano Base gratuito) +20 — PRIMA salvato backup zona DNS in scratchpad; verificato subito dopo che maps.chrispybmx.com risponde 200 e il CNAME punta ancora a 4d93e8294504622a.vercel-dns-017.com
+- [x] Memcached ON nel pannello (Site Tools > Velocita > Caching) +10
+- [x] Memcached ON anche nel plugin Speed Optimizer (va acceso in DUE posti, altrimenti non conta)
+- [x] Cache dinamica: risultava gia' attiva nel plugin
+- [x] Verificato dopo le modifiche: chrispybmx.com 200, TTFB ~0.4s, header x-cache-enabled: True; maps 200
+- [ ] PHP Ultraveloce +5: NON incluso nel piano StartUp, richiede upgrade a GrowBig (+12 EUR/mese). Non acquistato
+- [ ] 2FA SiteGround +5: azione di Christian (serve QR + codici di recupero)
+- [ ] 3 temi obsoleti +4: da aggiornare/eliminare in WP > Aspetto > Temi
+- [x] Creata pagina https://chrispybmx.com/mappa-spot-bmx/ (ID 186) che linka maps + 6 pagine citta + eventi + news
+- [ ] La pagina e' grezza (solo HTML, nessuno stile Elementor) — DA RIFARE INSIEME
+- [ ] Menu: il sito non espone menu via REST (Elementor) — link nel menu ancora da mettere
+
+### SCOPERTA IMPORTANTE: chrispybmx.com e' praticamente vuoto
+- 0 articoli pubblicati, 9 pagine, home = archivio blog senza post
+- Testo visibile in home: 180 caratteri. Link nella home: 1
+- Conseguenza: linkare la mappa da qui passa poca autorita'. Il dominio principale va riempito di contenuti
+- wp-sitemap.xml esiste (200) quindi la pagina nuova e' comunque scopribile
+
 ## Prossimi passi (aperti)
 - [ ] Mostrare country nella UI (filtro paese su mappa/cerca-spot, bandierine) — fase 2 del world-wide
 - [ ] Lingua/i18n (decisione aperta: en default / i18n / resta it)
