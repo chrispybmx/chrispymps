@@ -25,6 +25,9 @@ export interface SpotPhoto {
   position:    number;
   uploaded_by?: string;
   credit_name?: string;
+  /** 'rider' = scatto sul posto, 'streetview' = fermo immagine da mappa.
+      Popolata da 20260819_spot_photos_source.sql; assente finché non è applicata. */
+  source?:     'rider' | 'streetview';
   created_at:  string;
 }
 
@@ -70,6 +73,8 @@ export interface SpotMapPin {
   lon:       number;
   city?:     string;
   condition: SpotCondition;
+  /** Ultima conferma dello stato — alimenta lib/freshness.ts sulle card. */
+  condition_updated_at?: string;
   cover_url?:   string;    // prima foto
   photo_urls?:  string[];  // tutte le foto ordinate
   description?: string;

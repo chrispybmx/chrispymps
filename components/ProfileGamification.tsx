@@ -1,33 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-/* ── 7 Levels (must match lib/xp.ts — Fibonacci ×10 scaling) ── */
-const LEVELS = [
-  { threshold: 6100, name: 'Chrispy Scout',  image: '/badges/level-7-chrispy-scout.png' },
-  { threshold: 2330, name: 'City Legend',     image: '/badges/level-6-city-legend.png' },
-  { threshold: 890,  name: 'Verified Rider',  image: '/badges/level-5-verified-rider.png' },
-  { threshold: 340,  name: 'Local Scout',     image: '/badges/level-4-local-scout.png' },
-  { threshold: 130,  name: 'Spot Hunter',     image: '/badges/level-3-spot-hunter.png' },
-  { threshold: 50,   name: 'Local Rider',     image: '/badges/level-2-local-rider.png' },
-  { threshold: 0,    name: 'Rookie',          image: '/badges/level-1-rookie.png' },
-];
-
-function getLevelInfo(xp: number) {
-  for (let i = 0; i < LEVELS.length; i++) {
-    if (xp >= LEVELS[i].threshold) {
-      const current = LEVELS[i];
-      const next = i > 0 ? LEVELS[i - 1] : null;
-      const prevThreshold = current.threshold;
-      const nextThreshold = next?.threshold ?? current.threshold;
-      const progress = next
-        ? Math.min(100, ((xp - prevThreshold) / (nextThreshold - prevThreshold)) * 100)
-        : 100;
-      return { current, next, nextThreshold, progress };
-    }
-  }
-  return { current: LEVELS[LEVELS.length - 1], next: LEVELS[LEVELS.length - 2], nextThreshold: 25, progress: 0 };
-}
+import { getLevelInfo } from '@/lib/levels';
 
 interface Stats {
   lifetime_xp: number;

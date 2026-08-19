@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import type { SpotType, SpotCondition } from '@/lib/types';
 import BottomNav from '@/components/BottomNav';
+import { LEVELS } from '@/lib/levels';
 
 export const metadata: Metadata = {
   title: 'Classifica Spot BMX e Rider',
@@ -34,17 +35,7 @@ interface RiderRow {
   username: string; spot_count: number; xp: number; level: string; level_image: string; avatar_url?: string;
 }
 
-/* ── Level info (must match lib/xp.ts — Fibonacci ×10 scaling) ── */
-const LEVELS = [
-  { threshold: 6100, name: 'Chrispy Scout',  image: '/badges/level-7-chrispy-scout.png' },
-  { threshold: 2330, name: 'City Legend',     image: '/badges/level-6-city-legend.png' },
-  { threshold: 890,  name: 'Verified Rider',  image: '/badges/level-5-verified-rider.png' },
-  { threshold: 340,  name: 'Local Scout',     image: '/badges/level-4-local-scout.png' },
-  { threshold: 130,  name: 'Spot Hunter',     image: '/badges/level-3-spot-hunter.png' },
-  { threshold: 50,   name: 'Local Rider',     image: '/badges/level-2-local-rider.png' },
-  { threshold: 0,    name: 'Rookie',          image: '/badges/level-1-rookie.png' },
-];
-
+/* ── Livelli: sorgente unica in lib/levels.ts ── */
 function getLevelForXP(xp: number) {
   for (const l of LEVELS) { if (xp >= l.threshold) return l; }
   return LEVELS[LEVELS.length - 1];
@@ -204,16 +195,18 @@ export default async function ClassificaPage() {
                   @{rider.username}
                 </div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 2 }}>
-                  {rider.level} · {rider.xp} XP
+                  {rider.level} · {rider.spot_count} spot
                 </div>
               </div>
 
-              {/* Spot count */}
+              {/* XP — è il criterio di ordinamento, quindi è il numero grande.
+                  Prima qui c'era spot_count: l'occhio leggeva quello come criterio
+                  e la classifica sembrava fuori ordine (10 spot sopra 11 spot). */}
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: i < 3 ? 'var(--orange)' : 'var(--gray-600)', fontWeight: 700 }}>
-                  {rider.spot_count}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: i < 3 ? 'var(--orange)' : 'var(--gray-600)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                  {rider.xp}
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)' }}>spot</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--gray-600)' }}>xp</div>
               </div>
             </div>
           </Link>

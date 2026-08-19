@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
+import { getFreshness } from '@/lib/freshness';
 import type { Spot } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
 import PhotoCarousel from '@/components/PhotoCarousel';
@@ -24,17 +25,37 @@ interface Props { params: { slug: string }; searchParams: { from?: string } }
     generateMetadata (dove sta il check di esistenza) e il componente. */
 const getSpot = cache(async (slug: string): Promise<Spot | null> => {
   const supabase = supabaseServer();
-  const { data } = await supabase
+
+  /* `spot_photos.source` arriva con 20260819_spot_photos_source.sql. Finché la
+     migration non è applicata in produzione la colonna non esiste e Postgrest
+     fa fallire l'intera query: riproviamo senza. Stesso pattern già usato in
+     app/api/events/route.ts per il join opzionale su spots.
+     I due select sono scritti per esteso perché il parser dei tipi di
+     supabase-js legge la stringa letterale, non un template. */
+  const withSource = await supabase
     .from('spots')
-    .select('*, likes_count, spot_photos(id, url, position, credit_name)')
+    .select('*, likes_count, spot_photos(id, url, position, credit_name, source)')
     .eq('slug', slug)
     .eq('status', 'approved')
     .single();
-  if (!data) return null;
-  if (data.spot_photos) {
-    data.spot_photos.sort((a: { position: number }, b: { position: number }) => a.position - b.position);
+
+  let data = withSource.data as Record<string, unknown> | null;
+
+  if (withSource.error) {
+    const legacy = await supabase
+      .from('spots')
+      .select('*, likes_count, spot_photos(id, url, position, credit_name)')
+      .eq('slug', slug)
+      .eq('status', 'approved')
+      .single();
+    data = legacy.data as Record<string, unknown> | null;
   }
-  return data as Spot;
+  if (!data) return null;
+  const photos = data.spot_photos as { position: number }[] | undefined;
+  if (photos) {
+    photos.sort((a, b) => a.position - b.position);
+  }
+  return data as unknown as Spot;
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -68,6 +89,9 @@ export default async function SpotPage({ params, searchParams }: Props) {
 
   const tipo   = TIPI_SPOT[spot.type];
   const cond   = CONDIZIONI[spot.condition];
+  /* Il badge non dice più solo "alive": dice da quanto tempo nessuno lo conferma.
+     Vedi lib/freshness.ts — la condizione da sola valeva 116 spot su 116. */
+  const fresh  = getFreshness(spot.condition, spot.condition_updated_at);
   const photos = spot.spot_photos ?? [];
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
 
@@ -98,14 +122,18 @@ export default async function SpotPage({ params, searchParams }: Props) {
           {searchParams.from === 'jamroma' ? '← Jam Roma' : '← Mappa'}
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Condition badge */}
-          <span style={{
+          {/* Stato + freschezza — un solo segnale */}
+          <span title={fresh.label} style={{
             fontFamily: 'var(--font-mono)', fontSize: 10,
-            color: cond.bg, background: `${cond.bg}18`,
+            color: fresh.color, background: `${fresh.color}18`,
             padding: '3px 8px', borderRadius: 10,
-            border: `1px solid ${cond.bg}44`,
+            border: `1px solid ${fresh.color}44`,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
           }}>
             {cond.label.toUpperCase()}
+            {fresh.days !== null && (
+              <span style={{ opacity: 0.75 }}>· {fresh.short}</span>
+            )}
           </span>
           {/* 🔥 Like + ❤️ Save — client component */}
           <SpotPageActions spotId={spot.id} initialLikes={spot.likes_count ?? 0} />
@@ -130,7 +158,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
 
       {/* ── FOTO ── */}
       {photos.length > 0 && (
-        <PhotoCarousel photos={photos.map(p => ({ url: p.url, credit_name: p.credit_name ?? undefined }))} />
+        <PhotoCarousel photos={photos.map(p => ({ url: p.url, credit_name: p.credit_name ?? undefined, source: p.source }))} />
       )}
 
       <div style={{ padding: '16px 20px 0' }}>
@@ -237,7 +265,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
       <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
 
       <div style={{ textAlign: 'center', padding: '16px 20px 4px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>
-        aggiornato {new Date(spot.condition_updated_at).toLocaleDateString('it-IT')}
+        {fresh.label.toLowerCase()} · {new Date(spot.condition_updated_at).toLocaleDateString('it-IT')}
       </div>
 
       <SupportStrip />

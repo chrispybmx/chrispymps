@@ -112,3 +112,40 @@ permalink: ai/antigravity/tasks/todo
   - [x] scripts/compress-existing-photos.mjs eseguito su prod: 94 foto 113MB→30MB (-74%, PNG legacy -91%), 0 errori, URL invariati. Verificato: content-type image/jpeg, immagini valide
   - [x] commit 2f3d31c pushato → deploy
   - [ ] monitorare che il banner sparisca nei prossimi giorni (egress si resetta a ciclo)
+
+## 2026-08-19 — Design pass UX/emozione (fasi 1+2 audit)
+Vincolo esplicito Christian: **non toccare il flusso "aggiungi spot"** (AddSpotModal, /api/submit-spot, bottone +) — rispettato, zero modifiche a quei file.
+Branch `ux/fase1-2-app`, NON committato, NON pushato.
+
+### Fase 1 — prima impressione
+- [x] Apertura su vista locale: SpotMap zoom avvio 5 (paese) → 11 (zona) + callback `onUserLocated`
+- [x] MapClient: `userPos`, `nearestOverall`, `nearbyCount` (raggio 25 km), distanza sulle card
+- [x] Popup in coda: CookieBanner emette `cmaps:cookie-dismissed`, OnboardingHints lo aspetta — VERIFICATO a 375px, niente più sovrapposizione né bottoni tagliati
+- [x] Onboarding: da 3 slide tutorial a 1 schermata di risultato (`cmaps_onboarding_v2`) — VERIFICATO: "116 spot mappati dai rider" + un bottone
+- [x] Mappa scura di default (CARTO dark esisteva già come opt-in; ora default, preferenza salvata rispettata)
+- [x] Empty state a 3 casi: filtri troppo stretti / zona scoperta con "portami lì" + km / zona vuota con +25 XP Fondatore
+
+### Fase 2 — fiducia
+- [x] `lib/freshness.ts` — lo stato decade da `condition_updated_at`; 16 test verdi. `condition_updated_at` propagato in SpotMapPin, /api/spots, /scopri
+- [x] `components/FreshnessDot.tsx` su card mappa, card espansa, griglia Scopri; badge scheda spot — VERIFICATO: Panchina/Silandro passa da "ALIVE" verde a "ALIVE · 4m" giallo
+- [x] Classifica: numero dominante = XP invece di spot_count — VERIFICATO: 240·175·152·100·80·50 monotono, niente più 10 spot sopra 11
+- [x] `lib/levels.ts` sorgente unica (le soglie erano triplicate e divergenti in xp.ts/classifica/ProfileGamification). Ricalibrate 0/30/80/180/380/750/1400 sui numeri reali
+- [x] Eventi per vicinanza: `/api/events/nearby` (150 km, orizzonte 60 gg) + `NearbyEventBanner` che sostituisce JamBanner, cablato su Colle del Cemento 6 giugno e quindi morto da metà giugno
+- [x] Sessioni: voce di menu nascosta quando non c'è nessuno fuori, con badge "N ORA" quando c'è
+- [x] Foto Street View: migration `20260819_spot_photos_source.sql` + etichetta in PhotoCarousel + select con fallback se la colonna non esiste
+
+### Verifica
+- [x] `npx tsc --noEmit` pulito
+- [x] `npx vitest run` — 94/94 verdi (78 preesistenti + 16 nuovi)
+- [x] `npx next build` — compilato, 172/172 pagine statiche, zero errori
+- [x] Giro manuale a 375px su dev server: mappa, onboarding, classifica, scheda spot, scopri
+- [x] Errori console in dev confrontati con `main` via stash: identici, nessuno introdotto da questo lavoro
+
+### Aperti — servono decisioni o dati di Christian
+- [ ] **Applicare** `supabase/migrations/20260819_spot_photos_source.sql` in SQL Editor, poi marcare a mano le foto Street View (query di supporto dentro il file). Finché non è applicata l'etichetta non compare — il codice degrada senza rompersi
+- [ ] Verificare su telefono vero l'apertura geolocalizzata: nel browser di test il permesso non viene concesso, quindi il ramo "116 spot / nella tua zona" con distanza non è stato visto dal vivo
+- [ ] `A&C Wedding Jam` (05/09) ha lat/lng nulli → resta fuori dal banner evento vicino. Coprirlo richiede un fallback su country_code, che però mostrerebbe eventi a 800 km. Da decidere
+- [ ] Fase 3 (push, rituale post-visita, clip agganciate agli spot) non iniziata — le push richiedono chiavi VAPID
+
+### Preesistente, trovato ma non toccato (fuori scope)
+- [ ] Errore di idratazione da `SpotRadarToggle` in SideMenu.tsx: legge localStorage durante il render, il server rende un markup diverso dal client. Presente anche su `main`, visibile solo in dev

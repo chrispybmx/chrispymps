@@ -78,3 +78,25 @@ cartella = upload mai completato (non "foto cancellate").
 DDL solo via Supabase SQL Editor (browser). Nessun `DATABASE_URL`, nessun Personal Access Token
 Management, `supabase` CLI non installato. Il service-role key fa solo PostgREST (no DDL).
 Le migration si scrivono in `supabase/migrations/` per storico, ma vanno applicate a mano.
+
+## 2026-08-19 — `git stash pop` può applicare a metà e non dirtelo in faccia
+Per capire se certi errori console fossero miei o preesistenti ho fatto `git stash push -u`,
+ricaricato, confrontato, poi `git stash pop`. Il pop ha ripristinato **solo i file untracked**:
+le modifiche ai file tracked non sono rientrate, perché tre `.md` (README, SECURITY_PRIVACY_AUDIT,
+competitor-analysis — riscritti di continuo da basic-memory) avevano modifiche locali che
+confliggevano. Git ha abortito il merge, ma il messaggio utile (`error: Your local changes...
+would be overwritten`) stava in cima all'output, e leggendo solo `tail` sembrava tutto a posto.
+Lo stash per fortuna resta (`The stash entry is kept`), quindi niente è andato perso.
+**Pattern:** dopo `git stash pop`/`apply` non fidarsi dell'exit code né della coda dell'output —
+leggere l'output **intero** e verificare con `git status --short` che i file attesi siano tornati,
+prima di continuare a scrivere. Se il repo ha file rumorosi rigenerati da tool esterni, pulirli
+(`git checkout -- <file>`) prima di stashare, non dopo.
+
+## 2026-08-19 — Il parser dei tipi di supabase-js legge la stringa letterale, non un template
+Per rendere opzionale una colonna nuova (`spot_photos.source`) avevo fattorizzato la query in
+`select(`*, spot_photos(${cols})`)`. `tsc` è esploso con `ParserError<Expected identifier>`:
+il tipo di ritorno di `.select()` è dedotto **staticamente dal literal**, quindi un template
+interpolato produce un tipo di errore, non uno `Spot`. **Pattern:** per query alternative scrivere
+due `.select()` per esteso (uno con la colonna nuova, uno senza) e scegliere in base a `error`,
+come già fa `app/api/events/route.ts` per il join opzionale. Costa qualche riga in più, ma i tipi
+restano veri e il codice regge il periodo in cui la migration non è ancora applicata in produzione.
