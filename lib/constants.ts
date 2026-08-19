@@ -1,8 +1,12 @@
 import type { SpotType, SpotCondition } from './types';
 
 // ===== TIPI SPOT =====
-export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: string }> = {
-  street: { label: 'Street',  emoji: '🏙️', color: '#ff6a00' },
+export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: string; legacy?: boolean }> = {
+  /* `legacy`: resta per i 60 spot già catalogati così e per i filtri, ma non
+     è più scegliibile quando si aggiunge uno spot. Era diventata il calderone
+     — più della metà del database — quindi il filtro per tipo non serviva a
+     scegliere. Chi aggiunge ora deve dire cos'è davvero. */
+  street: { label: 'Street',  emoji: '🏙️', color: '#ff6a00', legacy: true },
   /* Transition = tutto ciò che è curvo e si porta con la velocità:
      quarter, bank, ramp, gobbe. Sta accanto a Street perché è l'altra
      grande famiglia di terreno, non un sottotipo di park. */
@@ -19,6 +23,13 @@ export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: 
 };
 
 // ===== CONDIZIONI =====
+/** Tipi che un rider può scegliere aggiungendo uno spot.
+    Esclude le categorie `legacy`: restano valide per gli spot già catalogati
+    e per i filtri, ma non si possono più assegnare. */
+export const TIPI_SPOT_SELEZIONABILI = (
+  Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]
+).filter(([, info]) => !info.legacy);
+
 export const CONDIZIONI: Record<SpotCondition, { label: string; color: string; bg: string }> = {
   alive:    { label: 'Alive',    color: '#000',      bg: '#00c851' },
   bustato:  { label: 'Bustato',  color: '#000',      bg: '#ff6a00' },

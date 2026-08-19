@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, DIFFICOLTA, CONDIZIONI, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
+import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, DIFFICOLTA, CONDIZIONI, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
 import { reverseGeocode } from '@/lib/geocoding';
 import type { SpotType, SpotMapPin } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
@@ -1019,7 +1019,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               <div>
                 <label style={lbl}>Tipo *</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                  {(Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]).map(([t, info]) => (
+                  {TIPI_SPOT_SELEZIONABILI.map(([t, info]) => (
                     <button key={t} onClick={() => setType(t)} style={{
                       padding: '6px 12px',
                       border: `1px solid ${type === t ? info.color : 'var(--gray-600)'}`,

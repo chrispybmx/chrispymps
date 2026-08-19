@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   TIPI_SPOT,
+  TIPI_SPOT_SELEZIONABILI,
   CONDIZIONI,
   DIFFICOLTA,
   PALETTE,
@@ -77,5 +78,34 @@ describe('Timing constants', () => {
 
   it('APPROVE_TOKEN_EXPIRES_HOURS è 72', () => {
     expect(APPROVE_TOKEN_EXPIRES_HOURS).toBe(72);
+  });
+});
+
+describe('TIPI_SPOT_SELEZIONABILI', () => {
+  it('non offre street a chi aggiunge uno spot', () => {
+    const chiavi = TIPI_SPOT_SELEZIONABILI.map(([k]) => k);
+    expect(chiavi).not.toContain('street');
+  });
+
+  it('offre transition e le altre categorie vive', () => {
+    const chiavi = TIPI_SPOT_SELEZIONABILI.map(([k]) => k);
+    expect(chiavi).toContain('transition');
+    expect(chiavi).toContain('park');
+    expect(chiavi).toContain('rail');
+    expect(chiavi).toContain('bowl');
+  });
+
+  it('esclude esattamente i tipi marcati legacy', () => {
+    const legacy = (Object.entries(TIPI_SPOT) as [string, { legacy?: boolean }][])
+      .filter(([, i]) => i.legacy).map(([k]) => k);
+    expect(TIPI_SPOT_SELEZIONABILI).toHaveLength(Object.keys(TIPI_SPOT).length - legacy.length);
+    for (const k of legacy) {
+      expect(TIPI_SPOT_SELEZIONABILI.map(([x]) => x)).not.toContain(k);
+    }
+  });
+
+  it('street resta valido per gli spot già catalogati e per i filtri', () => {
+    expect(TIPI_SPOT.street).toBeDefined();
+    expect(TIPI_SPOT.street.label).toBe('Street');
   });
 });
