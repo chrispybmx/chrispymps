@@ -206,7 +206,14 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [lon,  setLon]  = useState<number | null>(initialLon ?? null);
 
   /* Step 1 */
-  const [locMode,     setLocMode]     = useState<'gps' | 'coords' | null>(null);
+  /* Parte già su 'gps': chi aggiunge uno spot quasi sempre ci sta davanti.
+     La schermata "come vuoi indicare la posizione?" chiedeva una decisione a
+     uno in piedi sullo spot con la bici in mano — la risposta era ovvia. Il
+     percorso manuale resta, in fondo e in piccolo. */
+  const [locMode,     setLocMode]     = useState<'gps' | 'coords' | null>('gps');
+  /* true quando il browser ha già il permesso: possiamo leggere la posizione
+     senza far comparire nessun dialog, quindi zero tap. */
+  const [geoPreGranted, setGeoPreGranted] = useState<boolean | null>(null);
   const [coordInput,  setCoordInput]  = useState('');
   const [coordError,  setCoordError]  = useState<string | null>(null);
   const [gpsState,    setGpsState]    = useState<'idle' | 'loading' | 'ok' | 'error' | 'denied' | 'timeout'>('idle');
@@ -345,6 +352,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   /* Reset */
   const handleClose = useCallback(() => {
     setStep('posizione');
+    setLocMode('gps');
     setLat(initialLat ?? null); setLon(initialLon ?? null); setCity(''); setCountry(''); setCountryCode('');
     setLocMode(null);
     setCoordInput(''); setCoordError(null);
@@ -404,6 +412,37 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setLat(pLat); setLon(pLon);
     fetchCity(pLat, pLon);
   };
+
+  /* ── Permesso posizione: già concesso? ──
+     Se il browser ha già il permesso possiamo leggere la posizione senza che
+     compaia nessun dialog — quindi la prendiamo da soli e l'utente non tocca
+     niente. Se NON è concesso non spariamo il dialog a sorpresa: chi se lo
+     vede arrivare senza contesto tocca "Blocca" d'istinto, e il browser se lo
+     ricorda per sempre. In quel caso mostriamo una riga di spiegazione e un
+     bottone solo. */
+  useEffect(() => {
+    if (!open || geoPreGranted !== null) return;
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) {
+      setGeoPreGranted(false); // niente Permissions API (Safari vecchi) → chiediamo
+      return;
+    }
+    let cancelled = false;
+    navigator.permissions.query({ name: 'geolocation' as PermissionName })
+      .then(res => { if (!cancelled) setGeoPreGranted(res.state === 'granted'); })
+      .catch(() => { if (!cancelled) setGeoPreGranted(false); });
+    return () => { cancelled = true; };
+  }, [open, geoPreGranted]);
+
+  /* Permesso già dato → posizione presa da sola, zero tap. */
+  useEffect(() => {
+    if (!open) return;
+    if (geoPreGranted !== true) return;
+    if (locMode !== 'gps') return;
+    if (lat != null || lon != null) return;
+    if (gpsState !== 'idle') return;
+    getGPS();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, geoPreGranted, locMode, lat, lon, gpsState]);
 
   /* GPS */
   const getGPS = () => {
@@ -698,59 +737,33 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>@{user.username}</span>
               </div>
 
-              {/* ── Scelta metodo ── */}
-              {!locMode && !hasCoords && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Come vuoi indicare la posizione?
-                  </p>
-                  <button
-                    onClick={() => {
-                      setLocMode('gps');
-                      // Piccolo delay per mostrare il pre-prompt prima del dialog del browser
-                      setTimeout(() => getGPS(), 50);
-                    }}
-                    style={methodBtn}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
-                  >
-                    <span style={{ fontSize: 28 }}>📍</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Sono nello spot</div>
-                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Usa il GPS del telefono</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setLocMode('coords')}
-                    style={methodBtn}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
-                  >
-                    <span style={{ fontSize: 28 }}>🗺️</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--bone)', marginBottom: 2 }}>Conosco la posizione</div>
-                      <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Incolla il link Google Maps o le coordinate</div>
-                    </div>
-                  </button>
-                </div>
-              )}
-
               {/* ── GPS path ── */}
               {locMode === 'gps' && !hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
                   {gpsState === 'idle' && (
-                    <div style={{
-                      background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)',
-                      borderRadius: 8, padding: '16px 14px', textAlign: 'center',
-                    }}>
-                      <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 6 }}>
-                        Il browser chiederà il permesso per la tua posizione
-                      </div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.6 }}>
-                        Tocca <strong style={{ color: 'var(--orange)' }}>&quot;Consenti&quot;</strong> quando appare il dialog — serve solo per piazzare il pin sullo spot, non ti tracciamo.
-                      </div>
-                    </div>
+                    /* Permesso già concesso → la posizione parte da sola (effetto sopra)
+                       e qui non si vede nulla. Se manca, spieghiamo prima di far
+                       comparire il dialog: chi se lo trova addosso senza contesto
+                       tocca "Blocca", e il browser se lo ricorda per sempre. */
+                    geoPreGranted === true ? null : (
+                      <>
+                        <div style={{
+                          background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)',
+                          borderRadius: 8, padding: '16px 14px', textAlign: 'center',
+                        }}>
+                          <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 6 }}>
+                            Prendiamo la posizione dello spot dal tuo telefono
+                          </div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.6 }}>
+                            Tocca <strong style={{ color: 'var(--orange)' }}>&quot;Consenti&quot;</strong> quando appare il dialog — serve solo per piazzare il pin, non ti tracciamo.
+                          </div>
+                        </div>
+                        <button onClick={() => getGPS()} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                          📍 SONO QUI, PRENDI LA POSIZIONE
+                        </button>
+                      </>
+                    )
                   )}
                   {gpsState === 'loading' && (
                     <div style={{ textAlign: 'center', padding: '24px 0', fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14 }}>
@@ -801,8 +814,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       </button>
                     </>
                   )}
-                  <button onClick={() => { setLocMode(null); setGpsState('idle'); }} style={backLink}>
-                    ← Cambia metodo
+                  {/* Via di fuga per chi NON è sullo spot — piccola, sotto tutto. */}
+                  <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} style={backLink}>
+                    Non sono nello spot — inserisci le coordinate →
                   </button>
                 </div>
               )}
@@ -830,8 +844,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   >
                     📍 Conferma posizione
                   </button>
-                  <button onClick={() => { setLocMode(null); setCoordInput(''); setCoordError(null); }} style={backLink}>
-                    ← Cambia metodo
+                  <button onClick={() => { setLocMode('gps'); setCoordInput(''); setCoordError(null); }} style={backLink}>
+                    ← Sono nello spot, usa il GPS
                   </button>
                 </div>
               )}
@@ -1088,12 +1102,6 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   );
 }
 
-const methodBtn: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 14,
-  width: '100%', padding: '16px', textAlign: 'left',
-  background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
-  borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
-};
 
 const backLink: React.CSSProperties = {
   background: 'none', border: 'none', color: 'var(--gray-400)',

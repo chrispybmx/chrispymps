@@ -107,42 +107,43 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
       {/* Slot disponibili */}
       {remaining > 0 && (
         isMobile ? (
-          /* ── MOBILE: due bottoni separati ── */
-          <div style={{ display: 'flex', gap: 10 }}>
-            {/* Scatta foto */}
+          /* ── MOBILE: lo scatto è l'azione, la galleria è la via secondaria ──
+             Prima erano due bottoni identici affiancati: nessun default, e
+             l'utente doveva scegliere di nuovo. Ma la foto che serve è quella
+             dello spot davanti a te — non a caso 26 copertine su 116 erano
+             screenshot di Google Maps arrivati dalla galleria. */
+          <div style={{ display: 'grid', gap: 10 }}>
             <button
               onClick={() => cameraRef.current?.click()}
               style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 6, padding: '18px 10px',
-                background: 'var(--gray-700)', border: '2px solid var(--gray-600)',
-                borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 10, padding: '18px 16px',
+                background: 'var(--orange)', border: 'none',
+                borderRadius: 10, cursor: 'pointer',
+                boxShadow: '0 2px 16px rgba(255,106,0,0.3)',
+                transition: 'transform 0.1s',
+                WebkitTapHighlightColor: 'transparent',
               }}
-              onTouchStart={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
-              onTouchEnd={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
+              onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+              onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              <span style={{ fontSize: 30 }}>📸</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', textAlign: 'center' }}>
-                Scatta foto
+              <span style={{ fontSize: 24 }}>📸</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: '#000', letterSpacing: '0.04em' }}>
+                SCATTA LA FOTO
               </span>
             </button>
 
-            {/* Scegli dalla galleria */}
             <button
               onClick={() => galleryRef.current?.click()}
               style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 6, padding: '18px 10px',
-                background: 'var(--gray-700)', border: '2px solid var(--gray-600)',
-                borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s',
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                color: 'var(--gray-400)', padding: '4px 0',
+                textDecoration: 'underline', textUnderlineOffset: 3,
+                WebkitTapHighlightColor: 'transparent',
               }}
-              onTouchStart={e => (e.currentTarget.style.borderColor = 'var(--orange)')}
-              onTouchEnd={e => (e.currentTarget.style.borderColor = 'var(--gray-600)')}
             >
-              <span style={{ fontSize: 30 }}>🖼️</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', textAlign: 'center' }}>
-                Galleria
-              </span>
+              aggiungi dalla galleria
             </button>
           </div>
         ) : (

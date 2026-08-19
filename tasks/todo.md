@@ -169,3 +169,17 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 - [x] **Supabase "Grace period is over"**: allarme rientrato dopo aver aperto i numeri. Il testo completo è *"Your grace period ended on 02 Jun, 2026. Fair Use Policy applies now. **If** your organization is over its quota, your projects can be restricted"* — è un avviso di policy che Supabase mostra a tutti i piani Free, non una segnalazione sull'account.
       Uso reale al 19/08/2026 (ciclo 05 ago – 05 set), org `chrispybmx`: Cached Egress 0,725/5 GB (15%) · Storage 0,103/1 GB (10%) · Database 0,03/0,5 GB (6%) · Egress 0,243/5 GB (5%) · MAU 11/50.000 · Realtime ed Edge Functions a zero. Nessuna azione necessaria.
 - [ ] Solo da tenere d'occhio nel tempo: **Storage, limite 1 GB** — è il contatore che si riempie per primo man mano che la community carica foto (238 foto = 10%)
+
+## 2026-08-19 — Aggiungi spot: meno passaggi (richiesta di Christian)
+Il vincolo "non toccare aggiungi spot" è stato tolto da Christian, che ha proposto lui la modifica.
+
+- [x] **Posizione: da 2 tap a 0 o 1.** Prima: schermata "come vuoi indicare la posizione?" → schermata "il browser chiederà il permesso" → dialog. Il primo tap chiedeva una decisione a uno in piedi sullo spot.
+      Ora `locMode` parte su `'gps'` e si guarda `navigator.permissions.query({name:'geolocation'})`:
+      permesso già concesso → `getGPS()` da solo, zero tap; permesso assente → spiegazione + un bottone.
+      **Perché non spariamo il dialog subito**: chi se lo vede arrivare senza contesto tocca "Blocca" d'istinto e il browser lo ricorda per sempre — si brucia proprio chi voleva contribuire.
+      Via di fuga in fondo, piccola: "Non sono nello spot — inserisci le coordinate →"
+- [x] Selettore metodo rimosso (irraggiungibile dopo il default) + `methodBtn` inutilizzato. I link di ritorno da `coords` ora puntano a `'gps'`, non al selettore inesistente
+- [x] **Foto: lo scatto diventa l'azione.** Prima due bottoni identici affiancati (Scatta / Galleria): nessun default. Ora `📸 SCATTA LA FOTO` arancione pieno e sotto, piccolo, "aggiungi dalla galleria".
+      Collegato al problema delle copertine: 26 su 116 erano screenshot di Google Maps, e la galleria è la porta da cui entrano
+- [x] Verificato: tsc pulito, 94/94 test, build 172/172, tutti gli stati GPS (denied/timeout/error) ancora raggiungibili
+- [ ] **NON verificato a video**: il modale richiede login e non posso autenticarmi al posto di Christian. Prova dal telefono: premi + SPOT e guarda se la posizione arriva da sola
