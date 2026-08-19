@@ -163,5 +163,7 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 ### Preesistente, trovato ma non toccato (fuori scope)
 - [ ] Errore di idratazione da `SpotRadarToggle` in SideMenu.tsx: legge localStorage durante il render, il server rende un markup diverso dal client. Presente anche su `main`, visibile solo in dev
 
-### Trovato durante la sessione — da guardare, non c'entra col design pass
-- [ ] **Supabase: "Grace period is over"** — banner in cima al dashboard: *"Your projects will not be able to serve requests when you use up your quota"*. Org `chrispybmx`, piano Free. Se la quota si esaurisce il DB smette di rispondere e il sito va giù. Da verificare in Review billing
+### Trovato durante la sessione — verificato, NON è un problema
+- [x] **Supabase "Grace period is over"**: allarme rientrato dopo aver aperto i numeri. Il testo completo è *"Your grace period ended on 02 Jun, 2026. Fair Use Policy applies now. **If** your organization is over its quota, your projects can be restricted"* — è un avviso di policy che Supabase mostra a tutti i piani Free, non una segnalazione sull'account.
+      Uso reale al 19/08/2026 (ciclo 05 ago – 05 set), org `chrispybmx`: Cached Egress 0,725/5 GB (15%) · Storage 0,103/1 GB (10%) · Database 0,03/0,5 GB (6%) · Egress 0,243/5 GB (5%) · MAU 11/50.000 · Realtime ed Edge Functions a zero. Nessuna azione necessaria.
+- [ ] Solo da tenere d'occhio nel tempo: **Storage, limite 1 GB** — è il contatore che si riempie per primo man mano che la community carica foto (238 foto = 10%)
