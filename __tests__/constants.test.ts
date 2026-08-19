@@ -15,11 +15,12 @@ describe('TIPI_SPOT', () => {
   it('contiene tutti i tipi attesi', () => {
     const tipi = Object.keys(TIPI_SPOT);
     expect(tipi).toContain('street');
+    expect(tipi).toContain('transition');
     expect(tipi).toContain('park');
     expect(tipi).toContain('diy');
     expect(tipi).toContain('bowl');
     expect(tipi).toContain('pumptrack');
-    expect(tipi).toHaveLength(10);
+    expect(tipi).toHaveLength(11);
   });
 
   it('ogni tipo ha label, emoji e color', () => {

@@ -249,14 +249,13 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, []);
 
   /* ── Stile mappa (chiaro/scuro) ── */
-  /* Scura di default: le tile OSM chiare sotto una UI nera/arancio facevano
-     sembrare la mappa un widget incollato dentro l'app invece che l'app stessa.
-     Chi aveva già scelto uno stile mantiene la sua preferenza. */
+  /* Chiara di default. Era stata messa scura per uniformarla alla UI, ma
+     Christian la preferisce chiara: sulle tile scure gli spot si leggono
+     peggio quando si gira davvero, e la coerenza cromatica vale meno della
+     leggibilità. Il toggle resta, la preferenza salvata vince. */
   const [darkMap, setDarkMap] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('cmaps_dark_map');
-      return saved === null ? true : saved === '1';
-    } catch { return true; }
+    try { return localStorage.getItem('cmaps_dark_map') === '1'; }
+    catch { return false; }
   });
   const toggleDarkMap = () => setDarkMap(prev => {
     const next = !prev;

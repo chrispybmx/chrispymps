@@ -1,7 +1,7 @@
 // ChrispyMPS — Tipi TypeScript
 
 export type SpotType =
-  | 'street' | 'park' | 'diy' | 'rail' | 'ledge'
+  | 'street' | 'transition' | 'park' | 'diy' | 'rail' | 'ledge'
   | 'trail'  | 'plaza' | 'gap' | 'bowl' | 'pumptrack';
 
 export type SpotStatus    = 'pending' | 'approved' | 'rejected' | 'archived';

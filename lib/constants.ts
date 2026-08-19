@@ -3,6 +3,10 @@ import type { SpotType, SpotCondition } from './types';
 // ===== TIPI SPOT =====
 export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: string }> = {
   street: { label: 'Street',  emoji: '🏙️', color: '#ff6a00' },
+  /* Transition = tutto ciò che è curvo e si porta con la velocità:
+     quarter, bank, ramp, gobbe. Sta accanto a Street perché è l'altra
+     grande famiglia di terreno, non un sottotipo di park. */
+  transition: { label: 'Transition', emoji: '〰️', color: '#a3e635' },
   park:   { label: 'Park',    emoji: '🏟️', color: '#00c851' },
   diy:    { label: 'DIY',     emoji: '🔧', color: '#ffce4d' },
   rail:   { label: 'Rail',    emoji: '🛤️', color: '#a78bfa' },
