@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
-const COOKIE_KEY = 'cmaps_cookie_notice';
+export const COOKIE_KEY = 'cmaps_cookie_notice';
+/** Emesso quando l'informativa viene chiusa: sblocca la coda dei popup. */
+export const COOKIE_DISMISSED_EVENT = 'cmaps:cookie-dismissed';
 
 /** Pagine che hanno BottomNav fisso in basso */
 const PAGES_WITH_NAV = ['/map', '/classifica', '/scopri', '/sessioni', '/cerca-spot', '/preferiti'];
@@ -21,6 +23,9 @@ export default function CookieBanner() {
   const dismiss = () => {
     setVisible(false);
     try { localStorage.setItem(COOKIE_KEY, '1'); } catch {}
+    /* L'onboarding resta in attesa di questo evento: due livelli sovrapposti
+       tagliavano i bottoni della card di benvenuto sotto i 400px. */
+    try { window.dispatchEvent(new Event(COOKIE_DISMISSED_EVENT)); } catch {}
   };
 
   if (!visible) return null;

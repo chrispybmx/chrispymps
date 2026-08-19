@@ -22,39 +22,11 @@ export const XP = {
   CORRECT_REPORT:           5,
 } as const;
 
-/* ── 7 Level thresholds (Fibonacci ×10 scaling, descending order for lookup) ── */
-export const LEVELS: { threshold: number; name: string; key: string; image: string }[] = [
-  { threshold: 6100, name: 'Chrispy Scout',  key: 'chrispy-scout',  image: '/badges/level-7-chrispy-scout.png' },
-  { threshold: 2330, name: 'City Legend',     key: 'city-legend',     image: '/badges/level-6-city-legend.png' },
-  { threshold: 890,  name: 'Verified Rider',  key: 'verified-rider',  image: '/badges/level-5-verified-rider.png' },
-  { threshold: 340,  name: 'Local Scout',     key: 'local-scout',     image: '/badges/level-4-local-scout.png' },
-  { threshold: 130,  name: 'Spot Hunter',     key: 'spot-hunter',     image: '/badges/level-3-spot-hunter.png' },
-  { threshold: 50,   name: 'Local Rider',     key: 'local-rider',     image: '/badges/level-2-local-rider.png' },
-  { threshold: 0,    name: 'Rookie',          key: 'rookie',          image: '/badges/level-1-rookie.png' },
-];
-
-function calculateLevel(xp: number): string {
-  for (const level of LEVELS) {
-    if (xp >= level.threshold) return level.name;
-  }
-  return 'Rookie';
-}
-
-export function getLevelInfo(xp: number) {
-  for (let i = 0; i < LEVELS.length; i++) {
-    if (xp >= LEVELS[i].threshold) {
-      const current = LEVELS[i];
-      const next = i > 0 ? LEVELS[i - 1] : null;
-      const prevThreshold = current.threshold;
-      const nextThreshold = next?.threshold ?? current.threshold;
-      const progress = next
-        ? Math.min(100, ((xp - prevThreshold) / (nextThreshold - prevThreshold)) * 100)
-        : 100;
-      return { current, next, progress };
-    }
-  }
-  return { current: LEVELS[LEVELS.length - 1], next: LEVELS[LEVELS.length - 2], progress: 0 };
-}
+/* ── Livelli ──
+   Soglie e lookup vivono in lib/levels.ts (modulo puro, condiviso col client).
+   Qui li ri-esportiamo per non rompere gli import esistenti. */
+export { LEVELS, getLevelInfo, calculateLevel } from './levels';
+import { calculateLevel } from './levels';
 
 /* ── Trust score changes ── */
 const TRUST = {

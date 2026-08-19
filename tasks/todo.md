@@ -112,3 +112,58 @@ permalink: ai/antigravity/tasks/todo
   - [x] scripts/compress-existing-photos.mjs eseguito su prod: 94 foto 113MB→30MB (-74%, PNG legacy -91%), 0 errori, URL invariati. Verificato: content-type image/jpeg, immagini valide
   - [x] commit 2f3d31c pushato → deploy
   - [ ] monitorare che il banner sparisca nei prossimi giorni (egress si resetta a ciclo)
+
+## 2026-08-19 — Design pass UX/emozione (fasi 1+2 audit)
+Vincolo esplicito Christian: **non toccare il flusso "aggiungi spot"** (AddSpotModal, /api/submit-spot, bottone +) — rispettato, zero modifiche a quei file.
+Branch `ux/fase1-2-app`, NON committato, NON pushato.
+
+### Fase 1 — prima impressione
+- [x] Apertura su vista locale: SpotMap zoom avvio 5 (paese) → 11 (zona) + callback `onUserLocated`
+- [x] MapClient: `userPos`, `nearestOverall`, `nearbyCount` (raggio 25 km), distanza sulle card
+- [x] Popup in coda: CookieBanner emette `cmaps:cookie-dismissed`, OnboardingHints lo aspetta — VERIFICATO a 375px, niente più sovrapposizione né bottoni tagliati
+- [x] Onboarding: da 3 slide tutorial a 1 schermata di risultato (`cmaps_onboarding_v2`) — VERIFICATO: "116 spot mappati dai rider" + un bottone
+- [x] Mappa scura di default (CARTO dark esisteva già come opt-in; ora default, preferenza salvata rispettata)
+- [x] Empty state a 3 casi: filtri troppo stretti / zona scoperta con "portami lì" + km / zona vuota con +25 XP Fondatore
+
+### Fase 2 — fiducia
+- [x] `lib/freshness.ts` — lo stato decade da `condition_updated_at`; 16 test verdi. `condition_updated_at` propagato in SpotMapPin, /api/spots, /scopri
+- [x] `components/FreshnessDot.tsx` su card mappa, card espansa, griglia Scopri; badge scheda spot — VERIFICATO: Panchina/Silandro passa da "ALIVE" verde a "ALIVE · 4m" giallo
+- [x] Classifica: numero dominante = XP invece di spot_count — VERIFICATO: 240·175·152·100·80·50 monotono, niente più 10 spot sopra 11
+- [x] `lib/levels.ts` sorgente unica (le soglie erano triplicate e divergenti in xp.ts/classifica/ProfileGamification). Ricalibrate 0/30/80/180/380/750/1400 sui numeri reali
+- [x] Eventi per vicinanza: `/api/events/nearby` (150 km, orizzonte 60 gg) + `NearbyEventBanner` che sostituisce JamBanner, cablato su Colle del Cemento 6 giugno e quindi morto da metà giugno
+- [x] Sessioni: voce di menu nascosta quando non c'è nessuno fuori, con badge "N ORA" quando c'è
+- [x] Foto Street View: migration `20260819_spot_photos_source.sql` + etichetta in PhotoCarousel + select con fallback se la colonna non esiste
+
+### Verifica
+- [x] `npx tsc --noEmit` pulito
+- [x] `npx vitest run` — 94/94 verdi (78 preesistenti + 16 nuovi)
+- [x] `npx next build` — compilato, 172/172 pagine statiche, zero errori
+- [x] Giro manuale a 375px su dev server: mappa, onboarding, classifica, scheda spot, scopri
+- [x] Errori console in dev confrontati con `main` via stash: identici, nessuno introdotto da questo lavoro
+
+### Foto Street View — identificate, SQL pronto
+- [x] Guardate tutte e 116 le copertine, non solo l'euristica: **26 sono screenshot di Google Maps / Street View**. L'estensione `.png` ne prendeva solo 16; fra i `.jpg` ce n'erano altri 10 riconoscibili da status bar del telefono, logo Google, "© 2026 Google", barra indirizzo, pin rossi, un dialog "Share Street View?"
+- [x] `supabase/migrations/20260819b_mark_streetview_photos.sql` — UPDATE per url, con il nome dello spot in commento su ogni riga
+- [ ] **DECISIONE APERTA**: `Skate park austria` (Zirl) — vista dall'alto 320x489, nessuna UI Google. Potrebbe essere una foto da drone. L'ho lasciato FUORI dall'UPDATE: dimmi tu
+
+### Rimasti — serve la tua mano
+- [x] **Push fatto** (autorizzato da Christian): branch `ux/fase1-2-app` su origin. PR da aprire: https://github.com/chrispybmx/chrispymps/pull/new/ux/fase1-2-app — `gh` non è installato sulla macchina, quindi la PR va aperta dal browser
+- [ ] **Merge in main**: le migration sono fatte, quindi il merge è sbloccato. PR da aprire: https://github.com/chrispybmx/chrispymps/pull/new/ux/fase1-2-app
+- [x] **Migration APPLICATE al DB prod** (19/08/2026, SQL Editor via browser, dopo login fatto da Christian):
+      1. `20260819_spot_photos_source.sql` → "Success. No rows returned". Prima `spot_photos` aveva 10 colonne, nessuna `source`
+      2. `20260819b_mark_streetview_photos.sql` → prima un SELECT di controllo ha confermato **26 righe corrispondenti** sulle 26 attese, poi l'UPDATE
+      Verifica finale: `SELECT source, count(*) FROM spot_photos GROUP BY source` → **rider 212, streetview 26** (238 foto totali)
+      NB: l'etichetta sul sito compare solo dopo il merge — il codice che legge `source` è sul branch, non ancora in produzione. La colonna in più non disturba il codice attualmente deployato
+- [ ] **Provare su telefono vero** l'apertura geolocalizzata: nel browser di test il permesso non viene concesso, quindi il ramo "N spot nella tua zona" con la distanza non è mai stato visto dal vivo
+- [ ] Fase 3 (push notification, rituale post-visita, clip agganciate agli spot) non iniziata — le push richiedono chiavi VAPID che devi generare tu
+
+### Chiuso con una decisione
+- [x] `A&C Wedding Jam` (05/09) fuori dal banner evento vicino, e va bene così: il record ha `location: 'Italy'`, niente città e niente coordinate — è granularità nazionale, arriva così dallo scraper illuminatebmx. Un fallback su `country_code` lo mostrerebbe a ogni italiano a qualunque distanza, cioè esattamente il rumore che il banner serve a togliere. Se lo vuoi coperto, serve la città nel record, non codice
+
+### Preesistente, trovato ma non toccato (fuori scope)
+- [ ] Errore di idratazione da `SpotRadarToggle` in SideMenu.tsx: legge localStorage durante il render, il server rende un markup diverso dal client. Presente anche su `main`, visibile solo in dev
+
+### Trovato durante la sessione — verificato, NON è un problema
+- [x] **Supabase "Grace period is over"**: allarme rientrato dopo aver aperto i numeri. Il testo completo è *"Your grace period ended on 02 Jun, 2026. Fair Use Policy applies now. **If** your organization is over its quota, your projects can be restricted"* — è un avviso di policy che Supabase mostra a tutti i piani Free, non una segnalazione sull'account.
+      Uso reale al 19/08/2026 (ciclo 05 ago – 05 set), org `chrispybmx`: Cached Egress 0,725/5 GB (15%) · Storage 0,103/1 GB (10%) · Database 0,03/0,5 GB (6%) · Egress 0,243/5 GB (5%) · MAU 11/50.000 · Realtime ed Edge Functions a zero. Nessuna azione necessaria.
+- [ ] Solo da tenere d'occhio nel tempo: **Storage, limite 1 GB** — è il contatore che si riempie per primo man mano che la community carica foto (238 foto = 10%)

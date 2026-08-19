@@ -15,6 +15,8 @@ import { useToast } from '@/components/Toast';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
 import OnboardingHints from '@/components/OnboardingHints';
+import FreshnessDot from '@/components/FreshnessDot';
+import NearbyEventBanner from '@/components/NearbyEventBanner';
 import { findNearby } from '@/lib/nearby-radar';
 
 /* ── Haversine ── */
@@ -25,6 +27,13 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const dLon = toR(lon2 - lon1);
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Distanza in forma leggibile: sotto il km si scende ai metri. */
+function formatKm(km: number): string {
+  if (km < 1)   return `${Math.round(km * 1000)} m`;
+  if (km < 10)  return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
 }
 
 const SpotMap = dynamic(() => import('@/components/SpotMap'), {
@@ -68,6 +77,8 @@ interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean }
 
 const topOffset_MOBILE  = 56;  // topbar only (filter bar hidden on mobile)
 const topOffset_DESKTOP = 100; // topbar + filter bar
+/** Raggio entro cui uno spot conta come "nella tua zona". */
+const NEARBY_KM       = 25;
 const PANEL_MIN       = 0;
 const PANEL_SNAP      = 140;
 const EXPANDED_CARD_H = 0; // not used — expanded cards open to 92% viewport
@@ -206,6 +217,11 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [locateTrigger, setLocateTrigger] = useState(0);
   const [isLocating,    setIsLocating]    = useState(false);
 
+  /* Posizione utente, emessa da SpotMap sia all'avvio automatico sia dal tasto GPS.
+     Serve a ordinare il pannello per vicinanza e a scrivere le distanze sulle card:
+     senza, la prima domanda del rider («c'è qualcosa vicino a me?») resta senza risposta. */
+  const [userPos, setUserPos] = useState<{ lat: number; lon: number } | null>(null);
+
   /* ── Drag handle hint — bounce on first visit ── */
   const [showDragHint, setShowDragHint] = useState(false);
   useEffect(() => {
@@ -233,8 +249,14 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   }, []);
 
   /* ── Stile mappa (chiaro/scuro) ── */
+  /* Scura di default: le tile OSM chiare sotto una UI nera/arancio facevano
+     sembrare la mappa un widget incollato dentro l'app invece che l'app stessa.
+     Chi aveva già scelto uno stile mantiene la sua preferenza. */
   const [darkMap, setDarkMap] = useState<boolean>(() => {
-    try { return localStorage.getItem('cmaps_dark_map') === '1'; } catch { return false; }
+    try {
+      const saved = localStorage.getItem('cmaps_dark_map');
+      return saved === null ? true : saved === '1';
+    } catch { return true; }
   });
   const toggleDarkMap = () => setDarkMap(prev => {
     const next = !prev;
@@ -363,14 +385,44 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       const expandedSpot = filtered.find(s => s.id === expandedId);
       if (expandedSpot) list = [expandedSpot, ...list];
     }
-    // Shuffle con seed stabile (ordine casuale per sessione, non per render)
+    /* Se sappiamo dov'è l'utente, il più vicino va per primo: è l'ordine che
+       risponde alla domanda con cui apre l'app. Altrimenti resta lo shuffle
+       con seed stabile (ordine casuale per sessione, non per render). */
+    if (userPos) {
+      return [...list].sort((a, b) =>
+        haversineKm(userPos.lat, userPos.lon, a.lat, a.lon) -
+        haversineKm(userPos.lat, userPos.lon, b.lat, b.lon)
+      );
+    }
     const seed = shuffleSeed.current;
     return [...list].sort((a, b) => {
       const ha = Math.sin(seed * 10000 + a.id.charCodeAt(0) * 9973) * 10000;
       const hb = Math.sin(seed * 10000 + b.id.charCodeAt(0) * 9973) * 10000;
       return (ha - Math.floor(ha)) - (hb - Math.floor(hb));
     });
-  }, [filtered, mapBounds, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, expandedId]);
+  }, [filtered, mapBounds, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, expandedId, userPos]);
+
+  /* Spot più vicino in assoluto (non filtrato, non limitato al viewport).
+     Serve all'empty state: quando la zona inquadrata è vuota, la risposta
+     utile non è "nessuno spot trovato" ma "il più vicino è a N km". */
+  const nearestOverall = useMemo(() => {
+    if (!userPos || spots.length === 0) return null;
+    let best: SpotMapPin | null = null;
+    let bestKm = Infinity;
+    for (const s of spots) {
+      const km = haversineKm(userPos.lat, userPos.lon, s.lat, s.lon);
+      if (km < bestKm) { bestKm = km; best = s; }
+    }
+    return best ? { spot: best, km: bestKm } : null;
+  }, [userPos, spots]);
+
+  /* Quanti spot cadono nel raggio "zona" — alimenta la schermata di benvenuto. */
+  const nearbyCount = useMemo(() => {
+    if (!userPos) return null;
+    return spots.filter(s => haversineKm(userPos.lat, userPos.lon, s.lat, s.lon) <= NEARBY_KM).length;
+  }, [userPos, spots]);
+
+  const filtersActive = !!(filterType || filterRegion || filterCondition || filterDifficulty || searchQuery);
 
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
@@ -548,6 +600,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onLocatingChange={setIsLocating}
           onBoundsChanged={setMapBounds}
           darkMap={darkMap}
+          onUserLocated={setUserPos}
         />
         {/* Toast solo quando raggio attivo e nessun centro ancora */}
         {/* RadiusToast rimosso: il centro si sceglie solo da GPS o città nel pannello */}
@@ -976,6 +1029,14 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 scrollToId={scrollToId}
                 onScrolled={() => setScrollToId(null)}
                 radiusCenter={radiusMode && !radiusPanelOpen ? radiusCenter : null}
+                userPos={userPos}
+                nearestOverall={nearestOverall}
+                filtersActive={filtersActive}
+                onGoToNearest={() => {
+                  if (!nearestOverall) return;
+                  setFlyTarget({ lat: nearestOverall.spot.lat, lon: nearestOverall.spot.lon, zoom: 16 });
+                  handleSpotClick(nearestOverall.spot);
+                }}
                 isDesktop={isDesktop}
                 scrollInstantRef={scrollInstantRef}
                 onReset={() => { setFilterType(null); setFilterRegion(null); setFilterCondition(null); setFilterDifficulty(null); }}
@@ -998,14 +1059,23 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
 
-      {/* ── JAM ROMA BANNER ── */}
-      <JamBanner />
+      {/* ── EVENTO VICINO — data-driven, sostituisce il banner Jam Roma cablato ── */}
+      <NearbyEventBanner userPos={userPos} />
 
       {/* ── BOTTOM NAV — solo mobile, sostituisce il pulsante +SPOT della topbar ── */}
       <BottomNav onAddSpot={openAddSpot} onOpenAuth={() => setAuthOpen(true)} />
 
-      {/* ── ONBOARDING — first visit only ── */}
-      <OnboardingHints />
+      {/* ── BENVENUTO — prima visita, una schermata sola ── */}
+      <OnboardingHints
+        totalSpots={spots.length}
+        nearbyCount={nearbyCount}
+        nearest={nearestOverall ? { name: nearestOverall.spot.name, km: nearestOverall.km } : null}
+        onGoToNearest={() => {
+          if (!nearestOverall) return;
+          setFlyTarget({ lat: nearestOverall.spot.lat, lon: nearestOverall.spot.lon, zoom: 16 });
+          handleSpotClick(nearestOverall.spot);
+        }}
+      />
     </div>
   );
 }
@@ -1016,6 +1086,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
 
 function SpotListPanel({
   spots, activeId, expandedId, onActivate, onSpotClick, scrollToId, onScrolled, radiusCenter,
+  userPos, nearestOverall, filtersActive, onGoToNearest,
   isDesktop, scrollInstantRef, onReset, isFav, onToggleFav,
 }: {
   spots:            SpotMapPin[];
@@ -1026,6 +1097,10 @@ function SpotListPanel({
   scrollToId:       string | null;
   onScrolled:       () => void;
   radiusCenter:     { lat: number; lon: number } | null;
+  userPos:          { lat: number; lon: number } | null;
+  nearestOverall:   { spot: SpotMapPin; km: number } | null;
+  filtersActive:    boolean;
+  onGoToNearest:    () => void;
   isDesktop:        boolean;
   scrollInstantRef: React.MutableRefObject<boolean>;
   onReset?:         () => void;
@@ -1158,28 +1233,72 @@ function SpotListPanel({
   /* Lightbox keyboard/close handled by shared <Lightbox> component */
 
   if (spots.length === 0) {
+    /* Tre vuoti diversi, tre risposte diverse.
+       Il vecchio testo unico ("Nessuno spot trovato") comunicava «questa app non
+       serve nella tua città» proprio a chi la apre per la prima volta fuori dalle
+       poche zone coperte — ed è statisticamente il caso più frequente. */
+    const btnPrimary: React.CSSProperties = {
+      fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+      padding: '11px 22px', border: 'none', borderRadius: 6,
+      background: 'var(--orange)', color: '#000', cursor: 'pointer',
+      letterSpacing: '0.05em', touchAction: 'manipulation',
+      WebkitTapHighlightColor: 'transparent',
+    };
+    const btnGhost: React.CSSProperties = {
+      fontFamily: 'var(--font-mono)', fontSize: 13,
+      padding: '9px 20px', border: '1px solid var(--gray-600)',
+      borderRadius: 6, background: 'transparent',
+      color: 'var(--gray-400)', cursor: 'pointer',
+      letterSpacing: '0.05em', touchAction: 'manipulation',
+      WebkitTapHighlightColor: 'transparent',
+    };
+
+    /* 1. Filtri troppo stretti — è un problema di filtri, non di copertura. */
+    if (filtersActive) {
+      return (
+        <div style={{ padding: '48px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
+          <div style={{ color: 'var(--bone)', fontSize: 15, marginBottom: 6 }}>Nessuno spot con questi filtri</div>
+          <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 20 }}>Allarga la ricerca e riprova.</div>
+          {onReset && <button onClick={onReset} style={btnGhost}>✕ AZZERA FILTRI</button>}
+        </div>
+      );
+    }
+
+    /* 2. Zona scoperta ma sappiamo dov'è il più vicino — allarghiamo noi. */
+    if (nearestOverall) {
+      const km = formatKm(nearestOverall.km);
+      return (
+        <div style={{ padding: '40px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🏴</div>
+          <div style={{ color: 'var(--bone)', fontSize: 15, marginBottom: 6 }}>
+            Qui non ha ancora mappato nessuno
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 20, lineHeight: 1.6 }}>
+            Il più vicino è <span style={{ color: 'var(--orange)' }}>{nearestOverall.spot.name}</span>
+            {nearestOverall.spot.city ? ` a ${nearestOverall.spot.city}` : ''}, a {km} da te.
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={onGoToNearest} style={btnPrimary}>PORTAMI LÌ</button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--gray-600)', marginTop: 18, lineHeight: 1.6 }}>
+            Oppure sii tu il primo a mappare questa zona:<br />
+            il primo spot di una città vale <span style={{ color: 'var(--orange)' }}>+25 XP</span> e il badge Fondatore.
+          </div>
+        </div>
+      );
+    }
+
+    /* 3. Nessuna posizione nota e nessuno spot in vista. */
     return (
-      <div style={{ padding: '48px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-        <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
-        <div style={{ color: 'var(--bone)', fontSize: 15, marginBottom: 6 }}>Nessuno spot trovato</div>
-        <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 20 }}>Prova a cambiare o azzerare i filtri.</div>
-        {onReset && (
-          <button
-            onClick={onReset}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: 13,
-              padding: '9px 20px',
-              border: '1px solid var(--orange)',
-              borderRadius: 4, background: 'transparent',
-              color: 'var(--orange)', cursor: 'pointer',
-              letterSpacing: '0.05em',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-            } as React.CSSProperties}
-          >
-            ✕ AZZERA FILTRI
-          </button>
-        )}
+      <div style={{ padding: '40px 20px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>🏴</div>
+        <div style={{ color: 'var(--bone)', fontSize: 15, marginBottom: 6 }}>Zona ancora vuota</div>
+        <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 20, lineHeight: 1.6 }}>
+          Sposta la mappa per esplorare, oppure sii tu il primo a mappare qui:<br />
+          il primo spot di una città vale <span style={{ color: 'var(--orange)' }}>+25 XP</span> e il badge Fondatore.
+        </div>
+        {onReset && <button onClick={onReset} style={btnGhost}>✕ AZZERA FILTRI</button>}
       </div>
     );
   }
@@ -1266,14 +1385,10 @@ function SpotListPanel({
                     <div style={{ position: 'absolute', bottom: 6, left: 8, fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
                       {tipo.emoji} {tipo.label.toUpperCase()}
                     </div>
-                    {/* Condition dot */}
-                    {spot.condition === 'alive' ? (
-                      <div style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851' }} />
-                    ) : (
-                      <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-mono)', fontSize: 9, background: cond.bg, color: cond.color, padding: '2px 6px', borderRadius: 3 }}>
-                        {cond.label.toUpperCase()}
-                      </div>
-                    )}
+                    {/* Stato + freschezza */}
+                    <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex' }}>
+                      <FreshnessDot condition={spot.condition} updatedAt={spot.condition_updated_at} />
+                    </div>
                     {/* Fav */}
                     <button onClick={e => onToggleFav(e, spot.id)} className="spot-fav-btn"
                       style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', width: 28, height: 28, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1287,6 +1402,11 @@ function SpotListPanel({
                       {spot.name}
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {userPos && (
+                        <span style={{ color: 'var(--orange)' }}>
+                          {formatKm(haversineKm(userPos.lat, userPos.lon, spot.lat, spot.lon))}
+                        </span>
+                      )}
                       {spot.city && <span>📍 {spot.city}</span>}
                       {spot.submitted_by_username && <span style={{ color: 'var(--gray-600)' }}>@{spot.submitted_by_username}</span>}
                     </div>
@@ -1405,11 +1525,7 @@ function SpotListPanel({
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '3px 7px', borderRadius: 4, border: `1px solid ${tipo.color}55` }}>
                         {tipo.emoji} {tipo.label.toUpperCase()}
                       </span>
-                      {spot.condition === 'alive' ? (
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851', display: 'inline-block' }} />
-                      ) : (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, background: cond.bg, color: cond.color, padding: '2px 6px', borderRadius: 4 }}>{cond.label.toUpperCase()}</span>
-                      )}
+                      <FreshnessDot condition={spot.condition} updatedAt={spot.condition_updated_at} variant="label" />
                     </div>
 
                     {/* Close — top-right only (fav moved to CTA bar) */}
@@ -1568,89 +1684,6 @@ function MapBtn({
     >
       {children}
     </button>
-  );
-}
-
-/* ════════════════════════════════════════════════════════
-   JAM BANNER — floating pill sopra la BottomNav
-   Visibile fino al 6 giugno 2026.
-   Dopo l'evento si nasconde automaticamente.
-════════════════════════════════════════════════════════ */
-function JamBanner() {
-  const [dismissed, setDismissed] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    // Nascondi dopo l'evento
-    if (new Date() > new Date('2026-06-07T00:00:00+02:00')) return;
-    // Nascondi se gia chiuso in questa sessione
-    try {
-      if (sessionStorage.getItem('cmaps_jam_banner_off')) return;
-    } catch {}
-    setVisible(true);
-  }, []);
-
-  if (!visible || dismissed) return null;
-
-  const dismiss = () => {
-    setDismissed(true);
-    try { sessionStorage.setItem('cmaps_jam_banner_off', '1'); } catch {}
-  };
-
-  return (
-    <div style={{
-      position: 'fixed',
-      bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))',
-      left: 12, right: 12,
-      zIndex: 50,
-      animation: 'slideUp 0.35s ease-out',
-    }}>
-      <a
-        href="/jamroma"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          background: 'linear-gradient(135deg, #2D1F42 0%, #1A1020 100%)',
-          border: '1px solid rgba(123,94,167,0.4)',
-          borderRadius: 14, padding: '10px 14px',
-          textDecoration: 'none', color: '#F2E8D5',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(123,94,167,0.15)',
-        }}
-      >
-        <img
-          src="/events/jamroma/poster.jpg" alt=""
-          style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>
-            Colle del Cemento V4
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#E85D75', marginTop: 1 }}>
-            6 giugno · EUR Fermi · Roma
-          </div>
-        </div>
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
-          background: '#F5A623', color: '#1A1020',
-          borderRadius: 6, padding: '6px 12px',
-          whiteSpace: 'nowrap', textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-        }}>
-          ENTRA
-        </div>
-      </a>
-      <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); dismiss(); }}
-        style={{
-          position: 'absolute', top: -6, right: -2,
-          width: 22, height: 22, borderRadius: '50%',
-          background: '#333', border: '1px solid #555', color: '#aaa',
-          fontSize: 11, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        ✕
-      </button>
-    </div>
   );
 }
 

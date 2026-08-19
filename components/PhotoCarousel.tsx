@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-interface Photo { url: string; credit_name?: string }
+interface Photo { url: string; credit_name?: string; source?: 'rider' | 'streetview' }
 
 /* Easing "move" della skill ui-animation: usato solo DOPO il rilascio del dito.
    Durante il drag l'immagine resta agganciata al puntatore (nessuna transizione). */
@@ -104,6 +104,18 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
                 loading={i === 0 ? 'eager' : 'lazy'}
               />
+              {/* Origine — una foto presa da Street View non è una foto dello spot:
+                  dirlo apertamente evita che passi per documentazione vera. */}
+              {p.source === 'streetview' && (
+                <div style={{
+                  position: 'absolute', bottom: 10, left: 10, zIndex: 2,
+                  background: 'rgba(0,0,0,0.68)', border: '1px solid rgba(255,206,77,0.45)',
+                  borderRadius: 4, padding: '3px 8px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ffce4d',
+                }}>
+                  🗺️ foto da mappa — serve uno scatto vero
+                </div>
+              )}
               {/* Credit */}
               {p.credit_name && (
                 <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', zIndex: 2 }}>

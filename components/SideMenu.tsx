@@ -16,7 +16,7 @@ const MENU_ITEMS = [
   { href: '/events',   label: 'Eventi',   emoji: '📅' },
   { href: '/news',       label: 'News',       emoji: '📰' },
   { href: '/cerca-spot', label: 'Cerca Spot', emoji: '📍' },
-  { href: '/sessioni',  label: 'Sessioni',   emoji: '🔴' },
+  { href: '/sessioni',  label: 'Sessioni',   emoji: '🔴', liveOnly: true },
   { divider: true },
   { href: LINKS.youtube,   label: 'Tutorial',    emoji: '▶️', external: true },
   { href: '/map/support',  label: 'Supporta',    emoji: '☕' },
@@ -25,6 +25,27 @@ const MENU_ITEMS = [
 
 export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
   const user = useUser();
+
+  /* ── Rider in sessione adesso ──
+     Le sessioni scadono dopo 3 ore, quindi lo stato normale della sezione è
+     "vuota": una voce di menu che porta sempre a una pagina vuota comunica che
+     l'app non la usa nessuno. La mostriamo solo quando c'è davvero qualcuno
+     fuori, e in quel caso il numero diventa il messaggio. */
+  const [liveRiders, setLiveRiders] = useState<number | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch('/api/sessions')
+      .then(r => r.json())
+      .then((j: { ok: boolean; data?: { riders: { username: string }[] }[] }) => {
+        if (cancelled || !j.ok) return;
+        const total = (j.data ?? []).reduce((n, g) => n + (g.riders?.length ?? 0), 0);
+        setLiveRiders(total);
+      })
+      .catch(() => { if (!cancelled) setLiveRiders(0); });
+    return () => { cancelled = true; };
+  }, [open]);
+
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -104,6 +125,8 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
             if ('divider' in item) {
               return <li key={idx}><div style={{ height: 1, background: 'var(--gray-700)', margin: '8px 20px' }} /></li>;
             }
+            /* Voce viva solo quando c'è qualcosa da vedere. */
+            if ('liveOnly' in item && item.liveOnly && !liveRiders) return null;
             return (
               <li key={item.href}>
                 <a
@@ -131,6 +154,15 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
                 >
                   <span aria-hidden="true" style={{ fontSize: 20, minWidth: 28 }}>{item.emoji}</span>
                   <span>{item.label}</span>
+                  {'liveOnly' in item && item.liveOnly && !!liveRiders && (
+                    <span style={{
+                      marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: '#000', background: '#ff3b30', borderRadius: 10,
+                      padding: '2px 8px', letterSpacing: '0.04em', whiteSpace: 'nowrap',
+                    }}>
+                      {liveRiders} ORA
+                    </span>
+                  )}
                   {'external' in item && item.external && (
                     <span style={{ marginLeft: 'auto', color: 'var(--gray-400)', fontSize: 13 }}>↗</span>
                   )}

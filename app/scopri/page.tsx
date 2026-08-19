@@ -26,7 +26,7 @@ async function getSpots(): Promise<SpotMapPin[]> {
   const supabase = supabaseServer();
   const { data } = await supabase
     .from('spots')
-    .select('id, slug, name, type, lat, lon, city, condition, difficulty, submitted_by_username, spot_photos(url, position)')
+    .select('id, slug, name, type, lat, lon, city, condition, condition_updated_at, difficulty, submitted_by_username, spot_photos(url, position)')
     .eq('status', 'approved')
     .order('approved_at', { ascending: false });
 
@@ -36,6 +36,7 @@ async function getSpots(): Promise<SpotMapPin[]> {
     return {
       id: s.id, slug: s.slug, name: s.name, type: s.type,
       lat: s.lat, lon: s.lon, city: s.city, condition: s.condition,
+      condition_updated_at: s.condition_updated_at ?? undefined,
       difficulty: s.difficulty ?? undefined,
       cover_url: photos[0]?.url,
       photo_urls: photos.map(p => p.url),

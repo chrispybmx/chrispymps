@@ -33,6 +33,8 @@ interface SpotMapProps {
   onBoundsChanged?: (bounds: { south: number; west: number; north: number; east: number }) => void;
   // Stile mappa
   darkMap?: boolean;
+  /** Emesso quando la posizione dell'utente è nota (avvio automatico o tasto GPS). */
+  onUserLocated?: (pos: { lat: number; lon: number }) => void;
 }
 
 /* ── SVG pin individuale ── */
@@ -101,7 +103,7 @@ function computeGridClusters(spots: SpotMapPin[], zoom: number) {
 export default function SpotMap({
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
-  locateTrigger, onLocatingChange, onBoundsChanged, darkMap: darkMapProp,
+  locateTrigger, onLocatingChange, onBoundsChanged, darkMap: darkMapProp, onUserLocated,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
@@ -127,6 +129,8 @@ export default function SpotMap({
   const [zoom, setZoom]         = useState<number>(APP_CONFIG.mapZoom ?? 6);
   const tileLayerRef = useRef<import('leaflet').TileLayer | null>(null);
 
+  const onUserLocatedRef = useRef(onUserLocated);
+  useEffect(() => { onUserLocatedRef.current      = onUserLocated; });
   useEffect(() => { onMapClickRef.current       = onMapClick; });
   useEffect(() => { onSpotClickRef.current      = onSpotClick; });
   useEffect(() => { onBoundsChangedRef.current  = onBoundsChanged; });
@@ -224,19 +228,20 @@ export default function SpotMap({
       map.once('dragstart', () => { hasInitialFit.current = true; });
 
       /* ── Geolocalizzazione automatica all'avvio ──
-         Se il browser conosce la posizione dell'utente, centra sulla sua zona
-         rimanendo a zoom paese (~5) — l'utente vede il suo Paese nello spazio
-         visibile sopra il pannello, non zoomato a livello città. */
+         Prima si apriva a zoom paese (5): il primo fotogramma era una cartina
+         politica dell'Europa, e la domanda con cui il rider apre l'app
+         («c'è qualcosa vicino a me?») restava senza risposta. Ora si apre a
+         livello città, dove i pin sono spot riconoscibili e non cluster. */
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             if (!mapInstance.current || !L) return;
             const { latitude, longitude } = pos.coords;
 
-            /* Zoom 5 = paese intero visibile; poi offsettiamo verso il basso
+            /* Zoom 11 = la zona intorno a te; poi offsettiamo verso il basso
                di metà altezza pannello così il centro cade nell'area visibile */
-            const COUNTRY_ZOOM = 5;
-            mapInstance.current.setView([latitude, longitude], COUNTRY_ZOOM, { animate: false });
+            const LOCAL_ZOOM = 11;
+            mapInstance.current.setView([latitude, longitude], LOCAL_ZOOM, { animate: false });
             mapInstance.current.panBy([0, overlayOffsetPx], { animate: false });
             hasInitialFit.current = true;
 
@@ -257,6 +262,8 @@ export default function SpotMap({
             } else {
               userMarkerRef.current.setLatLng([latitude, longitude]);
             }
+
+            onUserLocatedRef.current?.({ lat: latitude, lon: longitude });
           },
           () => { /* permesso negato → nessuna azione */ },
           { timeout: 6000, maximumAge: 300_000 }
@@ -645,6 +652,7 @@ export default function SpotMap({
               .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
           }
         }
+        onUserLocatedRef.current?.({ lat: latitude, lon: longitude });
         setLocating(false);
         onLocatingChange?.(false);
       },

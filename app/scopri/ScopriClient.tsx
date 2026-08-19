@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, REGIONI_ITALIA, DIFFICOLTA } from '@/lib/constants';
+import FreshnessDot from '@/components/FreshnessDot';
 import BottomNav from '@/components/BottomNav';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
@@ -297,14 +298,10 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                     <div style={{ position: 'absolute', bottom: 6, left: 6, fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
                       {tipo.emoji} {tipo.label.toUpperCase()}
                     </div>
-                    {/* Condition dot */}
-                    {spot.condition === 'alive' ? (
-                      <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: '#00c851', boxShadow: '0 0 6px #00c851' }} />
-                    ) : (
-                      <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-mono)', fontSize: 9, background: cond.bg, color: cond.color, padding: '2px 5px', borderRadius: 3 }}>
-                        {cond.label.toUpperCase()}
-                      </div>
-                    )}
+                    {/* Stato + freschezza */}
+                    <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex' }}>
+                      <FreshnessDot condition={spot.condition} updatedAt={spot.condition_updated_at} />
+                    </div>
                   </div>
 
                   {/* Info — fixed height for uniform grid */}
