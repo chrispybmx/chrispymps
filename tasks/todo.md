@@ -182,4 +182,9 @@ Il vincolo "non toccare aggiungi spot" è stato tolto da Christian, che ha propo
 - [x] **Foto: lo scatto diventa l'azione.** Prima due bottoni identici affiancati (Scatta / Galleria): nessun default. Ora `📸 SCATTA LA FOTO` arancione pieno e sotto, piccolo, "aggiungi dalla galleria".
       Collegato al problema delle copertine: 26 su 116 erano screenshot di Google Maps, e la galleria è la porta da cui entrano
 - [x] Verificato: tsc pulito, 94/94 test, build 172/172, tutti gli stati GPS (denied/timeout/error) ancora raggiungibili
-- [ ] **NON verificato a video**: il modale richiede login e non posso autenticarmi al posto di Christian. Prova dal telefono: premi + SPOT e guarda se la posizione arriva da sola
+- [x] **VERIFICATO a video** (dopo il feedback di Christian: la posizione arrivava, ma il link piccolo non c'era). Montato il modale in locale con uno stub di `useUser` dietro `NEXT_PUBLIC_UI_PREVIEW=1`, provati tutti gli stati, poi stub rimosso e `git diff --quiet hooks/useUser.ts` confermato pulito.
+
+### Due bug che avevo introdotto io, trovati grazie alla prova di Christian
+- [x] **Il link di uscita spariva proprio nel caso normale.** Stava dentro il blocco `locMode === 'gps' && !hasCoords`: prendendo il GPS da solo, `hasCoords` diventa subito true e quel blocco non compare mai. Chi NON era sullo spot restava senza via d'uscita. Ora "Non sono nello spot — ho le coordinate →" sta anche sotto la posizione confermata
+- [x] **Vicolo cieco su "Cambia →".** Faceva `setLocMode(null)`, ma il selettore di metodo l'avevo rimosso: `null` non corrisponde a nessun ramo, quindi la sezione posizione restava VUOTA. Ora è "Rileva di nuovo →" e riporta su `'gps'`
+- [x] **Reset con doppia assegnazione.** In `handleClose` avevo aggiunto `setLocMode('gps')` ma sotto era rimasto `setLocMode(null)`, che vinceva: chiudendo e riaprendo il modale la sezione posizione sarebbe rimasta vuota. Latente — funzionava solo la prima volta

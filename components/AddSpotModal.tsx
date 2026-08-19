@@ -352,9 +352,11 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   /* Reset */
   const handleClose = useCallback(() => {
     setStep('posizione');
-    setLocMode('gps');
     setLat(initialLat ?? null); setLon(initialLon ?? null); setCity(''); setCountry(''); setCountryCode('');
-    setLocMode(null);
+    /* 'gps' e non null: il selettore di metodo non esiste più, quindi null
+       lascerebbe il passo posizione completamente vuoto alla riapertura. */
+    setLocMode('gps');
+    setGeoPreGranted(null); // ricontrolla il permesso alla prossima apertura
     setCoordInput(''); setCoordError(null);
     setGpsState('idle');
     setPhotos([]);
@@ -859,12 +861,26 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>{lat!.toFixed(5)}, {lon!.toFixed(5)}</div>
                     </div>
                     <button
-                      onClick={() => { setLat(null); setLon(null); setCoordInput(''); setCoordError(null); setGpsState('idle'); setLocMode(null); }}
+                      onClick={() => { setLat(null); setLon(null); setCoordInput(''); setCoordError(null); setGpsState('idle'); setLocMode('gps'); }}
                       style={{ background: 'none', border: 'none', color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer' }}
                     >
-                      Cambia →
+                      Rileva di nuovo →
                     </button>
                   </div>
+
+                  {/* Via di fuga, anche a posizione già presa.
+                     Prendendo il GPS da soli si salta la schermata dove stava
+                     questo link, quindi chi NON è sullo spot restava senza uscita. */}
+                  <button
+                    onClick={() => {
+                      setLat(null); setLon(null);
+                      setCoordInput(''); setCoordError(null);
+                      setGpsState('idle'); setLocMode('coords');
+                    }}
+                    style={backLink}
+                  >
+                    Non sono nello spot — ho le coordinate →
+                  </button>
 
                   {/* ── NEARBY SPOTS — duplicate detection ── */}
                   {nearbyLoading && (
