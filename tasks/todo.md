@@ -148,7 +148,9 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 
 ### Rimasti — serve la tua mano
 - [x] **Push fatto** (autorizzato da Christian): branch `ux/fase1-2-app` su origin. PR da aprire: https://github.com/chrispybmx/chrispymps/pull/new/ux/fase1-2-app — `gh` non è installato sulla macchina, quindi la PR va aperta dal browser
-- [ ] **Merge in main**: le migration sono fatte, quindi il merge è sbloccato. PR da aprire: https://github.com/chrispybmx/chrispymps/pull/new/ux/fase1-2-app
+- [x] **MERGE FATTO E DEPLOY LIVE** (19/08/2026, commit merge `dfa257c`). Verificato PRIMA del push su main mergiato: tsc pulito, 94/94 test, build 172/172.
+      Verificato DOPO sul sito vero: `/api/spots` restituisce `condition_updated_at` su tutti e 116 gli spot (solo il codice nuovo lo fa); scheda Panchina/Silandro mostra badge giallo `ALIVE · 4m` e l'etichetta "foto da mappa — serve uno scatto vero"; classifica in ordine 240·175·152·100·80·50.
+      NB: il push ha portato su anche `dc19fda` (docs sessione SiteGround), che era fermo in locale su main da prima e non era mai stato pushato
 - [x] **Migration APPLICATE al DB prod** (19/08/2026, SQL Editor via browser, dopo login fatto da Christian):
       1. `20260819_spot_photos_source.sql` → "Success. No rows returned". Prima `spot_photos` aveva 10 colonne, nessuna `source`
       2. `20260819b_mark_streetview_photos.sql` → prima un SELECT di controllo ha confermato **26 righe corrispondenti** sulle 26 attese, poi l'UPDATE
