@@ -148,9 +148,12 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 
 ### Rimasti — serve la tua mano
 - [x] **Push fatto** (autorizzato da Christian): branch `ux/fase1-2-app` su origin. PR da aprire: https://github.com/chrispybmx/chrispymps/pull/new/ux/fase1-2-app — `gh` non è installato sulla macchina, quindi la PR va aperta dal browser
-- [ ] **Merge in main**: da fare DOPO le due migration, non prima
-- [ ] **Applicare le due migration** in SQL Editor, in ordine: `20260819_spot_photos_source.sql` poi `20260819b_mark_streetview_photos.sql`. Finché non lo fai l'etichetta non compare e il codice degrada senza rompersi (verificato).
-      NB: non posso applicarle io — servirebbe `SUPABASE_DB_URL` da `.env.local`, e la lettura di quel file è bloccata (è un file di segreti). Non ci ho girato intorno
+- [ ] **Merge in main**: le migration sono fatte, quindi il merge è sbloccato. PR da aprire: https://github.com/chrispybmx/chrispymps/pull/new/ux/fase1-2-app
+- [x] **Migration APPLICATE al DB prod** (19/08/2026, SQL Editor via browser, dopo login fatto da Christian):
+      1. `20260819_spot_photos_source.sql` → "Success. No rows returned". Prima `spot_photos` aveva 10 colonne, nessuna `source`
+      2. `20260819b_mark_streetview_photos.sql` → prima un SELECT di controllo ha confermato **26 righe corrispondenti** sulle 26 attese, poi l'UPDATE
+      Verifica finale: `SELECT source, count(*) FROM spot_photos GROUP BY source` → **rider 212, streetview 26** (238 foto totali)
+      NB: l'etichetta sul sito compare solo dopo il merge — il codice che legge `source` è sul branch, non ancora in produzione. La colonna in più non disturba il codice attualmente deployato
 - [ ] **Provare su telefono vero** l'apertura geolocalizzata: nel browser di test il permesso non viene concesso, quindi il ramo "N spot nella tua zona" con la distanza non è mai stato visto dal vivo
 - [ ] Fase 3 (push notification, rituale post-visita, clip agganciate agli spot) non iniziata — le push richiedono chiavi VAPID che devi generare tu
 
@@ -159,3 +162,6 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 
 ### Preesistente, trovato ma non toccato (fuori scope)
 - [ ] Errore di idratazione da `SpotRadarToggle` in SideMenu.tsx: legge localStorage durante il render, il server rende un markup diverso dal client. Presente anche su `main`, visibile solo in dev
+
+### Trovato durante la sessione — da guardare, non c'entra col design pass
+- [ ] **Supabase: "Grace period is over"** — banner in cima al dashboard: *"Your projects will not be able to serve requests when you use up your quota"*. Org `chrispybmx`, piano Free. Se la quota si esaurisce il DB smette di rispondere e il sito va giù. Da verificare in Review billing
