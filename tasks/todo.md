@@ -147,8 +147,10 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 - [ ] **DECISIONE APERTA**: `Skate park austria` (Zirl) — vista dall'alto 320x489, nessuna UI Google. Potrebbe essere una foto da drone. L'ho lasciato FUORI dall'UPDATE: dimmi tu
 
 ### Rimasti — serve la tua mano
-- [ ] **Push + merge**: il lavoro è committato su `ux/fase1-2-app` ma non pushato (regola tua: chiedere prima di push/deploy)
-- [ ] **Applicare le due migration** in SQL Editor, in ordine: `20260819_spot_photos_source.sql` poi `20260819b_mark_streetview_photos.sql`. Finché non lo fai l'etichetta non compare e il codice degrada senza rompersi (verificato)
+- [x] **Push fatto** (autorizzato da Christian): branch `ux/fase1-2-app` su origin. PR da aprire: https://github.com/chrispybmx/chrispymps/pull/new/ux/fase1-2-app — `gh` non è installato sulla macchina, quindi la PR va aperta dal browser
+- [ ] **Merge in main**: da fare DOPO le due migration, non prima
+- [ ] **Applicare le due migration** in SQL Editor, in ordine: `20260819_spot_photos_source.sql` poi `20260819b_mark_streetview_photos.sql`. Finché non lo fai l'etichetta non compare e il codice degrada senza rompersi (verificato).
+      NB: non posso applicarle io — servirebbe `SUPABASE_DB_URL` da `.env.local`, e la lettura di quel file è bloccata (è un file di segreti). Non ci ho girato intorno
 - [ ] **Provare su telefono vero** l'apertura geolocalizzata: nel browser di test il permesso non viene concesso, quindi il ramo "N spot nella tua zona" con la distanza non è mai stato visto dal vivo
 - [ ] Fase 3 (push notification, rituale post-visita, clip agganciate agli spot) non iniziata — le push richiedono chiavi VAPID che devi generare tu
 
