@@ -141,11 +141,19 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 - [x] Giro manuale a 375px su dev server: mappa, onboarding, classifica, scheda spot, scopri
 - [x] Errori console in dev confrontati con `main` via stash: identici, nessuno introdotto da questo lavoro
 
-### Aperti — servono decisioni o dati di Christian
-- [ ] **Applicare** `supabase/migrations/20260819_spot_photos_source.sql` in SQL Editor, poi marcare a mano le foto Street View (query di supporto dentro il file). Finché non è applicata l'etichetta non compare — il codice degrada senza rompersi
-- [ ] Verificare su telefono vero l'apertura geolocalizzata: nel browser di test il permesso non viene concesso, quindi il ramo "116 spot / nella tua zona" con distanza non è stato visto dal vivo
-- [ ] `A&C Wedding Jam` (05/09) ha lat/lng nulli → resta fuori dal banner evento vicino. Coprirlo richiede un fallback su country_code, che però mostrerebbe eventi a 800 km. Da decidere
-- [ ] Fase 3 (push, rituale post-visita, clip agganciate agli spot) non iniziata — le push richiedono chiavi VAPID
+### Foto Street View — identificate, SQL pronto
+- [x] Guardate tutte e 116 le copertine, non solo l'euristica: **26 sono screenshot di Google Maps / Street View**. L'estensione `.png` ne prendeva solo 16; fra i `.jpg` ce n'erano altri 10 riconoscibili da status bar del telefono, logo Google, "© 2026 Google", barra indirizzo, pin rossi, un dialog "Share Street View?"
+- [x] `supabase/migrations/20260819b_mark_streetview_photos.sql` — UPDATE per url, con il nome dello spot in commento su ogni riga
+- [ ] **DECISIONE APERTA**: `Skate park austria` (Zirl) — vista dall'alto 320x489, nessuna UI Google. Potrebbe essere una foto da drone. L'ho lasciato FUORI dall'UPDATE: dimmi tu
+
+### Rimasti — serve la tua mano
+- [ ] **Push + merge**: il lavoro è committato su `ux/fase1-2-app` ma non pushato (regola tua: chiedere prima di push/deploy)
+- [ ] **Applicare le due migration** in SQL Editor, in ordine: `20260819_spot_photos_source.sql` poi `20260819b_mark_streetview_photos.sql`. Finché non lo fai l'etichetta non compare e il codice degrada senza rompersi (verificato)
+- [ ] **Provare su telefono vero** l'apertura geolocalizzata: nel browser di test il permesso non viene concesso, quindi il ramo "N spot nella tua zona" con la distanza non è mai stato visto dal vivo
+- [ ] Fase 3 (push notification, rituale post-visita, clip agganciate agli spot) non iniziata — le push richiedono chiavi VAPID che devi generare tu
+
+### Chiuso con una decisione
+- [x] `A&C Wedding Jam` (05/09) fuori dal banner evento vicino, e va bene così: il record ha `location: 'Italy'`, niente città e niente coordinate — è granularità nazionale, arriva così dallo scraper illuminatebmx. Un fallback su `country_code` lo mostrerebbe a ogni italiano a qualunque distanza, cioè esattamente il rumore che il banner serve a togliere. Se lo vuoi coperto, serve la città nel record, non codice
 
 ### Preesistente, trovato ma non toccato (fuori scope)
 - [ ] Errore di idratazione da `SpotRadarToggle` in SideMenu.tsx: legge localStorage durante il render, il server rende un markup diverso dal client. Presente anche su `main`, visibile solo in dev
