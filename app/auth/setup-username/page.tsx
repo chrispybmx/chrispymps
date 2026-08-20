@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { checkUsername, setupGoogleUsername } from '@/lib/auth-client';
+import { AUTH_ERROR_PARAM } from '@/lib/auth-errors';
 
 interface SessionInfo {
   id: string;
@@ -57,9 +58,10 @@ export default function SetupUsernamePage() {
     };
   }, [router]);
 
-  // Se non loggato (dopo timeout), manda alla mappa
+  /* Se la sessione non arriva, la mappa deve dire PERCHÉ: prima si tornava
+     indietro in silenzio e il rider vedeva il bottone Google non fare nulla. */
   useEffect(() => {
-    if (session === null) router.replace('/map');
+    if (session === null) router.replace(`/map?${AUTH_ERROR_PARAM}=no_session`);
   }, [session, router]);
 
   let unDebounce: ReturnType<typeof setTimeout>;

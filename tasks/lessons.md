@@ -100,3 +100,29 @@ interpolato produce un tipo di errore, non uno `Spot`. **Pattern:** per query al
 due `.select()` per esteso (uno con la colonna nuova, uno senza) e scegliere in base a `error`,
 come già fa `app/api/events/route.ts` per il join opzionale. Costa qualche riga in più, ma i tipi
 restano veri e il codice regge il periodo in cui la migration non è ancora applicata in produzione.
+
+## 2026-08-19 — Un errore scritto nell'URL che nessuno legge è un errore che non esiste
+Christian segnala: "il login con Google non funziona, non ti fa creare un profilo".
+Indagine sistematica su tutti i confini, e il risultato è che **quasi tutto funzionava**:
+bottone presente nel bundle di produzione (dal 9 luglio), provider Google `Enabled` su
+Supabase con client_id reale, Site URL e Redirect URLs corretti, `/auth/v1/authorize`
+risponde 302 verso Google, Google accetta la richiesta (nessun `redirect_uri_mismatch`
+né `invalid_client`), route `/auth/callback` e `/auth/setup-username` raggiungibili,
+RLS su `profiles` corretta (`profiles_own_insert` con `auth.uid() = id`), e
+`setupGoogleUsername` inserisce davvero il profilo.
+
+Il difetto certo era un altro: `/auth/callback` scriveva `?auth_error=...` nell'URL e
+**nessun file leggeva quel parametro** (`grep -rn auth_error` → solo le due scritture).
+In più `setup-username`, se la sessione non arrivava entro 6 secondi, faceva
+`router.replace('/map')` senza dire nulla. Due strade diverse che finivano entrambe
+sulla mappa identica a com'era: dal punto di vista del rider il bottone non faceva nulla.
+
+**Pattern:** prima di cercare la causa di "non funziona", verificare se il fallimento è
+*osservabile*. Un ramo di errore che non ha un lettore non è gestione dell'errore, è
+silenzio con una variabile in più. E un errore mostrato in un toast da 2,5 secondi è
+quasi altrettanto silenzioso: se il messaggio contiene istruzioni, serve un avviso che
+resta finché l'utente lo chiude.
+
+**Falsa pista utile:** avevo concluso che `/api/auth/set-username` non creasse il profilo
+(aggiorna solo `user_metadata`). Vero, ma irrilevante: l'insert sta in `setupGoogleUsername`
+lato client. Verificare chi altro fa il lavoro prima di dichiarare la causa radice.

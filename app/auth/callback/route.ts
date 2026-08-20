@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/map`);
+    return NextResponse.redirect(`${origin}/map?auth_error=no_code`);
   }
 
   const cookieStore = cookies();
@@ -37,7 +37,9 @@ export async function GET(request: NextRequest) {
   const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeError || !data.session) {
-    console.error('[auth/callback] exchangeCodeForSession error:', exchangeError);
+    /* Logghiamo il messaggio esatto: è l'unico modo per sapere se salta lo
+       scambio PKCE, il cookie o la rete. Vedi lib/auth-errors.ts. */
+    console.error('[auth/callback] exchangeCodeForSession error:', exchangeError?.message, exchangeError);
     return NextResponse.redirect(`${origin}/map?auth_error=oauth_failed`);
   }
 

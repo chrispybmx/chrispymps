@@ -17,6 +17,7 @@ import { useUser } from '@/hooks/useUser';
 import OnboardingHints from '@/components/OnboardingHints';
 import FreshnessDot from '@/components/FreshnessDot';
 import NearbyEventBanner from '@/components/NearbyEventBanner';
+import AuthErrorBanner from '@/components/AuthErrorBanner';
 import { findNearby } from '@/lib/nearby-radar';
 
 /* ── Haversine ── */
@@ -1057,6 +1058,9 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         initialLat={addLat} initialLon={addLon}
       />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+
+      {/* ── ACCESSO SOCIAL FALLITO — prima tornava alla mappa in silenzio ── */}
+      <AuthErrorBanner />
 
       {/* ── EVENTO VICINO — data-driven, sostituisce il banner Jam Roma cablato ── */}
       <NearbyEventBanner userPos={userPos} />

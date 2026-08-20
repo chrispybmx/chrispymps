@@ -208,3 +208,30 @@ Richiesta di Christian: "cancella profilo" via dalla pagina profilo, dentro modi
 - [x] Verificato a video con stub di sessione (poi rimosso, `git diff --quiet` su supabase-browser e useUser): profilo senza più "Cancella profilo", link a `/u/chrispy/modifica`, campi precompilati, bottone disabilitato con nome sbagliato e attivo con quello giusto
 - [x] tsc pulito, 98/98 test, build 172/172, lint pulito sui file toccati
 - NB GDPR: la cancellazione resta raggiungibile — è un diritto dell'utente e la privacy policy la promette. È nascosta, non rimossa
+
+## 2026-08-19 — Login Google: reso visibile il fallimento (causa radice NON ancora isolata)
+Segnalazione: "il login con Google non funziona, non ti fa creare un profilo".
+
+### Verificato funzionante (non è qui il problema)
+- [x] Bottone "Continua con Google" nel bundle di produzione, live dal commit 98586c6 del 9 luglio
+- [x] Provider Google `Enabled` su Supabase, con client_id reale
+- [x] Site URL `https://maps.chrispybmx.com`; Redirect URLs includono `maps.chrispybmx.com/**`
+- [x] `/auth/v1/authorize?provider=google` → 302 verso accounts.google.com con client_id valido
+- [x] Google accetta: nessun `redirect_uri_mismatch`, nessun `invalid_client`, nessun "Access blocked"
+- [x] `/auth/callback` raggiungibile e coerente col codice (codice finto → `?auth_error=oauth_failed`)
+- [x] `/auth/setup-username` → 200
+- [x] RLS `profiles`: `profiles_own_insert` con check `auth.uid() = id` — corretta
+- [x] `setupGoogleUsername` inserisce davvero in `profiles` ed è collegata alla pagina
+
+### Dati
+- 47 utenti totali, **tutti `provider = email`, zero Google**. 7 iscritti dal 9 luglio, zero Google. Zero utenti senza profilo (il flusso email funziona)
+
+### Difetto certo, corretto
+- [x] `?auth_error=` veniva scritto e **mai letto da nessuno** → nuovo `components/AuthErrorBanner.tsx`, avviso persistente sulla mappa
+- [x] `setup-username`: il timeout di 6s rimandava a `/map` in silenzio → ora `/map?auth_error=no_session`
+- [x] `/auth/callback`: distingue `no_code` da `oauth_failed` e logga il messaggio esatto dell'errore
+- [x] `lib/auth-errors.ts` con messaggi che dicono cosa fare + 6 test
+- [x] Verificato a video: l'avviso compare e resta finché non lo chiudi; il parametro sparisce dall'URL
+
+### Aperto
+- [ ] **Causa radice non isolata**: l'ultimo tratto (scambio del codice e passaggio della sessione al browser) richiede un login Google vero, che non posso fare al posto di Christian. Ora però il fallimento ha un nome: **Christian riprova e il messaggio dirà quale passaggio si rompe** (`oauth_failed` = scambio lato server, `no_session` = sessione non arrivata al browser, `profile_failed` = profilo non creato)
