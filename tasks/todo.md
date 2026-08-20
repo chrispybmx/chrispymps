@@ -195,3 +195,16 @@ Il vincolo "non toccare aggiungi spot" è stato tolto da Christian, che ha propo
 - [x] **Migration APPLICATA** (19/08/2026, SQL Editor). Al primo tentativo il classifier aveva bloccato; su richiesta esplicita di Christian ripetuto ed è passato. Verificato: `enum_range(NULL::spot_type)` restituisce **11 valori** con `transition` presente
 - [x] **Street diventa categoria storica** (decisione di Christian): i 60 spot restano `street` e il filtro continua a mostrarla, ma **non è più scegliibile quando si aggiunge uno spot**. Implementato con un flag `legacy: true` in `TIPI_SPOT` + `TIPI_SPOT_SELEZIONABILI` in constants (costante testabile invece di un filtro dentro il JSX). 4 test nuovi
 - [ ] Ri-categorizzare i 60 `street` esistenti: una parte sono transition. Serve l'occhio di chi conosce gli spot. Da oggi però il calderone non cresce più
+
+## 2026-08-19 — Cancella account: fuori dal profilo, dentro Modifica profilo
+Richiesta di Christian: "cancella profilo" via dalla pagina profilo, dentro modifica profilo come seconda pagina, quasi nascosto.
+
+- [x] Nuova pagina `/u/[username]/modifica` (`page.tsx` + `EditProfileClient.tsx`), `noindex/nofollow` e canonical null: è una pagina privata
+- [x] Guardia proprietario nel client: se la sessione non corrisponde all'username → schermata "Questo profilo non è tuo". La pagina non espone dati sensibili (bio e Instagram sono già pubblici sul profilo), quindi è un guard di UX, non di sicurezza; le scritture restano protette dal token su `/api/profile`
+- [x] Spostati nella pagina nuova: avatar, bio, Instagram, salvataggio
+- [x] `ProfileClient`: "✏️ Modifica profilo" da bottone che apriva un pannello inline a link verso la pagina. Rimossi form inline, `handleSave`, `handleDeleteAccount` e gli stati `editing/saving/deleting/msg`
+- [x] Cancellazione account: in fondo alla pagina modifica, testo grigio scurissimo "Elimina account". Aprendola compare la spiegazione + campo dove scrivere il proprio username; il bottone resta disabilitato finché il nome non combacia
+- [x] Sostituito `window.confirm` con la conferma per digitazione: un confirm si scarta per riflesso, scrivere il proprio nome no
+- [x] Verificato a video con stub di sessione (poi rimosso, `git diff --quiet` su supabase-browser e useUser): profilo senza più "Cancella profilo", link a `/u/chrispy/modifica`, campi precompilati, bottone disabilitato con nome sbagliato e attivo con quello giusto
+- [x] tsc pulito, 98/98 test, build 172/172, lint pulito sui file toccati
+- NB GDPR: la cancellazione resta raggiungibile — è un diritto dell'utente e la privacy policy la promette. È nascosta, non rimossa

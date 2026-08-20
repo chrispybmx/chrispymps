@@ -20,15 +20,11 @@ interface Props {
 export default function ProfileClient({ profile, joinDate }: Props) {
   const router = useRouter();
   const [isOwn,    setIsOwn]    = useState(false);
-  const [editing,  setEditing]  = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [bio,      setBio]      = useState(profile.bio ?? '');
-  const [insta,    setInsta]    = useState(profile.instagram_handle ?? '');
+  const [bio]      = useState(profile.bio ?? '');
+  const [insta]    = useState(profile.instagram_handle ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const [saving,   setSaving]   = useState(false);
-  const [msg,      setMsg]      = useState('');
   const [token,    setToken]    = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,51 +60,6 @@ export default function ProfileClient({ profile, joinDate }: Props) {
       }
     } catch {}
     finally { setUploadingAvatar(false); }
-  };
-
-  const handleSave = async () => {
-    if (!token) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ bio: bio.trim() || null, instagram_handle: insta.replace('@','').trim() || null }),
-      });
-      const j = await res.json();
-      if (j.ok) { setMsg('✅ Profilo aggiornato!'); setEditing(false); }
-      else { setMsg('❌ ' + (j.error ?? 'Errore')); }
-    } catch { setMsg('❌ Errore di rete'); }
-    finally { setSaving(false); setTimeout(() => setMsg(''), 3000); }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!token) return;
-    const ok = window.confirm(
-      'Sei sicuro di voler eliminare il tuo account?\n\n' +
-      'Eliminando l\'account cancelleremo il tuo profilo e i tuoi dati personali. ' +
-      'Gli spot già pubblicati resteranno visibili sulla mappa come contributi anonimi della community. ' +
-      'Questa azione è irreversibile.'
-    );
-    if (!ok) return;
-    setDeleting(true);
-    try {
-      const res = await fetch('/api/user/delete', {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const j = await res.json();
-      if (j.ok) {
-        await supabaseBrowser().auth.signOut();
-        router.push('/map');
-      } else {
-        alert('Errore: ' + (j.error ?? 'Impossibile eliminare l\'account'));
-      }
-    } catch {
-      alert('Errore di rete. Riprova più tardi.');
-    } finally {
-      setDeleting(false);
-    }
   };
 
   const instaHandle = insta || profile.instagram_handle;
@@ -162,14 +113,14 @@ export default function ProfileClient({ profile, joinDate }: Props) {
           </div>
 
           {/* Bio */}
-          {(profile.bio || bio) && !editing && (
+          {(profile.bio || bio) && (
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', margin: '0 0 8px', lineHeight: 1.5 }}>
               {bio || profile.bio}
             </p>
           )}
 
           {/* Instagram */}
-          {instaHandle && !editing && (
+          {instaHandle && (
             <a
               href={`https://instagram.com/${instaHandle.replace('@','')}`}
               target="_blank" rel="noopener noreferrer"
@@ -180,14 +131,14 @@ export default function ProfileClient({ profile, joinDate }: Props) {
           )}
 
           {/* Edit button + Preferiti (solo owner) */}
-          {isOwn && !editing && (
+          {isOwn && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-              <button
-                onClick={() => setEditing(true)}
-                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', background: 'none', border: '1px solid var(--gray-600)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+              <a
+                href={`/u/${profile.username}/modifica`}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', background: 'none', border: '1px solid var(--gray-600)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
               >
                 ✏️ Modifica profilo
-              </button>
+              </a>
               <a
                 href="/preferiti"
                 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff4d6d', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.4)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
@@ -199,69 +150,6 @@ export default function ProfileClient({ profile, joinDate }: Props) {
         </div>
       </div>
 
-      {/* Edit form */}
-      {editing && (
-        <div style={{ marginTop: 20, background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 8, padding: '16px' }}>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-              Bio (max 200 caratteri)
-            </label>
-            <textarea
-              value={bio}
-              onChange={e => setBio(e.target.value)}
-              maxLength={200} rows={2}
-              placeholder="Rider di BMX da... Street, trail, park..."
-              style={{ width: '100%', background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 4, color: 'var(--bone)', fontSize: 14, padding: '8px 10px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }}
-            />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-              Instagram (solo username)
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)' }}>@</span>
-              <input
-                type="text" value={insta.replace('@','')} onChange={e => setInsta(e.target.value)}
-                placeholder="chrispybmx" maxLength={60}
-                style={{ flex: 1, background: 'var(--gray-700)', border: '1px solid var(--gray-600)', borderRadius: 4, color: 'var(--bone)', fontSize: 14, padding: '8px 10px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
-              />
-            </div>
-          </div>
-          {msg && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: msg.startsWith('✅') ? '#00c851' : '#ff4444', marginBottom: 10 }}>{msg}</div>}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { setEditing(false); setBio(profile.bio ?? ''); setInsta(profile.instagram_handle ?? ''); }}
-              style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px', background: 'transparent', border: '1px solid var(--gray-600)', borderRadius: 4, color: 'var(--gray-400)', cursor: 'pointer' }}>
-              Annulla
-            </button>
-            <button onClick={handleSave} disabled={saving}
-              style={{ flex: 2, fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px', background: saving ? 'var(--gray-700)' : 'var(--orange)', border: 'none', borderRadius: 4, color: saving ? 'var(--gray-400)' : '#000', cursor: saving ? 'default' : 'pointer', fontWeight: 700 }}>
-              {saving ? '...' : '💾 Salva'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Cancella profilo — nascosto in fondo, solo owner */}
-      {isOwn && !editing && (
-        <div style={{ marginTop: 80, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
-          <button
-            onClick={handleDeleteAccount}
-            disabled={deleting}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: 9,
-              color: 'var(--gray-700)',
-              background: 'none', border: 'none', padding: 0,
-              cursor: deleting ? 'default' : 'pointer',
-              opacity: deleting ? 0.4 : 1,
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-500)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-700)'; }}
-          >
-            {deleting ? 'Eliminazione...' : 'Cancella profilo'}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
