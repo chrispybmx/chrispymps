@@ -27,11 +27,18 @@ describe('authErrorMessage', () => {
   });
 
   it('ogni messaggio offre una via di uscita o una spiegazione', () => {
-    for (const code of ['oauth_failed', 'no_code', 'no_session', 'profile_failed']) {
+    for (const code of ['oauth_failed', 'no_code', 'no_session', 'profile_failed', 'unexpected_failure']) {
       const m = authErrorMessage(code)!;
       expect(m.length).toBeGreaterThan(20);
-      expect(m).toMatch(/riprova|prova|scrivimi/i);
+      expect(m).toMatch(/riprova|prova|scrivimi|entra con email/i);
     }
+  });
+
+  it('quando riprovare è inutile, non invita a riprovare', () => {
+    const m = authErrorMessage('unexpected_failure')!;
+    expect(m).toContain('email e password');
+    expect(m).toContain('non tuo');
+    expect(m).not.toMatch(/riprova tra poco/i);
   });
 
   it('il nome del parametro è quello usato nel callback', () => {

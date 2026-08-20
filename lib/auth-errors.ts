@@ -19,7 +19,8 @@ export type AuthErrorCode =
   | 'no_code'           // Google è tornato senza codice
   | 'no_session'        // sessione mai arrivata al browser dopo il callback
   | 'profile_failed'    // sessione ok, creazione profilo fallita
-  | 'access_denied';    // l'utente ha annullato su Google
+  | 'access_denied'      // l'utente ha annullato su Google
+  | 'unexpected_failure';// Supabase non è riuscito a scambiare il codice con Google
 
 const MESSAGGI: Record<string, string> = {
   oauth_failed:
@@ -34,6 +35,12 @@ const MESSAGGI: Record<string, string> = {
     'Accesso annullato su Google.',
   server_error:
     'Google ha risposto con un errore. Riprova tra poco.',
+  /* "Unable to exchange external code": Google rifiuta lo scambio perché il
+     client secret salvato su Supabase non è più valido. Riprovare non serve a
+     niente — è una configurazione da sistemare, non un intoppo momentaneo, e
+     dirlo evita di far sbattere la gente contro lo stesso muro. */
+  unexpected_failure:
+    'Accesso con Google non disponibile: è un problema di configurazione dalla nostra parte, non tuo. Entra con email e password — lo stiamo sistemando.',
   temporarily_unavailable:
     'Google non è raggiungibile in questo momento. Riprova tra poco.',
 };

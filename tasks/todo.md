@@ -258,3 +258,24 @@ Christian riprova e vede ancora solo "errore" senza riferire il dettaglio. Tolgo
 - [ ] Christian riprova il login Google UNA volta → leggo la riga in SQL:
       `SELECT created_at, stage, error_code, error_detail FROM auth_failure_log WHERE error_code NOT LIKE 'sonda%' ORDER BY created_at DESC LIMIT 5;`
 - Nota: le righe `sonda_*` e `test_deploy` sono mie, da ignorare o cancellare
+
+### CAUSA RADICE TROVATA (20/08/2026)
+Riga letta da `auth_failure_log` dopo il tentativo di Christian:
+```
+stage: provider_redirect
+unexpected_failure >>> Unable to exchange external code: 4/0A...
+```
+**Significato**: Supabase riceve il codice da Google e prova a scambiarlo per i token sull'endpoint di Google. Google **rifiuta lo scambio**. Il client_id è valido (Google accetta la richiesta di autorizzazione), quindi il pezzo che non torna è il **client secret salvato su Supabase**: scaduto, ruotato o appartenente a un OAuth client ricreato.
+
+Ipotesi che avevo fatto e che i dati hanno **smentito**:
+- ~~trigger su auth.users~~ → nessun trigger
+- ~~collisione con account email esistente~~ → fallisce prima, allo scambio del codice: non arriva mai a creare o collegare un utente
+- ~~cache/service worker~~ → il deploy era corretto, l'errore è reale
+
+- [x] Messaggio corretto per `unexpected_failure`: non dice più "riprova tra poco" (inutile), dice che è configurazione nostra e indirizza a email/password
+- [ ] **DA FARE, SOLO CHRISTIAN** (tocca credenziali, non posso):
+      1. Google Cloud Console → API e servizi → Credenziali → OAuth 2.0 Client ID `808986601662-2mu4l...`
+      2. Generare un nuovo client secret e copiarlo
+      3. Supabase → Authentication → Sign In / Providers → Google → incollarlo in Client Secret → Save
+      4. Riprovare il login: se la riga in `auth_failure_log` non compare più, è risolto
+      NB: il redirect URI in Google è già corretto (Google accetta la richiesta di autorizzazione), quindi non serve toccarlo
