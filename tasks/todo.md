@@ -235,3 +235,17 @@ Segnalazione: "il login con Google non funziona, non ti fa creare un profilo".
 
 ### Aperto
 - [ ] **Causa radice non isolata**: l'ultimo tratto (scambio del codice e passaggio della sessione al browser) richiede un login Google vero, che non posso fare al posto di Christian. Ora però il fallimento ha un nome: **Christian riprova e il messaggio dirà quale passaggio si rompe** (`oauth_failed` = scambio lato server, `no_session` = sessione non arrivata al browser, `profile_failed` = profilo non creato)
+
+### 2026-08-19, secondo giro — Christian riprova: "Google ha risposto con un errore"
+Codice ricevuto: `server_error`. Significa che Google ha completato ma **Supabase non è riuscito a chiudere lo scambio**.
+
+Escluse con prove:
+- [x] Trigger su `auth.users`: **nessuno** (query su pg_trigger) → esclusa la "Database error saving new user" da trigger
+- [x] Gli account `christian.ceresato@gmail.com` e `christian.ceresatob@gmail.com` esistono come `provider=email`, email **confermata**, 1 identità ciascuno
+
+Rimane in piedi: collisione di identità (email già registrata con password che tenta di legarsi a Google) oppure client secret Google errato/scaduto lato Supabase.
+
+- [x] **Mio errore corretto**: il callback leggeva solo `error` e buttava via `error_description` / `error_code`, cioè proprio la stringa che dice il motivo. Ora li legge, li logga e li mostra come "Dettaglio tecnico" nel banner
+- [ ] **Prossimo passo**: Christian riprova e legge il Dettaglio tecnico. Quella stringa è la risposta letterale di Supabase e chiude l'indagine
+- [ ] Se dice "Unable to exchange external code" → rigenerare Client ID/Secret su Google Cloud Console e reincollarli in Supabase
+- [ ] Se parla di identità/utente già esistente → è la collisione con l'account email; si risolve provando con un account Google mai usato sul sito, o abilitando il linking manuale

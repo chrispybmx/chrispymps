@@ -16,6 +16,7 @@ import { AUTH_ERROR_PARAM, authErrorMessage } from '@/lib/auth-errors';
  */
 export default function AuthErrorBanner() {
   const [messaggio, setMessaggio] = useState<string | null>(null);
+  const [dettaglio, setDettaglio] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -25,6 +26,11 @@ export default function AuthErrorBanner() {
     if (!msg) return;
 
     setMessaggio(msg);
+    /* Il motivo letterale del provider, quando c'è: è quello che dice
+       davvero cosa si è rotto. */
+    setDettaglio(url.searchParams.get('auth_error_detail'));
+    url.searchParams.delete('auth_error_detail');
+    url.searchParams.delete('auth_error_code');
     url.searchParams.delete(AUTH_ERROR_PARAM);
     window.history.replaceState({}, '', url.pathname + url.search + url.hash);
   }, []);
@@ -55,6 +61,14 @@ export default function AuthErrorBanner() {
         color: 'var(--bone)', lineHeight: 1.6,
       }}>
         {messaggio}
+        {dettaglio && (
+          <div style={{
+            marginTop: 6, fontSize: 11, color: 'var(--gray-400)',
+            wordBreak: 'break-word',
+          }}>
+            Dettaglio tecnico: {dettaglio}
+          </div>
+        )}
       </div>
       <button
         onClick={() => setMessaggio(null)}

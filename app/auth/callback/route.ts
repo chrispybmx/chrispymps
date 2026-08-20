@@ -11,7 +11,18 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
 
   if (error) {
-    return NextResponse.redirect(`${origin}/map?auth_error=${encodeURIComponent(error)}`);
+    /* Supabase e Google mandano ANCHE error_description / error_code con il
+       motivo letterale ("Unable to exchange external code", "Database error
+       saving new user", ...). Leggere solo `error` lascia il codice generico
+       `server_error`, che dice che è rotto ma non dice dove. */
+    const description = searchParams.get('error_description');
+    const errorCode   = searchParams.get('error_code');
+    console.error('[auth/callback] provider error:', { error, errorCode, description });
+
+    const params = new URLSearchParams({ auth_error: error });
+    if (description) params.set('auth_error_detail', description);
+    if (errorCode)   params.set('auth_error_code', errorCode);
+    return NextResponse.redirect(`${origin}/map?${params.toString()}`);
   }
 
   if (!code) {
