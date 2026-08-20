@@ -249,3 +249,12 @@ Rimane in piedi: collisione di identità (email già registrata con password che
 - [ ] **Prossimo passo**: Christian riprova e legge il Dettaglio tecnico. Quella stringa è la risposta letterale di Supabase e chiude l'indagine
 - [ ] Se dice "Unable to exchange external code" → rigenerare Client ID/Secret su Google Cloud Console e reincollarli in Supabase
 - [ ] Se parla di identità/utente già esistente → è la collisione con l'account email; si risolve provando con un account Google mai usato sul sito, o abilitando il linking manuale
+
+### Strumentazione: i fallimenti OAuth finiscono nel database
+Christian riprova e vede ancora solo "errore" senza riferire il dettaglio. Tolgo l'utente dalla staffetta.
+- [x] Tabella `auth_failure_log` creata e **applicata in produzione** (RLS attiva, zero policy → solo service role)
+- [x] `/auth/callback` ci scrive: provider, error_code, error_detail (l'`error_description` del provider), stage, user_agent. Scrittura in try/catch e **awaited** (vedi lessons: su serverless le promise non attese non completano)
+- [x] **Verificato end-to-end in produzione**: 6 sonde inviate al callback vero → 6 righe con stage `provider_redirect`, codice e dettaglio corretti, ua `curl/8.7.1`
+- [ ] Christian riprova il login Google UNA volta → leggo la riga in SQL:
+      `SELECT created_at, stage, error_code, error_detail FROM auth_failure_log WHERE error_code NOT LIKE 'sonda%' ORDER BY created_at DESC LIMIT 5;`
+- Nota: le righe `sonda_*` e `test_deploy` sono mie, da ignorare o cancellare
