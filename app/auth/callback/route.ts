@@ -1,9 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { supabaseAdmin } from '@/lib/supabase';
 
 const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+
+/** Registra il fallimento su auth_failure_log. Non deve mai far cadere il flusso. */
+async function logAuthFailure(params: {
+  errorCode: string | null;
+  errorDetail: string | null;
+  stage: 'provider_redirect' | 'code_exchange';
+  userAgent: string | null;
+}) {
+  try {
+    await supabaseAdmin().from('auth_failure_log').insert({
+      provider:     'google',
+      error_code:   params.errorCode,
+      error_detail: params.errorDetail,
+      stage:        params.stage,
+      user_agent:   params.userAgent,
+    });
+  } catch (e) {
+    console.error('[auth/callback] impossibile registrare il fallimento:', e);
+  }
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -18,6 +40,12 @@ export async function GET(request: NextRequest) {
     const description = searchParams.get('error_description');
     const errorCode   = searchParams.get('error_code');
     console.error('[auth/callback] provider error:', { error, errorCode, description });
+    await logAuthFailure({
+      errorCode:   errorCode ?? error,
+      errorDetail: description,
+      stage:       'provider_redirect',
+      userAgent:   request.headers.get('user-agent'),
+    });
 
     const params = new URLSearchParams({ auth_error: error });
     if (description) params.set('auth_error_detail', description);
@@ -51,6 +79,12 @@ export async function GET(request: NextRequest) {
     /* Logghiamo il messaggio esatto: è l'unico modo per sapere se salta lo
        scambio PKCE, il cookie o la rete. Vedi lib/auth-errors.ts. */
     console.error('[auth/callback] exchangeCodeForSession error:', exchangeError?.message, exchangeError);
+    await logAuthFailure({
+      errorCode:   exchangeError?.code ?? 'exchange_failed',
+      errorDetail: exchangeError?.message ?? 'nessun messaggio',
+      stage:       'code_exchange',
+      userAgent:   request.headers.get('user-agent'),
+    });
     return NextResponse.redirect(`${origin}/map?auth_error=oauth_failed`);
   }
 
