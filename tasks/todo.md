@@ -279,3 +279,33 @@ Ipotesi che avevo fatto e che i dati hanno **smentito**:
       3. Supabase → Authentication → Sign In / Providers → Google → incollarlo in Client Secret → Save
       4. Riprovare il login: se la riga in `auth_failure_log` non compare più, è risolto
       NB: il redirect URI in Google è già corretto (Google accetta la richiesta di autorizzazione), quindi non serve toccarlo
+
+## 2026-08-21 — Registrazione: dati del rider in casa, Google fuori
+Obiettivo di Christian: raccogliere informazioni monetizzabili in un database suo, non dentro MailerLite.
+
+### Impianto deciso insieme
+- Registrazione corta: username, email, password, data di nascita, regione, casella newsletter. **Niente Google.**
+- Le due domande che rendono di piu' (disciplina, anno di inizio) stanno DOPO, in una schermata saltabile: a quel punto l'account c'e' gia', quindi non costano iscritti
+- Christian non manda proposte di terzi ne' cede la lista, quindi **nessuna casella "partner" necessaria**. Gli sponsor si pagano col dato aggregato, che non richiede consenso
+- Niente fasce salvate: si salva il dato vero (data esatta, anno di inizio). Le fasce si calcolano solo nel file aggregato
+
+### Fatto
+- [x] `rider_details` tabella separata, non colonne su `profiles`: **`profiles` ha `profiles_public_read USING true`**, quindi qualunque colonna li' dentro sarebbe scaricabile da chiunque con la chiave anon. Date di nascita di minorenni pubbliche = incidente. Qui ognuno vede solo la propria riga
+- [x] Applicata in produzione, poi modificata: `riding_since` (fascia) sostituita da `riding_since_year` (anno vero)
+- [x] `lib/rider-profile.ts` + 20 test: eta', regola dei 16 anni, fasce derivate, normalizzazione discipline e anno
+- [x] `POST /api/rider/details`: la regola sui minorenni e' **server-side**, dove il browser non arriva. MailerLite riceve solo email e gruppo
+- [x] `components/DateWheels.tsx`: data a tre rondelle native, giorni adattati al mese (31 febbraio non selezionabile)
+- [x] AuthModal: Google rimosso (bottone, handler, componente), data di nascita, regione con il tasto posizione che *suggerisce*, newsletter che **sparisce sotto i 16**
+- [x] `components/PersonalizzaMappa.tsx`: disciplina multipla + anno di inizio, saltabile, dopo la registrazione
+- [x] `GET /api/admin/export/riders?tipo=aggregato|completo` + bottoni in /admin. Default aggregato; anagrafica defilata e con conferma. CSV protetto dall'iniezione di formule
+- [x] `admin_export_log` creata: traccia di chi scarica cosa
+- [x] Verificato a video: rondelle, blocco 16 anni (2014 fa sparire la casella, 2000 la fa tornare), schermata personalizza
+
+### Bug miei trovati provando davvero
+- [x] **DateWheels non tratteneva nulla**: derivava tutto da `value`, che resta vuoto finche' la data non e' completa, quindi il giorno scelto si azzerava e la data era **impossibile da compilare**. Essendo obbligatoria, nessuno si sarebbe piu' potuto registrare. tsc, test e build erano tutti verdi. Risolto con stato interno
+- [x] Export aggregato: chiave composta unendo con lo spazio e poi riseparata sullo spazio, quindi "Valle d'Aosta" e "meno di 1 anno" finivano spezzate su piu' colonne. Ora il separatore e' un carattere di controllo che in un nome non puo' esistere
+
+### Aperto
+- [ ] Privacy policy iubenda: dichiarare la raccolta di data di nascita, regione, disciplina e anno di inizio
+- [ ] `setup_brand` esiste nello schema ma non e' ancora chiesto: previsto per un terzo momento, a contributore gia' attivo
+- [ ] 2FA sull'account Supabase (li' dentro c'e' l'anagrafica, minorenni compresi)

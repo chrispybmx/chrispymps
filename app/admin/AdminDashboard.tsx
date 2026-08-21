@@ -615,6 +615,54 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       {/* ── TAB: UTENTI ── */}
       {tab === 'users' && (
         <div style={{ padding: '16px 20px 0' }}>
+
+          {/* Esportazione dati rider.
+              Due file distinti di proposito: l'aggregato non contiene nessuna
+              persona e si può mandare a uno sponsor; l'anagrafica sì, e ogni
+              copia che esce è una responsabilità in più. Il primo è in
+              evidenza, il secondo è defilato. */}
+          <div style={{
+            border: '1px solid var(--gray-700)', borderRadius: 8,
+            padding: '14px', marginBottom: 16, background: 'rgba(255,255,255,0.02)',
+          }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)', marginBottom: 4 }}>
+              📊 Esporta dati rider
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', lineHeight: 1.6, marginBottom: 12 }}>
+              L&apos;aggregato è il file da media kit: conteggi per regione, disciplina e fascia d&apos;età, nessun dato personale.
+            </div>
+            <a
+              href="/api/admin/export/riders?tipo=aggregato"
+              style={{
+                display: 'inline-block', padding: '9px 14px',
+                background: 'var(--orange)', color: '#000', borderRadius: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+                textDecoration: 'none', letterSpacing: '0.04em',
+              }}
+            >
+              ⬇ SCARICA AGGREGATO
+            </a>
+            <div style={{ marginTop: 10 }}>
+              <a
+                href="/api/admin/export/riders?tipo=completo"
+                onClick={e => {
+                  if (!window.confirm(
+                    'Stai per scaricare l\'anagrafica completa: email e date di nascita, minorenni compresi.\n\n' +
+                    'Scaricala solo se ti serve davvero, e cancellala quando hai finito. ' +
+                    'Per gli sponsor basta il file aggregato.\n\nProcedo?'
+                  )) e.preventDefault();
+                }}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  color: 'var(--gray-600)', textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                }}
+              >
+                scarica anagrafica completa
+              </a>
+            </div>
+          </div>
+
           {/* Search + refresh bar */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
             <input

@@ -19,7 +19,7 @@ export async function signUp(
   email: string,
   password: string,
   username: string,
-  opts?: { newsletter?: boolean },
+  opts?: { newsletter?: boolean; birthDate?: string; region?: string },
 ): Promise<'ok' | 'confirm_email'> {
   const sb = supabaseBrowser();
 
@@ -38,17 +38,31 @@ export async function signUp(
     .insert({ id: data.user.id, username });
   if (profileErr) throw new Error(profileErr.message);
 
-  // 4. MailerLite — Spot Submission = email benvenuto + regolamento mappa (legittimo interesse,
-  //    dichiarato nella Privacy Policy). Newsletter = opt-in esplicito via checkbox.
+  /* 4. Dati del rider + newsletter — passano dal server.
+        La regola sui minorenni non può stare qui: dal browser si aggira. Il
+        server salva su rider_details e decide se l'iscrizione parte davvero. */
+  if (data.session?.access_token) {
+    fetch('/api/rider/details', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${data.session.access_token}`,
+      },
+      body: JSON.stringify({
+        birthDate:  opts?.birthDate ?? null,
+        region:     opts?.region ?? null,
+        newsletter: !!opts?.newsletter,
+        username,
+      }),
+    }).catch(() => { /* non blocca la registrazione */ });
+  }
+
+  /* Gruppo "Spot Submission": email di benvenuto e regolamento della mappa.
+     Resta legato all'account, non alla newsletter. */
   fetch('/api/newsletter/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      username,
-      source: 'submit-spot',
-      alsoNewsletter: !!opts?.newsletter,
-    }),
+    body: JSON.stringify({ email, username, source: 'submit-spot' }),
   }).catch(() => {});
 
   // Se l'email è già confermata (email confirmation disabled in Supabase) → ok

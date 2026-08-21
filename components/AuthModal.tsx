@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { signIn, signUp, signInWithGoogle, checkUsername, resetPassword } from '@/lib/auth-client';
+import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
+import DateWheels from '@/components/DateWheels';
+import PersonalizzaMappa from '@/components/PersonalizzaMappa';
+import { REGIONI_ITALIA } from '@/lib/constants';
+import { puoRicevereMarketing, ETA_MINIMA_MARKETING } from '@/lib/rider-profile';
 
 interface AuthModalProps {
   open:          boolean;
@@ -25,6 +29,9 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [usernameOk,   setUsernameOk]  = useState<boolean | null>(null);
   const [checkingUn,   setCheckingUn]  = useState(false);
   const [newsletter, setNewsletter] = useState(false);
+  const [birthDate,  setBirthDate]  = useState('');
+  const [region,     setRegion]     = useState('');
+  const [rilevando,  setRilevando]  = useState(false);
 
   // Accedi
   const [loginEmail,    setLoginEmail]    = useState('');
@@ -61,13 +68,34 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     }, 600);
   };
 
+  /* Regione dalla posizione: un tap invece della tastiera. Usa le bbox già
+     presenti in REGIONI_ITALIA, quindi niente chiamate esterne. */
+  const rilevaRegione = () => {
+    if (!navigator.geolocation) return;
+    setRilevando(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude: la, longitude: lo } = pos.coords;
+        const trovata = REGIONI_ITALIA.find(r => {
+          const [latMin, lonMin, latMax, lonMax] = r.bbox;
+          return la >= latMin && la <= latMax && lo >= lonMin && lo <= lonMax;
+        });
+        if (trovata) setRegion(trovata.label);
+        setRilevando(false);
+      },
+      () => setRilevando(false),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 },
+    );
+  };
+
   const handleSignUp = async () => {
     if (!regUsername || !regEmail || !regPassword) { setError('Compila tutti i campi.'); return; }
     if (regUsername.length < 3) { setError('Username troppo corto (min 3 caratteri).'); return; }
     if (regPassword.length < 6) { setError('Password troppo corta (min 6 caratteri).'); return; }
+    if (!birthDate) { setError('Manca la data di nascita.'); return; }
     setLoading(true); setError(null);
     try {
-      const result = await signUp(regEmail, regPassword, regUsername, { newsletter });
+      const result = await signUp(regEmail, regPassword, regUsername, { newsletter, birthDate, region });
       setDone(result);
       if (result === 'ok' && onSuccess) onSuccess();
     } catch (e) {
@@ -87,16 +115,6 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     } finally { setLoading(false); }
   };
 
-  // Redirect flow: parte verso Google, al ritorno /auth/callback gestisce sessione e profilo
-  const handleGoogle = async () => {
-    setLoading(true); setError(null);
-    try {
-      await signInWithGoogle();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore accesso Google');
-      setLoading(false);
-    }
-  };
 
   if (!open) return null;
 
@@ -156,17 +174,10 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
         )}
 
         {/* Done: ok (email confirmation disabled) */}
+        {/* Registrato: due domande facoltative, poi via.
+            Qui l'account c'è già, quindi chiedere non costa più iscrizioni. */}
         {done === 'ok' && (
-          <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-            <div style={{ fontSize: 52, marginBottom: 16 }}>🏴</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 10 }}>
-              BENVENUTO @{regUsername}!
-            </div>
-            <p style={{ color: 'var(--bone)', lineHeight: 1.6 }}>Sei dentro. Ora puoi aggiungere i tuoi spot BMX.</p>
-            <button onClick={handleClose} className="btn-primary" style={{ marginTop: 24, width: '100%', justifyContent: 'center' }}>
-              Vai alla mappa
-            </button>
-          </div>
+          <PersonalizzaMappa username={regUsername} onFinito={handleClose} />
         )}
 
         {!done && (
@@ -231,7 +242,6 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                 <button onClick={handleSignIn} disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: loading ? 0.6 : 1 }}>
                   {loading ? '⏳ Accesso...' : '🔑 ENTRA'}
                 </button>
-                <GoogleButton onClick={handleGoogle} disabled={loading} />
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
                   Non hai un account?{' '}
                   <button onClick={() => { setTab('registrati'); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
@@ -273,19 +283,66 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                   <label style={lbl}>Password * (min 6 caratteri)</label>
                   <input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
                 </div>
-                {/* Newsletter opt-in */}
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
-                  <input type="checkbox" checked={newsletter} onChange={e => setNewsletter(e.target.checked)}
-                    style={{ marginTop: 2, accentColor: 'var(--orange)', width: 16, height: 16, flexShrink: 0 }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', lineHeight: 1.5 }}>
-                    Voglio ricevere la newsletter BMX di Chrispy Maps
-                  </span>
-                </label>
+                {/* Data di nascita — rondelle, niente tastiera */}
+                <div>
+                  <label style={lbl}>Data di nascita *</label>
+                  <DateWheels value={birthDate} onChange={setBirthDate} annoMin={1950} />
+                </div>
+
+                {/* Regione — un tap, o la si rileva */}
+                <div>
+                  <label style={lbl}>Dove giri di solito</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <select
+                      value={region}
+                      onChange={e => setRegion(e.target.value)}
+                      style={{ ...inp, flex: 1, appearance: 'none', WebkitAppearance: 'none' } as React.CSSProperties}
+                      aria-label="Regione"
+                    >
+                      <option value="">Scegli la regione</option>
+                      {REGIONI_ITALIA.map(r => (
+                        <option key={r.label} value={r.label}>{r.emoji} {r.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={rilevaRegione}
+                      disabled={rilevando}
+                      title="Suggerisci dalla posizione attuale"
+                      style={{
+                        flexShrink: 0, padding: '0 14px',
+                        background: 'transparent', border: '1px solid var(--gray-600)',
+                        borderRadius: 6, color: 'var(--bone)', cursor: rilevando ? 'default' : 'pointer',
+                        fontSize: 16,
+                      }}
+                    >
+                      {rilevando ? '…' : '📍'}
+                    </button>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 4, lineHeight: 1.5 }}>
+                    La regione dove giri di solito, non dove ti trovi adesso. Il 📍 la suggerisce, puoi cambiarla.
+                  </div>
+                </div>
+
+                {/* Newsletter — sotto i 16 non compare: non si promette ciò che non parte */}
+                {(!birthDate || puoRicevereMarketing(birthDate)) && (
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
+                    <input type="checkbox" checked={newsletter} onChange={e => setNewsletter(e.target.checked)}
+                      style={{ marginTop: 2, accentColor: 'var(--orange)', width: 16, height: 16, flexShrink: 0 }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', lineHeight: 1.5 }}>
+                      Voglio ricevere la newsletter BMX di Chrispy Maps
+                    </span>
+                  </label>
+                )}
+                {birthDate && !puoRicevereMarketing(birthDate) && (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', lineHeight: 1.6 }}>
+                    Sotto i {ETA_MINIMA_MARKETING} anni non inviamo newsletter. L'account funziona uguale.
+                  </div>
+                )}
                 {error && <Err msg={error} />}
                 <button onClick={handleSignUp} disabled={loading || usernameOk === false} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: (loading || usernameOk === false) ? 0.6 : 1 }}>
                   {loading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT'}
                 </button>
-                <GoogleButton onClick={handleGoogle} disabled={loading} />
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6 }}>
                   Cliccando su "Crea Account" accetti la nostra{' '}
                   <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>
@@ -314,35 +371,4 @@ function Err({ msg }: { msg: string }) {
   );
 }
 
-/** Divider "oppure" + bottone Google (redirect OAuth via Supabase) */
-function GoogleButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
-  return (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>oppure</span>
-        <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
-      </div>
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: 6,
-          padding: '12px 16px', cursor: disabled ? 'default' : 'pointer',
-          fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600,
-          opacity: disabled ? 0.6 : 1,
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/>
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.78.43 3.45 1.18 4.94l3.66-2.84z"/>
-          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.16-3.16C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-        </svg>
-        Continua con Google
-      </button>
-    </>
-  );
-}
 
