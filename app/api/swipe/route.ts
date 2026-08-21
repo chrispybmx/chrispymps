@@ -17,7 +17,6 @@ import { distanceKm } from '@/lib/nearby-radar';
 
 export const dynamic = 'force-dynamic';
 
-const CARTE_PER_MAZZO = 20;
 
 async function utenteDaToken(req: NextRequest) {
   const auth = req.headers.get('authorization');
@@ -95,11 +94,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    data: carte.slice(0, CARTE_PER_MAZZO),
-    rimanenti: Math.max(0, carte.length - CARTE_PER_MAZZO),
-  });
+  /* Tutte, non le prime venti: con 116 spot il mazzo sta in memoria senza
+     problemi, e chi sfoglia non deve trovarsi una fine finta a metà. */
+  return NextResponse.json({ ok: true, data: carte });
 }
 
 /* ────────────────────────────── VOTO ────────────────────────────── */

@@ -334,3 +334,16 @@ Le tabelle esistevano gia' tutte, ed erano vuote: voti 9, fuochi 5, "ci sono gir
 ### Aperto
 - [ ] Commento rapido dentro la carta: riusare il sistema commenti esistente, non costruirne un secondo
 - [ ] Il mazzo finisce: 116 spot. Come manutenzione continua servirebbe far ricomparire gli spot vecchi da riconfermare, che e' l'idea che avevo proposto all'inizio
+
+### Sfoglia, secondo giro (feedback di Christian)
+- [x] **Foto multiple**: tocco sulla meta' destra avanti, sinistra indietro. Puntini in alto, altrimenti nessuno scopre che ci sono altre foto. 59 spot su 116 ne hanno piu' di una
+- [x] **Nome cliccabile**: porta a `/map/spot/<slug>`, con la freccia. `stopPropagation` sul pointerdown, altrimenti il tocco sul nome inizia un trascinamento
+- [x] **Fluidita'**: il trascinamento aggiornava lo stato React a ogni pixel, quindi ridisegnava il componente decine di volte al secondo. Ora la carta si muove scrivendo direttamente su `style.transform` del nodo, e lo stato rientra solo al rilascio. Anche i timbri MI PIACE/PASSO sono sempre montati e cambiano solo opacita'
+- [x] **Niente limite di 20**: il mazzo arriva tutto (113 carte alla prova). Alla fine il messaggio manda a esplorare: "vai a esplorare la citta' e trovane di nuovi"
+- [x] Verificato: puntini 3, tocco destra 1->2, tocco sinistra 2->1
+
+### Nota di metodo
+Due "bug" cercati a lungo erano difetti del mio test, non del codice: un riferimento DOM vecchio (colpivo la carta dietro, che non ha gestori) e letture sincrone del DOM subito dopo il dispatch, quando React ridisegna al tick successivo. Con le interfacce serve rileggere il nodo fresco e aspettare il render prima di dichiarare che qualcosa non funziona.
+
+### Aperto
+- [ ] Messaggistica di gruppo e privata: **sconsigliata**. Motivo principale: ci sono minorenni (per questo esiste il blocco dei 16 anni), e i messaggi privati fra sconosciuti su una piattaforma gestita da una persona sola sono una responsabilita' di sorveglianza seria. Inoltre 47 iscritti sparsi in Italia non fanno una chat viva, e la community e' gia' su WhatsApp. Alternativa a costo bassissimo: **notifiche sui commenti**, cosi' chi commenta uno spot viene letto
