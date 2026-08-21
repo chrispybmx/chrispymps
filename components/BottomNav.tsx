@@ -23,7 +23,7 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
   };
 
   const isMap       = !!pathname?.startsWith('/map');
-  const isClassifica= !!pathname?.startsWith('/classifica');
+  const isSfoglia   = !!pathname?.startsWith('/sfoglia');
   const isScopri    = !!pathname?.startsWith('/scopri');
   const isProfile   = !!pathname?.startsWith('/u/');
 
@@ -108,15 +108,14 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
           MAPPA
         </Link>
 
-        {/* CLASSIFICA */}
-        <Link href="/classifica" className={`mbn-link${isClassifica ? ' active' : ''}`} aria-label="Classifica">
+        {/* SFOGLIA — scorri gli spot e salva quelli che ti piacciono */}
+        <Link href="/sfoglia" className={`mbn-link${isSfoglia ? ' active' : ''}`} aria-label="Sfoglia gli spot">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2"  y="14" width="4" height="8" rx="1"/>
-            <rect x="10" y="9"  width="4" height="13" rx="1"/>
-            <rect x="18" y="4"  width="4" height="18" rx="1"/>
-            <path d="M20 4l-3-3m0 0l-3 3m3-3v8"/>
+            <rect x="6" y="3" width="12" height="16" rx="2"/>
+            <path d="M3 7v10a2 2 0 0 0 1.2 1.8M21 7v10a2 2 0 0 1-1.2 1.8"/>
+            <path d="M12 21v-1"/>
           </svg>
-          CLASSIFICA
+          SFOGLIA
         </Link>
 
         {/* + SPOT — CTA centrale */}

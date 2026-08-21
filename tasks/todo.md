@@ -309,3 +309,28 @@ Obiettivo di Christian: raccogliere informazioni monetizzabili in un database su
 - [ ] Privacy policy iubenda: dichiarare la raccolta di data di nascita, regione, disciplina e anno di inizio
 - [ ] `setup_brand` esiste nello schema ma non e' ancora chiesto: previsto per un terzo momento, a contributore gia' attivo
 - [ ] 2FA sull'account Supabase (li' dentro c'e' l'anagrafica, minorenni compresi)
+
+## 2026-08-21 — Sfoglia: gli spot a carte, tipo Tinder
+Richiesta di Christian: Classifica nel menu sotto News, e al suo posto nella barra uno swipe di spot con voto, salvataggio e commento.
+
+### Decisione di prodotto
+Avevo proposto che lo swipe a destra significasse "ci sono stato" (avrebbe alimentato le conferme di stato, ferme a 0 su 116 spot). **Christian ha scelto "mi piace" + cartella personale**, e si procede cosi'.
+
+### Perche' regge lo stesso
+Le tabelle esistevano gia' tutte, ed erano vuote: voti 9, fuochi 5, "ci sono girato" 2, preferiti 2, commenti 2, conferme 0. Non mancava il modello dati, mancava un posto dove usarlo: sei azioni sparse dentro la scheda del singolo spot, ognuna con un tap deliberato.
+
+### Fatto
+- [x] `spot_swipes` (uno swipe per utente per spot, like|pass) creata e applicata in produzione, con RLS per proprietario
+- [x] `GET /api/swipe` — mazzo di 20 carte: esclude i gia' visti, esclude quelli senza foto (qui si vota guardando), ordina per vicinanza se c'e' la posizione, altrimenti mescola
+- [x] `POST /api/swipe` — un like scrive in tre posti: `spot_swipes`, `spot_likes` (contatore pubblico) e `spot_favorites` (la cartella). Insert semplice con tolleranza al doppione 23505, cosi' non dipende dal nome del vincolo
+- [x] I `pass` vengono registrati: non riproporre la carta, e dare a Christian la lista degli spot piu' scartati, che e' la lista degli spot con la foto sbagliata
+- [x] `/sfoglia` — pila di carte, trascinamento con rotazione e timbro MI PIACE / PASSO, bottoni tondi (lo swipe non si scopre da solo), frecce da tastiera, `noindex` perche' il mazzo e' personale
+- [x] BottomNav: Classifica sostituita da SFOGLIA. SideMenu: Classifica aggiunta sotto News
+- [x] **Verificato end-to-end con utente vero**: un click su "Mi piace" ha scritto 3 righe — swipe 0 a 1, fuochi 5 a 6, preferiti 2 a 3
+
+### Bug mio, trovato perche' ho guardato il database invece del contatore
+- [x] La carta spariva e il contatore saliva **anche quando il salvataggio falliva**: il `fetch` aveva un `.catch()` vuoto. Per l'utente sembrava salvato, il voto era perso. Con connessione debole (cioe' chi sfoglia per strada) sarebbe successo di continuo. Ora la carta **torna nel mazzo** e compare un avviso. Stesso difetto del login Google di ieri: fallire in silenzio
+
+### Aperto
+- [ ] Commento rapido dentro la carta: riusare il sistema commenti esistente, non costruirne un secondo
+- [ ] Il mazzo finisce: 116 spot. Come manutenzione continua servirebbe far ricomparire gli spot vecchi da riconfermare, che e' l'idea che avevo proposto all'inizio

@@ -15,6 +15,7 @@ const MENU_ITEMS = [
   { href: '/map',      label: 'Mappa',    emoji: '🗺️' },
   { href: '/events',   label: 'Eventi',   emoji: '📅' },
   { href: '/news',       label: 'News',       emoji: '📰' },
+  { href: '/classifica', label: 'Classifica', emoji: '🏆' },
   { href: '/cerca-spot', label: 'Cerca Spot', emoji: '📍' },
   { href: '/sessioni',  label: 'Sessioni',   emoji: '🔴', liveOnly: true },
   { divider: true },
