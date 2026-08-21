@@ -347,3 +347,25 @@ Due "bug" cercati a lungo erano difetti del mio test, non del codice: un riferim
 
 ### Aperto
 - [ ] Messaggistica di gruppo e privata: **sconsigliata**. Motivo principale: ci sono minorenni (per questo esiste il blocco dei 16 anni), e i messaggi privati fra sconosciuti su una piattaforma gestita da una persona sola sono una responsabilita' di sorveglianza seria. Inoltre 47 iscritti sparsi in Italia non fanno una chat viva, e la community e' gia' su WhatsApp. Alternativa a costo bassissimo: **notifiche sui commenti**, cosi' chi commenta uno spot viene letto
+
+## 2026-08-21 — Commenti nella carta + notifica spot vicino
+
+### Correzione a quanto avevo detto
+Avevo scritto che mancavano le notifiche sui commenti. **Falso**: esistono e funzionano gia' in `app/api/comments/[slug]/route.ts` — notifica al proprietario dello spot per un commento nuovo, e all'autore del commento in caso di risposta. Anche `NotificationBell` e' montato in TopBar. Verificare prima di proporre di costruire.
+
+### Fatto
+- [x] `CommentiCarta.tsx`: pannello commenti dentro la carta dello Sfoglia, terzo bottone 💬 fra ✕ e ❤️. Usa lo **stesso** `/api/comments/[slug]` della scheda spot: un secondo sistema avrebbe significato una seconda moderazione
+- [x] Gesti fermati dentro il pannello (`stopPropagation` su pointerdown/move/up): senza, scrivere faceva partire un trascinamento e il commento volava via
+- [x] Frecce da tastiera disattivate a pannello aperto: servono a muoversi nel testo, non a votare
+- [x] Il pannello si chiude quando la carta cambia
+- [x] **Notifica `spot_nearby`**: all'approvazione di uno spot, chi ha dichiarato quella regione in registrazione riceve "Nuovo spot in <regione>". Isolata in try/catch: se fallisce, l'approvazione resta valida. Si appoggia a `rider_details.region`, che raccogliamo da ieri
+- [x] Verificato a video: pannello si apre, resta stabile, lista e campo funzionano
+
+### Non verificabile in locale
+- [ ] L'invio del commento richiede un JWT vero: con il token finto l'API risponde 401 "Token non valido" (corretto). Il percorso d'errore in UI non e' stato visto dal vivo. **Da provare col telefono**: aprire 💬 su una carta, scrivere, inviare
+- [ ] La notifica `spot_nearby` parte solo all'approvazione di uno spot nuovo: si vede alla prossima approvazione, e solo verso utenti con la regione compilata (oggi 0, la registrazione nuova e' di poche ore fa)
+
+### Forum: sconsigliato adesso
+Un forum vuoto e' peggio di nessun forum: e' visibile, e dichiara che non c'e' nessuno. Con 47 iscritti e **2 commenti in tutta la vita dell'app**, la conversazione non esiste ancora. Pregio vero del forum: contenuto duraturo e indicizzabile su Google — quindi non e' un no per sempre.
+**Soglia proposta**: 300-500 iscritti attivi e 10+ commenti a settimana spontanei.
+**Alternativa quasi gratuita**: `components/ActivityFeed.tsx` esiste, l'API `/api/activity-feed` risponde, e **non e' montato da nessuna parte**. Mostrarlo da' la sensazione di community viva usando quello che la gente gia' fa.

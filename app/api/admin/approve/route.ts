@@ -88,6 +88,40 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
     catch (e) { console.error('[approve] XP:', e); }
   }
 
+  /* ── Avvisa chi gira in quella regione ──
+     Chi ha indicato la propria regione in fase di registrazione riceve una
+     notifica quando lì compare uno spot nuovo. È il motivo più concreto per
+     riaprire l'app: non "è successo qualcosa", ma "è successo qualcosa dove
+     giri tu".
+     Isolato come il resto: se fallisce, l'approvazione resta valida. */
+  if (spot.region) {
+    try {
+      const { data: vicini } = await supabase
+        .from('rider_details')
+        .select('user_id')
+        .eq('region', spot.region);
+
+      const destinatari = (vicini ?? [])
+        .map(v => v.user_id as string)
+        .filter(id => id !== spot.submitted_by_user_id);
+
+      if (destinatari.length) {
+        const { error } = await supabase.from('notifications').insert(
+          destinatari.map(user_id => ({
+            user_id,
+            type:      'spot_nearby',
+            title:     `Nuovo spot in ${spot.region}`,
+            body:      `"${spot.name}"${spot.city ? ` a ${spot.city}` : ''} — vai a vedere com'è messo.`,
+            spot_slug: spot.slug,
+          })),
+        );
+        if (error) console.error('[approve] notifiche regione:', error.message);
+      }
+    } catch (e) {
+      console.error('[approve] notifiche regione:', e);
+    }
+  }
+
   // Invalida le pagine cachate: senza questo un nuovo spot approvato non appare
   // su mappa/home per un massimo di 5 minuti (ISR revalidate=300) e sembra che
   // l'approvazione non abbia funzionato.

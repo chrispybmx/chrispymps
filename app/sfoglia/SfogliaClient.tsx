@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { TIPI_SPOT } from '@/lib/constants';
+import CommentiCarta from './CommentiCarta';
 import type { SpotType } from '@/lib/types';
 
 interface Carta {
@@ -33,6 +34,7 @@ export default function SfogliaClient() {
   const [token,    setToken]    = useState<string | null>(null);
   const [erroreSalvataggio, setErroreSalvataggio] = useState(false);
   const [indiceFoto, setIndiceFoto] = useState(0);
+  const [commentiAperti, setCommentiAperti] = useState(false);
 
   /* Il trascinamento NON passa da React.
      Aggiornare lo stato a ogni pixel fa ridisegnare il componente decine di
@@ -125,6 +127,7 @@ export default function SfogliaClient() {
       spostamento.current = { x: 0, y: 0 };
       inUscita.current = false;
       setIndiceFoto(0);
+      setCommentiAperti(false);
       if (cartaRef.current) { cartaRef.current.style.transition = 'none'; cartaRef.current.style.transform = ''; }
       if (timbroSi.current) timbroSi.current.style.opacity = '0';
       if (timbroNo.current) timbroNo.current.style.opacity = '0';
@@ -138,7 +141,7 @@ export default function SfogliaClient() {
 
   /* ── Gesto ── */
   const giu = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (inUscita.current) return;
+    if (inUscita.current || commentiAperti) return;
     partenza.current = { x: e.clientX, y: e.clientY };
     spostamento.current = { x: 0, y: 0 };
   };
@@ -177,13 +180,14 @@ export default function SfogliaClient() {
   /* Frecce da tastiera: stessa cosa, senza dito. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (stato !== 'pronto') return;
+      if (stato !== 'pronto' || commentiAperti) return;
+      /* Con il pannello aperto le frecce servono a muoversi nel testo. */
       if (e.key === 'ArrowRight') vota('like');
       if (e.key === 'ArrowLeft')  vota('pass');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [stato, vota]);
+  }, [stato, vota, commentiAperti]);
 
   /* ── Stati senza carte ── */
   if (stato === 'carico') return <Messaggio titolo="Preparo il mazzo…" />;
@@ -248,18 +252,28 @@ export default function SfogliaClient() {
           onPointerMove={muovi}
           onPointerUp={su}
           onPointerCancel={su}
+          pannelloCommenti={commentiAperti
+            ? <CommentiCarta slug={carta.slug} token={token} onChiudi={() => setCommentiAperti(false)} />
+            : null}
         />
       </div>
 
       <div style={{ display: 'flex', gap: 18, justifyContent: 'center', marginTop: 18 }}>
         <button onClick={() => vota('pass')} aria-label="Passo" style={tondo('#3a3a3a')}>✕</button>
+        <button
+          onClick={() => setCommentiAperti(v => !v)}
+          aria-label="Commenti"
+          style={{ ...tondo('#3a3a3a'), width: 50, height: 50, fontSize: 19 }}
+        >
+          💬
+        </button>
         <button onClick={() => vota('like')} aria-label="Mi piace" style={tondo('var(--orange)')}>❤️</button>
       </div>
       <div style={{
         textAlign: 'center', marginTop: 10, marginBottom: 16,
         fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)', lineHeight: 1.6,
       }}>
-        trascina per votare · tocca la foto per vederle tutte · tocca il nome per aprire lo spot
+        trascina per votare · tocca la foto per vederle tutte · 💬 per i commenti
       </div>
     </div>
   );
@@ -267,11 +281,12 @@ export default function SfogliaClient() {
 
 /* ── Carta ── */
 function CartaVista({
-  dati, dietro, indiceFoto = 0, riferimento, timbroSi, timbroNo, ...handlers
+  dati, dietro, indiceFoto = 0, riferimento, timbroSi, timbroNo, pannelloCommenti, ...handlers
 }: {
   dati: Carta;
   dietro?: boolean;
   indiceFoto?: number;
+  pannelloCommenti?: React.ReactNode;
   riferimento?: React.RefObject<HTMLDivElement>;
   timbroSi?: React.RefObject<HTMLDivElement>;
   timbroNo?: React.RefObject<HTMLDivElement>;
@@ -327,6 +342,8 @@ function CartaVista({
           <div ref={timbroNo} style={timbro('pass')}>PASSO</div>
         </>
       )}
+
+      {pannelloCommenti}
 
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
