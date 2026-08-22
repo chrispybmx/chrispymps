@@ -9,7 +9,7 @@ import AdminImportKML from '@/components/AdminImportKML';
 import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 
-type Tab = 'pending' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users';
+type Tab = 'pending' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users' | 'numeri';
 
 interface AdminComment {
   id: string;
@@ -112,6 +112,8 @@ const labelStyle: React.CSSProperties = {
 export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   const router = useRouter();
   const [tab, setTab]     = useState<Tab>('pending');
+  /* Numeri: si caricano solo quando apri la scheda. */
+  const [numeri, setNumeri] = useState<Record<string, any> | null>(null);
   const [pending,   setPending] = useState<Spot[]>(initialSpots);
   const [allSpots,  setAllSpots] = useState<Spot[]>([]);
   const [loadingAll, setLoadingAll] = useState(false);
@@ -160,6 +162,14 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   }, [tab]);
 
   /* ── Load events ── */
+  useEffect(() => {
+    if (tab !== 'numeri' || numeri) return;
+    fetch('/api/admin/numeri')
+      .then(r => r.json())
+      .then(j => { if (j.ok) setNumeri(j.data); })
+      .catch(() => {});
+  }, [tab, numeri]);
+
   useEffect(() => {
     if (tab !== 'events') return;
     if (events.length > 0) return;
@@ -398,6 +408,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
     { key: 'all',      label: '🗺️ Spot' },
     { key: 'comments', label: '💬 Commenti' },
     { key: 'users',    label: '👤 Utenti' },
+    { key: 'numeri',   label: '📊 Numeri' },
     { key: 'events',   label: '📅 Eventi' },
     { key: 'news',     label: '📰 News' },
     { key: 'import',   label: '📂 Importa' },
@@ -609,6 +620,70 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── TAB: NUMERI ── */}
+      {tab === 'numeri' && (
+        <div style={{ padding: '16px 20px 40px', display: 'grid', gap: 18 }}>
+          {!numeri && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)' }}>carico…</div>}
+
+          {numeri && <>
+            <Riquadro titolo="Freschezza degli spot" nota="Verde = confermato di recente. Cresce da solo verso l'arancione se nessuno conferma.">
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                {Object.entries(numeri.spot.freschezza as Record<string, number>).map(([tono, n]) => (
+                  <Numero key={tono} etichetta={tono} valore={n as number} />
+                ))}
+                <Numero etichetta="totale" valore={numeri.spot.totale} />
+              </div>
+              {numeri.spot.piuVecchi?.length > 0 && (
+                <div style={{ marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.8 }}>
+                  Più vecchi: {numeri.spot.piuVecchi.map((s: any) => `${s.name} (${s.giorni}g)`).join(' · ')}
+                </div>
+              )}
+            </Riquadro>
+
+            <Riquadro titolo="Sfoglia" nota="Gli spot più scartati sono quelli con la foto sbagliata.">
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <Numero etichetta="mi piace" valore={numeri.swipe.like} />
+                <Numero etichetta="passo" valore={numeri.swipe.pass} />
+                <Numero etichetta="ultimi 7 giorni" valore={numeri.swipe.ultimaSettimana} />
+              </div>
+              {numeri.swipe.piuScartati?.length > 0 && (
+                <div style={{ marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.8 }}>
+                  {numeri.swipe.piuScartati.map((s: any) => (
+                    <div key={s.slug}>{s.name} — scartato dal {s.percentualeScarto}% ({s.pass}✕ / {s.like}❤️)</div>
+                  ))}
+                </div>
+              )}
+            </Riquadro>
+
+            <Riquadro titolo="Registrazione (ultimi 30 giorni)" nota="Dove si fermano e quanto ci mettono. Nessun dato personale.">
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <Numero etichetta="tentativi" valore={numeri.registrazione.tentativi} />
+                <Numero etichetta="completati" valore={numeri.registrazione.riusciti} />
+                <Numero etichetta="tempo mediano" valore={numeri.registrazione.tempoMedianoSecondi ?? '—'} suffisso="s" />
+              </div>
+              {numeri.registrazione.abbandoniPerCampo?.length > 0 && (
+                <div style={{ marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.8 }}>
+                  Abbandoni: {numeri.registrazione.abbandoniPerCampo.map(([campo, n]: [string, number]) => `${campo} (${n})`).join(' · ')}
+                </div>
+              )}
+              {numeri.registrazione.erroriPiuFrequenti?.length > 0 && (
+                <div style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff8080', lineHeight: 1.8 }}>
+                  Errori: {numeri.registrazione.erroriPiuFrequenti.map(([m, n]: [string, number]) => `${m} (${n})`).join(' · ')}
+                </div>
+              )}
+            </Riquadro>
+
+            <Riquadro titolo="Rider per regione" nota="È il numero che si mette in un media kit.">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-300)', lineHeight: 1.9 }}>
+                {numeri.rider.conDettagli === 0
+                  ? 'Ancora nessuno ha compilato il profilo: la registrazione nuova è di oggi.'
+                  : numeri.rider.perRegione.map(([r, n]: [string, number]) => `${r}: ${n}`).join(' · ')}
+              </div>
+            </Riquadro>
+          </>}
         </div>
       )}
 
@@ -1466,6 +1541,30 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
           ❌ {err}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Riquadri della scheda Numeri ── */
+function Riquadro({ titolo, nota, children }: { titolo: string; nota?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ border: '1px solid var(--gray-700)', borderRadius: 8, padding: '14px', background: 'rgba(255,255,255,0.02)' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', marginBottom: 2 }}>{titolo}</div>
+      {nota && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginBottom: 12, lineHeight: 1.5 }}>{nota}</div>}
+      {children}
+    </div>
+  );
+}
+
+function Numero({ etichetta, valore, suffisso }: { etichetta: string; valore: number | string; suffisso?: string }) {
+  return (
+    <div style={{ minWidth: 74 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--bone)', fontVariantNumeric: 'tabular-nums' }}>
+        {valore}{suffisso ?? ''}
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {etichetta}
+      </div>
     </div>
   );
 }

@@ -369,3 +369,25 @@ Avevo scritto che mancavano le notifiche sui commenti. **Falso**: esistono e fun
 Un forum vuoto e' peggio di nessun forum: e' visibile, e dichiara che non c'e' nessuno. Con 47 iscritti e **2 commenti in tutta la vita dell'app**, la conversazione non esiste ancora. Pregio vero del forum: contenuto duraturo e indicizzabile su Google — quindi non e' un no per sempre.
 **Soglia proposta**: 300-500 iscritti attivi e 10+ commenti a settimana spontanei.
 **Alternativa quasi gratuita**: `components/ActivityFeed.tsx` esiste, l'API `/api/activity-feed` risponde, e **non e' montato da nessuna parte**. Mostrarlo da' la sensazione di community viva usando quello che la gente gia' fa.
+
+## 2026-08-21 — Analisi d'uso: telemetria dell'imbuto + pagina Numeri
+
+### Il principio adottato
+Due volumi, due posti diversi:
+- **Alto volume** (ogni click, ogni scroll) → analitica esterna **senza cookie**, mai nel database. Scrivere ogni click su Supabase e' la via piu' rapida per far esplodere la quota (piano Free, banner "Grace period is over" gia' acceso)
+- **Basso volume e alto valore** (imbuto registrazione) → tabella nostra. Sono pochi eventi per tentativo, con ~7 iscritti al mese e' irrilevante come volume
+
+Vincolo che ha deciso la scelta sull'analitica: il banner dice *"solo cookie tecnici necessari"*. Un'analitica con cookie renderebbe falsa quella frase e imporrebbe un banner di consenso vero (blocco script, registro consensi) — piu' lavoro E meta' dei dati, perche' meta' rifiuta. Cookieless: nessun consenso, nessuna modifica al banner, 100% del traffico.
+
+### Fatto
+- [x] `funnel_events` creata in produzione. **Nessun user_id, nessun IP, nessun contenuto digitato**: solo passo, campo, millisecondi. `attempt_id` generato dal browser, cambia a ogni apertura del modulo
+- [x] RLS attiva, `REVOKE` da anon e authenticated: si scrive solo via API con service role. Senza la rotta servirebbe una policy che lascia scrivere chiunque
+- [x] `POST /api/funnel`: valida il passo contro una lista chiusa, limita le lunghezze, e **risponde ok anche se l'insert fallisce** — la telemetria non deve mai essere il motivo per cui qualcosa si rompe
+- [x] `lib/funnel.ts`: usa `sendBeacon`, che sopravvive alla chiusura della pagina. Senza, l'evento "abbandonato" — proprio quello che interessa — andrebbe perso
+- [x] Agganciata alla registrazione: apertura, campo raggiunto, invio, riuscita, errore col motivo, abbandono
+- [x] `GET /api/admin/numeri` + scheda **📊 Numeri** in /admin: freschezza, swipe (con **gli spot piu' scartati** = le foto da rifare), imbuto registrazione (tentativi, completati, tempo mediano, dove si fermano, errori piu' frequenti), rider per regione
+- [x] Verificato end-to-end: tre eventi inviati all'API vera, percorso ricostruito nel database (`aperto/-/0 | campo/data di nascita/8200 | abbandonato/...`), passo inventato respinto con 400. Righe di prova cancellate
+
+### Non fatto, di proposito
+- [ ] Analitica esterna cookieless (Umami o Plausible): serve un account che deve creare Christian. Consigliata **dopo**, quando "quante visite ho" sara' una domanda con una risposta interessante — oggi con 47 iscritti si conta a mano
+- [ ] Privacy policy: aggiungere una riga sulla telemetria anonima di percorso. Non contiene dati personali, ma dichiararla e' corretto

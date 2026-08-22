@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
 import DateWheels from '@/components/DateWheels';
+import { TracciaFunnel } from '@/lib/funnel';
 import PersonalizzaMappa from '@/components/PersonalizzaMappa';
 import { REGIONI_ITALIA } from '@/lib/constants';
 import { puoRicevereMarketing, ETA_MINIMA_MARKETING } from '@/lib/rider-profile';
@@ -32,6 +33,10 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [birthDate,  setBirthDate]  = useState('');
   const [region,     setRegion]     = useState('');
   const [rilevando,  setRilevando]  = useState(false);
+
+  /* Traccia del percorso di registrazione: quanto ci mette, dove si ferma.
+     Anonima — vedi lib/funnel.ts. */
+  const traccia = useRef<TracciaFunnel | null>(null);
 
   // Accedi
   const [loginEmail,    setLoginEmail]    = useState('');
@@ -88,18 +93,31 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     );
   };
 
+  /* Apre una traccia quando si entra in registrazione, la chiude quando si
+     esce senza aver finito. */
+  useEffect(() => {
+    if (!open || tab !== 'registrati') return;
+    traccia.current = new TracciaFunnel('signup');
+    traccia.current.aperto();
+    return () => { traccia.current?.abbandonato(); traccia.current = null; };
+  }, [open, tab]);
+
   const handleSignUp = async () => {
-    if (!regUsername || !regEmail || !regPassword) { setError('Compila tutti i campi.'); return; }
-    if (regUsername.length < 3) { setError('Username troppo corto (min 3 caratteri).'); return; }
-    if (regPassword.length < 6) { setError('Password troppo corta (min 6 caratteri).'); return; }
-    if (!birthDate) { setError('Manca la data di nascita.'); return; }
+    if (!regUsername || !regEmail || !regPassword) { setError('Compila tutti i campi.'); traccia.current?.errore('campi vuoti'); return; }
+    if (regUsername.length < 3) { setError('Username troppo corto (min 3 caratteri).'); traccia.current?.errore('username corto'); return; }
+    if (regPassword.length < 6) { setError('Password troppo corta (min 6 caratteri).'); traccia.current?.errore('password corta'); return; }
+    if (!birthDate) { setError('Manca la data di nascita.'); traccia.current?.errore('data mancante'); return; }
     setLoading(true); setError(null);
+    traccia.current?.inviato();
     try {
       const result = await signUp(regEmail, regPassword, regUsername, { newsletter, birthDate, region });
+      traccia.current?.riuscito();
       setDone(result);
       if (result === 'ok' && onSuccess) onSuccess();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore sconosciuto');
+      const msg = e instanceof Error ? e.message : 'Errore sconosciuto';
+      traccia.current?.errore(msg);
+      setError(msg);
     } finally { setLoading(false); }
   };
 
