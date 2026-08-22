@@ -391,3 +391,19 @@ Vincolo che ha deciso la scelta sull'analitica: il banner dice *"solo cookie tec
 ### Non fatto, di proposito
 - [ ] Analitica esterna cookieless (Umami o Plausible): serve un account che deve creare Christian. Consigliata **dopo**, quando "quante visite ho" sara' una domanda con una risposta interessante — oggi con 47 iscritti si conta a mano
 - [ ] Privacy policy: aggiungere una riga sulla telemetria anonima di percorso. Non contiene dati personali, ma dichiararla e' corretto
+
+## 2026-08-21 — Freschezza: orizzonte a 2 anni (correzione di Christian)
+Christian: "toglierei quella roba, cioe' per 2 anni".
+
+Aveva ragione, ed e' una correzione migliore della soluzione che avevo proposto io.
+Avevo tarato il decadimento come se uno spot fosse informazione deperibile: 14 giorni verde, 60 ok, 180 giallo, 365 arancione. Ma un ledge, un rail o una scalinata restano dove sono per anni; quello che cambia davvero — recinzione, demolizione, guardiano — succede su scala di anni.
+Con quelle soglie il pallino diventava arancione **per il solo passare del tempo**, e poi proponevo un meccanismo di conferme per rimediare a un problema che avevo creato io con una soglia sbagliata.
+
+Nuove soglie: <=30g verde · <=1 anno ok · <=2 anni giallo · oltre 2 anni "nessuno conferma da N anni".
+`needsConfirmation` scatta solo oltre l'anno: prima non ci sarebbe niente da confermare.
+
+**Effetto sui 116 spot reali**: prima 5 verdi / 34 ok / **77 gialli**. Adesso 13 verdi / 103 ok / **0 in allarme** — che e' la verita': il database ha 4 mesi, nessuna informazione e' vecchia.
+
+Cade anche il "debito" che segnalavo da tre giorni (la mappa tutta arancione a ottobre): non era un debito del prodotto, era la mia taratura.
+
+- [x] `lib/freshness.ts` ritarato, test riscritti (13 sul modulo, 122 in totale)

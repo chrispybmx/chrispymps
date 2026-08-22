@@ -23,53 +23,37 @@ describe('getFreshness — condizioni dichiarate', () => {
   });
 });
 
-describe('getFreshness — decadimento di uno spot alive', () => {
-  it('oggi', () => {
-    expect(getFreshness('alive', daysAgo(0), NOW).label).toBe('Confermato oggi');
+describe('getFreshness — uno spot fisico non scade in pochi mesi', () => {
+  it('appena confermato', () => {
+    expect(getFreshness('alive', daysAgo(0), NOW).label).toBe('Confermato da poco');
   });
 
-  it('ieri', () => {
-    expect(getFreshness('alive', daysAgo(1), NOW).label).toBe('Confermato ieri');
-  });
-
-  it('entro due settimane resta fresh', () => {
-    const f = getFreshness('alive', daysAgo(9), NOW);
+  it('entro il mese resta verde', () => {
+    const f = getFreshness('alive', daysAgo(20), NOW);
     expect(f.tone).toBe('fresh');
-    expect(f.label).toBe('Confermato 9 giorni fa');
-    expect(f.short).toBe('9g');
+    expect(f.label).toBe('Confermato 20 giorni fa');
   });
 
-  it('un mese → settimane, tono ok', () => {
-    const f = getFreshness('alive', daysAgo(28), NOW);
-    expect(f.tone).toBe('ok');
-    expect(f.label).toBe('Confermato 4 settimane fa');
-  });
-
-  it('tre mesi → aging', () => {
+  it('a tre mesi NON e\' un allarme: un ledge sta li\'', () => {
     const f = getFreshness('alive', daysAgo(90), NOW);
+    expect(f.tone).toBe('ok');
+    expect(f.label).toBe('Confermato 3 mesi fa');
+  });
+
+  it('a undici mesi ancora nessun allarme', () => {
+    expect(getFreshness('alive', daysAgo(330), NOW).tone).toBe('ok');
+  });
+
+  it('oltre l\'anno comincia a invecchiare', () => {
+    const f = getFreshness('alive', daysAgo(400), NOW);
     expect(f.tone).toBe('aging');
-    expect(f.label).toBe('Ultima conferma 3 mesi fa');
+    expect(f.label).toBe('Confermato piu\' di un anno fa');
   });
 
-  it('otto mesi → stale, il testo cambia registro', () => {
-    const f = getFreshness('alive', daysAgo(240), NOW);
+  it('oltre i due anni chiede davvero una conferma', () => {
+    const f = getFreshness('alive', daysAgo(800), NOW);
     expect(f.tone).toBe('stale');
-    expect(f.label).toBe('Nessuno conferma da 8 mesi');
-  });
-
-  it('oltre un anno → dead', () => {
-    const f = getFreshness('alive', daysAgo(500), NOW);
-    expect(f.tone).toBe('dead');
-    expect(f.label).toBe('Nessuno passa da oltre un anno');
-  });
-
-  it('oltre due anni pluralizza gli anni', () => {
-    expect(getFreshness('alive', daysAgo(800), NOW).label).toBe('Nessuno passa da oltre 2 anni');
-  });
-
-  it('singolare corretto a una settimana e a un mese', () => {
-    expect(getFreshness('alive', daysAgo(16), NOW).label).toBe('Confermato 2 settimane fa');
-    expect(getFreshness('alive', daysAgo(63), NOW).label).toBe('Ultima conferma 2 mesi fa');
+    expect(f.label).toContain('2 anni');
   });
 });
 
@@ -91,13 +75,14 @@ describe('getFreshness — input mancante o rotto', () => {
 });
 
 describe('needsConfirmation', () => {
-  it('non chiede conferma su spot freschi', () => {
+  it('non chiede conferma per mesi: non ci sarebbe niente da confermare', () => {
     expect(needsConfirmation(getFreshness('alive', daysAgo(3), NOW))).toBe(false);
-    expect(needsConfirmation(getFreshness('alive', daysAgo(30), NOW))).toBe(false);
+    expect(needsConfirmation(getFreshness('alive', daysAgo(90), NOW))).toBe(false);
+    expect(needsConfirmation(getFreshness('alive', daysAgo(330), NOW))).toBe(false);
   });
 
-  it('chiede conferma da tre mesi in poi', () => {
-    expect(needsConfirmation(getFreshness('alive', daysAgo(120), NOW))).toBe(true);
+  it('chiede conferma oltre l\'anno', () => {
     expect(needsConfirmation(getFreshness('alive', daysAgo(400), NOW))).toBe(true);
+    expect(needsConfirmation(getFreshness('alive', daysAgo(800), NOW))).toBe(true);
   });
 });

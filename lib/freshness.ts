@@ -66,36 +66,37 @@ export function getFreshness(
 
   const days = Math.max(0, Math.floor((now.getTime() - ts) / 86_400_000));
 
-  if (days <= 1) {
-    return { label: days === 0 ? 'Confermato oggi' : 'Confermato ieri', short: 'oggi', color: COLORS.fresh, tone: 'fresh', days };
-  }
-  if (days <= 14) {
-    return { label: `Confermato ${days} giorni fa`, short: `${days}g`, color: COLORS.fresh, tone: 'fresh', days };
-  }
-  if (days <= 60) {
-    const w = Math.round(days / 7);
-    return { label: `Confermato ${plural(w, 'settimana', 'settimane')} fa`, short: `${w}sett`, color: COLORS.ok, tone: 'ok', days };
-  }
-  if (days <= 180) {
-    const m = Math.round(days / 30);
-    return { label: `Ultima conferma ${plural(m, 'mese', 'mesi')} fa`, short: `${m}m`, color: COLORS.aging, tone: 'aging', days };
+  /* Orizzonte di due anni.
+     Uno spot fisico non e' informazione deperibile: un ledge, un rail, una
+     scalinata restano dove sono per anni. Quello che cambia davvero — una
+     recinzione, una demolizione, un guardiano — succede su scala di anni, non
+     di mesi. Con soglie brevi il pallino diventava arancione per il solo
+     passare del tempo, e un segnale che si allarma da solo smette di essere
+     un segnale. */
+  if (days <= 30) {
+    return { label: days <= 1 ? 'Confermato da poco' : `Confermato ${days} giorni fa`, short: `${days}g`, color: COLORS.fresh, tone: 'fresh', days };
   }
   if (days <= 365) {
     const m = Math.round(days / 30);
-    return { label: `Nessuno conferma da ${plural(m, 'mese', 'mesi')}`, short: `${m}m`, color: COLORS.stale, tone: 'stale', days };
+    return { label: `Confermato ${plural(m, 'mese', 'mesi')} fa`, short: `${m}m`, color: COLORS.ok, tone: 'ok', days };
+  }
+  if (days <= 730) {
+    return { label: 'Confermato piu\' di un anno fa', short: '1a+', color: COLORS.aging, tone: 'aging', days };
   }
 
   const y = Math.floor(days / 365);
   return {
-    label: y <= 1 ? 'Nessuno passa da oltre un anno' : `Nessuno passa da oltre ${y} anni`,
+    label: `Nessuno conferma da ${y} anni`,
     short: `${y}a+`,
-    color: COLORS.dead,
-    tone: 'dead',
+    color: COLORS.stale,
+    tone: 'stale',
     days,
   };
 }
 
 /** Vero quando lo spot merita un invito esplicito a confermare lo stato. */
 export function needsConfirmation(f: Freshness): boolean {
-  return f.tone === 'aging' || f.tone === 'stale' || f.tone === 'dead';
+  /* Si chiede conferma solo oltre l'anno: prima non c'e' niente da confermare,
+     lo spot e' quasi certamente ancora li'. */
+  return f.tone === 'aging' || f.tone === 'stale';
 }
