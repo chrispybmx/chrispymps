@@ -162,8 +162,8 @@ Branch `ux/fase1-2-app`, NON committato, NON pushato.
 ### Chiuso con una decisione
 - [x] `A&C Wedding Jam` (05/09) fuori dal banner evento vicino, e va bene così: il record ha `location: 'Italy'`, niente città e niente coordinate — è granularità nazionale, arriva così dallo scraper illuminatebmx. Un fallback su `country_code` lo mostrerebbe a ogni italiano a qualunque distanza, cioè esattamente il rumore che il banner serve a togliere. Se lo vuoi coperto, serve la città nel record, non codice
 
-### Preesistente, trovato ma non toccato (fuori scope)
-- [ ] Errore di idratazione da `SpotRadarToggle` in SideMenu.tsx: legge localStorage durante il render, il server rende un markup diverso dal client. Presente anche su `main`, visibile solo in dev
+### Preesistente, trovato e chiuso
+- [x] Errore di idratazione da `SpotRadarToggle` in SideMenu.tsx: ora il toggle si monta solo dopo hydration (`mounted`), quindi server e primo render client restano allineati. Verificato con build produzione il 22/08/2026
 
 ### Trovato durante la sessione — verificato, NON è un problema
 - [x] **Supabase "Grace period is over"**: allarme rientrato dopo aver aperto i numeri. Il testo completo è *"Your grace period ended on 02 Jun, 2026. Fair Use Policy applies now. **If** your organization is over its quota, your projects can be restricted"* — è un avviso di policy che Supabase mostra a tutti i piani Free, non una segnalazione sull'account.

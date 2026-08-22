@@ -1,3 +1,9 @@
+---
+title: SECURITY_PRIVACY_AUDIT
+type: note
+permalink: ai/antigravity/security-privacy-audit
+---
+
 # SECURITY & PRIVACY AUDIT — ChrispyMPS (maps.chrispybmx.com)
 
 **Data**: 2026-05-06

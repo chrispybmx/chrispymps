@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import QRCode from 'qrcode';
 import { LINKS } from '@/lib/constants';
 
 export const metadata: Metadata = {
@@ -26,12 +27,11 @@ const DONATE = {
 export default async function SupportPage() {
   let btcQr = '';
   try {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=ff6a00&bgcolor=111111&data=bitcoin:${DONATE.btc}`;
-    const res = await fetch(qrUrl, { next: { revalidate: 86400 } });
-    if (res.ok) {
-      const buf = await res.arrayBuffer();
-      btcQr = `data:image/png;base64,${Buffer.from(buf).toString('base64')}`;
-    }
+    btcQr = await QRCode.toDataURL(`bitcoin:${DONATE.btc}`, {
+      width:  200,
+      margin: 1,
+      color:  { dark: '#ff6a00', light: '#111111' },
+    });
   } catch { /* fallback */ }
 
   return (

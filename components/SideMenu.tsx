@@ -196,8 +196,10 @@ const RADAR_KEY = 'cmaps_radar_enabled';
 function SpotRadarToggle() {
   const [enabled, setEnabled] = useState(false);
   const [denied, setDenied] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     try { setEnabled(localStorage.getItem(RADAR_KEY) === '1'); } catch {}
   }, []);
 
@@ -231,7 +233,7 @@ function SpotRadarToggle() {
     }
   };
 
-  const hasGeo = typeof window !== 'undefined' && 'geolocation' in navigator;
+  const hasGeo = mounted && 'geolocation' in navigator;
   if (!hasGeo) return null;
 
   return (

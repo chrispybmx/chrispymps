@@ -1,9 +1,27 @@
-# ChrispyMPS — Find Your Spot 🏴
+---
+title: README
+type: note
+permalink: ai/antigravity/readme
+---
 
-La mappa BMX street italiana, community-driven.
+# Chrispy Maps — Find Your Spot 🏴
 
-**URL**: [chrispybmx.com/map](https://chrispybmx.com/map)  
-**Stack**: Next.js 14 · Supabase · Leaflet/OSM · Vercel · Resend
+La mappa community per trovare, salvare e aggiornare spot BMX, skate e scooter.
+
+**URL**: [maps.chrispybmx.com](https://maps.chrispybmx.com)<br>
+**Stack**: Next.js 14 · Supabase · Leaflet/OSM · Vercel · Resend · MailerLite
+
+## Stato prodotto
+
+Chrispy Maps non è più solo una mappa Day 1. Oggi include:
+- mappa spot con filtri, ricerca, geolocalizzazione, radius search e preferiti
+- contributi community: nuovi spot, foto, commenti, like, rating e conferme stato
+- profili rider, XP, livelli e classifica
+- sezioni Scopri, Sfoglia, Eventi, News e Sessioni live
+- admin per moderazione spot, news, eventi, foto e utenti
+- privacy policy, cancellazione account e gestione consenso cookie/localStorage
+
+La priorità UX resta: aprire la mappa, capire cosa c'è vicino, contribuire uno spot reale con foto scattata sul posto.
 
 ---
 
@@ -95,9 +113,9 @@ Output in `tmp/qr-stickers/` — file HTML stampabile (A4, 3 sticker per riga).
 3. In Settings → Environment Variables → aggiungi tutte le variabili da `.env.local`
 4. Deploy!
 
-### Custom domain (chrispybmx.com/map)
+### Custom domain (maps.chrispybmx.com)
 
-In Vercel → Settings → Domains → aggiungi `chrispybmx.com`.  
+In Vercel → Settings → Domains → aggiungi `maps.chrispybmx.com`.<br>
 Nel tuo registrar DNS aggiungi i record che Vercel ti mostra.
 
 ---
@@ -106,15 +124,21 @@ Nel tuo registrar DNS aggiungi i record che Vercel ti mostra.
 
 ```
 app/
-  layout.tsx          — Root layout (VHS overlay, SupportStrip)
+  layout.tsx          — Root layout, metadata, JSON-LD, cookie banner
   map/
     page.tsx           — Mappa principale (server component)
-    MapClient.tsx      — Wrapper client con stato
+    MapClient.tsx      — Wrapper client con stato mappa, filtri, pannello spot
     loading.tsx        — Loading screen VHS
     [city]/page.tsx    — Pagina città (ISR)
     spot/[slug]/       — Pagina singolo spot (OpenGraph completo)
-    support/           — Pagina donazioni Ko-fi
-    about/             — Chi siamo / Privacy
+    support/           — Pagina supporto community e donazioni
+    about/             — Chi siamo
+  sfoglia/             — Esperienza swipe per salvare spot
+  scopri/              — Feed scoperta spot
+  events/              — Eventi e calendario community
+  news/                — News e contenuti editoriali
+  classifica/          — Ranking XP rider
+  u/[username]/        — Profilo pubblico e modifica profilo
   admin/
     login/             — Form password
     page.tsx           — Dashboard moderazione
@@ -129,22 +153,26 @@ app/
     admin/logout       — POST: logout admin
     admin/edit-spot    — POST: modifica spot da admin
     flag/              — POST: segnala spot
+    user/delete        — DELETE: cancellazione account
 
 components/
   SpotMap.tsx          — Mappa Leaflet (dynamic, no SSR)
-  SpotSheet.tsx        — Scheda spot (bottom sheet)
-  AddSpotModal.tsx     — Form aggiungi spot (multi-step)
+  AddSpotModal.tsx     — Form aggiungi spot con GPS, foto e anti-duplicati
   PhotoUpload.tsx      — Upload foto con camera support
   TopBar.tsx           — Barra superiore + filtri
   SideMenu.tsx         — Drawer menu laterale
-  SupportStrip.tsx     — Strip donazioni ambient
-  SupportModal.tsx     — Modal Ko-fi
+  BottomNav.tsx        — Navigazione mobile principale
+  FreshnessDot.tsx     — Freschezza dello stato spot
   AdminCard.tsx        — Card moderazione mobile
   VhsOverlay.tsx       — Scanlines overlay
+  AuthModal.tsx        — Login, registrazione, reset password
 
 lib/
   types.ts             — Tipi TypeScript
-  constants.ts         — TIPI_SPOT, CITTA, palette, link
+  constants.ts         — TIPI_SPOT, regioni, palette, link, config
+  image.ts             — Resize, compressione e strip EXIF
+  ssrf.ts              — Guardie anti-SSRF
+  rate-limit.ts        — Rate limit Upstash opzionale + fallback memory
   email.ts             — Email Resend (admin, conferma, approvazione)
   mailerlite.ts        — Iscrizione newsletter
   auth.ts              — Autenticazione admin + token HMAC
@@ -176,7 +204,7 @@ Funzionalità:
 
 ---
 
-## Feature Day 1 ✅
+## Feature principali
 
 - [x] Mappa interattiva Leaflet/OSM
 - [x] Filtri per tipo spot
@@ -193,6 +221,11 @@ Funzionalità:
 - [x] QR sticker generabili da script
 - [x] Cache offline tile mappa
 - [x] Donazioni Ko-fi ambient (no popup, no paywall)
+- [x] Profili rider, XP, livelli e classifica
+- [x] Eventi, news, commenti e notifiche
+- [x] Upload immagini ottimizzato con rimozione metadati EXIF
+- [x] Rate limiting e CSP nonce-based
+- [x] Privacy policy, cookie banner e cancellazione account
 
 ---
 

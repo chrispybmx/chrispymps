@@ -126,3 +126,27 @@ resta finché l'utente lo chiude.
 **Falsa pista utile:** avevo concluso che `/api/auth/set-username` non creasse il profilo
 (aggiorna solo `user_metadata`). Vero, ma irrilevante: l'insert sta in `setupGoogleUsername`
 lato client. Verificare chi altro fa il lavoro prima di dichiarare la causa radice.
+
+## 2026-08-22 — Il soft-404 era davvero nei loading.tsx, e la prova e' lo status
+Da inizio agosto il progetto conviveva con un limite noto: le route inesistenti
+restituivano `200` invece di `404`, nonostante `notFound()` in `generateMetadata`,
+`cache()` sulle query e `not-found.tsx` con noindex. La diagnosi era gia' scritta
+(i `loading.tsx` di segmento flushano lo shell con 200 prima che `notFound()` possa
+impostare il codice), ma il fix era rimasto sospeso perche' Christian aveva chiesto
+di non toccare quei file.
+
+Rimossi i tre `loading.tsx`, lo status e' diventato corretto. Verificato su build di
+produzione servita in locale, non in dev:
+`/map/citta-inesistente-xyz`, `/map/spot/questo-non-esiste`, `/news/non-esiste` e
+`/map/Verona` (maiuscola) → **404 + noindex**; `/map/verona`, `/news/bmxnews-9`, `/`
+→ **200 + index,follow**.
+
+**Pattern:** per lo status HTTP non basta guardare la pagina renderizzata — `noindex`
+nei metadata poteva far sembrare il problema risolto mentre il server continuava a
+dire 200. La verifica giusta e' `curl -o /dev/null -w "%{http_code}"` su build di
+produzione: in `next dev` il comportamento dei confini Suspense e' diverso.
+
+**Prezzo del fix, da tenere presente:** quelle tre route hanno perso lo scheletro di
+caricamento (la mappa aveva 69 righe di skeleton animato). Se la latenza si nota, il
+fallback va rimesso dentro un `<Suspense>` interno alla pagina, DOPO il check di
+esistenza — non come `loading.tsx` di segmento.
