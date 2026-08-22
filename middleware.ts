@@ -33,7 +33,10 @@ function buildCsp(nonce: string): string {
     // Connessioni API: Supabase, Nominatim OSM
     "connect-src 'self' *.supabase.co *.supabase.in nominatim.openstreetmap.org wss://*.supabase.co tiles.stadiamaps.com",
     // Worker per Leaflet
-    "worker-src blob:",
+    // Worker: 'self' serve al service worker (/sw.js). Con il solo blob: la
+    // registrazione veniva bloccata dal CSP e la PWA non ha mai avuto cache
+    // offline, cache delle tile, ne' la possibilita' di ricevere push.
+    "worker-src 'self' blob:",
     // Frame: OSM per anteprima mappa + YouTube per video spot
     "frame-src https://*.openstreetmap.org https://www.youtube.com https://www.youtube-nocookie.com",
     // Object: nessuno

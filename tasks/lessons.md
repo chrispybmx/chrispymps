@@ -150,3 +150,24 @@ produzione: in `next dev` il comportamento dei confini Suspense e' diverso.
 caricamento (la mappa aveva 69 righe di skeleton animato). Se la latenza si nota, il
 fallback va rimesso dentro un `<Suspense>` interno alla pagina, DOPO il check di
 esistenza — non come `loading.tsx` di segmento.
+
+## 2026-08-22 — Una direttiva CSP sbagliata teneva spento il service worker da sempre
+Cercando difetti residui in produzione, l'unico errore in console era:
+`Creating a worker from '.../sw.js' violates the following Content Security Policy
+directive: "worker-src blob:"`.
+
+Non era il browser di test: l'header lo serviva il sito.
+`worker-src blob:` autorizza **solo** i worker creati da URL blob. Il service worker
+del progetto e' `/sw.js`, un file normale di pari origine, quindi la registrazione
+veniva rifiutata a ogni visitatore. Conseguenze silenziose: nessuna cache offline,
+nessuna cache delle tile OSM (piu' banda e mappa piu' lenta), pagina `/offline` mai
+raggiungibile, e push notification impossibili — proprio la funzione discussa come
+prossimo passo.
+
+Fix: `worker-src 'self' blob:`.
+
+**Pattern:** gli errori CSP non rompono niente in modo visibile — la pagina funziona,
+solo che una capacita' non esiste. Vanno letti nella console di **produzione**, perche'
+in sviluppo l'header puo' essere diverso. E vale la pena rileggere ogni direttiva
+chiedendosi "questa lista copre davvero le risorse che il sito usa?", invece di
+fidarsi che una policy restrittiva sia per definizione corretta.
