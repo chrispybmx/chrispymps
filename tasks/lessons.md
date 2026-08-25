@@ -341,3 +341,34 @@ ripiego serve a sopravvivere all'ordine sbagliato, non a renderlo indifferente.
 Come l'ho trovato: non dai test, non dalla build. Da una curl su /api/spots
 dopo aver costruito. Nessun controllo statico puo' sapere quali colonne
 esistono davvero nel database.
+
+## 2026-08-25 — Stale-while-revalidate sulla cosa che deve essere fresca
+
+Il 24/08 ho messo /api/spots in stale-while-revalidate nel service worker, per
+dare al sito una modalita' offline vera. Guadagno reale, ma con un costo che
+non avevo pesato: SWR serve SEMPRE la copia vecchia e aggiorna dopo.
+
+Il giorno dopo Natanael ha caricato «Thermal forum», Christian l'ha approvato e
+non lo vedeva. Lo spot era a posto: approvato, tre foto, e l'API lo restituiva
+(119 spot). Era il suo browser a mostrargli l'elenco di prima.
+
+L'errore non e' tecnico, e' di categoria. Un elenco di spot su una mappa di
+community non e' un asset statico: **e' la notizia**. Quando arriva qualcosa di
+nuovo, quello E' il contenuto. SWR va bene per il guscio dell'app, per le
+pagine, per le tile — non per il dato che cambia ed e' il motivo per cui uno
+apre il sito.
+
+Sostituito con rete-prima e tetto di 2,5 secondi: online si vede l'elenco
+fresco, offline si ripiega sull'ultima copia buona. Misurato con il server
+spento: ripiego in 342 ms, 119 spot, mappa navigabile. La rete che manca
+fallisce subito, quindi il tetto non si sente quasi mai.
+
+Seconda causa, indipendente: /api/spots diceva al CDN `s-maxage=300`. Cinque
+minuti di invisibilita' per ogni spot approvato, e `revalidatePath` non tocca
+quella cache perche' e' un header HTTP, non la ISR di Next. Portato a 60 con
+stale-while-revalidate=300: risposta comunque immediata, ritardo massimo un
+minuto.
+
+Regola: prima di scegliere una strategia di cache, chiedersi «se questo dato
+cambia, quanto puo' restare vecchio prima che sia un problema?». Per il guscio
+sono giorni. Per l'elenco degli spot e' meno di un minuto.

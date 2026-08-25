@@ -80,6 +80,12 @@ export async function GET() {
   });
 
   return NextResponse.json({ ok: true, data: pins }, {
-    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+    /* 60 secondi, non 300. L'elenco degli spot non e' un asset statico: e' la
+       notizia. Con cinque minuti uno spot appena approvato restava invisibile
+       per cinque minuti — successo davvero con "Thermal forum" di Natanael, il
+       25/08. `stale-while-revalidate` tiene comunque la risposta immediata:
+       serve la copia vecchia mentre aggiorna in sottofondo, quindi il costo
+       della soglia piu' bassa e' un rinfresco piu' frequente, non una attesa. */
+    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
   });
 }

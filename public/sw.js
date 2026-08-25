@@ -7,7 +7,7 @@
 // riceve header CSP e le fetch qui dentro non sono ristrette. Il CSP della
 // pagina governa solo la registrazione (worker-src), non il traffico interno.
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE  = `chrispymaps-static-${CACHE_VERSION}`;
 const MAP_CACHE     = `chrispymaps-map-${CACHE_VERSION}`;
 const PAGE_CACHE    = `chrispymaps-pages-${CACHE_VERSION}`;
@@ -96,15 +96,19 @@ self.addEventListener('fetch', (event) => {
   // Il resto di Supabase non si tocca (auth, query, realtime)
   if (url.hostname.endsWith('.supabase.co') || url.hostname.endsWith('.supabase.in')) return;
 
-  /* Gli spot della mappa → stale-while-revalidate.
-     Prima erano network-only come ogni API: aprire il sito senza rete dava una
-     mappa che si disegnava, con le tile in cache, e zero spot sopra. Cioe' la
-     modalita' offline esisteva ma non serviva a niente, che e' il contrario
-     della funzione bandiera di app come park4night.
-     Ora l'ultima lista buona resta salvata: offline vedi gli spot dell'ultima
-     volta, e appena c'e' rete si aggiornano da soli. */
+  /* Gli spot della mappa → prima la rete, la cache come rete di sicurezza.
+     Erano network-only: senza rete la mappa si disegnava con le tile in cache
+     e zero spot sopra, cioe' una modalita' offline che non serviva a niente.
+     Il 24/08 li ho messi in stale-while-revalidate, e ho sbagliato: quella
+     strategia serve SEMPRE la copia vecchia e aggiorna dopo. Su una mappa di
+     community significa che uno spot appena approvato non compare al primo
+     caricamento — ed e' successo davvero, con "Thermal forum" di Natanael.
+     Un elenco di spot non e' un asset statico: e' la notizia.
+     Ora si aspetta la rete, con un tetto di 2,5 secondi. Se risponde si vede
+     l'elenco fresco; se e' lenta o assente si ripiega sull'ultima copia buona.
+     L'offline resta, la freschezza torna. */
   if (url.origin === self.location.origin && url.pathname === '/api/spots') {
-    event.respondWith(staleWhileRevalidate(request, DATA_CACHE));
+    event.respondWith(reteConRipiego(request, DATA_CACHE, 2500));
     return;
   }
 
@@ -242,6 +246,40 @@ async function cacheFirstConTTL(request, cacheName, ttlSecondi, massimo) {
     /* Scaduta ma senza rete: una tile vecchia vale piu' di un buco grigio. */
     return cached || new Response('', { status: 503 });
   }
+}
+
+/** Prima la rete; la cache entra in gioco solo se la rete tarda o manca.
+ *
+ *  Il timeout non annulla la richiesta: se arriva tardi finisce comunque in
+ *  cache, cosi' il caricamento successivo parte da una copia aggiornata. */
+async function reteConRipiego(request, cacheName, msTimeout) {
+  const cache = await caches.open(cacheName);
+
+  const inArrivo = fetch(request).then((r) => {
+    if (r.ok) cache.put(request, r.clone());
+    return r;
+  });
+  inArrivo.catch(() => { /* gestita sotto */ });
+
+  const scaduto = Symbol('scaduto');
+  try {
+    const esito = await Promise.race([
+      inArrivo,
+      new Promise((res) => setTimeout(() => res(scaduto), msTimeout)),
+    ]);
+    if (esito !== scaduto && esito.ok) return esito;
+  } catch { /* rete assente: si ripiega */ }
+
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  /* Ne' rete ne' cache: meglio aspettare la rete che rispondere "offline" a
+     chi magari ha solo una connessione lenta. */
+  try { return await inArrivo; } catch { /* davvero offline */ }
+  return new Response(
+    JSON.stringify({ ok: false, error: 'offline' }),
+    { status: 503, headers: { 'Content-Type': 'application/json' } },
+  );
 }
 
 /** Serve subito la copia in cache e intanto aggiorna.
