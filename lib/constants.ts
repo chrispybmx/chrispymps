@@ -49,6 +49,11 @@ export const CONDIZIONI: Record<SpotCondition, { label: string; color: string; b
   demolito: { label: 'Demolito', color: '#f3ead8',   bg: '#3a3a3a' },
 };
 
+/** Le condizioni valide, per la validazione lato server. Stesso motivo di
+ *  TIPI_SPOT_TUTTI: una lista ricopiata a mano diverge appena se ne aggiunge
+ *  una, e il rider lo scopre con un 422 senza spiegazione. */
+export const CONDIZIONI_TUTTE = Object.keys(CONDIZIONI) as [SpotCondition, ...SpotCondition[]];
+
 // ===== DIFFICOLTÀ =====
 export const DIFFICOLTA = [
   { value: 'beginner',     label: 'Beginner' },

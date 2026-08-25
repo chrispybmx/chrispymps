@@ -4,12 +4,14 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { submitToIndexNow } from '@/lib/indexnow';
-import { APP_CONFIG } from '@/lib/constants';
+import { APP_CONFIG, TIPI_SPOT_TUTTI } from '@/lib/constants';
 
 const Schema = z.object({
   id:          z.string().uuid(),
   name:        z.string().min(2).max(100).optional(),
-  type:        z.enum(['street','park','diy','rail','ledge','trail','plaza','gap','bowl','pumptrack']).optional(),
+  /* Derivato da lib/constants, mai ricopiato: l'elenco scritto a mano qui
+     ha respinto la categoria `transition` per cinque giorni. */
+  type:        z.enum(TIPI_SPOT_TUTTI).optional(),
   city:        z.string().max(60).optional(),
   description: z.string().max(500).optional().nullable(),
   surface:     z.string().max(50).optional().nullable(),

@@ -3,12 +3,13 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { onStatusConfirmed, getXPSummary } from '@/lib/xp';
 import { UUID_RE } from '@/lib/validation';
+import { CONDIZIONI_TUTTE } from '@/lib/constants';
 
 const MAX_CONFIRMATIONS_PER_WEEK = 5;
 
 const Schema = z.object({
   spot_id: z.string().regex(UUID_RE),
-  condition: z.enum(['alive', 'bustato', 'demolito']),
+  condition: z.enum(CONDIZIONI_TUTTE),
   note: z.string().max(300).optional(),
   access_token: z.string().min(1),
 });

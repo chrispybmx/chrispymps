@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminAuthenticated } from '@/lib/auth';
+import { CONDIZIONI_TUTTE } from '@/lib/constants';
 
 const Schema = z.object({
   spot_id:   z.string().uuid(),
-  condition: z.enum(['alive', 'bustato', 'demolito']),
+  condition: z.enum(CONDIZIONI_TUTTE),
   note:      z.string().max(300).optional(),
   photo_url: z.string().url().optional(),
 });

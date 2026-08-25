@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { supabaseServer, supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
+import { TIPI_SPOT_TUTTI } from '@/lib/constants';
 
 /**
  * Invalida le pagine che mostrano uno spot. Senza questo la pagina spot (ISR,
@@ -65,7 +66,9 @@ export async function GET(
 
 const EditSchema = z.object({
   name:        z.string().min(2).max(100).optional(),
-  type:        z.enum(['street','park','diy','rail','ledge','trail','plaza','gap','bowl','pumptrack']).optional(),
+  /* Derivato da lib/constants, mai ricopiato: l'elenco scritto a mano qui
+     ha respinto la categoria `transition` per cinque giorni. */
+  type:        z.enum(TIPI_SPOT_TUTTI).optional(),
   description: z.string().max(500).nullable().optional(),
   guardians:   z.string().max(200).nullable().optional(),
   difficulty:  z.string().max(30).nullable().optional(),
