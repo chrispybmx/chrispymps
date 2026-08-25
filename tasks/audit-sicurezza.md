@@ -180,8 +180,7 @@ caricamento dal sito funzioni ancora e che le due sonde vengano respinte.
    la chiave anon, chi espone messaggi del database al client.
 2. **`AddSpotModal`, 1134 righe** — letto un terzo, quello che serviva per il
    bug della categoria.
-3. **Le policy dello Storage** — chi può caricare file nel bucket, con che
-   limiti di dimensione e tipo. Mai guardate.
+3. ~~Le policy dello Storage~~ — fatte il 25/08, vedi sopra.
 
 ---
 
