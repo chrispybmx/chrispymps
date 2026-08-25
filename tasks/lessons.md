@@ -280,3 +280,35 @@ costerebbe piu' della tile — ma una volta su dieci.
 
 Workbox risolve la stessa cosa con ExpirationPlugin({ maxEntries }). Vale la
 pena leggere come lo fanno loro prima di scrivere il proprio.
+
+## 2026-08-24 — Due elenchi della stessa cosa, in due file diversi
+
+Il 19/08 e' arrivata la categoria `transition`. Il modale l'ha mostrata subito
+perche' legge `TIPI_SPOT_SELEZIONABILI` da lib/constants. Il server no: dentro
+submit-spot l'elenco dei tipi era ricopiato a mano dentro uno `z.enum([...])`,
+e nessuno l'ha aggiornato.
+
+Effetto: `transition` — che tolto `street` dai selezionabili era diventata la
+PRIMA casella del selettore — rispondeva 422 a ogni invio. Con le foto gia'
+caricate nello storage, perche' il pre-upload avviene al passo 2 e la categoria
+si sceglie al passo 3. E con il messaggio «Dati non validi. Controlla tutti i
+campi.», che non diceva quale campo.
+
+Un rider che ci finiva sopra ricontrollava nome, posizione e foto — tutti
+giusti — riprovava con la stessa categoria e falliva di nuovo. Per sempre.
+Cinque giorni cosi'.
+
+Niente lo segnalava: tsc pulito, test verdi, build verde. Le due liste erano
+entrambe TypeScript valido, semplicemente diverse.
+
+Regole che ne escono:
+1. Un elenco di valori validi vive in UN posto solo. Se il server deve
+   validare cio' che la UI offre, deve LEGGERE la stessa costante.
+2. Buttare via le `issues` di zod in un `catch {}` costa caro: zod sapeva
+   esattamente qual era il campo, e lo stavamo scartando.
+3. Quando due file devono restare allineati e non si puo' derivare uno
+   dall'altro, serve un test che confronti i due elenchi. Non verifica una
+   funzione: verifica che non divergano.
+
+Modo per trovarne altri: cercare `z.enum([` con valori scritti a mano e
+chiedersi da dove vengono quei valori nella UI.

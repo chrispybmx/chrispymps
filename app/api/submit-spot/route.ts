@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendAdminNotification } from '@/lib/email';
 import { optimizeImage } from '@/lib/image';
+import { TIPI_SPOT_TUTTI } from '@/lib/constants';
 
 /**
  * Le foto pre-caricate devono vivere nel NOSTRO storage: senza questo controllo
@@ -25,7 +26,10 @@ function storagePath(url: string, bucket = 'spot-photos'): string | null {
 
 const SpotSchema = z.object({
   name:         z.string().min(2).max(100),
-  type:         z.enum(['street','park','diy','rail','ledge','trail','plaza','gap','bowl','pumptrack']),
+  /* Letto da lib/constants, mai riscritto qui: vedi TIPI_SPOT_TUTTI per il
+     motivo. Una lista copiata a mano diverge dal selettore alla prima
+     categoria nuova, e il rider se ne accorge solo dopo aver caricato le foto. */
+  type:         z.enum(TIPI_SPOT_TUTTI),
   lat:          z.number().min(-90).max(90),
   lon:          z.number().min(-180).max(180),
   city:         z.string().max(60).optional(),
@@ -49,6 +53,48 @@ const ALLOWED_MIME: Record<string, string> = {
 // Max 5MB per foto
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 
+/** Nome del campo come lo vede il rider, non come si chiama nel codice. */
+const NOME_CAMPO: Record<string, string> = {
+  name:         'nome',
+  type:         'categoria',
+  lat:          'posizione',
+  lon:          'posizione',
+  city:         'citta',
+  country:      'paese',
+  country_code: 'paese',
+  description:  'descrizione',
+  guardians:    'note',
+  difficulty:   'difficolta',
+  photo_urls:   'foto',
+  access_token: 'sessione',
+};
+
+/**
+ * Risposta 422 che dice DOVE si e' rotto.
+ *
+ * Prima si rispondeva sempre «Dati non validi. Controlla tutti i campi.»,
+ * buttando via le `issues` di zod che dicevano esattamente quale campo fosse
+ * il problema. Chi finiva sulla categoria non accettata ricontrollava nome,
+ * posizione e foto — tutti giusti — e non aveva modo di arrivarci.
+ */
+function erroreValidazione(err: unknown): NextResponse {
+  const campi = err instanceof z.ZodError
+    ? [...new Set(
+        err.issues
+          .map(i => NOME_CAMPO[String(i.path[0])] ?? null)
+          .filter((c): c is string => c !== null),
+      )]
+    : [];
+
+  return NextResponse.json({
+    ok: false,
+    error: campi.length
+      ? `Controlla ${campi.length === 1 ? 'il campo' : 'i campi'}: ${campi.join(', ')}.`
+      : 'Dati non validi. Controlla tutti i campi.',
+    campi,
+  }, { status: 422 });
+}
+
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type') ?? '';
   let parsed: z.infer<typeof SpotSchema>;
@@ -58,8 +104,8 @@ export async function POST(req: NextRequest) {
     // Fast path: pre-uploaded photos, JSON body
     try {
       parsed = SpotSchema.parse(await req.json());
-    } catch {
-      return NextResponse.json({ ok: false, error: 'Dati non validi. Controlla tutti i campi.' }, { status: 422 });
+    } catch (err) {
+      return erroreValidazione(err);
     }
   } else {
     // Legacy path: FormData with photo files
@@ -74,8 +120,8 @@ export async function POST(req: NextRequest) {
     }
     try {
       parsed = SpotSchema.parse(JSON.parse(rawData));
-    } catch {
-      return NextResponse.json({ ok: false, error: 'Dati non validi. Controlla tutti i campi.' }, { status: 422 });
+    } catch (err) {
+      return erroreValidazione(err);
     }
   }
 

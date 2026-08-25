@@ -30,6 +30,19 @@ export const TIPI_SPOT_SELEZIONABILI = (
   Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]
 ).filter(([, info]) => !info.legacy);
 
+/** Ogni tipo che uno spot puo' avere, categorie legacy comprese.
+ *
+ *  Il server valida su QUESTA lista invece di riscriverla a mano. Il 19/08/2026
+ *  `transition` era stato aggiunto qui e quindi offerto dal modale, ma l'elenco
+ *  copiato dentro submit-spot non era stato aggiornato: la prima categoria del
+ *  selettore rispondeva 422 a ogni invio, con le foto gia' caricate e un
+ *  messaggio che non diceva quale campo fosse sbagliato. Cinque giorni cosi'.
+ *
+ *  Comprende i legacy perche' server e modale rispondono a domande diverse:
+ *  il modale decide cosa si puo' scegliere ORA, il server cosa e' valido —
+ *  e i 60 spot gia' catalogati `street` restano validi. */
+export const TIPI_SPOT_TUTTI = Object.keys(TIPI_SPOT) as [SpotType, ...SpotType[]];
+
 export const CONDIZIONI: Record<SpotCondition, { label: string; color: string; bg: string }> = {
   alive:    { label: 'Alive',    color: '#000',      bg: '#00c851' },
   bustato:  { label: 'Bustato',  color: '#000',      bg: '#ff6a00' },
