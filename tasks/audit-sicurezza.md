@@ -102,7 +102,79 @@ da qualcosa di attendibile.
 
 ---
 
+## 2026-08-25 · Storage — bucket e policy
+
+**Perché quest'area.** È l'unica superficie dove un estraneo può scrivere byte
+sull'account, e non era mai stata guardata.
+
+**Come ho verificato.** Query di sola lettura su `storage.buckets` e
+`pg_policies`, poi **due sonde reali** con la chiave anon presa dal bundle
+JavaScript del sito (che è pubblica per progetto). La sonda di scrittura ha
+creato un file, rimosso subito dopo; verificato che le 210 foto vere fossero
+intatte.
+
+### I bucket sono configurati bene
+
+| Bucket | Pubblico | Limite | Tipi ammessi |
+|---|---|---|---|
+| `spot-photos` | sì | 5 MB | jpeg, png, webp, heic |
+| `status-photos` | sì | 5 MB | jpeg, png, webp, heic |
+
+Lettura pubblica: corretta, le foto degli spot devono vedersi.
+
+### Le policy sono aperte a chiunque — GRAVE
+
+    service delete spot photos    DELETE  {public}  bucket_id = 'spot-photos'
+    service delete status photos  DELETE  {public}  bucket_id = 'status-photos'
+    public upload spot photos     INSERT  {public}  (solo forma del percorso)
+    public upload status photos   INSERT  {public}  (solo forma del percorso)
+
+Il ruolo è `public`, non `service_role`: il nome della policy dice «service» ma
+la condizione no. `anon` eredita da `public`, quindi **chiunque abbia la chiave
+del browser passa**.
+
+**Sonda 1 — cancellazione**, su un percorso inesistente:
+
+    → {"statusCode":"404","message":"Object not found"}
+
+`Object not found` significa che la policy ha autorizzato: mancava solo il
+file. Se avesse negato avrebbe risposto `Unauthorized`. Cioè: **un estraneo può
+cancellare qualsiasi foto dei due bucket.**
+
+**Sonda 2 — caricamento senza login**:
+
+    → {"Key":"spot-photos/__sonda__/x.png","Id":"1311f4bd-..."}
+
+Riuscito. Rimosso subito; 118 spot e 210 foto verificati intatti dopo.
+
+### Si chiude senza rompere niente
+
+Tutte e otto le rotte che toccano lo storage usano `supabaseAdmin`, cioè
+`service_role`, che **ignora le policy RLS**:
+
+    submit-spot · upload-image · spot-photos
+    admin/upload-photo · admin/upload-cover
+    admin/delete-photo · admin/delete-spot · admin/pending-photos
+
+Nessun codice — né browser né server — dipende dalle policy pubbliche di
+scrittura. Rimuoverle non tocca nessun flusso.
+
+**Rimedio, NON eseguito** (le scritture SQL sono bloccate dal classificatore):
+
+```sql
+DROP POLICY IF EXISTS "service delete spot photos"   ON storage.objects;
+DROP POLICY IF EXISTS "service delete status photos" ON storage.objects;
+DROP POLICY IF EXISTS "public upload spot photos"    ON storage.objects;
+DROP POLICY IF EXISTS "public upload status photos"  ON storage.objects;
+```
+
+Restano le due di lettura pubblica. Dopo l'esecuzione va verificato che il
+caricamento dal sito funzioni ancora e che le due sonde vengano respinte.
+
+---
+
 ## Aree ancora da esaminare
+
 
 1. **Le ~30 rotte API** — chi valida cosa, chi usa `service_role` dove basterebbe
    la chiave anon, chi espone messaggi del database al client.
