@@ -34,7 +34,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
      supabase-js legge la stringa letterale, non un template. */
   const withSource = await supabase
     .from('spots')
-    .select('*, likes_count, spot_photos(id, url, position, credit_name, source)')
+    .select('*, likes_count, spot_photos(id, url, position, credit_name, source, moderation_status)')
     .eq('slug', slug)
     .eq('status', 'approved')
     .single();
@@ -44,16 +44,26 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
   if (withSource.error) {
     const legacy = await supabase
       .from('spots')
-      .select('*, likes_count, spot_photos(id, url, position, credit_name)')
+      .select('*, likes_count, spot_photos(id, url, position, credit_name, moderation_status)')
       .eq('slug', slug)
       .eq('status', 'approved')
       .single();
     data = legacy.data as Record<string, unknown> | null;
   }
   if (!data) return null;
-  const photos = data.spot_photos as { position: number }[] | undefined;
+
+  /* Solo foto approvate. La lettura non si puo' lasciare alle policy: in
+     schema.sql ne esiste una che apre tutte le foto di uno spot approvato
+     senza guardare `moderation_status`, e le permissive in Postgres si
+     sommano. Senza questo filtro una foto appena caricata sarebbe pubblica
+     prima di essere moderata. Le righe piu' vecchie della moderazione hanno
+     la colonna a NULL e restano visibili. */
+  const photos = data.spot_photos as
+    { position: number; moderation_status?: string | null }[] | undefined;
   if (photos) {
-    photos.sort((a, b) => a.position - b.position);
+    data.spot_photos = photos
+      .filter(p => p.moderation_status === 'approved' || p.moderation_status == null)
+      .sort((a, b) => a.position - b.position);
   }
   return data as unknown as Spot;
 });

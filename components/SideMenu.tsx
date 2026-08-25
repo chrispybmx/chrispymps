@@ -11,8 +11,14 @@ interface SideMenuProps {
   onOpenAuth?: () => void;
 }
 
+/* Sfoglia e Preferiti stavano solo nella BottomNav, che sopra i 768px e'
+   display:none — quindi da desktop erano irraggiungibili, e da mobile il
+   cuore sulle card della mappa salvava in una cartella che dalla mappa non
+   si poteva aprire. */
 const MENU_ITEMS = [
   { href: '/map',      label: 'Mappa',    emoji: '🗺️' },
+  { href: '/sfoglia',   label: 'Sfoglia',   emoji: '🃏' },
+  { href: '/preferiti', label: 'Preferiti', emoji: '❤️' },
   { href: '/events',   label: 'Eventi',   emoji: '📅' },
   { href: '/news',       label: 'News',       emoji: '📰' },
   { href: '/classifica', label: 'Classifica', emoji: '🏆' },

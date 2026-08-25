@@ -15,6 +15,11 @@ interface Props {
   nearest?: { name: string; km: number } | null;
   /** Porta l'utente sullo spot più vicino. */
   onGoToNearest?: () => void;
+  /** Chiede il permesso di posizione. È il tap esplicito che ha sostituito la
+   *  richiesta automatica all'avvio: prima il prompt di sistema compariva da
+   *  solo sopra al banner cookie, e questa card diceva «attiva la posizione»
+   *  offrendo un bottone che si limitava a chiudersi. */
+  onAttivaPosizione?: () => void;
 }
 
 function formatKm(km: number): string {
@@ -36,7 +41,7 @@ function formatKm(km: number): string {
  * Compare solo dopo che l'informativa cookie è stata chiusa: i due livelli
  * sovrapposti tagliavano i bottoni di questa card sotto i 400px di larghezza.
  */
-export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGoToNearest }: Props) {
+export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGoToNearest, onAttivaPosizione }: Props) {
   const user = useUser();
   const [visible, setVisible]     = useState(false);
   const [cookieDone, setCookieDone] = useState(false);
@@ -137,7 +142,7 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
               )}
             </>
           ) : (
-            <>Attiva la posizione per vedere quali hai vicino, oppure muovi la mappa per esplorare.</>
+            <>Fammi vedere dove sei e ti dico quali hai vicino. Altrimenti muovi la mappa per esplorare.</>
           )}
         </div>
 
@@ -163,6 +168,29 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
                 }}
               >
                 PORTAMI LÌ →
+              </button>
+            </>
+          ) : onAttivaPosizione ? (
+            <>
+              <button onClick={dismiss} style={{
+                flex: 1, fontFamily: 'var(--font-mono)', fontSize: 12,
+                padding: '11px', border: '1px solid var(--gray-600)',
+                borderRadius: 6, background: 'transparent',
+                color: 'var(--gray-400)', cursor: 'pointer',
+              }}>
+                ESPLORO
+              </button>
+              <button
+                onClick={() => { dismiss(); onAttivaPosizione(); }}
+                style={{
+                  flex: 2, fontFamily: 'var(--font-mono)', fontSize: 12,
+                  padding: '11px', border: 'none',
+                  borderRadius: 6, background: 'var(--orange)',
+                  color: '#000', cursor: 'pointer', fontWeight: 700,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                📍 DOVE SONO
               </button>
             </>
           ) : (

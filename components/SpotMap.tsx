@@ -3,12 +3,18 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, APP_CONFIG, PALETTE } from '@/lib/constants';
+import { getFreshness, needsConfirmation } from '@/lib/freshness';
 import 'leaflet/dist/leaflet.css';
 
 let L: typeof import('leaflet') | null = null;
 
 /* Zoom sotto il quale mostriamo i cluster invece dei pin individuali. */
 const CLUSTER_ZOOM = 12;
+
+/** Ricordiamo noi che il permesso e' stato concesso almeno una volta: Safari
+ *  non espone `geolocation` nel Permissions API, e senza questo flag i suoi
+ *  utenti dovrebbero ritoccare il tasto a ogni visita. */
+const GEO_CONCESSA_KEY = 'cmaps_geo_concessa';
 
 interface SpotMapProps {
   spots:             SpotMapPin[];
@@ -29,6 +35,10 @@ interface SpotMapProps {
   // GPS locate triggered from MapClient
   locateTrigger?: number;
   onLocatingChange?: (v: boolean) => void;
+  /** Il tasto GPS ha fallito. Senza questo il bottone girava, si fermava e non
+   *  succedeva niente: se il permesso e' gia' stato negato il browser rifiuta
+   *  all'istante, e l'utente non aveva modo di sapere perche'. */
+  onLocateError?: (messaggio: string) => void;
   // Viewport bounds callback — emitted on moveend/zoomend
   onBoundsChanged?: (bounds: { south: number; west: number; north: number; east: number }) => void;
   // Stile mappa
@@ -38,7 +48,7 @@ interface SpotMapProps {
 }
 
 /* ── SVG pin individuale ── */
-function pinSvg(type: SpotType, condition: string, isSelected = false): string {
+function pinSvg(type: SpotType, condition: string, isSelected = false, updatedAt?: string | null): string {
   const info  = TIPI_SPOT[type];
   const color = condition === 'alive'   ? info.color
               : condition === 'bustato' ? '#888'
@@ -48,6 +58,18 @@ function pinSvg(type: SpotType, condition: string, isSelected = false): string {
     <line x1="21" y1="9" x2="9" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
   ` : '';
   const glow = condition === 'alive' ? `<circle cx="15" cy="15" r="13" fill="${color}" opacity="0.12"/>` : '';
+
+  /* Il corpo del pin resta del colore del TIPO: e' quello che distingue un
+     rail da un bowl a colpo d'occhio, e sostituirlo con la freschezza
+     perderebbe piu' di quanto guadagna. La freschezza si aggiunge come
+     bollino, e solo quando ha qualcosa da dire: sotto l'anno non compare.
+     Un segnale che si accende su tutti i pin torna a essere decorazione —
+     e' lo stesso motivo per cui le soglie sono a uno e due anni. */
+  const fresh  = condition === 'alive' ? getFreshness('alive', updatedAt) : null;
+  const bollino = fresh && needsConfirmation(fresh)
+    ? `<circle cx="24" cy="7" r="5.5" fill="${fresh.color}" stroke="#0a0a0a" stroke-width="1.5"/>`
+    : '';
+
   const strokeColor = isSelected ? '#ff6a00' : '#0a0a0a';
   const strokeWidth = isSelected ? 2.5 : 1.5;
   const w = isSelected ? 38 : 30;
@@ -60,6 +82,7 @@ function pinSvg(type: SpotType, condition: string, isSelected = false): string {
     <circle cx="15" cy="15" r="9" fill="rgba(0,0,0,0.22)"/>
     <text x="15" y="15.5" text-anchor="middle" font-size="12" dominant-baseline="middle">${info.emoji}</text>
     ${cross}
+    ${bollino}
   </svg>`;
 }
 
@@ -103,7 +126,7 @@ function computeGridClusters(spots: SpotMapPin[], zoom: number) {
 export default function SpotMap({
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
-  locateTrigger, onLocatingChange, onBoundsChanged, darkMap: darkMapProp, onUserLocated,
+  locateTrigger, onLocatingChange, onLocateError, onBoundsChanged, darkMap: darkMapProp, onUserLocated,
 }: SpotMapProps) {
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
@@ -227,12 +250,35 @@ export default function SpotMap({
          scavalcare la sua vista. */
       map.once('dragstart', () => { hasInitialFit.current = true; });
 
-      /* ── Geolocalizzazione automatica all'avvio ──
-         Prima si apriva a zoom paese (5): il primo fotogramma era una cartina
-         politica dell'Europa, e la domanda con cui il rider apre l'app
-         («c'è qualcosa vicino a me?») restava senza risposta. Ora si apre a
-         livello città, dove i pin sono spot riconoscibili e non cluster. */
-      if (navigator.geolocation) {
+      /* ── Posizione all'avvio, ma solo per chi l'ha gia' concessa ──
+         Si apre a livello citta' invece che a zoom paese: il primo fotogramma
+         deve rispondere a «c'e' qualcosa vicino a me?», non mostrare una
+         cartina politica dell'Europa.
+         Ma la richiesta NON parte piu' a freddo. Prima `getCurrentPosition`
+         veniva chiamata all'init: il prompt di sistema compariva entro un
+         secondo dall'apertura, sopra al banner cookie, prima che il rider
+         avesse un motivo per dire di si'. Chi negava perdeva ordinamento per
+         vicinanza, distanze sulle card e "portami li'" — e la scelta resta
+         appiccicata alle visite successive.
+         Ora si parte solo se il permesso e' gia' stato dato: in quel caso il
+         browser non chiede niente e l'esperienza resta identica. A tutti gli
+         altri lo chiede la card di benvenuto, con un tap esplicito. */
+      const chiedibileInSilenzio = async (): Promise<boolean> => {
+        try {
+          if (localStorage.getItem(GEO_CONCESSA_KEY) === '1') return true;
+        } catch { /* storage negato: si prosegue col Permissions API */ }
+        try {
+          const p = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+          return p.state === 'granted';
+        } catch {
+          /* Safari non espone geolocation nel Permissions API: senza risposta
+             non si rischia il prompt a freddo, decide il tap. */
+          return false;
+        }
+      };
+
+      if (navigator.geolocation) void chiedibileInSilenzio().then((ok) => {
+        if (!ok) return;
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             if (!mapInstance.current || !L) return;
@@ -265,10 +311,10 @@ export default function SpotMap({
 
             onUserLocatedRef.current?.({ lat: latitude, lon: longitude });
           },
-          () => { /* permesso negato → nessuna azione */ },
+          () => { /* permesso revocato fra un giro e l'altro → nessuna azione */ },
           { timeout: 6000, maximumAge: 300_000 }
         );
-      }
+      });
 
       /* Click sulla mappa → radius mode */
       map.on('click', (e) => {
@@ -368,7 +414,7 @@ export default function SpotMap({
 
         // Usa selPinRef (sempre aggiornato) per rendere l'icona corretta
         const isSel = selPinRef.current?.id === pin.id;
-        const svg   = pinSvg(pin.type, pin.condition, isSel);
+        const svg   = pinSvg(pin.type, pin.condition, isSel, pin.condition_updated_at);
         const pw    = isSel ? 48 : 38;
         const ph    = isSel ? 60 : 48;
         const icon  = L!.divIcon({
@@ -481,7 +527,7 @@ export default function SpotMap({
       if (marker) {
         const pin = filteredRef.current.find(s => s.id === prevSelId);
         if (pin) {
-          const svg  = pinSvg(pin.type, pin.condition, false);
+          const svg  = pinSvg(pin.type, pin.condition, false, pin.condition_updated_at);
           const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
           marker.setIcon(icon);
         }
@@ -492,7 +538,7 @@ export default function SpotMap({
     if (selectedPin) {
       const marker = pinMarkersRef.current.get(selectedPin.id);
       if (marker) {
-        const svg  = pinSvg(selectedPin.type, selectedPin.condition, true);
+        const svg  = pinSvg(selectedPin.type, selectedPin.condition, true, selectedPin.condition_updated_at);
         const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [48, 60], iconAnchor: [24, 60], popupAnchor: [0, -62] });
         marker.setIcon(icon);
       }
@@ -652,14 +698,30 @@ export default function SpotMap({
               .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
           }
         }
+        /* Da qui in poi il permesso c'e': le prossime visite possono
+           localizzare all'avvio senza far comparire nessun prompt. */
+        try { localStorage.setItem(GEO_CONCESSA_KEY, '1'); } catch { /* */ }
         onUserLocatedRef.current?.({ lat: latitude, lon: longitude });
         setLocating(false);
         onLocatingChange?.(false);
       },
-      () => { setLocating(false); onLocatingChange?.(false); },
+      (err) => {
+        setLocating(false);
+        onLocatingChange?.(false);
+        /* PERMISSION_DENIED (1) e' il caso che confondeva: il permesso era
+           stato negato in una visita precedente, il browser rifiuta senza
+           chiedere niente e il bottone sembrava semplicemente rotto. */
+        onLocateError?.(
+          err.code === err.PERMISSION_DENIED
+            ? 'Posizione bloccata per questo sito. Sbloccala dal lucchetto accanto all\'indirizzo, poi riprova.'
+            : err.code === err.TIMEOUT
+              ? 'Il GPS ci sta mettendo troppo. Riprova all\'aperto.'
+              : 'Non riesco a leggere la posizione.',
+        );
+      },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  }, [onLocatingChange]);
+  }, [onLocatingChange, onLocateError]);
 
   /* Cambia tile layer quando darkMapProp cambia */
   useEffect(() => {

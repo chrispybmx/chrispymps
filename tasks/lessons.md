@@ -171,3 +171,62 @@ solo che una capacita' non esiste. Vanno letti nella console di **produzione**, 
 in sviluppo l'header puo' essere diverso. E vale la pena rileggere ogni direttiva
 chiedendosi "questa lista copre davvero le risorse che il sito usa?", invece di
 fidarsi che una policy restrittiva sia per definizione corretta.
+
+## 2026-08-23 — Una query che caricava i dati e poi li buttava
+
+`/api/spots` selezionava `spot_photos (url, position)`, ordinava, e teneva
+`sorted[0]`. `photo_urls` restava vuoto. Sulla mappa la card espansa mostrava
+quindi sempre una foto sola, e tutto il carosello — strip scroll-snap, puntini,
+frecce, lightbox, piu' il workaround non-passivo per Safari — era codice
+irraggiungibile. Misurato: 57 spot su 117 ne avevano piu' di una, 91 foto non
+si vedevano.
+
+Niente lo segnalava: tsc pulito, 122 test verdi, build verde, zero errori in
+console. Un test avrebbe potuto coprirlo solo controllando il CONTRATTO della
+rotta, non il suo tipo — `photo_urls` era dichiarato opzionale, quindi non
+popolarlo era legale per TypeScript.
+
+Lezione: quando una query carica dei campi che poi non compaiono nella risposta,
+o la query e' sbagliata o la risposta lo e'. Vale la pena confrontare cosa si
+chiede al database con cosa esce dalla rotta.
+
+Costo della correzione, misurato: payload gzip da 11.2 KB a 12.7 KB. Gli URL
+condividono un prefisso lungo, quindi 91 foto in piu' pesano 1.4 KB.
+
+## 2026-08-23 — Due policy permissive in OR non restringono niente
+
+`schema.sql` aveva dal primo giorno:
+
+    create policy "public read photos of approved spots" on spot_photos
+      for select using (exists(select 1 from spots
+                                where spots.id = spot_photos.spot_id
+                                  and spots.status = 'approved'));
+
+Poi `20260429_phase1_contributions.sql` ha aggiunto la moderazione delle foto e
+la policy corretta ("Public read approved photos", che guarda
+`moderation_status`) — ma non ha rimosso la vecchia.
+
+In Postgres le policy permissive sulla stessa operazione si sommano in OR:
+basta che UNA passi. La nuova quindi non restringeva nulla, e ogni foto
+caricata era pubblicamente leggibile prima di essere moderata.
+
+Lezione: aggiungere una policy piu' stretta non stringe. Bisogna togliere
+quella larga. Quando una migration introduce uno stato di moderazione, la
+domanda da farsi e' «quali policy ESISTENTI ignorano questa colonna?».
+
+Verifica: `select policyname, qual from pg_policies where tablename = '...' and cmd = 'SELECT';`
+
+## 2026-08-23 — Il permesso di posizione chiesto prima di dare un motivo
+
+`SpotMap` chiamava `getCurrentPosition` dentro l'init della mappa: il prompt di
+sistema compariva entro un secondo dall'apertura, sopra al banner cookie, prima
+che il rider sapesse cosa fosse il sito. Da quel permesso dipendeva tutto —
+ordinamento per vicinanza, distanze sulle card, "portami li'" — e un no resta
+appiccicato alle visite successive.
+
+Peggio: la card di benvenuto diceva «attiva la posizione» e offriva un bottone
+che si limitava a chiudersi. Il consiglio senza il mezzo per seguirlo.
+
+Ora la richiesta automatica parte solo se il permesso c'e' gia' (Permissions
+API, piu' un flag nostro in localStorage perche' Safari non espone
+`geolocation` li' dentro). A tutti gli altri lo chiede un tap esplicito.

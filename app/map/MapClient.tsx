@@ -523,8 +523,11 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         // Chiudi card → torna a lista
         snapTo(DEFAULT_PANEL_H());
       } else {
-        // Apri anteprima — foto + info + VEDI SPOT ben visibile
-        snapTo(400);
+        /* Apri anteprima — foto + info + VEDI SPOT ben visibile.
+           Il tetto e' relativo allo schermo: con i 400px fissi di prima, su un
+           viewport sotto i ~645px si superava la soglia di auto-hide (62%) e
+           aprire uno spot faceva sparire i bottoni GPS e raggio. */
+        snapTo(Math.min(400, Math.round(window.innerHeight * 0.58)));
       }
       return isClosing ? null : pin.id;
     });
@@ -598,6 +601,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           onMapClick={handleMapClick}
           locateTrigger={locateTrigger}
           onLocatingChange={setIsLocating}
+          onLocateError={(m) => toast(m, 'error')}
           onBoundsChanged={setMapBounds}
           darkMap={darkMap}
           onUserLocated={setUserPos}
@@ -1078,6 +1082,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           setFlyTarget({ lat: nearestOverall.spot.lat, lon: nearestOverall.spot.lon, zoom: 16 });
           handleSpotClick(nearestOverall.spot);
         }}
+        /* Stesso percorso del tasto GPS: un solo posto che chiede la posizione. */
+        onAttivaPosizione={() => setLocateTrigger(n => n + 1)}
       />
     </div>
   );
@@ -1384,9 +1390,20 @@ function SpotListPanel({
                     )}
                     {/* Gradient bottom */}
                     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 50, background: 'linear-gradient(transparent, rgba(0,0,0,0.7))', pointerEvents: 'none' }} />
-                    {/* Type badge */}
-                    <div style={{ position: 'absolute', bottom: 6, left: 8, fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
-                      {tipo.emoji} {tipo.label.toUpperCase()}
+                    {/* Type badge + origine copertina */}
+                    <div style={{ position: 'absolute', bottom: 6, left: 8, display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: tipo.color, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: 3 }}>
+                        {tipo.emoji} {tipo.label.toUpperCase()}
+                      </span>
+                      {/* 26 copertine su 116 sono fermi immagine da Street View. Il
+                          bollino esisteva solo nella scheda spot: qui passavano per
+                          scatti veri, ed e' proprio la griglia che si guarda per prima. */}
+                      {spot.cover_source === 'streetview' && (
+                        <span title="Foto presa da mappa, non scattata sul posto"
+                          style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#ffce4d', background: 'rgba(0,0,0,0.6)', padding: '2px 5px', borderRadius: 3 }}>
+                          🗺️
+                        </span>
+                      )}
                     </div>
                     {/* Stato + freschezza */}
                     <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex' }}>
@@ -1529,6 +1546,12 @@ function SpotListPanel({
                         {tipo.emoji} {tipo.label.toUpperCase()}
                       </span>
                       <FreshnessDot condition={spot.condition} updatedAt={spot.condition_updated_at} variant="label" />
+                      {/* Segue la foto che stai guardando, non solo la copertina. */}
+                      {spot.photo_sources?.[curPhotoIdx] === 'streetview' && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ffce4d', background: 'rgba(0,0,0,0.68)', border: '1px solid rgba(255,206,77,0.45)', padding: '3px 7px', borderRadius: 4 }}>
+                          🗺️ foto da mappa
+                        </span>
+                      )}
                     </div>
 
                     {/* Close — top-right only (fav moved to CTA bar) */}

@@ -77,6 +77,12 @@ export interface SpotMapPin {
   condition_updated_at?: string;
   cover_url?:   string;    // prima foto
   photo_urls?:  string[];  // tutte le foto ordinate
+  /** Origine della copertina. Una foto presa da Street View non documenta lo
+      spot: dirlo anche sulle card evita che passi per uno scatto vero. */
+  cover_source?: 'rider' | 'streetview';
+  /** Origine di ogni foto, allineata per indice a `photo_urls`. Serve alla card
+      espansa, che sfoglia: il bollino deve seguire la foto che stai guardando. */
+  photo_sources?: (string | null)[];
   description?: string;
   difficulty?:  string;
   submitted_by_username?: string;

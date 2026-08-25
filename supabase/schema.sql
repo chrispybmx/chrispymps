@@ -99,10 +99,14 @@ alter table flags enable row level security;
 create policy "public read approved spots" on spots
   for select using (status = 'approved');
 
-create policy "public read photos of approved spots" on spot_photos
-  for select using (exists(
-    select 1 from spots where spots.id = spot_photos.spot_id and spots.status = 'approved'
-  ));
+-- La lettura pubblica delle foto NON e' definita qui: la definisce
+-- 20260429_phase1_contributions.sql ("Public read approved photos"), che
+-- guarda anche `moderation_status`.
+--
+-- Qui c'era una policy che apriva ogni foto di uno spot approvato senza
+-- guardare lo stato di moderazione. Le policy permissive in Postgres si
+-- sommano in OR, quindi quella piu' larga vinceva e le foto in attesa erano
+-- pubbliche. Rimossa dal database da 20260823_drop_stale_photo_policy.sql.
 
 create policy "public read status updates" on spot_status_updates
   for select using (true);
