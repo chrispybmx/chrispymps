@@ -1,203 +1,306 @@
-// ChrispyMPS Service Worker
-// Strategia: cache-first per assets statici, network-first per API, stale-while-revalidate per pagine città
+// Chrispy Maps Service Worker
+//
+// Strategie: cache-first per gli asset, stale-while-revalidate per pagine e
+// dati della mappa, network-only per tutto il resto delle API.
+//
+// NB: /sw.js e' escluso dal matcher del middleware, quindi questo file NON
+// riceve header CSP e le fetch qui dentro non sono ristrette. Il CSP della
+// pagina governa solo la registrazione (worker-src), non il traffico interno.
 
-const CACHE_VERSION = 'v1';
-const STATIC_CACHE  = `chrispymps-static-${CACHE_VERSION}`;
-const MAP_CACHE     = `chrispymps-map-${CACHE_VERSION}`;
-const PAGE_CACHE    = `chrispymps-pages-${CACHE_VERSION}`;
+const CACHE_VERSION = 'v3';
+const STATIC_CACHE  = `chrispymaps-static-${CACHE_VERSION}`;
+const MAP_CACHE     = `chrispymaps-map-${CACHE_VERSION}`;
+const PAGE_CACHE    = `chrispymaps-pages-${CACHE_VERSION}`;
+const DATA_CACHE    = `chrispymaps-data-${CACHE_VERSION}`;
+const PHOTO_CACHE   = `chrispymaps-photos-${CACHE_VERSION}`;
 
+const CACHES_ATTIVE = [STATIC_CACHE, MAP_CACHE, PAGE_CACHE, DATA_CACHE, PHOTO_CACHE];
+
+/* Nessun font qui dentro: i font passano da next/font/google, che li scarica
+   in fase di build e li serve da /_next/static/media. Il sito non contatta mai
+   fonts.googleapis.com, quindi precaricarne il CSS teneva in cache un file che
+   nessuno chiede mai. */
 const STATIC_ASSETS = [
   '/',
   '/map',
   '/offline',
   '/manifest.json',
-  'https://fonts.googleapis.com/css2?family=VT323&family=Barlow+Condensed:wght@400;600;700&display=swap',
 ];
 
-// Tile OSM da cachare per offline (quando l'utente visita una zona)
-const OSM_TILE_ORIGINS = [
-  'https://a.tile.openstreetmap.org',
-  'https://b.tile.openstreetmap.org',
-  'https://c.tile.openstreetmap.org',
-];
+/* Tetti per cache. Senza, le tile crescono all'infinito: navigare una citta'
+   a piu' zoom ne produce centinaia, e quando il browser sfonda la quota puo'
+   buttare via TUTTO lo storage dell'origine — precache compreso. */
+const MAX_TILE  = 600;   // ~15-25 KB l'una → nell'ordine dei 10 MB
+const MAX_PHOTO = 60;
+
+/* Le tile della mappa. Il tema chiaro (predefinito) usa OSM, quello scuro
+   CARTO: prima c'era solo OSM, quindi chi mappava al buio non aveva cache. */
+function isTile(url) {
+  return url.hostname.endsWith('.tile.openstreetmap.org')
+      || url.hostname.endsWith('.basemaps.cartocdn.com');
+}
+
+/* Solo le foto pubbliche degli spot. Il resto di Supabase — auth, query,
+   realtime — non va mai toccato. */
+function isSpotPhoto(url) {
+  return url.hostname.endsWith('.supabase.co')
+      && url.pathname.startsWith('/storage/v1/object/public/spot-photos/');
+}
 
 // ===== INSTALL =====
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[SW] Alcuni asset statici non cachati:', err);
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(STATIC_CACHE)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .catch((err) => {
+        /* addAll e' atomica: se un solo URL fallisce non viene salvato niente.
+           Si logga e si prosegue, il sito funziona comunque online. */
+        console.warn('[SW] precache fallito:', err);
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
 // ===== ACTIVATE =====
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => ![STATIC_CACHE, MAP_CACHE, PAGE_CACHE].includes(key))
-          .map((key) => caches.delete(key))
-      )
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(
+        keys.filter((k) => !CACHES_ATTIVE.includes(k)).map((k) => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
 // ===== FETCH =====
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
-
-  // Non intercettare richieste non-GET, Supabase, o admin routes
   if (request.method !== 'GET') return;
-  if (url.hostname.includes('supabase.co')) return;
+
+  const url = new URL(request.url);
   if (url.pathname.startsWith('/admin')) return;
+  if (url.pathname.startsWith('/api/admin')) return;
 
-  // Tile OSM → cache-first con TTL 7 giorni
-  if (OSM_TILE_ORIGINS.some((origin) => request.url.startsWith(origin))) {
-    event.respondWith(cacheFirstWithTTL(request, MAP_CACHE, 7 * 24 * 60 * 60));
+  // Tile della mappa → cache-first con scadenza a 7 giorni
+  if (isTile(url)) {
+    event.respondWith(cacheFirstConTTL(request, MAP_CACHE, 7 * 24 * 60 * 60, MAX_TILE));
     return;
   }
 
-  // API interne → network-only (dati sempre freschi)
+  // Foto degli spot → cache-first, tetto basso
+  if (isSpotPhoto(url)) {
+    event.respondWith(cacheFirst(request, PHOTO_CACHE, MAX_PHOTO));
+    return;
+  }
+
+  // Il resto di Supabase non si tocca (auth, query, realtime)
+  if (url.hostname.endsWith('.supabase.co') || url.hostname.endsWith('.supabase.in')) return;
+
+  /* Gli spot della mappa → stale-while-revalidate.
+     Prima erano network-only come ogni API: aprire il sito senza rete dava una
+     mappa che si disegnava, con le tile in cache, e zero spot sopra. Cioe' la
+     modalita' offline esisteva ma non serviva a niente, che e' il contrario
+     della funzione bandiera di app come park4night.
+     Ora l'ultima lista buona resta salvata: offline vedi gli spot dell'ultima
+     volta, e appena c'e' rete si aggiornano da soli. */
+  if (url.origin === self.location.origin && url.pathname === '/api/spots') {
+    event.respondWith(staleWhileRevalidate(request, DATA_CACHE));
+    return;
+  }
+
+  // Ogni altra API → solo rete, con un errore leggibile se non c'e'
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(request).catch(() => new Response('{"error":"offline"}', {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' },
-    })));
+    event.respondWith(
+      fetch(request).catch(() => new Response(
+        JSON.stringify({ ok: false, error: 'offline' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      ))
+    );
     return;
   }
 
-  // Pagine città → stale-while-revalidate
-  if (url.pathname.startsWith('/map/') && !url.pathname.includes('.')) {
+  // Pagine mappa e spot → stale-while-revalidate
+  if (url.pathname.startsWith('/map') && !url.pathname.includes('.')) {
     event.respondWith(staleWhileRevalidate(request, PAGE_CACHE));
     return;
   }
 
-  // Assets statici (js, css, fonts, images) → cache-first
-  if (
-    url.pathname.match(/\.(js|css|woff2?|png|jpg|webp|svg|ico)$/) ||
-    url.hostname === 'fonts.googleapis.com' ||
-    url.hostname === 'fonts.gstatic.com'
-  ) {
+  // Asset statici → cache-first
+  if (url.pathname.match(/\.(js|css|woff2?|png|jpg|jpeg|webp|svg|ico)$/)) {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
     return;
   }
 
-  // Default → network con fallback cache
+  // Default → rete, con la cache come rete di sicurezza
   event.respondWith(
     fetch(request)
       .then((response) => {
         if (response.ok) {
           const clone = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+          caches.open(PAGE_CACHE).then((cache) => cache.put(request, clone));
         }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || offlinePage()))
+      .catch(async () => (await caches.match(request)) || paginaOffline())
   );
 });
 
-// ===== PUSH NOTIFICATIONS (futuro) =====
+// ===== PUSH =====
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  const data = event.data.json();
+  let data = {};
+  try { data = event.data.json(); } catch { return; }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'ChrispyMPS', {
-      body: data.body || 'Nuovo spot approvato vicino a te!',
-      icon: '/icons/icon-192.png',
+    self.registration.showNotification(data.title || 'Chrispy Maps', {
+      body:  data.body || 'Nuovo spot approvato vicino a te',
+      icon:  '/icons/icon-192.png',
       badge: '/icons/icon-72.png',
-      data: { url: data.url || '/map' },
+      data:  { url: data.url || '/map' },
     })
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(
-    clients.openWindow(event.notification.data?.url || '/map')
-  );
+  event.waitUntil(clients.openWindow(event.notification.data?.url || '/map'));
 });
 
-// ===== HELPERS =====
+// ===== HELPER =====
 
-async function cacheFirst(request, cacheName) {
-  const cached = await caches.match(request);
+/** Toglie le voci piu' vecchie quando la cache supera il tetto.
+ *  Cache Storage restituisce le chiavi in ordine di inserimento, quindi
+ *  eliminare dalla testa scarta le piu' vecchie.
+ *  Il controllo non gira a ogni scrittura: contare centinaia di chiavi per
+ *  ogni tile costerebbe piu' della tile stessa. */
+async function sfoltisci(cache, massimo) {
+  if (Math.random() > 0.1) return;
+  const keys = await cache.keys();
+  const troppe = keys.length - massimo;
+  if (troppe > 0) await Promise.all(keys.slice(0, troppe).map((k) => cache.delete(k)));
+}
+
+/** Scarica una risorsa di altra origine in modo LEGGIBILE.
+ *
+ *  Il punto delicato di tutto questo file. Leaflet e i tag <img> chiedono le
+ *  immagini in `no-cors`, e la risposta che ne esce e' opaca: corpo illeggibile,
+ *  `status` 0 e `ok` sempre falso. Ogni `if (response.ok)` la scarta in
+ *  silenzio — ed e' il motivo per cui la cache delle tile e' rimasta a zero
+ *  voci da sempre, anche dopo aver sbloccato il service worker.
+ *
+ *  Rifacendo la richiesta in `cors` si ottiene una risposta vera: tile.openstreetmap.org,
+ *  basemaps.cartocdn.com e lo storage di Supabase rispondono tutti con
+ *  `access-control-allow-origin: *` (verificato).
+ *
+ *  Se il giro CORS non riesce si lascia passare la richiesta originale senza
+ *  salvarla: meglio una tile non messa in cache che una tile vuota. */
+async function fetchLeggibile(request) {
+  try {
+    const r = await fetch(request.url, { mode: 'cors', credentials: 'omit' });
+    if (r.ok && r.type !== 'opaque') return { risposta: r, salvabile: true };
+  } catch { /* si ripiega sulla richiesta originale */ }
+  return { risposta: await fetch(request), salvabile: false };
+}
+
+async function cacheFirst(request, cacheName, massimo) {
+  const cache  = await caches.open(cacheName);
+  const cached = await cache.match(request);
   if (cached) return cached;
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, response.clone());
+    const { risposta, salvabile } = await fetchLeggibile(request);
+    if (salvabile) {
+      await cache.put(request, risposta.clone());
+      if (massimo) await sfoltisci(cache, massimo);
     }
-    return response;
+    return risposta;
   } catch {
-    return offlinePage();
+    return paginaOffline();
   }
 }
 
-async function cacheFirstWithTTL(request, cacheName, ttlSeconds) {
-  const cache = await caches.open(cacheName);
+async function cacheFirstConTTL(request, cacheName, ttlSecondi, massimo) {
+  const cache  = await caches.open(cacheName);
   const cached = await cache.match(request);
   if (cached) {
-    const fetchedAt = cached.headers.get('sw-fetched-at');
-    if (fetchedAt) {
-      const age = (Date.now() - parseInt(fetchedAt)) / 1000;
-      if (age < ttlSeconds) return cached;
-    } else {
-      return cached; // cache senza timestamp → usa comunque
-    }
+    const salvataA = cached.headers.get('sw-fetched-at');
+    if (!salvataA) return cached;
+    if ((Date.now() - Number(salvataA)) / 1000 < ttlSecondi) return cached;
   }
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const headers = new Headers(response.headers);
-      headers.set('sw-fetched-at', Date.now().toString());
-      const modified = new Response(await response.blob(), { status: response.status, headers });
-      cache.put(request, modified);
-      return modified;
-    }
-    return response;
+    const { risposta, salvabile } = await fetchLeggibile(request);
+    /* Senza risposta leggibile non si tocca il corpo: leggere il blob di una
+       risposta opaca restituisce zero byte, e rimetterla in circolo darebbe
+       una tile vuota, cioe' un buco grigio al posto della mappa. */
+    if (!salvabile) return risposta;
+
+    const headers = new Headers(risposta.headers);
+    headers.set('sw-fetched-at', String(Date.now()));
+    const copia = new Response(await risposta.blob(), { status: risposta.status, headers });
+    await cache.put(request, copia.clone());
+    if (massimo) await sfoltisci(cache, massimo);
+    return copia;
   } catch {
+    /* Scaduta ma senza rete: una tile vecchia vale piu' di un buco grigio. */
     return cached || new Response('', { status: 503 });
   }
 }
 
+/** Serve subito la copia in cache e intanto aggiorna.
+ *
+ *  La versione precedente finiva con `cached || fetchPromise || paginaOffline()`:
+ *  una Promise e' sempre vera, quindi paginaOffline() era irraggiungibile, e se
+ *  la rete cadeva la funzione restituiva null. Un respondWith(null) non e' una
+ *  risposta: il browser mostrava il proprio errore di rete al posto della
+ *  pagina offline scritta apposta. */
 async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
+  const cache  = await caches.open(cacheName);
   const cached = await cache.match(request);
-  const fetchPromise = fetch(request).then((response) => {
-    if (response.ok) cache.put(request, response.clone());
-    return response;
-  }).catch(() => null);
-  return cached || fetchPromise || offlinePage();
+
+  const inArrivo = fetch(request)
+    .then((response) => {
+      if (response.ok) cache.put(request, response.clone());
+      return response;
+    })
+    .catch(() => null);
+
+  if (cached) {
+    /* Aggiorna in sottofondo senza far aspettare nessuno. */
+    inArrivo.catch(() => {});
+    return cached;
+  }
+
+  const dallaRete = await inArrivo;
+  if (dallaRete) return dallaRete;
+
+  /* Ultima spiaggia prima della pagina offline: la copia messa da parte
+     all'installazione vive in STATIC_CACHE, non in questa. Senza questo
+     passaggio, aprire /map senza rete alla prima visita mostrerebbe la pagina
+     offline pur avendo la mappa gia' salvata. */
+  return (await caches.match(request)) || paginaOffline();
 }
 
-function offlinePage() {
+function paginaOffline() {
   return new Response(
     `<!DOCTYPE html>
 <html lang="it">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ChrispyMPS — Offline</title>
+<title>Chrispy Maps — Offline</title>
 <style>
-  body { background:#0a0a0a; color:#f3ead8; font-family:'VT323',monospace; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; text-align:center; }
-  h1 { color:#ff6a00; font-size:3rem; margin-bottom:0.5rem; }
-  p { font-size:1.2rem; opacity:0.7; }
+  body { background:#0a0a0a; color:#f3ead8; font-family:monospace; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }
+  h1 { color:#ff6a00; font-size:2.5rem; margin-bottom:0.5rem; }
+  p { font-size:1.05rem; opacity:0.75; line-height:1.6; }
   a { color:#ff6a00; }
 </style>
 </head>
 <body>
   <div>
-    <h1>📡 NO SIGNAL</h1>
-    <p>Sei offline. Connettiti e riprova.</p>
-    <p><a href="/map">↩ Torna alla mappa</a></p>
+    <h1>NO SIGNAL</h1>
+    <p>Sei offline.<br>Gli spot che hai gia' aperto restano disponibili.</p>
+    <p><a href="/map">Torna alla mappa</a></p>
   </div>
 </body>
 </html>`,
-    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+    { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
   );
 }

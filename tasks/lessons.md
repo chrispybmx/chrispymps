@@ -230,3 +230,53 @@ che si limitava a chiudersi. Il consiglio senza il mezzo per seguirlo.
 Ora la richiesta automatica parte solo se il permesso c'e' gia' (Permissions
 API, piu' un flag nostro in localStorage perche' Safari non espone
 `geolocation` li' dentro). A tutti gli altri lo chiede un tap esplicito.
+
+## 2026-08-24 — Le risposte opache: `response.ok` e' sempre falso
+
+La cache delle tile non ha MAI funzionato. Non per il CSP (quello era un altro
+bug, risolto ieri): per questo.
+
+Leaflet carica le tile con dei tag `<img>`. Una richiesta di immagine
+cross-origin parte in modalita' `no-cors`, e cio' che torna e' una **risposta
+opaca**: corpo illeggibile, `status` a 0, `ok` sempre `false`. Quindi il
+classico
+
+    const response = await fetch(request);
+    if (response.ok) cache.put(request, response.clone());
+
+scarta ogni singola tile, in silenzio, per sempre. Misurato: `chrispymaps-map`
+a 0 voci dopo aver navigato la mappa.
+
+Peggio, il tentativo di allegare un timestamp:
+
+    new Response(await response.blob(), ...)
+
+su una risposta opaca produce un corpo VUOTO. Se quella fosse finita in cache,
+la mappa avrebbe mostrato buchi grigi al posto delle tile — un bug peggiore di
+non avere cache.
+
+Soluzione: rifare la richiesta in `mode: 'cors'` dentro il service worker.
+tile.openstreetmap.org, basemaps.cartocdn.com e lo storage di Supabase mandano
+tutti `access-control-allow-origin: *` (verificato con curl). Cosi' la risposta
+e' leggibile, `ok` significa qualcosa e il corpo si puo' toccare.
+
+Verificato dopo il fix, in Chrome vero, con il server SPENTO: 24 tile in cache
+da 21.980 byte l'una, 118 spot, 17 pin disegnati, mappa perfettamente usabile.
+
+Regola: dentro un service worker, `response.ok` non e' un controllo valido su
+risorse di altra origine finche' non sai che la risposta non e' opaca.
+
+## 2026-08-24 — Una cache senza tetto e' una bomba a orologeria
+
+MAP_CACHE non aveva limiti. Le tile sono ~20 KB e navigare una citta' a piu'
+zoom ne genera centinaia. Quando il browser sfonda la quota dell'origine non
+cancella solo la cache piu' grossa: puo' buttare via TUTTO lo storage, precache
+e pagina offline comprese. Le risposte opache contano poi molto piu' del loro
+peso reale.
+
+Aggiunto un tetto (600 tile, 60 foto) con scarto delle piu' vecchie. Il
+controllo non gira a ogni scrittura — contare centinaia di chiavi per ogni tile
+costerebbe piu' della tile — ma una volta su dieci.
+
+Workbox risolve la stessa cosa con ExpirationPlugin({ maxEntries }). Vale la
+pena leggere come lo fanno loro prima di scrivere il proprio.
