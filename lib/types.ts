@@ -1,8 +1,27 @@
 // ChrispyMPS — Tipi TypeScript
 
+/** DOVE sei. Un solo valore per spot.
+ *
+ *  `rail`, `ledge`, `gap`, `bowl` e `transition` restano qui dentro perche' 39
+ *  spot su 118 li hanno ancora come `type`: sono ostacoli finiti nel campo
+ *  sbagliato quando il campo era uno solo. Toglierli adesso farebbe restituire
+ *  `undefined` a TIPI_SPOT[spot.type] e la mappa andrebbe in crash.
+ *  Spariranno quando quei 39 avranno un contesto assegnato. */
 export type SpotType =
   | 'street' | 'transition' | 'park' | 'diy' | 'rail' | 'ledge'
   | 'trail'  | 'plaza' | 'gap' | 'bowl' | 'pumptrack';
+
+/** COSA c'e'. Quanti se ne vuole per spot.
+ *
+ *  Un ostacolo non dice dove sei: un bank puo' stare contro un muro in centro
+ *  (street) o dentro uno skatepark. Per questo e' un campo separato da
+ *  SpotType, e per questo `transition` non e' piu' una categoria: e' `bank` e
+ *  `quarter`, che e' come li chiamano i rider. */
+export type Ostacolo =
+  | 'rail' | 'ledge' | 'hubba' | 'stairs' | 'gap' | 'drop'
+  | 'bank' | 'quarter' | 'spine' | 'box' | 'kicker'
+  | 'manual_pad' | 'wallride' | 'pole_jam' | 'curb'
+  | 'bowl' | 'dirt_jump' | 'flat';
 
 export type SpotStatus    = 'pending' | 'approved' | 'rejected' | 'archived';
 export type SpotCondition = 'alive' | 'bustato' | 'demolito';
@@ -47,6 +66,8 @@ export interface Spot {
   condition_updated_at: string;
   status:               SpotStatus;
   youtube_url?:         string;
+  /** Cosa c'e' sullo spot — vedi il tipo Ostacolo. */
+  ostacoli?:            Ostacolo[];
   surface?:             string;
   wax_needed:           boolean;
   guardians?:           string;
@@ -75,6 +96,8 @@ export interface SpotMapPin {
   condition: SpotCondition;
   /** Ultima conferma dello stato — alimenta lib/freshness.ts sulle card. */
   condition_updated_at?: string;
+  /** Cosa c'e' sullo spot. Vuoto sugli spot vecchi: si riempie col tempo. */
+  ostacoli?:    Ostacolo[];
   cover_url?:   string;    // prima foto
   photo_urls?:  string[];  // tutte le foto ordinate
   /** Origine della copertina. Una foto presa da Street View non documenta lo

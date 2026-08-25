@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, DIFFICOLTA, CONDIZIONI, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
+import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, OSTACOLI, DIFFICOLTA, CONDIZIONI, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
 import { reverseGeocode } from '@/lib/geocoding';
-import type { SpotType, SpotMapPin } from '@/lib/types';
+import type { Ostacolo, SpotType, SpotMapPin } from '@/lib/types';
 import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
@@ -285,6 +285,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   /* Step 3 */
   const [name,        setName]        = useState('');
   const [type,        setType]        = useState<SpotType | ''>('');
+  /* Cosa c'e' sullo spot. Separato dal tipo perche' un bank puo' stare contro
+     un muro in centro o dentro un park: l'ostacolo non dice dove sei. */
+  const [ostacoli,    setOstacoli]    = useState<Ostacolo[]>([]);
   const [description, setDescription] = useState('');
   const [notes,       setNotes]       = useState('');
   const [difficulty,  setDifficulty]  = useState<string>('');
@@ -360,7 +363,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setCoordInput(''); setCoordError(null);
     setGpsState('idle');
     setPhotos([]);
-    setName(''); setType(''); setDescription(''); setNotes('');
+    setName(''); setType(''); setOstacoli([]); setDescription(''); setNotes('');
     setError(null); setSubmitting(false);
     setNearbySpots([]); setNearbyDismissed(false);
     setPreUploadedUrls([]); setUploading(false);
@@ -487,6 +490,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: name.trim(), type, lat, lon,
+            ostacoli,
             city: city || undefined,
             country: country || undefined,
             country_code: countryCode || undefined,
@@ -502,6 +506,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         const fd = new FormData();
         fd.append('data', JSON.stringify({
           name: name.trim(), type, lat, lon,
+          ostacoli,
           city: city || undefined,
           country: country || undefined,
           country_code: countryCode || undefined,
@@ -1031,6 +1036,35 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       {info.emoji} {info.label}
                     </button>
                   ))}
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Cosa c&apos;è (opzionale)</label>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
+                  Scegline quanti vuoi. Serve a chi cerca un rail o un bank.
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {(Object.entries(OSTACOLI) as [Ostacolo, typeof OSTACOLI[Ostacolo]][]).map(([o, info]) => {
+                    const scelto = ostacoli.includes(o);
+                    return (
+                      <button
+                        key={o}
+                        onClick={() => setOstacoli(prev =>
+                          prev.includes(o) ? prev.filter(x => x !== o) : prev.length >= 8 ? prev : [...prev, o]
+                        )}
+                        style={{
+                          padding: '6px 11px',
+                          border: `1px solid ${scelto ? 'var(--orange)' : 'var(--gray-600)'}`,
+                          borderRadius: 2,
+                          background: scelto ? 'var(--orange)' : 'transparent',
+                          color: scelto ? 'var(--black)' : 'var(--bone)',
+                          fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', transition: 'all 0.1s',
+                        }}
+                      >
+                        {info.emoji} {info.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div>

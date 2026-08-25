@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { TIPI_SPOT, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
-import type { SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
+import { TIPI_SPOT, OSTACOLI, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
+import type { Ostacolo, SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
 import { geocodeForward, type GeoPlace } from '@/lib/geocoding';
 import { useUser } from '@/hooks/useUser';
 import SideMenu from './SideMenu';
@@ -15,11 +15,15 @@ interface TopBarProps {
   onFilterRegion:    (region: string | null) => void;
   onFilterCondition: (condition: SpotCondition | null) => void;
   onFilterDifficulty:(difficulty: string | null) => void;
+  /** «Dove trovo un rail» e' la domanda vera del rider. Fino a ora il sito non
+   *  poteva rispondere: l'informazione non era registrata da nessuna parte. */
+  onFilterOstacolo:  (o: Ostacolo | null) => void;
   onAddSpot:         () => void;
   activeType:        SpotType | null;
   activeRegion:      string | null;
   activeCondition:   SpotCondition | null;
   activeDifficulty:  string | null;
+  activeOstacolo:    Ostacolo | null;
   spots:             SpotMapPin[];
   filteredCount?:    number;
   onCitySelect:      (city: string, lat: number, lon: number) => void;
@@ -28,8 +32,8 @@ interface TopBarProps {
 }
 
 export default function TopBar({
-  onSearch, onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onAddSpot,
-  activeType, activeRegion, activeCondition, activeDifficulty,
+  onSearch, onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onFilterOstacolo, onAddSpot,
+  activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo,
   spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
 }: TopBarProps) {
   const [menuOpen,        setMenuOpen]        = useState(false);
@@ -117,7 +121,7 @@ export default function TopBar({
     onFilterType(activeType === type ? null : type);
   }, [activeType, onFilterType]);
 
-  const anyFilter = !!(activeType || activeRegion || activeDifficulty);
+  const anyFilter = !!(activeType || activeRegion || activeDifficulty || activeOstacolo);
 
   const openSearch = () => {
     setSearchOpen(true);
@@ -271,7 +275,7 @@ export default function TopBar({
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 10, fontWeight: 700, lineHeight: 1, flexShrink: 0,
             }}>
-              {[activeType, activeRegion, activeCondition, activeDifficulty].filter(Boolean).length}
+              {[activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo].filter(Boolean).length}
             </span>
           )}
         </button>
@@ -359,10 +363,12 @@ export default function TopBar({
           activeRegion={activeRegion}
           activeCondition={activeCondition}
           activeDifficulty={activeDifficulty}
+          activeOstacolo={activeOstacolo}
           onFilterType={onFilterType}
           onFilterRegion={onFilterRegion}
           onFilterCondition={onFilterCondition}
           onFilterDifficulty={onFilterDifficulty}
+          onFilterOstacolo={onFilterOstacolo}
           onClose={() => setFilterSheetOpen(false)}
           filteredCount={filteredCount ?? spots.length}
         />
@@ -780,18 +786,20 @@ function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }
 
 /* ── Filter Sheet (slide-up) ── */
 function FilterSheet({
-  activeType, activeRegion, activeCondition, activeDifficulty,
-  onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty,
+  activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo,
+  onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onFilterOstacolo,
   onClose, filteredCount,
 }: {
   activeType: SpotType | null;
   activeRegion: string | null;
   activeCondition: SpotCondition | null;
   activeDifficulty: string | null;
+  activeOstacolo: Ostacolo | null;
   onFilterType: (t: SpotType | null) => void;
   onFilterRegion: (r: string | null) => void;
   onFilterCondition: (c: SpotCondition | null) => void;
   onFilterDifficulty: (d: string | null) => void;
+  onFilterOstacolo: (o: Ostacolo | null) => void;
   onClose: () => void;
   filteredCount: number;
 }) {
@@ -876,6 +884,35 @@ function FilterSheet({
                 >
                   <span>{info.emoji}</span>
                   <span>{info.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* COSA C'È — l'ostacolo, non il contesto */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              Cosa c&apos;è
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {(Object.entries(OSTACOLI) as [Ostacolo, typeof OSTACOLI[Ostacolo]][]).map(([o, info]) => (
+                <button
+                  key={o}
+                  onClick={() => onFilterOstacolo(activeOstacolo === o ? null : o)}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 12,
+                    padding: '7px 13px',
+                    border: `1px solid ${activeOstacolo === o ? 'var(--orange)' : 'var(--gray-600)'}`,
+                    borderRadius: 20,
+                    background: activeOstacolo === o ? 'rgba(255,106,0,0.15)' : 'transparent',
+                    color: activeOstacolo === o ? 'var(--orange)' : 'var(--gray-400)',
+                    cursor: 'pointer',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    transition: 'all 0.15s',
+                  } as React.CSSProperties}
+                >
+                  {info.emoji} {info.label}
                 </button>
               ))}
             </div>

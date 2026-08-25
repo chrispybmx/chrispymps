@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendAdminNotification } from '@/lib/email';
 import { optimizeImage } from '@/lib/image';
-import { TIPI_SPOT_TUTTI } from '@/lib/constants';
+import { TIPI_SPOT_TUTTI, OSTACOLI_TUTTI } from '@/lib/constants';
 
 /**
  * Le foto pre-caricate devono vivere nel NOSTRO storage: senza questo controllo
@@ -30,6 +30,7 @@ const SpotSchema = z.object({
      motivo. Una lista copiata a mano diverge dal selettore alla prima
      categoria nuova, e il rider se ne accorge solo dopo aver caricato le foto. */
   type:         z.enum(TIPI_SPOT_TUTTI),
+  ostacoli:     z.array(z.enum(OSTACOLI_TUTTI)).max(8).optional(),
   lat:          z.number().min(-90).max(90),
   lon:          z.number().min(-180).max(180),
   city:         z.string().max(60).optional(),
@@ -57,6 +58,7 @@ const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const NOME_CAMPO: Record<string, string> = {
   name:         'nome',
   type:         'categoria',
+  ostacoli:     'cosa c\'è',
   lat:          'posizione',
   lon:          'posizione',
   city:         'citta',
@@ -152,9 +154,12 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Crea spot (errori DB non esposti al client)
-  const { data: spot, error: spotErr } = await supabase
-    .from('spots')
-    .insert({
+  /* `ostacoli` arriva con 20260824_ostacoli.sql. Se il deploy del codice
+     precede l'esecuzione della migration la colonna non esiste, Postgrest
+     rifiuta l'intera insert e nessuno riesce piu' ad aggiungere uno spot.
+     Si riprova quindi senza: meglio uno spot senza ostacoli che un flusso
+     rotto. Stesso schema gia' usato per spot_photos.source. */
+  const campiSpot = {
       name:                   parsed.name,
       type:                   parsed.type,
       lat:                    parsed.lat,
@@ -169,9 +174,19 @@ export async function POST(req: NextRequest) {
       condition:              'alive',
       submitted_by_user_id:   user.id,
       submitted_by_username:  profile.username,
-    })
+  };
+
+  let { data: spot, error: spotErr } = await supabase
+    .from('spots')
+    .insert({ ...campiSpot, ostacoli: parsed.ostacoli ?? [] })
     .select()
     .single();
+
+  if (spotErr && /ostacoli/i.test(spotErr.message)) {
+    console.warn('[submit-spot] colonna ostacoli assente, migration non eseguita');
+    ({ data: spot, error: spotErr } = await supabase
+      .from('spots').insert(campiSpot).select().single());
+  }
 
   if (spotErr || !spot) {
     console.error('[submit-spot] DB error:', spotErr?.message);

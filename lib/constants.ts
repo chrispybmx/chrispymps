@@ -1,44 +1,80 @@
-import type { SpotType, SpotCondition } from './types';
+import type { SpotType, SpotCondition, Ostacolo } from './types';
 
-// ===== TIPI SPOT =====
-export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: string; legacy?: boolean }> = {
-  /* Street NON è un calderone: è una macrocategoria, come Park. Dentro ci
-     stanno ledge, box, rail, scale, transition — sono gli OSTACOLI che
-     contiene, non alternative ad essa.
-     Il 19/08/2026 era stata marcata `legacy` leggendo «60 spot su 116 nella
-     stessa etichetta» come segno di pigrizia. Era una lettura sbagliata: 60 su
-     118 è semplicemente quanto street c'è in giro. L'effetto è stato che chi
-     aggiungeva un vero spot street non poteva più dirlo, ed era costretto a
-     scegliere un ostacolo al suo posto — peggiorando da solo il disordine che
-     si voleva sistemare.
-     Il problema vero è un altro e resta aperto: questo campo fa due domande
-     insieme, «dove sei» (street, park, plaza) e «cosa c'è» (ledge, rail, gap).
-     Si risolve separandole in due campi, non togliendo scelte dall'elenco. */
-  street: { label: 'Street',  emoji: '🏙️', color: '#ff6a00' },
-  /* Transition = tutto ciò che è curvo e si porta con la velocità:
-     quarter, bank, ramp, gobbe. Sta accanto a Street perché è l'altra
-     grande famiglia di terreno, non un sottotipo di park. */
-  transition: { label: 'Transition', emoji: '〰️', color: '#a3e635' },
-  park:   { label: 'Park',    emoji: '🏟️', color: '#00c851' },
-  diy:    { label: 'DIY',     emoji: '🔧', color: '#ffce4d' },
-  rail:   { label: 'Rail',    emoji: '🛤️', color: '#a78bfa' },
-  ledge:  { label: 'Ledge',   emoji: '📐', color: '#38bdf8' },
-  trail:  { label: 'Trail',   emoji: '🌲', color: '#86efac' },
-  plaza:  { label: 'Plaza',   emoji: '🏛️', color: '#f472b6' },
-  gap:    { label: 'Gap',     emoji: '⬜', color: '#fb923c' },
-  bowl:      { label: 'Bowl',      emoji: '🥣', color: '#34d399' },
-  pumptrack: { label: 'Pumptrack', emoji: '🌀', color: '#06b6d4' },
+// ===== CONTESTO DELLO SPOT — dove sei =====
+/**
+ * Un campo, una domanda: DOVE si gira.
+ *
+ * Prima questo elenco rispondeva a due domande insieme. Sui 118 spot
+ * pubblicati, 79 dicevano dove (street, park, plaza, pumptrack) e 39 dicevano
+ * cosa (ledge, rail, gap, bowl) — e nessuno dei due gruppi aveva l'altra
+ * meta' dell'informazione. Uno spot marcato `ledge` e' quasi sempre anche uno
+ * spot street, ma non c'era modo di saperlo; e nei 60 street ci sono rail e
+ * scalinate che non risultavano da nessuna parte. Per questo il filtro per
+ * tipo non aiutava a scegliere: non perche' una categoria fosse troppo grande,
+ * ma perche' il campo era uno e le domande due.
+ *
+ * `contesto: false` marca i valori che sono in realta' ostacoli. Restano qui
+ * perche' 39 spot li usano ancora come `type` e senza di loro
+ * TIPI_SPOT[spot.type] darebbe undefined — cioe' mappa in crash. Non sono
+ * scegliibili, e spariranno quando quei 39 avranno un contesto vero.
+ */
+export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: string; contesto?: boolean }> = {
+  /* Street e' una macrocategoria come Park: dentro ci stanno ledge, box, rail
+     e scale, che sono i suoi OSTACOLI, non alternative ad essa. */
+  street:    { label: 'Street',    emoji: '\u{1F3D9}\uFE0F', color: '#ff6a00', contesto: true },
+  park:      { label: 'Park',      emoji: '\u{1F3DF}\uFE0F', color: '#00c851', contesto: true },
+  plaza:     { label: 'Plaza',     emoji: '\u{1F3DB}\uFE0F', color: '#f472b6', contesto: true },
+  diy:       { label: 'DIY',       emoji: '\u{1F527}',        color: '#ffce4d', contesto: true },
+  trail:     { label: 'Trail',     emoji: '\u{1F332}',        color: '#86efac', contesto: true },
+  pumptrack: { label: 'Pumptrack', emoji: '\u{1F300}',        color: '#06b6d4', contesto: true },
+
+  /* Sotto: ostacoli finiti nel campo sbagliato. Solo lettura. */
+  transition:{ label: 'Transition', emoji: '\u3030\uFE0F',   color: '#a3e635' },
+  rail:      { label: 'Rail',       emoji: '\u{1F6E4}\uFE0F', color: '#a78bfa' },
+  ledge:     { label: 'Ledge',      emoji: '\u{1F4D0}',        color: '#38bdf8' },
+  gap:       { label: 'Gap',        emoji: '\u2B1C',           color: '#fb923c' },
+  bowl:      { label: 'Bowl',       emoji: '\u{1F963}',        color: '#34d399' },
 };
 
-// ===== CONDIZIONI =====
-/** Tipi che un rider può scegliere aggiungendo uno spot.
-    Esclude le categorie `legacy`: restano valide per gli spot già catalogati
-    e per i filtri, ma non si possono più assegnare. */
+// ===== OSTACOLI — cosa ci trovi =====
+/**
+ * Quanti se ne vuole per spot. Un ostacolo non dice dove sei: un bank puo'
+ * stare contro un muro in centro o dentro uno skatepark.
+ *
+ * I nomi sono quelli che usano i rider, non traduzioni: nessuno dice
+ * "corrimano" per un rail o "muretto grindabile" per un ledge.
+ */
+export const OSTACOLI: Record<Ostacolo, { label: string; emoji: string }> = {
+  rail:       { label: 'Rail',       emoji: '\u{1F6E4}\uFE0F' },
+  ledge:      { label: 'Ledge',      emoji: '\u{1F4D0}' },
+  hubba:      { label: 'Hubba',      emoji: '\u{1F4CF}' },
+  stairs:     { label: 'Scalinata',  emoji: '\u{1FA9C}' },
+  gap:        { label: 'Gap',        emoji: '\u2B1C' },
+  drop:       { label: 'Drop',       emoji: '\u2B07\uFE0F' },
+  bank:       { label: 'Bank',       emoji: '\u{1F4C9}' },
+  quarter:    { label: 'Quarter',    emoji: '\u{1F311}' },
+  spine:      { label: 'Spine',      emoji: '\u{1F53A}' },
+  box:        { label: 'Box',        emoji: '\u{1F4E6}' },
+  kicker:     { label: 'Kicker',     emoji: '\u{1F680}' },
+  manual_pad: { label: 'Manual pad', emoji: '\u25AC' },
+  wallride:   { label: 'Wallride',   emoji: '\u{1F9F1}' },
+  pole_jam:   { label: 'Pole jam',   emoji: '\u{1F6A7}' },
+  curb:       { label: 'Cordolo',    emoji: '\u{1F6E3}\uFE0F' },
+  bowl:       { label: 'Bowl',       emoji: '\u{1F963}' },
+  dirt_jump:  { label: 'Dirt jump',  emoji: '\u26F0\uFE0F' },
+  flat:       { label: 'Flat',       emoji: '\u{1F535}' },
+};
+
+/** Tutti gli ostacoli validi, per la validazione lato server. */
+export const OSTACOLI_TUTTI = Object.keys(OSTACOLI) as [Ostacolo, ...Ostacolo[]];
+
+/** Cosa puo' scegliere un rider come contesto. Solo i valori con
+    `contesto: true`: gli altri sono ostacoli rimasti nel campo sbagliato. */
 export const TIPI_SPOT_SELEZIONABILI = (
   Object.entries(TIPI_SPOT) as [SpotType, typeof TIPI_SPOT[SpotType]][]
-).filter(([, info]) => !info.legacy);
+).filter(([, info]) => info.contesto === true);
 
-/** Ogni tipo che uno spot puo' avere, categorie legacy comprese.
+/** Ogni valore che il campo `type` puo' avere, ostacoli storici compresi.
  *
  *  Il server valida su QUESTA lista invece di riscriverla a mano. Il 19/08/2026
  *  `transition` era stato aggiunto qui e quindi offerto dal modale, ma l'elenco
@@ -46,11 +82,13 @@ export const TIPI_SPOT_SELEZIONABILI = (
  *  selettore rispondeva 422 a ogni invio, con le foto gia' caricate e un
  *  messaggio che non diceva quale campo fosse sbagliato. Cinque giorni cosi'.
  *
- *  Comprende i legacy perche' server e modale rispondono a domande diverse:
- *  il modale decide cosa si puo' scegliere ORA, il server cosa e' valido —
- *  e i 60 spot gia' catalogati `street` restano validi. */
+ *  Comprende anche i valori non scegliibili perche' server e modale
+ *  rispondono a domande diverse: il modale decide cosa si puo' scegliere ORA,
+ *  il server cosa e' valido — e i 39 spot ancora catalogati per ostacolo
+ *  restano modificabili finche' non hanno un contesto. */
 export const TIPI_SPOT_TUTTI = Object.keys(TIPI_SPOT) as [SpotType, ...SpotType[]];
 
+// ===== CONDIZIONI =====
 export const CONDIZIONI: Record<SpotCondition, { label: string; color: string; bg: string }> = {
   alive:    { label: 'Alive',    color: '#000',      bg: '#00c851' },
   bustato:  { label: 'Bustato',  color: '#000',      bg: '#ff6a00' },

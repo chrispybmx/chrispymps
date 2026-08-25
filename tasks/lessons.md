@@ -312,3 +312,32 @@ Regole che ne escono:
 
 Modo per trovarne altri: cercare `z.enum([` con valori scritti a mano e
 chiedersi da dove vengono quei valori nella UI.
+
+## 2026-08-24 — Aggiungere una colonna a un select la rompe tutta
+
+Aggiunto `ostacoli` alla select di /api/spots. Build verde, tipi puliti, 137
+test verdi. Poi la verifica dal vivo:
+
+    {"ok":false,"error":"column spots.ostacoli does not exist"}
+    spot restituiti: 0
+
+La mappa completamente vuota. Postgrest non ignora una colonna che non
+conosce: fa fallire l'INTERA query. Se avessi pubblicato il codice prima di
+eseguire la migration, il sito sarebbe rimasto senza un solo spot.
+
+E' lo stesso schema del rischio in scrittura che avevo gia' previsto per
+l'insert di submit-spot — ma in lettura non ci avevo pensato. La differenza e'
+che l'insert fallisce per una persona alla volta, la select per tutti insieme.
+
+Regola: quando si aggiunge un campo a una query su una colonna che arriva con
+una migration non ancora eseguita, servono DUE select — uno con il campo, uno
+senza, e il ripiego sul secondo se il primo fallisce. Vale sia in lettura sia
+in scrittura. Lo schema esisteva gia' nel progetto per `spot_photos.source`:
+bastava riconoscere che era lo stesso caso.
+
+Corollario sull'ordine di pubblicazione: migration PRIMA, codice DOPO. Il
+ripiego serve a sopravvivere all'ordine sbagliato, non a renderlo indifferente.
+
+Come l'ho trovato: non dai test, non dalla build. Da una curl su /api/spots
+dopo aver costruito. Nessun controllo statico puo' sapere quali colonne
+esistono davvero nel database.

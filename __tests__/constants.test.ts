@@ -93,19 +93,23 @@ describe('TIPI_SPOT_SELEZIONABILI', () => {
     expect(chiavi).toContain('street');
   });
 
-  it('offre transition e le altre categorie vive', () => {
+  it('offre solo contesti, non ostacoli', () => {
+    /* `rail`, `bowl` e `transition` erano offerti come categorie. Ma sono
+       ostacoli: dicono cosa c'e', non dove sei. Ora stanno nel campo
+       `ostacoli`, e qui restano solo le risposte a «dove si gira». */
     const chiavi = TIPI_SPOT_SELEZIONABILI.map(([k]) => k);
-    expect(chiavi).toContain('transition');
-    expect(chiavi).toContain('park');
-    expect(chiavi).toContain('rail');
-    expect(chiavi).toContain('bowl');
+    expect(chiavi).toEqual(['street', 'park', 'plaza', 'diy', 'trail', 'pumptrack']);
   });
 
-  it('esclude esattamente i tipi marcati legacy', () => {
-    const legacy = (Object.entries(TIPI_SPOT) as [string, { legacy?: boolean }][])
-      .filter(([, i]) => i.legacy).map(([k]) => k);
-    expect(TIPI_SPOT_SELEZIONABILI).toHaveLength(Object.keys(TIPI_SPOT).length - legacy.length);
-    for (const k of legacy) {
+  it('esclude esattamente i valori senza contesto: true', () => {
+    /* I valori senza `contesto` sono ostacoli rimasti nel campo `type` di 39
+       spot. Restano in TIPI_SPOT per non far esplodere TIPI_SPOT[spot.type],
+       ma non si possono piu' scegliere. */
+    const senzaContesto = (Object.entries(TIPI_SPOT) as [string, { contesto?: boolean }][])
+      .filter(([, i]) => i.contesto !== true).map(([k]) => k);
+    expect(senzaContesto).toEqual(['transition', 'rail', 'ledge', 'gap', 'bowl']);
+    expect(TIPI_SPOT_SELEZIONABILI).toHaveLength(Object.keys(TIPI_SPOT).length - senzaContesto.length);
+    for (const k of senzaContesto) {
       expect(TIPI_SPOT_SELEZIONABILI.map(([x]) => x)).not.toContain(k);
     }
   });

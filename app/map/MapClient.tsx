@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import type { SpotMapPin, SpotType, SpotCondition } from '@/lib/types';
-import { REGIONI_ITALIA, TIPI_SPOT, CONDIZIONI, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
+import type { SpotMapPin, SpotType, SpotCondition, Ostacolo } from '@/lib/types';
+import { REGIONI_ITALIA, TIPI_SPOT, OSTACOLI, CONDIZIONI, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
 import { geocodeForward } from '@/lib/geocoding';
 import TopBar from '@/components/TopBar';
 import AddSpotModal from '@/components/AddSpotModal';
@@ -115,6 +115,10 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [filterRegion,    setFilterRegion]    = useState<typeof REGIONI_ITALIA[0] | null>(null);
   const [filterCondition, setFilterCondition] = useState<SpotCondition | null>(null);
   const [filterDifficulty,setFilterDifficulty]= useState<string | null>(null);
+  /* Filtro per ostacolo: la domanda vera del rider non e' «dammi gli spot
+     street», e' «dove trovo un rail». Fino ad ora il sito non sapeva
+     rispondere, perche' l'informazione non esisteva. */
+  const [filterOstacolo,  setFilterOstacolo]  = useState<Ostacolo | null>(null);
   const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [addOpen,            setAddOpen]            = useState(false);
@@ -347,6 +351,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         if (s.lat < latMin || s.lat > latMax || s.lon < lonMin || s.lon > lonMax) return false;
       }
       if (filterCondition && s.condition !== filterCondition) return false;
+      if (filterOstacolo && !(s.ostacoli ?? []).includes(filterOstacolo)) return false;
       if (filterDifficulty && s.difficulty !== filterDifficulty) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase().replace(/^@/, '');
@@ -365,7 +370,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         .sort((a, b) => (distanceMap.get(a.id) ?? 0) - (distanceMap.get(b.id) ?? 0));
     }
     return result;
-  }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, radiusKm, distanceMap]);
+  }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, filterOstacolo, searchQuery, radiusMode, radiusCenter, radiusPanelOpen, radiusKm, distanceMap]);
 
   /* Spot visibili nel pannello: filtrati per viewport della mappa + ordine casuale.
      Se l'utente è in radius mode o ha una ricerca attiva, non filtrare per viewport. */
@@ -422,7 +427,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     return spots.filter(s => haversineKm(userPos.lat, userPos.lon, s.lat, s.lon) <= NEARBY_KM).length;
   }, [userPos, spots]);
 
-  const filtersActive = !!(filterType || filterRegion || filterCondition || filterDifficulty || searchQuery);
+  const filtersActive = !!(filterType || filterRegion || filterCondition || filterDifficulty || filterOstacolo || searchQuery);
 
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
@@ -437,7 +442,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
     // Incrementa il trigger → SpotMap farà fitBounds sui filtered
     setFitAllTrigger(n => n + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, filterRegion, filterCondition, filterDifficulty, searchQuery]);
+  }, [filterType, filterRegion, filterCondition, filterDifficulty, filterOstacolo, searchQuery]);
 
   const handleFilterRegion = useCallback((label: string | null) => {
     if (!label) { setFilterRegion(null); return; }
@@ -566,6 +571,8 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         onFilterRegion={handleFilterRegion}
         onFilterCondition={setFilterCondition}
         onFilterDifficulty={setFilterDifficulty}
+        onFilterOstacolo={setFilterOstacolo}
+        activeOstacolo={filterOstacolo}
         onAddSpot={openAddSpot}
         activeType={filterType}
         activeRegion={filterRegion?.label ?? null}
@@ -1043,7 +1050,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 }}
                 isDesktop={isDesktop}
                 scrollInstantRef={scrollInstantRef}
-                onReset={() => { setFilterType(null); setFilterRegion(null); setFilterCondition(null); setFilterDifficulty(null); }}
+                onReset={() => { setFilterType(null); setFilterRegion(null); setFilterCondition(null); setFilterDifficulty(null); setFilterOstacolo(null); }}
                 isFav={isFav}
                 onToggleFav={(e, id) => {
                   e.stopPropagation();
@@ -1594,6 +1601,13 @@ function SpotListPanel({
                   <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
                     {spot.city && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>📍 {spot.city}</span>}
                     {spot.difficulty && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ffce4d' }}>⚡ {spot.difficulty.toUpperCase()}</span>}
+                    {/* Cosa c'e' sullo spot: e' l'informazione che fa decidere
+                        se vale la pena prendere la bici. */}
+                    {spot.ostacoli?.map(o => OSTACOLI[o] && (
+                      <span key={o} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-300)', background: 'rgba(255,255,255,0.07)', padding: '2px 6px', borderRadius: 3 }}>
+                        {OSTACOLI[o].emoji} {OSTACOLI[o].label}
+                      </span>
+                    ))}
                     {(spot.likes_count ?? 0) > 0 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)' }}>🔥 {spot.likes_count}</span>}
                     {spot.submitted_by_username && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>@{spot.submitted_by_username}</span>}
                   </div>

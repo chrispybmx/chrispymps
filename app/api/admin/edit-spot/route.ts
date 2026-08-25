@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { submitToIndexNow } from '@/lib/indexnow';
-import { APP_CONFIG, TIPI_SPOT_TUTTI } from '@/lib/constants';
+import { APP_CONFIG, TIPI_SPOT_TUTTI, OSTACOLI_TUTTI } from '@/lib/constants';
 
 const Schema = z.object({
   id:          z.string().uuid(),
@@ -12,6 +12,7 @@ const Schema = z.object({
   /* Derivato da lib/constants, mai ricopiato: l'elenco scritto a mano qui
      ha respinto la categoria `transition` per cinque giorni. */
   type:        z.enum(TIPI_SPOT_TUTTI).optional(),
+  ostacoli:    z.array(z.enum(OSTACOLI_TUTTI)).max(8).optional(),
   city:        z.string().max(60).optional(),
   description: z.string().max(500).optional().nullable(),
   surface:     z.string().max(50).optional().nullable(),

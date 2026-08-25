@@ -17,36 +17,55 @@ function pubblicabile(p: { moderation_status?: string | null }): boolean {
 
 export async function GET() {
   const supabase = supabaseServer();
-  const { data, error } = await supabase
+
+  /* `ostacoli` arriva con 20260824_ostacoli.sql. Finche' la migration non e'
+     stata eseguita la colonna non esiste, e Postgrest non ignora il campo
+     mancante: fa fallire l'INTERA query. Senza questo ripiego, pubblicare il
+     codice prima della migration lascerebbe la mappa completamente vuota —
+     verificato in locale, "column spots.ostacoli does not exist" e zero spot.
+     I due select sono scritti per esteso perche' il parser dei tipi di
+     supabase-js legge la stringa letterale, non un template. */
+  const conOstacoli = await supabase
     .from('spots')
-    .select(`
-      id, slug, name, type, lat, lon, city, condition, condition_updated_at, submitted_by_username, likes_count,
-      spot_photos (url, position, source, moderation_status)
-    `)
+    .select('id, slug, name, type, ostacoli, lat, lon, city, condition, condition_updated_at, submitted_by_username, likes_count, spot_photos (url, position, source, moderation_status)')
     .eq('status', 'approved')
     .order('approved_at', { ascending: false });
+
+  let data = conOstacoli.data as Record<string, unknown>[] | null;
+  let error = conOstacoli.error;
+
+  if (error) {
+    const senzaOstacoli = await supabase
+      .from('spots')
+      .select('id, slug, name, type, lat, lon, city, condition, condition_updated_at, submitted_by_username, likes_count, spot_photos (url, position, source, moderation_status)')
+      .eq('status', 'approved')
+      .order('approved_at', { ascending: false });
+    data  = senzaOstacoli.data as Record<string, unknown>[] | null;
+    error = senzaOstacoli.error;
+  }
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
   const pins: SpotMapPin[] = (data ?? []).map((s) => {
-    const photos = (s.spot_photos ?? []) as {
+    const photos = (s.spot_photos ?? []) as unknown as {
       url: string; position: number;
       source?: 'rider' | 'streetview';
       moderation_status?: string | null;
     }[];
     const sorted = photos.filter(pubblicabile).sort((a, b) => a.position - b.position);
     return {
-      id:        s.id,
-      slug:      s.slug,
-      name:      s.name,
-      type:      s.type,
-      lat:       s.lat,
-      lon:       s.lon,
-      city:      s.city,
-      condition: s.condition,
-      condition_updated_at: s.condition_updated_at ?? undefined,
+      id:        s.id as string,
+      slug:      s.slug as string,
+      name:      s.name as string,
+      type:      s.type as SpotMapPin['type'],
+      lat:       s.lat as number,
+      lon:       s.lon as number,
+      city:      s.city as string | undefined,
+      condition: s.condition as SpotMapPin['condition'],
+      ostacoli:  (s.ostacoli ?? []) as SpotMapPin['ostacoli'],
+      condition_updated_at: (s.condition_updated_at as string) ?? undefined,
       cover_url: sorted[0]?.url,
       /* Le foto erano gia' tutte caricate qui e venivano buttate tenendo solo
          la prima: la card espansa sulla mappa mostrava una foto sola anche
@@ -55,8 +74,8 @@ export async function GET() {
       photo_urls: sorted.map(p => p.url),
       photo_sources: sorted.map(p => p.source ?? null),
       cover_source: sorted[0]?.source,
-      submitted_by_username: s.submitted_by_username ?? undefined,
-      likes_count: s.likes_count ?? 0,
+      submitted_by_username: (s.submitted_by_username as string) ?? undefined,
+      likes_count: (s.likes_count as number) ?? 0,
     };
   });
 

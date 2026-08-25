@@ -3,10 +3,10 @@ import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
-import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, OSTACOLI, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
 import { getFreshness } from '@/lib/freshness';
-import type { Spot } from '@/lib/types';
+import type { Ostacolo, Spot } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
 import PhotoCarousel from '@/components/PhotoCarousel';
 import SupportStrip from '@/components/SupportStrip';
@@ -103,6 +103,10 @@ export default async function SpotPage({ params, searchParams }: Props) {
      Vedi lib/freshness.ts — la condizione da sola valeva 116 spot su 116. */
   const fresh  = getFreshness(spot.condition, spot.condition_updated_at);
   const photos = spot.spot_photos ?? [];
+  /* Filtrati contro OSTACOLI: un valore sconosciuto nel database — per esempio
+     rimasto da una versione futura o da un import — non deve far esplodere la
+     pagina con OSTACOLI[o].emoji su undefined. */
+  const ostacoli = ((spot.ostacoli ?? []) as Ostacolo[]).filter(o => OSTACOLI[o]);
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
 
   const isYouTube = spot.youtube_url && /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(spot.youtube_url);
@@ -155,6 +159,22 @@ export default async function SpotPage({ params, searchParams }: Props) {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {tipo.emoji} {tipo.label}
         </div>
+        {/* Cosa c'e' sullo spot. E' l'informazione che fa decidere se vale la
+            pena prendere la bici — piu' della categoria, che dice solo dove sei. */}
+        {ostacoli.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+            {ostacoli.map(o => (
+              <span key={o} style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                color: 'var(--bone)', background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                padding: '3px 9px', borderRadius: 12,
+              }}>
+                {OSTACOLI[o].emoji} {OSTACOLI[o].label}
+              </span>
+            ))}
+          </div>
+        )}
         <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 28, color: 'var(--orange)', margin: '0 0 8px', lineHeight: 1.15 }}>
           {spot.name}
         </h1>

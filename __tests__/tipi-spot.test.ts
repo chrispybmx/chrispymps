@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, TIPI_SPOT_TUTTI } from '@/lib/constants';
+import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, TIPI_SPOT_TUTTI, OSTACOLI, OSTACOLI_TUTTI } from '@/lib/constants';
 
 /**
  * Il selettore del modale e la validazione del server devono restare allineati.
@@ -24,9 +24,16 @@ describe('tipi spot — selettore e server allineati', () => {
     }
   });
 
-  it('transition e\' accettata — era il caso rotto', () => {
-    expect(selezionabili).toContain('transition');
+  it('transition resta valida lato server ma non e\' piu\' un contesto', () => {
+    /* Era offerta come categoria e respinta dal server: il bug che ha aperto
+       tutta questa storia. Ora non e' piu' una categoria affatto — un bank o
+       una quarter sono OSTACOLI, e possono stare in street come in un park.
+       Il valore resta accettato dal server perche' qualche spot potrebbe
+       averlo, e toglierlo spaccherebbe ogni modifica a quegli spot. */
     expect(TIPI_SPOT_TUTTI).toContain('transition');
+    expect(selezionabili).not.toContain('transition');
+    expect(OSTACOLI_TUTTI).toContain('bank');
+    expect(OSTACOLI_TUTTI).toContain('quarter');
   });
 
   it('street e\' scegliibile: e\' una macrocategoria, non un calderone', () => {
@@ -74,5 +81,48 @@ describe('nessuna rotta ricopia gli elenchi a mano', () => {
        ricopiato. z.enum(COSTANTE) invece e' derivato. */
     const letterali = src.match(/z\.enum\(\s*\[\s*['"]/g);
     expect(letterali, `${rotta} ha un elenco scritto a mano dentro z.enum([...])`).toBeNull();
+  });
+});
+
+/**
+ * Il campo `type` faceva due domande insieme. Sui 118 spot pubblicati, 79
+ * rispondevano a «dove sei» e 39 a «cosa c'e'» — e nessuno dei due gruppi
+ * aveva l'altra meta'. Ora le domande sono due campi.
+ */
+describe('ostacoli — cosa c\'e\' sullo spot', () => {
+  it('contiene i nomi che usano davvero i rider', () => {
+    for (const o of ['rail', 'ledge', 'hubba', 'stairs', 'gap', 'bank',
+                     'quarter', 'spine', 'box', 'kicker', 'manual_pad',
+                     'wallride', 'pole_jam', 'curb', 'drop', 'flat']) {
+      expect(OSTACOLI_TUTTI).toContain(o);
+    }
+  });
+
+  it('ogni ostacolo ha etichetta ed emoji', () => {
+    for (const o of OSTACOLI_TUTTI) {
+      expect(OSTACOLI[o].label, `${o} senza etichetta`).toBeTruthy();
+      expect(OSTACOLI[o].emoji, `${o} senza emoji`).toBeTruthy();
+    }
+  });
+
+  it('nessun ostacolo duplicato', () => {
+    expect(new Set(OSTACOLI_TUTTI).size).toBe(OSTACOLI_TUTTI.length);
+  });
+
+  it('i contesti non compaiono fra gli ostacoli', () => {
+    /* `street` e `park` dicono dove sei, non cosa c'e'. Se finissero anche
+       qui torneremmo alla confusione che stiamo smontando. */
+    for (const c of ['street', 'park', 'plaza', 'diy', 'trail', 'pumptrack']) {
+      expect(OSTACOLI_TUTTI).not.toContain(c);
+    }
+  });
+
+  it('la migration sposta i 39 spot filati per ostacolo', async () => {
+    /* La migration mappa rail/ledge/gap/bowl da `type` a `ostacoli`, e
+       transition in bank+quarter. Tutti quei valori devono esistere fra gli
+       ostacoli, altrimenti la migration scriverebbe dati non validi. */
+    for (const o of ['rail', 'ledge', 'gap', 'bowl', 'bank', 'quarter']) {
+      expect(OSTACOLI_TUTTI, `la migration scrive "${o}" ma non e' un ostacolo valido`).toContain(o);
+    }
   });
 });
