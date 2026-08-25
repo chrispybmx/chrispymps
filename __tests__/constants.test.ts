@@ -82,9 +82,15 @@ describe('Timing constants', () => {
 });
 
 describe('TIPI_SPOT_SELEZIONABILI', () => {
-  it('non offre street a chi aggiunge uno spot', () => {
+  /* Questo test difendeva la scelta opposta: «non offre street». Era nato da
+     una diagnosi sbagliata — 60 spot su 116 marcati street letti come pigrizia
+     invece che come la quantita' di street che semplicemente esiste. Street e'
+     una macrocategoria come Park, e dentro ci stanno ledge, box, rail e scale.
+     Toglierla dal selettore costringeva chi aggiungeva un vero spot street a
+     scegliere un ostacolo al suo posto. */
+  it('offre street: e\' una macrocategoria, non un ripiego', () => {
     const chiavi = TIPI_SPOT_SELEZIONABILI.map(([k]) => k);
-    expect(chiavi).not.toContain('street');
+    expect(chiavi).toContain('street');
   });
 
   it('offre transition e le altre categorie vive', () => {

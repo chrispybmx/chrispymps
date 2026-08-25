@@ -2,11 +2,19 @@ import type { SpotType, SpotCondition } from './types';
 
 // ===== TIPI SPOT =====
 export const TIPI_SPOT: Record<SpotType, { label: string; emoji: string; color: string; legacy?: boolean }> = {
-  /* `legacy`: resta per i 60 spot già catalogati così e per i filtri, ma non
-     è più scegliibile quando si aggiunge uno spot. Era diventata il calderone
-     — più della metà del database — quindi il filtro per tipo non serviva a
-     scegliere. Chi aggiunge ora deve dire cos'è davvero. */
-  street: { label: 'Street',  emoji: '🏙️', color: '#ff6a00', legacy: true },
+  /* Street NON è un calderone: è una macrocategoria, come Park. Dentro ci
+     stanno ledge, box, rail, scale, transition — sono gli OSTACOLI che
+     contiene, non alternative ad essa.
+     Il 19/08/2026 era stata marcata `legacy` leggendo «60 spot su 116 nella
+     stessa etichetta» come segno di pigrizia. Era una lettura sbagliata: 60 su
+     118 è semplicemente quanto street c'è in giro. L'effetto è stato che chi
+     aggiungeva un vero spot street non poteva più dirlo, ed era costretto a
+     scegliere un ostacolo al suo posto — peggiorando da solo il disordine che
+     si voleva sistemare.
+     Il problema vero è un altro e resta aperto: questo campo fa due domande
+     insieme, «dove sei» (street, park, plaza) e «cosa c'è» (ledge, rail, gap).
+     Si risolve separandole in due campi, non togliendo scelte dall'elenco. */
+  street: { label: 'Street',  emoji: '🏙️', color: '#ff6a00' },
   /* Transition = tutto ciò che è curvo e si porta con la velocità:
      quarter, bank, ramp, gobbe. Sta accanto a Street perché è l'altra
      grande famiglia di terreno, non un sottotipo di park. */

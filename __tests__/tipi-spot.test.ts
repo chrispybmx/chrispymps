@@ -29,11 +29,13 @@ describe('tipi spot — selettore e server allineati', () => {
     expect(TIPI_SPOT_TUTTI).toContain('transition');
   });
 
-  it('street resta valida lato server pur non essendo piu\' scegliibile', () => {
-    /* 60 spot su 118 sono catalogati cosi'. Toglierla dalla validazione
-       spaccherebbe ogni modifica futura di quegli spot. */
+  it('street e\' scegliibile: e\' una macrocategoria, non un calderone', () => {
+    /* Era stata tolta dal selettore leggendo «60 spot su 116» come pigrizia.
+       Ma street contiene ledge, box, rail e scale: quei 60 sono semplicemente
+       quanto street c'e' in giro. Toglierla obbligava chi aggiungeva un vero
+       spot street a scegliere un ostacolo al suo posto. */
     expect(TIPI_SPOT_TUTTI).toContain('street');
-    expect(selezionabili).not.toContain('street');
+    expect(selezionabili).toContain('street');
   });
 
   it('TIPI_SPOT_TUTTI copre davvero tutto, legacy compresi', () => {
