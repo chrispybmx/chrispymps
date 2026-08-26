@@ -3,29 +3,43 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { verifyRejectToken, isAdminAuthenticated } from '@/lib/auth';
 import { sendRejectionEmail } from '@/lib/email';
 
+/**
+ * GET — NON rifiuta piu'. Porta alla pagina di conferma.
+ * Stesso motivo di app/api/admin/approve: un link in un'email viene aperto
+ * anche dalle macchine, e una GET non deve cambiare lo stato di niente.
+ */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
   if (!token) return NextResponse.redirect(new URL('/admin?error=token_missing', req.url));
 
-  // BUG-FIX: usa verifyRejectToken dedicato (separatore '|') invece di verifyApproveToken
-  const spotId = verifyRejectToken(token);
-  if (!spotId) {
+  // Token dedicato con separatore '|', non quello di approvazione.
+  if (!verifyRejectToken(token)) {
     return NextResponse.redirect(new URL('/admin?error=token_invalid', req.url));
   }
 
-  return rejectSpot(spotId, req, undefined);
+  return NextResponse.redirect(new URL(`/admin/conferma?rifiuta=${encodeURIComponent(token)}`, req.url));
 }
 
+/** POST — rifiuta davvero. Sessione admin oppure token dell'email. */
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  const body = await req.json().catch(() => ({}));
+  const { spot_id, reason, token } = body as { spot_id?: string; reason?: string; token?: string };
+
+  let spotId: string | null = null;
+
+  if (typeof token === 'string' && token) {
+    spotId = verifyRejectToken(token);
+    if (!spotId) {
+      return NextResponse.json({ ok: false, error: 'Link scaduto o non valido. Rifiuta dalla dashboard.' }, { status: 401 });
+    }
+  } else if (isAdminAuthenticated()) {
+    if (!spot_id) return NextResponse.json({ ok: false, error: 'spot_id mancante' }, { status: 400 });
+    spotId = spot_id;
+  } else {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const { spot_id, reason } = body;
-  if (!spot_id) return NextResponse.json({ ok: false, error: 'spot_id mancante' }, { status: 400 });
-
-  return rejectSpot(spot_id, req, reason);
+  return rejectSpot(spotId, req, reason);
 }
 
 async function rejectSpot(spotId: string, req: NextRequest, reason?: string): Promise<NextResponse> {

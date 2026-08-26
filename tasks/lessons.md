@@ -372,3 +372,72 @@ minuto.
 Regola: prima di scegliere una strategia di cache, chiedersi «se questo dato
 cambia, quanto puo' restare vecchio prima che sia un problema?». Per il guscio
 sono giorni. Per l'elenco degli spot e' meno di un minuto.
+
+## 2026-08-26 — Una GET non deve mai cambiare lo stato
+
+L'email di notifica conteneva un link `/api/admin/approve?token=...` che
+approvava lo spot al solo essere aperto. Il token era fatto bene — HMAC-SHA256
+con segreto, scadenza 72 ore, confronto a tempo costante, non falsificabile.
+Il difetto non era la credenziale: era il METODO.
+
+Un link dentro un'email non lo apre solo chi clicca. Lo seguono gli antivirus
+della posta, i filtri aziendali, i generatori di anteprima, il prefetch del
+browser. Tutti fanno GET.
+
+La prova nei dati: lo spot «Thermal forum» risulta approvato 24 secondi dopo
+l'invio. Tutti gli altri spot del database vanno da 3 minuti a 25 ore. 24
+secondi e' il tempo di consegna di un'email piu' una scansione automatica.
+
+Ora la GET porta a una pagina di conferma che mostra lo spot con le foto, e a
+cambiare lo stato e' una POST. Nessuna macchina fa una POST seguendo un link.
+
+Verificato strutturalmente, non solo a occhio: in entrambe le rotte
+`approveSpot`/`rejectSpot` compaiono due volte in tutto — la definizione e una
+sola chiamata, dentro POST. Dalla GET non esiste alcun percorso che porti alla
+modifica.
+
+Regola: prima di mettere un link in un'email, chiedersi «se lo apre una
+macchina, cosa succede?». Se la risposta non e' «niente», e' una POST.
+
+Corollario: il token puo' restare la credenziale della POST. Serve proprio a
+poter moderare dal telefono senza fare il login — quello che va tolto e' il
+potere di decidere alla richiesta che semplicemente GUARDA.
+
+## 2026-08-26 — La regola scritta ieri ha trovato il secondo caso oggi
+
+Corretto al mattino il link email che approvava gli spot con una GET, ho
+annotato la regola: «prima di mettere un link in un'email, chiedersi cosa
+succede se lo apre una macchina».
+
+Nel pomeriggio, inventariando le 62 rotte API, `/api/admin/events/moderate` e'
+saltata fuori subito: stesso schema, stessa email, stessa GET che modificava —
+con un token che dura 7 giorni invece di 72 ore.
+
+Senza la regola non l'avrei cercata. E' il terzo caso in tre giorni in cui un
+bug corretto ne ha scovati altri della stessa famiglia:
+
+  transition respinta in submit-spot  → altre 2 rotte con lo stesso elenco
+  foto pubbliche in spot_photos       → audit RLS di tutte le tabelle
+  GET che approva in admin/approve    → GET che modera in events/moderate
+
+Non e' fortuna: e' che i difetti nascono da abitudini, e un'abitudine si ripete
+in piu' punti. Trovato uno, la domanda giusta non e' «e' risolto?» ma «dove
+altro ho fatto la stessa cosa?».
+
+## 2026-08-26 — Il middleware annullava il mio stesso fix
+
+Spostato il cambio di stato da GET a POST, la pagina di conferma non
+funzionava: il middleware esentava dal login admin solo `GET` con token, quindi
+la POST veniva fermata prima di arrivare alla rotta — proprio per chi arriva
+dall'email senza sessione, cioe' l'unico caso per cui il flusso esiste.
+
+Build verde, tipi puliti, 137 test verdi. Si vedeva solo facendo la POST con
+curl e leggendo CHI rispondeva: «Non autorizzato» e' il messaggio del
+middleware, non il mio.
+
+Lezione: quando si cambia il metodo HTTP di un'operazione, va controllato tutto
+cio' che filtra per metodo — middleware, CORS, cache, rate limit. Il codice
+della rotta e' solo l'ultimo anello.
+
+E: leggere il TESTO dell'errore, non solo il codice di stato. Un 401 del
+middleware e un 401 della rotta raccontano due storie diverse.

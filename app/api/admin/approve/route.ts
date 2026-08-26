@@ -7,34 +7,63 @@ import { onSpotApproved } from '@/lib/xp';
 import { submitToIndexNow } from '@/lib/indexnow';
 import { APP_CONFIG } from '@/lib/constants';
 
+/**
+ * GET — NON approva piu'. Porta alla pagina di conferma.
+ *
+ * Prima questa rotta approvava lo spot al solo essere aperta. Ma il link vive
+ * dentro un'email, e le GET non le apre solo chi clicca: le seguono gli
+ * antivirus della posta, i filtri aziendali, i generatori di anteprima, il
+ * prefetch del browser.
+ *
+ * E' successo davvero. Lo spot «Thermal forum» di Natanael risulta approvato
+ * 24 secondi dopo l'invio; tutti gli altri spot del database vanno da 3 minuti
+ * a 25 ore. Ventiquattro secondi e' il tempo di consegna di un'email piu' una
+ * scansione automatica, non quello di una persona che legge e decide.
+ *
+ * Il token non c'entra: e' HMAC-SHA256 con segreto e scadenza, non e'
+ * falsificabile. Il difetto era la forma della richiesta. Ora la GET mostra
+ * soltanto, e a cambiare lo stato e' una POST — che nessuna macchina fa per
+ * sbaglio seguendo un link.
+ */
 export async function GET(req: NextRequest) {
-  // Approvazione via link email (token HMAC nel query string)
   const token = req.nextUrl.searchParams.get('token');
   if (!token) {
     return NextResponse.redirect(new URL('/admin?error=token_missing', req.url));
   }
-
-  const spotId = verifyApproveToken(token);
-  if (!spotId) {
+  if (!verifyApproveToken(token)) {
     return NextResponse.redirect(new URL('/admin?error=token_invalid', req.url));
   }
-
-  return approveSpot(spotId, req);
+  return NextResponse.redirect(new URL(`/admin/conferma?token=${encodeURIComponent(token)}`, req.url));
 }
 
+/**
+ * POST — approva davvero.
+ *
+ * Due credenziali possibili: la sessione admin (dalla dashboard) oppure il
+ * token dell'email (dalla pagina di conferma). Il token serve perche' il
+ * senso del link e' proprio poter approvare dal telefono senza fare il login.
+ */
 export async function POST(req: NextRequest) {
-  // Approvazione dalla dashboard admin (richiede sessione autenticata)
-  if (!isAdminAuthenticated()) {
+  const body = await req.json().catch(() => ({}));
+  const { spot_id, token } = body as { spot_id?: string; token?: string };
+
+  let spotId: string | null = null;
+
+  if (typeof token === 'string' && token) {
+    spotId = verifyApproveToken(token);
+    if (!spotId) {
+      return NextResponse.json({ ok: false, error: 'Link scaduto o non valido. Approva dalla dashboard.' }, { status: 401 });
+    }
+  } else if (isAdminAuthenticated()) {
+    if (!spot_id) {
+      return NextResponse.json({ ok: false, error: 'spot_id mancante' }, { status: 400 });
+    }
+    spotId = spot_id;
+  } else {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const { spot_id } = body;
-  if (!spot_id) {
-    return NextResponse.json({ ok: false, error: 'spot_id mancante' }, { status: 400 });
-  }
-
-  return approveSpot(spot_id, req);
+  return approveSpot(spotId, req);
 }
 
 async function approveSpot(spotId: string, req: NextRequest): Promise<NextResponse> {

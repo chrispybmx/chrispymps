@@ -8,8 +8,9 @@ import { compressImage } from '@/lib/compress-image';
 import AdminImportKML from '@/components/AdminImportKML';
 import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
+import AdminApprovati from '@/components/AdminApprovati';
 
-type Tab = 'pending' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users' | 'numeri';
+type Tab = 'pending' | 'approvati' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users' | 'numeri';
 
 interface AdminComment {
   id: string;
@@ -403,7 +404,8 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   };
 
   const TABS: { key: Tab; label: string; badge?: number }[] = [
-    { key: 'pending',  label: '📥 In attesa', badge: pending.length },
+    { key: 'pending',   label: '📥 In attesa', badge: pending.length },
+    { key: 'approvati', label: '✅ Approvati' },
     { key: 'photos',   label: '📸 Foto', badge: pendingPhotos.length },
     { key: 'all',      label: '🗺️ Spot' },
     { key: 'comments', label: '💬 Commenti' },
@@ -513,6 +515,9 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       )}
 
       {/* ── TAB: TUTTI GLI SPOT ── */}
+      {/* ── TAB: APPROVATI ── */}
+      {tab === 'approvati' && <AdminApprovati />}
+
       {tab === 'all' && (
         <div style={{ padding: '16px 20px 0' }}>
           {loadingAll ? (

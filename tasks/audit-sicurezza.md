@@ -173,11 +173,69 @@ caricamento dal sito funzioni ancora e che le due sonde vengano respinte.
 
 ---
 
+## 2026-08-26 · Rotte API — 62 esaminate
+
+**Perché quest'area.** Ultima superficie grossa rimasta. La domanda: chi valida
+cosa, chi usa `service_role` dove basterebbe la chiave anon, e chi cambia lo
+stato senza doverlo fare.
+
+**Come ho verificato.** Inventario automatico di tutte le `route.ts`: metodi
+esposti, client Supabase usato, controllo di autenticazione, presenza di
+validazione. Poi lettura mirata delle anomalie.
+
+### Il difetto trovato: una seconda GET che modificava
+
+`/api/admin/events/moderate` aveva **lo stesso identico difetto** corretto lo
+stesso giorno in `/api/admin/approve`: un link in un'email che pubblicava o
+rifiutava un evento al solo essere aperto.
+
+Qui era anche peggio: il token degli eventi dura **7 giorni** contro le 72 ore
+di quello degli spot, quindi la finestra in cui uno scanner di posta poteva
+decidere al posto dell'admin era piu' che doppia.
+
+Non l'avrei cercata senza la regola scritta in `lessons.md` dopo il primo caso.
+
+### Il quadro generale è sano
+
+62 rotte. Tutte quelle che scrivono richiedono una credenziale: sessione admin,
+token utente Supabase, o token HMAC firmato. Le poche pubbliche senza
+autenticazione sono di sola lettura (`spots`, `news`, `events`,
+`activity-feed`, `user-stats`) oppure scrivono dati anonimi per progetto
+(`funnel`).
+
+`service_role` e' usato quasi ovunque, anche dove basterebbe la chiave anon.
+Non e' una falla — le rotte controllano l'autorizzazione da sole — ma toglie la
+rete di sicurezza delle policy RLS: se un controllo salta, non c'e' un secondo
+strato sotto. E' lo stesso schema che ha reso possibile il bug delle foto non
+moderate.
+
+Circa la meta' delle rotte non usa uno schema di validazione. Quelle che
+ricevono dati dall'utente lo fanno quasi tutte (`submit-spot`, `submit-event`,
+`submit-news`, `status-confirm`, `flag`, `profile`, `newsletter/subscribe`,
+`spots/[slug]`, `admin/edit-spot`). Le altre leggono e basta.
+
+### Cosa ho cambiato
+
+Le tre rotte di moderazione via email ora hanno la stessa forma:
+
+    GET  → verifica il token, mostra /admin/conferma. Non tocca niente.
+    POST → verifica il token, cambia lo stato.
+
+E il middleware, che esentava dal login solo le GET col token, ora esenta anche
+le POST — altrimenti chi arriva dall'email senza sessione admin veniva fermato
+proprio sul bottone. **Difetto che avevo introdotto io e intercettato prima di
+pubblicare**, provando la POST con curl invece di fidarmi della build.
+
+Verificato che nessuna delle tre GET contenga piu' un percorso che porti a
+`.update(`, `approveSpot(` o `rejectSpot(`.
+
+---
+
 ## Aree ancora da esaminare
 
 
-1. **Le ~30 rotte API** — chi valida cosa, chi usa `service_role` dove basterebbe
-   la chiave anon, chi espone messaggi del database al client.
+
+1. ~~Le rotte API~~ — fatte il 26/08, vedi sopra.
 2. **`AddSpotModal`, 1134 righe** — letto un terzo, quello che serviva per il
    bug della categoria.
 3. ~~Le policy dello Storage~~ — fatte il 25/08, vedi sopra.

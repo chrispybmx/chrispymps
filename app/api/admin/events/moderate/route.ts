@@ -22,6 +22,14 @@ function page(title: string, body: string, ok: boolean): NextResponse {
   );
 }
 
+/**
+ * GET — NON modera piu'. Porta alla pagina di conferma.
+ *
+ * Stesso difetto trovato in app/api/admin/approve il 26/08: il link vive in
+ * un'email, e le GET le seguono anche gli antivirus della posta e i
+ * generatori di anteprima. Qui era pure peggio, perche' il token degli eventi
+ * dura 7 giorni invece di 72 ore: finestra piu' larga.
+ */
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action');
   const token  = req.nextUrl.searchParams.get('token') ?? '';
@@ -29,33 +37,58 @@ export async function GET(req: NextRequest) {
   if (action !== 'approve' && action !== 'reject') {
     return page('Azione non valida', 'Il link è malformato.', false);
   }
-
-  const eventId = verifyEventActionToken(token, action);
-  if (!eventId) {
+  if (!verifyEventActionToken(token, action)) {
     return page('Link scaduto o non valido', 'Il link di moderazione è scaduto (7 giorni) o non è valido. Usa la dashboard admin.', false);
+  }
+
+  return NextResponse.redirect(new URL(
+    `/admin/conferma?evento=${encodeURIComponent(token)}&azione=${action}`,
+    req.url,
+  ));
+}
+
+/** POST — modera davvero. Il token resta la credenziale, il metodo no. */
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const { token, azione } = body as { token?: string; azione?: string };
+
+  if (azione !== 'approve' && azione !== 'reject') {
+    return NextResponse.json({ ok: false, error: 'Azione non valida' }, { status: 400 });
+  }
+  if (typeof token !== 'string' || !token) {
+    return NextResponse.json({ ok: false, error: 'Token mancante' }, { status: 400 });
+  }
+
+  const eventId = verifyEventActionToken(token, azione);
+  if (!eventId) {
+    return NextResponse.json({ ok: false, error: 'Link scaduto o non valido. Usa la dashboard.' }, { status: 401 });
   }
 
   const supabase = supabaseAdmin();
   const { data: event } = await supabase
     .from('events')
-    .select('id, title, event_date, city, moderation_status')
+    .select('id, title, moderation_status')
     .eq('id', eventId)
     .maybeSingle();
 
-  if (!event) return page('Evento non trovato', 'Forse è già stato eliminato.', false);
+  if (!event) {
+    return NextResponse.json({ ok: false, error: 'Evento non trovato. Forse è già stato eliminato.' }, { status: 404 });
+  }
 
-  const fields = action === 'approve'
+  const fields = azione === 'approve'
     ? { status: 'published', moderation_status: 'published' }
     : { status: 'draft',     moderation_status: 'rejected' };
 
   const { error } = await supabase.from('events').update(fields).eq('id', eventId);
   if (error) {
     console.error('[events/moderate] update error:', error.message);
-    return page('Errore', 'Aggiornamento fallito. Riprova dalla dashboard.', false);
+    return NextResponse.json({ ok: false, error: 'Aggiornamento fallito. Riprova dalla dashboard.' }, { status: 500 });
   }
 
-  const when = event.event_date ? new Date(event.event_date).toLocaleDateString('it-IT') : '';
-  return action === 'approve'
-    ? page('✅ Evento pubblicato', `«${event.title}»${when ? ` (${when})` : ''} è ora visibile nel calendario eventi.`, true)
-    : page('❌ Evento rifiutato', `«${event.title}» è stato rifiutato e non sarà pubblicato.`, true);
+  return NextResponse.json({
+    ok: true,
+    messaggio: azione === 'approve'
+      ? `«${event.title}» è ora nel calendario eventi.`
+      : `«${event.title}» è stato rifiutato.`,
+  });
 }

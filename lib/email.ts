@@ -83,12 +83,16 @@ export async function sendAdminNotification(spot: Spot, contributor: Contributor
   <div class="row"><span class="label">Da:</span>        <span class="val">${eContribName} (${eContribEmail})</span></div>
   ${eInstagram ? `<div class="row"><span class="label">Instagram:</span><span class="val">@${eInstagram}</span></div>` : ''}
   <hr class="sep">
-  <a href="${approveUrl}" class="btn btn-approve">✅ APPROVA</a>
-  <a href="${rejectUrl}"  class="btn btn-reject">❌ RIFIUTA</a>
+  <a href="${approveUrl}" class="btn btn-approve">✅ GUARDA E APPROVA</a>
+  <a href="${rejectUrl}"  class="btn btn-reject">❌ GUARDA E RIFIUTA</a>
   <a href="${adminUrl}"   class="btn btn-admin">📱 Admin dashboard</a>
   <hr class="sep">
-  <p style="color:#888;font-size:11px;">Spot ID: ${spot.id}<br>
-  I link di approvazione scadono dopo 72 ore.</p>
+  <p style="color:#888;font-size:11px;">
+  I link aprono una pagina con le foto: niente viene deciso finché non tocchi
+  un bottone lì dentro. Prima bastava aprire il link — e i filtri antispam,
+  che seguono i link da soli, potevano approvare al posto tuo.<br><br>
+  Spot ID: ${spot.id}<br>
+  I link scadono dopo 72 ore.</p>
 </div></body></html>
     `.trim(),
   });

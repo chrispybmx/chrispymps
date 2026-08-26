@@ -234,13 +234,22 @@ export async function middleware(req: NextRequest) {
   }
 
   // ── 12. Admin routes: verifica cookie sessione admin presente (difesa in profondità) ──
-  // Eccezioni: /api/admin/approve e /api/admin/reject GET con token HMAC (link email)
+  /* Eccezione per i link di moderazione via email: il token HMAC firmato E'
+     l'autorizzazione, ed e' cosi' che si modera dal telefono senza fare il
+     login.
+     Vale per GET e POST. Prima era solo GET, perche' la GET stessa approvava —
+     ed era il difetto: i link nelle email li seguono anche gli antivirus della
+     posta. Ora la GET porta a una pagina di conferma e a decidere e' una POST,
+     quindi l'eccezione deve coprire anche quella, altrimenti chi arriva
+     dall'email senza sessione admin viene fermato proprio sul bottone.
+     Qui si guarda solo la PRESENZA del token: a verificarne la firma e la
+     scadenza e' la rotta, che e' il controllo vero. */
   if (pathname.startsWith('/api/admin/') && pathname !== '/api/admin/login') {
     const isEmailLink =
       (pathname === '/api/admin/approve' ||
        pathname === '/api/admin/reject' ||
        pathname === '/api/admin/events/moderate') &&
-      req.method === 'GET' &&
+      (req.method === 'GET' || req.method === 'POST') &&
       req.nextUrl.searchParams.has('token');
 
     if (!isEmailLink) {
