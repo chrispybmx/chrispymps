@@ -10,7 +10,9 @@
     "lint": "next lint",
     "seed": "tsx scripts/import-kml.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verifica": "./scripts/verifica.sh",
+    "verifica:prod": "./scripts/verifica.sh https://maps.chrispybmx.com"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",

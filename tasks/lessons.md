@@ -533,3 +533,32 @@ fallisce quella, non hai rotto niente.
 **Un vincolo nella query non basta se nessuno guarda l'esito.**
 `.eq(...,'pending')` senza `.select()` e senza contare le righe e' un lucchetto
 su una porta che nessuno controlla se e' rimasta chiusa.
+
+## 2026-08-26 — La guardia, e perche' arriva solo adesso
+
+Regola del progetto, scritta in tasks/REGOLA.md: **un rider deve sempre poter
+aggiungere uno spot**. Tutto il resto e' migliorabile, quello no.
+
+Per tre giorni ho fatto gli stessi controlli a mano — curl sulle route, conteggio
+spot, invii di prova su ogni categoria — e ogni volta li ho reinventati. Non
+erano scritti da nessuna parte. Se domani lavora Codex, o Christian, o io fra un
+mese, quei controlli non esistono.
+
+Ora sono in `scripts/verifica.sh`, dietro `npm run verifica`.
+
+Il punto non e' automatizzare per comodita'. E' che i quattro bug piu' gravi di
+questi giorni — categoria respinta, mappa svuotata, foto pubbliche, link che
+approvavano da soli — erano TUTTI invisibili a tsc, ESLint, test e build. Sono
+usciti da richieste vere a un server vero. Se quella parte resta improvvisata,
+resta anche facoltativa.
+
+Una cosa fatta bene: lo script legge le categorie da `lib/constants.ts` invece
+di elencarle. Cosi' quando ne aggiungi una, la guardia la prova da sola — che e'
+esattamente il caso in cui il bug del 19/08 e' nato.
+
+E l'ho provata rimettendo il bug vero: tolta `street` dall'elenco del server,
+build verde e guardia rossa con il nome della categoria e il messaggio esatto.
+Ripristinata, verde. Uscita 1 col bug, 0 senza.
+
+**Una guardia che non e' mai stata vista fallire non e' una guardia**, e' una
+decorazione che da' fiducia senza meritarla.
