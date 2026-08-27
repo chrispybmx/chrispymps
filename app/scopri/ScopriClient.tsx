@@ -9,6 +9,7 @@ import BottomNav from '@/components/BottomNav';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
 import { useToast } from '@/components/Toast';
+import { miniatura } from '@/lib/immagini';
 
 interface ScopriClientProps { spots: SpotMapPin[] }
 
@@ -288,7 +289,7 @@ export default function ScopriClient({ spots }: ScopriClientProps) {
                     position: 'relative',
                   }}>
                     {cover ? (
-                      <img src={cover} alt={spot.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                      <img src={miniatura(cover, 400)} alt={spot.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                     ) : (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 36, opacity: 0.2 }}>{tipo.emoji}</span>

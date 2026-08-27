@@ -16,6 +16,7 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
 import OnboardingHints from '@/components/OnboardingHints';
 import FreshnessDot from '@/components/FreshnessDot';
+import { miniatura } from '@/lib/immagini';
 import NearbyEventBanner from '@/components/NearbyEventBanner';
 import AuthErrorBanner from '@/components/AuthErrorBanner';
 import { findNearby } from '@/lib/nearby-radar';
@@ -1389,7 +1390,7 @@ function SpotListPanel({
                     position: 'relative', overflow: 'hidden',
                   }}>
                     {cover ? (
-                      <img className="spot-grid-img" src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                      <img className="spot-grid-img" src={miniatura(cover, 400)} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                     ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 36, opacity: 0.2 }}>{tipo.emoji}</span>
@@ -1536,7 +1537,7 @@ function SpotListPanel({
                         <div key={url + i} style={{ flexShrink: 0, width: '100%', height: '100%', scrollSnapAlign: 'start' }}>
                           <img
                             className="spot-expanded-img"
-                            src={url} alt={spot.name}
+                            src={miniatura(url, 800)} alt={spot.name}
                             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
                             loading={i === 0 ? 'eager' : 'lazy'}
                           />
@@ -1667,7 +1668,7 @@ function SpotListPanel({
                 >
                   <div style={{ height: 100, background: '#111', position: 'relative', overflow: 'hidden' }}>
                     {cover ? (
-                      <img src={cover} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                      <img src={miniatura(cover, 300)} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                     ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: 28, opacity: 0.2 }}>{tipo.emoji}</span>

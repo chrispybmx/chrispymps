@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import type { Spot } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI, PALETTE } from '@/lib/constants';
+import { miniatura } from '@/lib/immagini';
 
 /* ── localStorage utils ── */
 const FAVS_KEY  = 'cmaps_favs_v1';
@@ -336,7 +337,7 @@ function SpotRow({
           }}>
             {cover ? (
               <img
-                src={cover}
+                src={miniatura(cover, 200)}
                 alt={spot.name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 loading="lazy"

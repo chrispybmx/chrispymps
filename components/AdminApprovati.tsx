@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { TIPI_SPOT, APP_CONFIG } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
+import { miniatura } from '@/lib/immagini';
 
 interface SpotApprovato {
   id: string;
@@ -102,7 +103,7 @@ export default function AdminApprovati() {
                 background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {s.cover
-                  ? <img src={s.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                  ? <img src={miniatura(s.cover, 160)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                   : <span style={{ fontSize: 24, opacity: 0.3 }}>{tipo?.emoji ?? '📍'}</span>}
               </div>
 

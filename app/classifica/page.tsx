@@ -5,6 +5,7 @@ import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import type { SpotType, SpotCondition } from '@/lib/types';
 import BottomNav from '@/components/BottomNav';
 import { LEVELS } from '@/lib/levels';
+import { miniatura } from '@/lib/immagini';
 
 export const metadata: Metadata = {
   title: 'Classifica Spot BMX e Rider',
@@ -247,7 +248,7 @@ export default async function ClassificaPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {spot.cover_url ? (
-                    <img src={spot.cover_url} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                    <img src={miniatura(spot.cover_url, 300)} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                   ) : (
                     <span style={{ fontSize: 22 }}>{tipo.emoji}</span>
                   )}

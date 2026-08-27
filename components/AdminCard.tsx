@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Spot } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import { miniatura } from '@/lib/immagini';
 
 interface AdminCardProps {
   spot:       Spot;
@@ -138,7 +139,7 @@ export default function AdminCard({ spot, onApprove, onReject, onEdit, onDelete,
                     background: '#111',
                   }}
                 >
-                  <img src={ph.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                  <img src={miniatura(ph.url, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                 </button>
               ))}
             </div>

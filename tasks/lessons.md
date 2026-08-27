@@ -562,3 +562,42 @@ Ripristinata, verde. Uscita 1 col bug, 0 senza.
 
 **Una guardia che non e' mai stata vista fallire non e' una guardia**, e' una
 decorazione che da' fiducia senza meritarla.
+
+## 2026-08-26 — La lentezza non era nel codice, era nei pixel
+
+«Velocizzare il sito» — e per giorni non l'avevo mai misurato. Quando l'ho
+fatto, il JavaScript era a posto: 87,9 KB condivisi, /map a 207 KB. Numeri
+normali per Next.js, niente da tagliare.
+
+Il peso stava altrove:
+
+  copertina reale       1200 x 1600 px, 274 KB di media
+  mostrata nella griglia          130 px di altezza
+
+Si scaricavano 400 KB per disegnarli in 130 pixel. Con venti spot visibili:
+5,9 MB per una schermata. Su /scopri, 4,9 MB.
+
+Supabase Storage sa gia' ridimensionare — `/render/image/public/` invece di
+`/object/public/` — e serve WebP quando il browser lo accetta. Misurato sulle
+stesse venti foto: 5,9 MB → 1,0 MB. L'82%.
+
+Non serviva installare niente ne' cambiare architettura. Serviva chiedere le
+foto della taglia giusta.
+
+Due cose imparate:
+
+**Misurare prima di ottimizzare, davvero.** Il mio istinto era guardare il
+peso del JavaScript, perche' e' quello che mostra la build. Ma la build non ti
+dice quanto pesano le immagini: quelle non sono nel bundle. Il numero che
+conta e' quanti byte scarica un telefono per vedere una schermata, e quello si
+misura solo scaricandoli.
+
+**Il ridimensionamento va dove la foto e' piccola, non ovunque.** Scheda spot e
+lightbox restano a piena risoluzione: una miniatura al posto della foto vera
+sarebbe un peggioramento travestito da ottimizzazione. La funzione applica la
+regola, il posto dove chiamarla e' una decisione.
+
+E una difensiva: `miniatura()` restituisce l'indirizzo INVARIATO se non
+riconosce lo storage. Una miniatura sbagliata su una griglia significa riquadri
+vuoti al posto delle foto — peggio di una foto pesante. Sei test proteggono
+proprio questo.
