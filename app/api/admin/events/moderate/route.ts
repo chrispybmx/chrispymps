@@ -90,9 +90,23 @@ export async function POST(req: NextRequest) {
     ? { status: 'published', moderation_status: 'published' }
     : { status: 'draft',     moderation_status: 'rejected' };
 
-  const { error } = await supabase.from('events').update(fields)
+  const { data: aggiornati, error } = await supabase.from('events').update(fields)
     .eq('id', eventId)
-    .eq('moderation_status', 'pending');
+    .eq('moderation_status', 'pending')
+    .select('id');
+
+  /* Se la UPDATE non ha toccato nessuna riga significa che, fra la lettura e
+     la scrittura, qualcun altro ha gia' deciso. Postgrest NON segnala errore in
+     quel caso: senza questo controllo il codice proseguiva come se avesse
+     funzionato — mandando l'email, la notifica, gli XP e rispondendo ok.
+     Nel caso peggiore approve e reject in parallelo: uno vince sul database e
+     l'altro manda comunque l'email opposta. */
+  if (!error && (!aggiornati || aggiornati.length === 0)) {
+    return NextResponse.json({
+      ok: false,
+      error: 'Qualcun altro ha appena deciso su questo evento. Ricarica la dashboard.',
+    }, { status: 409 });
+  }
   if (error) {
     console.error('[events/moderate] update error:', error.message);
     return NextResponse.json({ ok: false, error: 'Aggiornamento fallito. Riprova dalla dashboard.' }, { status: 500 });

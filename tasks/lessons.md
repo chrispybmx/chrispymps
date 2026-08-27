@@ -486,3 +486,50 @@ quello che tu non guardi.
 Regola operativa: dopo aver chiuso una falla, farla rileggere a qualcun altro
 con l'incarico esplicito di romperla — non di confermarla. E verificare tu le
 sue affermazioni prima di agire: sono un input, non una verita'.
+
+## 2026-08-26 — Tre giri di revisione, e ai giri 2 e 3 i bug erano miei
+
+Dopo aver chiuso i link email, tre giri con Codex. Ogni volta ho verificato io
+le sue affermazioni leggendo il codice prima di toccare niente: due volte su
+tre aveva ragione su tutto, ma il metodo conta piu' del punteggio.
+
+**Giro 1** — trova il replay: le UPDATE non richiedevano `status = 'pending'`,
+quindi un token poteva ribaltare una decisione per 72 ore (7 giorni sugli
+eventi). E il controllo che avevo messo stava nella PAGINA, non nella query:
+una POST diretta lo saltava.
+
+**Giro 2** — trova che la mia correzione era incompleta. Avevo aggiunto
+`.eq('status','pending')` alla UPDATE, ma nessuno guardava se avesse toccato
+righe. Postgrest non segnala errore quando ne tocca zero: su una corsa il
+perdente proseguiva mandando email, notifica e XP, e rispondendo `ok`. Nel caso
+peggiore approve e reject in parallelo: uno vince sul database, l'altro manda
+comunque l'email opposta.
+
+**Giro 3** — trova due cose che avevo introdotto IO correggendo il giro 2:
+
+1. In `pending-photos` il rifiuto cancellava il file dallo storage PRIMA di
+   verificare di poter cancellare la riga. Se nel frattempo la foto era stata
+   approvata, restava una riga viva che puntava a un file inesistente: foto
+   rotta sul sito. Ordine invertito — prima la riga, poi il file. Se la riga
+   non si toglie, il file resta e non si e' rotto niente.
+2. La dashboard non gestiva il 409 nuovo: `if (j.ok)` e basta, nessun ramo di
+   errore. Prima non capitava mai, dopo la mia modifica si'. Il bottone non
+   faceva niente e l'admin non capiva perche'.
+
+Le lezioni vere:
+
+**Una correzione e' una modifica come le altre**, e va revisionata come le
+altre. Le mie due peggiori di oggi sono nate mentre chiudevo un buco, non
+mentre costruivo una funzione.
+
+**Quando aggiungi un codice di errore nuovo, cerca chi chiama.** Un 409 che
+nessuno gestisce e' un fallimento silenzioso, e silenzioso e' peggio di
+rumoroso.
+
+**L'ordine delle operazioni irreversibili conta.** Cancellare un file e'
+irreversibile, cancellare una riga no. La cosa reversibile va per prima: se
+fallisce quella, non hai rotto niente.
+
+**Un vincolo nella query non basta se nessuno guarda l'esito.**
+`.eq(...,'pending')` senza `.select()` e senza contare le righe e' un lucchetto
+su una porta che nessuno controlla se e' rimasta chiusa.

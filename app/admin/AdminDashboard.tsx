@@ -226,8 +226,19 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       if (j.ok) {
         setPendingPhotos(prev => prev.filter(p => p.id !== photoId));
         showMsg(j.message);
+        return;
       }
-    } catch { showMsg('Errore'); }
+
+      /* Il ramo di errore non esisteva: quando la risposta non era ok non
+         succedeva NULLA — nessun messaggio, la foto restava in elenco, e
+         l'admin non capiva perche' il bottone non facesse niente.
+         Ora conta, perche' la rotta risponde 409 quando qualcun altro ha gia'
+         deciso: in quel caso la foto va tolta dall'elenco, che e' vecchio. */
+      showMsg(j.error ?? 'Non è andata. Riprova.');
+      if (res.status === 409) {
+        setPendingPhotos(prev => prev.filter(p => p.id !== photoId));
+      }
+    } catch { showMsg('Errore di rete. Riprova.'); }
   };
 
   /* ── Load users ── */

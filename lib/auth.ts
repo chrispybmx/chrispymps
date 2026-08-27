@@ -31,9 +31,13 @@ function verifyToken(token: string): boolean {
   if (parts.length !== 2) return false;
   const [timestamp, signature] = parts;
 
-  // Controlla scadenza (7 giorni)
-  const age = Date.now() - parseInt(timestamp);
-  if (age > SESSION_MAX_AGE * 1000) return false;
+  /* Scadenza (7 giorni). Stesso irrigidimento fatto sui token email: senza
+     questi controlli un timestamp NEL FUTURO (eta' negativa) o non numerico
+     (parseInt da' NaN, e ogni confronto con NaN e' falso) allungherebbe la
+     sessione oltre la finestra dichiarata. Non falsificabile senza il segreto,
+     ma era la stessa assunzione non verificata. */
+  const eta = Date.now() - parseInt(timestamp, 10);
+  if (!Number.isFinite(eta) || eta < 0 || eta > SESSION_MAX_AGE * 1000) return false;
 
   // Verifica firma — timing-safe per evitare timing attacks
   const expected = createHmac('sha256', getSecret())

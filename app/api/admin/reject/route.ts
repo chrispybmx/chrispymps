@@ -69,14 +69,28 @@ async function rejectSpot(spotId: string, req: NextRequest, reason?: string): Pr
     }, { status: 409 });
   }
 
-  const { error: updateErr } = await supabase
+  const { data: aggiornati, error: updateErr } = await supabase
     .from('spots')
     .update({ status: 'rejected', reviewer_notes: reason ?? null })
     .eq('id', spotId)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
+    .select('id');
 
   if (updateErr) {
     return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
+  }
+
+  /* Se la UPDATE non ha toccato nessuna riga significa che, fra la lettura e
+     la scrittura, qualcun altro ha gia' deciso. Postgrest NON segnala errore in
+     quel caso: senza questo controllo il codice proseguiva come se avesse
+     funzionato — mandando l'email, la notifica, gli XP e rispondendo ok.
+     Nel caso peggiore approve e reject in parallelo: uno vince sul database e
+     l'altro manda comunque l'email opposta. */
+  if (!aggiornati || aggiornati.length === 0) {
+    return NextResponse.json({
+      ok: false,
+      error: 'Qualcun altro ha appena deciso su questo spot. Ricarica la dashboard.',
+    }, { status: 409 });
   }
 
   // Effetti collaterali AWAITED (vedi approve/route.ts): su serverless una

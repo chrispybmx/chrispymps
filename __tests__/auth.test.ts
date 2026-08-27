@@ -155,3 +155,32 @@ describe('scadenza token — casi limite', () => {
     expect(verifyApproveToken(token)).toBeNull();
   });
 });
+
+/**
+ * Il token di SESSIONE admin aveva lo stesso difetto dei token email, ed era
+ * sfuggito alla prima correzione: avevo irrobustito i tre verificatori delle
+ * email e non questo. Trovato nel secondo giro di revisione con Codex.
+ */
+describe('sessione admin — scadenza', () => {
+  const SEGRETO_S = 'test-secret-at-least-32-characters-long-000';
+
+  const cuoci = (timestamp: string) => {
+    const sig = createHmac('sha256', SEGRETO_S).update(timestamp).digest('hex');
+    return `${timestamp}.${sig}`;
+  };
+
+  it('una sessione con timestamp nel futuro non e\' valida', () => {
+    cookieGet.mockReturnValue({ value: cuoci(String(Date.now() + 365 * 24 * 3600 * 1000)) });
+    expect(isAdminAuthenticated()).toBe(false);
+  });
+
+  it('una sessione con timestamp non numerico non e\' valida', () => {
+    cookieGet.mockReturnValue({ value: cuoci('domani') });
+    expect(isAdminAuthenticated()).toBe(false);
+  });
+
+  it('una sessione appena creata e\' valida', () => {
+    cookieGet.mockReturnValue({ value: cuoci(String(Date.now())) });
+    expect(isAdminAuthenticated()).toBe(true);
+  });
+});
