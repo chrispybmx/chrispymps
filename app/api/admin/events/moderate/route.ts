@@ -75,11 +75,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Evento non trovato. Forse è già stato eliminato.' }, { status: 404 });
   }
 
+  /* Si modera SOLO cio' che e' in attesa. Qui il token dura SETTE GIORNI, non
+     72 ore: senza questo controllo una decisione poteva essere ribaltata per
+     una settimana usando l'altro link della stessa email. */
+  if (event.moderation_status !== 'pending') {
+    return NextResponse.json({
+      ok: false,
+      error: 'Questo evento è già stato deciso. Se vuoi cambiare, usa la dashboard.',
+      stato: event.moderation_status,
+    }, { status: 409 });
+  }
+
   const fields = azione === 'approve'
     ? { status: 'published', moderation_status: 'published' }
     : { status: 'draft',     moderation_status: 'rejected' };
 
-  const { error } = await supabase.from('events').update(fields).eq('id', eventId);
+  const { error } = await supabase.from('events').update(fields)
+    .eq('id', eventId)
+    .eq('moderation_status', 'pending');
   if (error) {
     console.error('[events/moderate] update error:', error.message);
     return NextResponse.json({ ok: false, error: 'Aggiornamento fallito. Riprova dalla dashboard.' }, { status: 500 });

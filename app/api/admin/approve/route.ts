@@ -79,16 +79,30 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
     return NextResponse.json({ ok: false, error: 'Spot non trovato' }, { status: 404 });
   }
 
-  if (spot.status === 'approved') {
-    // Già approvato — redirect dashboard
-    if (req.method === 'GET') return NextResponse.redirect(new URL('/admin?msg=already_approved', req.url));
-    return NextResponse.json({ ok: true, msg: 'già approvato' });
+  /* Si approva SOLO cio' che e' ancora in attesa.
+     Prima si controllava solo `status === 'approved'`, quindi il doppio invio
+     era innocuo ma uno spot RIFIUTATO poteva essere riapprovato: il token vale
+     72 ore, e nella stessa email c'e' anche quello di rifiuto. Chi avesse
+     tenuto l'email poteva ribaltare la decisione per tre giorni.
+     Il controllo non puo' stare nella pagina di conferma — quella e' solo
+     l'interfaccia, e una POST diretta la salta. Deve stare qui. */
+  if (spot.status !== 'pending') {
+    return NextResponse.json({
+      ok: false,
+      error: spot.status === 'approved'
+        ? 'Questo spot era già approvato.'
+        : 'Questo spot è già stato deciso. Se vuoi cambiare, usa la dashboard.',
+      stato: spot.status,
+    }, { status: 409 });
   }
 
   const { error: updateErr } = await supabase
     .from('spots')
     .update({ status: 'approved', approved_at: new Date().toISOString() })
-    .eq('id', spotId);
+    .eq('id', spotId)
+    /* Anche nella query: fra la lettura e la scrittura potrebbe essersi
+       infilata un'altra decisione. */
+    .eq('status', 'pending');
 
   if (updateErr) {
     return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });

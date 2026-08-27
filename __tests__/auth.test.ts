@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
 
 // next/headers importa 'server-only' → mockiamo cookies() per poter testare in node.
 const { cookieGet } = vi.hoisted(() => ({ cookieGet: vi.fn() }));
@@ -120,5 +121,37 @@ describe('approve/reject token non sono intercambiabili (regression)', () => {
     const reject = generateRejectToken(UUID);
     expect(verifyRejectToken(approve)).toBeNull();
     expect(verifyApproveToken(reject)).toBeNull();
+  });
+});
+
+/**
+ * Trovati da una revisione fatta con Codex il 26/08/2026.
+ *
+ * Il controllo della scadenza guardava solo `age > maxHours`. Mancavano due
+ * casi che non rendono il token falsificabile — serve comunque il segreto —
+ * ma allargano la finestra oltre quanto dichiarato.
+ */
+describe('scadenza token — casi limite', () => {
+  const SEGRETO = 'test-secret-at-least-32-characters-long-000';
+
+  it('un timestamp nel futuro non allunga la validita\'', () => {
+    /* Un orologio sballato produrrebbe eta' negativa, che con il solo
+       `age > maxHours` passava sempre. */
+    const fraUnAnno = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    const payload = `11111111-1111-1111-1111-111111111111:${fraUnAnno}`;
+    const sig = createHmac('sha256', SEGRETO)
+      .update(payload).digest('hex');
+    const token = Buffer.from(`${payload}:${sig}`).toString('base64url');
+    expect(verifyApproveToken(token)).toBeNull();
+  });
+
+  it('un timestamp non numerico non passa', () => {
+    /* parseInt('domani') da' NaN, e ogni confronto con NaN e' falso: il
+       controllo `age > maxHours` lasciava quindi passare. */
+    const payload = '11111111-1111-1111-1111-111111111111:domani';
+    const sig = createHmac('sha256', SEGRETO)
+      .update(payload).digest('hex');
+    const token = Buffer.from(`${payload}:${sig}`).toString('base64url');
+    expect(verifyApproveToken(token)).toBeNull();
   });
 });

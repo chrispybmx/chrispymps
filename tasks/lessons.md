@@ -441,3 +441,48 @@ della rotta e' solo l'ultimo anello.
 
 E: leggere il TESTO dell'errore, non solo il codice di stato. Un 401 del
 middleware e un 401 della rotta raccontano due storie diverse.
+
+## 2026-08-26 — Cartelle fantasma ricreate da un MCP
+`basic-memory` aveva in config un progetto che puntava a una cartella rinominata. Non trovandola la ricreava vuota a ogni avvio: l'utente la cestinava, ricompariva (4 copie nel cestino). Quando una cartella "si ricrea da sola", cercare chi la crea nelle config degli MCP e dei tool, non tra i file.
+
+## 2026-08-26 — L'utente lavora tra un turno e l'altro
+Tra due messaggi sono passate 11 ore e Documents era stata riorganizzata a mano: cartelle spostate, sito consolidato in "Chrispy Maps". Il mio lavoro e il suo si sono sovrapposti creando doppioni. Prima di agire su una struttura vista in un turno precedente, ri-verificare lo stato reale.
+
+## 2026-08-26 — La revisione di un altro modello ha trovato quello che non vedevo
+
+Chiusa la falla dei link email (GET che moderavano), ho fatto revisionare il
+lavoro a Codex, con un incarico ostile: «non hai scritto tu questo codice, il
+tuo compito e' trovarci i buchi».
+
+Ha confermato quello che avevo verificato — nessuna GET modifica piu' nulla,
+l'eccezione nel middleware e' stretta, i token non sono intercambiabili grazie
+ai prefissi, timingSafeEqual e' usato ovunque.
+
+E ha trovato tre cose che mi erano sfuggite.
+
+**1. Il replay.** Le UPDATE non richiedevano `status = 'pending'`. Quindi un
+token di approvazione poteva RIAPPROVARE uno spot gia' rifiutato, e quello di
+rifiuto poteva annullare un'approvazione — per 72 ore, e nella stessa email ci
+sono entrambi. Sugli eventi il token dura SETTE giorni.
+
+**2. Avevo messo il controllo nel posto sbagliato.** La pagina di conferma
+mostra «gia' deciso» e nasconde i bottoni. Ma quella e' l'interfaccia: una POST
+diretta la salta. L'unico posto dove un controllo del genere conta e' la query
+che scrive.
+
+**3. La scadenza guardava solo un lato.** `if (age > maxHours)` lasciava
+passare un timestamp NEL FUTURO (eta' negativa) e uno non numerico (parseInt
+da' NaN, e ogni confronto con NaN e' falso). Non falsificabile senza il
+segreto, ma la finestra era piu' larga di quanto dichiarasse.
+
+Il punto: **un agente che rilegge il proprio lavoro ha gli stessi punti
+ciechi.** Io avevo controllato con cura che nessuna GET modificasse — ero
+concentrato li'. Non mi ero chiesto cosa succede se lo stesso token viene usato
+due volte, o dopo la decisione opposta.
+
+Un modello diverso non e' piu' bravo. Ha altri punti ciechi, e per questo vede
+quello che tu non guardi.
+
+Regola operativa: dopo aver chiuso una falla, farla rileggere a qualcun altro
+con l'incarico esplicito di romperla — non di confermarla. E verificare tu le
+sue affermazioni prima di agire: sono un input, non una verita'.

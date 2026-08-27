@@ -55,10 +55,25 @@ async function rejectSpot(spotId: string, req: NextRequest, reason?: string): Pr
     return NextResponse.json({ ok: false, error: 'Spot non trovato' }, { status: 404 });
   }
 
+  /* Si rifiuta SOLO cio' che e' ancora in attesa.
+     Qui non c'era alcun controllo: il token di rifiuto poteva annullare
+     un'approvazione per 72 ore, e ogni reinvio faceva ripartire l'email di
+     rifiuto al rider. */
+  if (spot.status !== 'pending') {
+    return NextResponse.json({
+      ok: false,
+      error: spot.status === 'rejected'
+        ? 'Questo spot era già stato rifiutato.'
+        : 'Questo spot è già stato deciso. Se vuoi cambiare, usa la dashboard.',
+      stato: spot.status,
+    }, { status: 409 });
+  }
+
   const { error: updateErr } = await supabase
     .from('spots')
     .update({ status: 'rejected', reviewer_notes: reason ?? null })
-    .eq('id', spotId);
+    .eq('id', spotId)
+    .eq('status', 'pending');
 
   if (updateErr) {
     return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });

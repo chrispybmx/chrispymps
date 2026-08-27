@@ -127,9 +127,12 @@ export function verifyApproveToken(token: string, maxHours = 72): string | null 
     if (parts.length !== 3) return null;
     const [spotId, timestamp, sig] = parts;
 
-    // Scadenza
-    const age = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
-    if (age > maxHours) return null;
+    /* Scadenza. Si controlla anche che l'eta' non sia NEGATIVA: un timestamp
+       nel futuro non e' falsificabile senza il segreto, ma se ci finisse per
+       un errore di orologio il token durerebbe piu' della finestra dichiarata.
+       E parseInt su testo non numerico da' NaN, che supera ogni confronto. */
+    const eta = (Date.now() - parseInt(timestamp, 10)) / (1000 * 60 * 60);
+    if (!Number.isFinite(eta) || eta < 0 || eta > maxHours) return null;
 
     // Verifica firma
     const payload = `${spotId}:${timestamp}`;
@@ -168,9 +171,12 @@ export function verifyRejectToken(token: string, maxHours = 72): string | null {
     const [prefix, spotId, timestamp, sig] = parts;
     if (prefix !== 'reject') return null;
 
-    // Scadenza
-    const age = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
-    if (age > maxHours) return null;
+    /* Scadenza. Si controlla anche che l'eta' non sia NEGATIVA: un timestamp
+       nel futuro non e' falsificabile senza il segreto, ma se ci finisse per
+       un errore di orologio il token durerebbe piu' della finestra dichiarata.
+       E parseInt su testo non numerico da' NaN, che supera ogni confronto. */
+    const eta = (Date.now() - parseInt(timestamp, 10)) / (1000 * 60 * 60);
+    if (!Number.isFinite(eta) || eta < 0 || eta > maxHours) return null;
 
     // Verifica firma
     const payload = `reject|${spotId}|${timestamp}`;
@@ -205,8 +211,8 @@ export function verifyEventActionToken(token: string, action: 'approve' | 'rejec
     const [prefix, eventId, timestamp, sig] = parts;
     if (prefix !== `event-${action}`) return null;
 
-    const age = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
-    if (age > maxHours) return null;
+    const eta = (Date.now() - parseInt(timestamp, 10)) / (1000 * 60 * 60);
+    if (!Number.isFinite(eta) || eta < 0 || eta > maxHours) return null;
 
     const payload = `event-${action}|${eventId}|${timestamp}`;
     const expected = createHmac('sha256', getSecret()).update(payload).digest('hex');
