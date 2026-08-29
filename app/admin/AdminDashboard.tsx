@@ -9,8 +9,9 @@ import AdminImportKML from '@/components/AdminImportKML';
 import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 import AdminApprovati from '@/components/AdminApprovati';
+import AdminContesti from '@/components/AdminContesti';
 
-type Tab = 'pending' | 'approvati' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users' | 'numeri';
+type Tab = 'pending' | 'contesti' | 'approvati' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users' | 'numeri';
 
 interface AdminComment {
   id: string;
@@ -417,6 +418,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
   const TABS: { key: Tab; label: string; badge?: number }[] = [
     { key: 'pending',   label: '📥 In attesa', badge: pending.length },
     { key: 'approvati', label: '✅ Approvati' },
+    { key: 'contesti',  label: '🧭 Contesti' },
     { key: 'photos',   label: '📸 Foto', badge: pendingPhotos.length },
     { key: 'all',      label: '🗺️ Spot' },
     { key: 'comments', label: '💬 Commenti' },
@@ -526,6 +528,9 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       )}
 
       {/* ── TAB: TUTTI GLI SPOT ── */}
+      {/* ── TAB: CONTESTI — i 39 spot rimasti a meta' dalla riforma ── */}
+      {tab === 'contesti' && <AdminContesti />}
+
       {/* ── TAB: APPROVATI ── */}
       {tab === 'approvati' && <AdminApprovati />}
 

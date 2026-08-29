@@ -126,3 +126,30 @@ describe('ostacoli — cosa c\'e\' sullo spot', () => {
     }
   });
 });
+
+/**
+ * La schermata Contesti (components/AdminContesti.tsx) mostra un bottone per
+ * ogni valore di TIPI_SPOT_SELEZIONABILI e scrive con /api/admin/edit-spot,
+ * che valida su TIPI_SPOT_TUTTI.
+ *
+ * Se le due liste divergessero, un bottone della schermata darebbe errore al
+ * clic — esattamente il bug del 19/08, ma dentro l'admin. Questo test lo
+ * impedisce.
+ */
+describe('schermata Contesti — ogni bottone deve funzionare', () => {
+  it('ogni contesto offerto e\' accettato da edit-spot', () => {
+    for (const [t] of TIPI_SPOT_SELEZIONABILI) {
+      expect(TIPI_SPOT_TUTTI, `il bottone "${t}" darebbe errore al clic`).toContain(t);
+    }
+  });
+
+  it('i valori da sistemare esistono ancora, altrimenti la coda e\' sempre vuota', () => {
+    /* La schermata cerca gli spot con questi `type`. Se venissero tolti da
+       TIPI_SPOT prima di aver assegnato i contesti, la coda risulterebbe
+       vuota e quei 39 spot resterebbero orfani senza che nessuno se ne
+       accorga. */
+    for (const t of ['rail', 'ledge', 'gap', 'bowl', 'transition']) {
+      expect(TIPI_SPOT_TUTTI, `"${t}" tolto troppo presto`).toContain(t);
+    }
+  });
+});
