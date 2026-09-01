@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { subscribeToNewsletter } from '@/lib/mailerlite';
+import { subscribeToNewsletter } from '@/lib/newsletter';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
@@ -48,7 +48,8 @@ export async function POST(req: NextRequest) {
     if (result.ok) ok++;
     else {
       failed++;
-      console.warn('[migrate-mailerlite] failed for', email, '-', result.error);
+      // PII: niente email nei log (SEC-12.2)
+      console.warn('[migrate-newsletter] iscrizione fallita:', result.error);
     }
     // Piccola pausa per rispettare i rate limit MailerLite
     await new Promise(r => setTimeout(r, 80));

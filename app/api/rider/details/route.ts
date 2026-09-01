@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { subscribeToNewsletter, GROUP_BY_SOURCE } from '@/lib/mailerlite';
+import { subscribeToNewsletter } from '@/lib/newsletter';
 import {
   puoRicevereMarketing,
   normalizzaDiscipline,
@@ -88,13 +88,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Salvataggio non riuscito' }, { status: 500 });
   }
 
-  /* MailerLite riceve solo indirizzo e gruppo: l'anagrafica resta da noi. */
+  /* Il provider newsletter riceve solo indirizzo e lista: l'anagrafica resta da noi. */
   if (puoEssereIscritto && user.email) {
     const nome = body.username || user.user_metadata?.username || '';
     await subscribeToNewsletter(user.email, nome, {
-      source:  'newsletter',
-      groupId: GROUP_BY_SOURCE.newsletter,
-    }).catch((e) => console.error('[api/rider/details] MailerLite:', e));
+      source: 'newsletter',
+    }).catch((e) => console.error('[api/rider/details] newsletter:', e));
   }
 
   return NextResponse.json({

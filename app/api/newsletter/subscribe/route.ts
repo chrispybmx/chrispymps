@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { subscribeToNewsletter } from '@/lib/mailerlite';
+import { subscribeToNewsletter } from '@/lib/newsletter';
 import { z } from 'zod';
 
 const Schema = z.object({
