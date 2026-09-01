@@ -111,7 +111,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
 
   const isYouTube = spot.youtube_url && /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(spot.youtube_url);
   const embedUrl = isYouTube
-    ? spot.youtube_url!.replace(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/\s]+)/, 'https://www.youtube.com/embed/$1?rel=0')
+    ? spot.youtube_url!.replace(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/\s]+)/, 'https://www.youtube-nocookie.com/embed/$1?rel=0')
     : null;
 
   return (

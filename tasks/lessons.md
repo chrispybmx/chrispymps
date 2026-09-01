@@ -601,3 +601,44 @@ E una difensiva: `miniatura()` restituisce l'indirizzo INVARIATO se non
 riconosce lo storage. Una miniatura sbagliata su una griglia significa riquadri
 vuoti al posto delle foto — peggio di una foto pesante. Sei test proteggono
 proprio questo.
+
+---
+
+## 1 settembre 2026 — La casella di posta non e' la fonte di verita'
+
+Domanda semplice: MailerLite manda da solo l'email di benvenuto a chi si
+iscrive, oppure va agganciata a mano?
+
+Ho cercato nella posta di Christian. Nessun benvenuto. Ho concluso che
+l'automazione non esisteva e ho preventivato venti minuti di lavoro per
+agganciare il `WELCOME_HTML` che sta in `/api/admin/send-welcome`.
+
+Sbagliato. Una GET a `connect.mailerlite.com/api/automations` ha mostrato **due
+automazioni attive**, agganciate ai gruppi giusti, 18 email gia' consegnate. Il
+benvenuto parte da mesi.
+
+Perche' la posta mentiva: Christian e' stato **importato** nelle liste, non si e'
+mai iscritto da un form. Il trigger `subscriber_joins_group` non e' mai scattato
+per lui. La sua casella era muta per un motivo che non aveva niente a che fare
+con la domanda.
+
+**L'assenza di prova in una casella non e' prova di assenza.** Chi riceve vede
+solo cio' che gli e' arrivato; chi manda sa cosa e' partito e a chi. Se la
+domanda e' «questo sistema manda X?», si chiede al sistema che manda.
+
+Il costo dell'errore sarebbe stato peggiore del tempo perso: agganciare il
+`WELCOME_HTML` avrebbe prodotto un **doppio benvenuto** a ogni nuovo iscritto —
+uno da Resend e uno da MailerLite. Una riga di codice «mancante» che in realta'
+era deliberatamente scollegata.
+
+Corollario che vale per tutto il progetto: quando la fonte primaria e'
+interrogabile — un'API, il database, un server vero — le inferenze indirette
+sono un'ipotesi da verificare, non una risposta. Vale per la posta come vale per
+`npm run build`: nessuno dei due sa cosa fa il sistema in produzione.
+
+Stessa sessione, stessa lezione al contrario: `SECURITY_PRIVACY_AUDIT.md`
+segnava «nessun EXIF stripping sulle foto» come rischio aperto, e la privacy
+policy dichiarava invece che i metadati vengono rimossi. Una delle due mentiva.
+Ha vinto il codice: `lib/image.ts` ricodifica con `sharp` senza `withMetadata()`,
+quindi i metadati **cadono davvero**. L'audit era vecchio di due settimane.
+Un documento non diventa vero perche' e' scritto bene.

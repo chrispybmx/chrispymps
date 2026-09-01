@@ -192,7 +192,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         if (ytId) return (
           <div key={i} style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 8, margin: '0 0 18px' }}>
             <iframe
-              src={`https://www.youtube.com/embed/${ytId}?rel=0`}
+              src={`https://www.youtube-nocookie.com/embed/${ytId}?rel=0`}
               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen

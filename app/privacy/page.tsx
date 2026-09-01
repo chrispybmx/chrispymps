@@ -347,7 +347,28 @@ export default function PrivacyPage() {
               di geocoding Nominatim: quando cerchi un luogo o selezioni una
               posizione, le relative coordinate vengono inviate a
               nominatim.openstreetmap.org per ottenere il nome di citta e paese.
+              Fornisce inoltre parte delle mappe di sfondo (tile.openstreetmap.org).
               Nessun dato identificativo (email, username) viene trasmesso.
+            </li>
+            <li style={styles.li}>
+              <strong>CARTO</strong> (CARTO Inc., USA) — mappe di sfondo
+              (basemaps.cartocdn.com). Il tuo browser richiede a CARTO i riquadri
+              della mappa che stai guardando: nella richiesta viaggiano
+              l&apos;indirizzo IP e, implicitamente, l&apos;area geografica
+              inquadrata. Nessun dato del tuo account viene trasmesso.
+            </li>
+            <li style={styles.li}>
+              <strong>unpkg</strong> (rete di distribuzione servita da Cloudflare,
+              Inc., USA) — icone dei segnaposto della mappa. Riceve
+              l&apos;indirizzo IP al caricamento delle immagini.
+            </li>
+            <li style={styles.li}>
+              <strong>YouTube</strong> (Google Ireland Limited, Irlanda) — video
+              incorporati nelle pagine delle notizie e, quando presente, nella
+              scheda di uno spot. Usiamo il dominio youtube-nocookie.com, che non
+              installa cookie di profilazione finche non avvii il video; al
+              caricamento del riquadro l&apos;indirizzo IP raggiunge comunque
+              Google.
             </li>
           </ul>
           <p style={styles.p}>
@@ -533,7 +554,7 @@ export default function PrivacyPage() {
           <h2 style={styles.h2}>9. ULTIMO AGGIORNAMENTO</h2>
           <p style={styles.p}>
             La presente informativa e stata aggiornata l&apos;ultima volta a{' '}
-            <strong>luglio 2026</strong>.
+            <strong>settembre 2026</strong>.
           </p>
           <p style={styles.p}>
             Il titolare si riserva il diritto di modificare la presente
