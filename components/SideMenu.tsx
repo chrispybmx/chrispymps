@@ -186,7 +186,8 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--gray-700)', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', lineHeight: 1.6 }}>
           <div>Chrispy Maps v1.0 — BETA</div>
           <div>Community BMX Italia</div>
-          <div style={{ marginTop: 8, display: 'flex', gap: 12 }}>
+          <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <a href="/regole" style={{ color: 'var(--orange)', textDecoration: 'none' }}>Regole</a>
             <a href="/privacy" style={{ color: 'var(--orange)', textDecoration: 'none' }}>Privacy Policy</a>
             <a href="/map/about" style={{ color: 'var(--gray-500)', textDecoration: 'none' }}>Contatti</a>
           </div>

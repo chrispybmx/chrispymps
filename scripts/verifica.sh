@@ -154,6 +154,8 @@ controlla /map 200
 controlla /sfoglia 200
 controlla /preferiti 200
 controlla /admin/conferma 200
+controlla /regole 200
+controlla /privacy 200
 controlla /map/citta-inesistente-xyz 404
 controlla /news/non-esiste 404
 
