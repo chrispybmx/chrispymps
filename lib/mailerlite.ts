@@ -21,10 +21,33 @@ export interface SubscribeResult {
 
 export type SubscribeSource = 'newsletter' | 'signup' | 'submit-spot';
 
+/**
+ * ATTENZIONE — questi id non sono intercambiabili: due di loro fanno partire
+ * un'email di benvenuto, uno no.
+ *
+ * Le automazioni MailerLite si attivano su «il contatto entra nel gruppo X».
+ * Verificato via API il 1 set 2026:
+ *
+ *   186569732865918849  Newsletter BMX Settimanale   → automazione ATTIVA
+ *   185532080718873760  ChrispyMPS — Spot Submission → automazione ATTIVA
+ *   188059390435132622  Account Chrispy Maps         → NESSUNA automazione
+ *
+ * Chi crea un account viene iscritto con `source: 'submit-spot'`, non
+ * 'signup' — vedi lib/auth-client.ts. Sembra sbagliato e non lo e': e' il
+ * gruppo Spot Submission ad avere l'automazione di benvenuto, nonostante
+ * l'automazione si chiami «Welcome — Account Chrispy Maps».
+ *
+ * Quindi: se «sistemi» auth-client.ts facendogli usare 'signup', il benvenuto
+ * smette di partire e nessun test se ne accorge. Prima sposta l'automazione
+ * sul gruppo giusto dalla dashboard.
+ *
+ * `signup` oggi lo usa solo /api/admin/migrate-mailerlite (import massivo, dove
+ * NON vuoi far partire i benvenuti). E' l'unico uso corretto.
+ */
 export const GROUP_BY_SOURCE: Record<SubscribeSource, string> = {
-  'newsletter':  '186569732865918849', // Newsletter BMX Settimanale
-  'signup':      '188059390435132622', // Account Chrispy Maps
-  'submit-spot': '185532080718873760', // ChrispyMPS — Spot Submission
+  'newsletter':  '186569732865918849', // Newsletter BMX Settimanale  — welcome ATTIVA
+  'signup':      '188059390435132622', // Account Chrispy Maps        — nessuna welcome
+  'submit-spot': '185532080718873760', // ChrispyMPS — Spot Submission — welcome ATTIVA
 };
 
 export interface SubscribeOpts {
