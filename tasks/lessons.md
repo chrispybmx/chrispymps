@@ -642,3 +642,37 @@ policy dichiarava invece che i metadati vengono rimossi. Una delle due mentiva.
 Ha vinto il codice: `lib/image.ts` ricodifica con `sharp` senza `withMetadata()`,
 quindi i metadati **cadono davvero**. L'audit era vecchio di due settimane.
 Un documento non diventa vero perche' e' scritto bene.
+
+---
+
+## Riconoscere su una forma, agire su un'altra (7 set 2026)
+
+`scripts/brevo-import.mjs` deve tenere fuori dalle liste di invio i 32 contatti di
+un gruppo MailerLite fasullo, il cui nome — «Spot Submission, Coaching Call, Corsi,
+Prima BMX» — e' fatto delle stesse virgole che separano i gruppi.
+
+La prima versione lo riconosceva con `normKey(resto).indexOf(normKey(ago))`, che
+normalizza, e lo rimuoveva con una regex costruita dalla stringa **letterale**. Su
+«Spot Submission, Coaching Call...» le due combaciavano e funzionava. Su
+«Spot Submission,Coaching Call...», senza spazio, il riconoscimento passava e la
+rimozione no: `trovato` restava `false`, il nome veniva spezzato sulle virgole, e i
+suoi quattro pezzi combaciavano con quattro liste vere. Nessun errore, nessun log:
+meta' della lista distribuita nelle liste da cui parte una campagna.
+
+**Se rilevare e agire non girano sulla stessa rappresentazione, il caso in cui le due
+divergono non da' un errore: da' l'esito opposto, in silenzio.** Un `if` che rileva su
+A e un corpo che opera su B sono due condizioni diverse travestite da una.
+
+Due corollari, dalla stessa correzione:
+
+- **Il percorso consigliato nella documentazione e' quello da testare per primo.**
+  L'artefatto veniva staccato dalla colonna gruppi ma non da `--group`, ed e' proprio
+  `--group` che `tasks/brevo-dashboard.md` consiglia. Il caso protetto era quello raro.
+- **Un test di regressione che passa anche sul codice rotto non prova niente.** Prima
+  di considerare chiusi i tre finding, la versione precedente e' stata rimessa al suo
+  posto: 4 test su 9 sono caduti. Senza quel passaggio non si sa se il test guarda il
+  bug o qualcos'altro.
+
+Trovato da `/revisione` (Codex, con `-c model="gpt-5.5"`: il `gpt-6-astra` del config
+richiede una CLI piu' nuova). Il secondo difetto e' emerso verificando il primo — il
+referto va controllato, ma anche seguito dove porta.
