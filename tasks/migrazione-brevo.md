@@ -124,13 +124,19 @@ Passo passo dei click, con i valori gia' pronti: **`tasks/brevo-dashboard.md`**.
         `residuo-import.csv` e va deciso a mano — non infilato nella newsletter.
         Serve una ottava lista `Residuo import 2026` che non riceve campagne.
 
-        Trappola trovata scrivendo lo script: il nome dell'artefatto **contiene
-        virgole** («Spot Submission, Coaching Call, Corsi, Prima BMX»). Spezzando la
-        colonna gruppi sulle virgole prima di riconoscerlo, quel nome unico diventa
-        quattro nomi che combaciano con quattro liste vere, e i 32 contatti finiscono
-        **sparpagliati nelle liste di invio** — l'opposto di scioglierli. Lo script
-        lo stacca per intero prima di qualsiasi split. Se un giorno importi a mano,
-        ricordatelo.
+        Trappola: il nome dell'artefatto **contiene virgole** («Spot Submission,
+        Coaching Call, Corsi, Prima BMX»). Trattandolo come quattro nomi, quei quattro
+        combaciano con quattro liste vere e i 32 contatti finiscono **sparpagliati
+        nelle liste di invio** — l'opposto di scioglierli. Lo script lo riconosce come
+        sequenza di token normalizzati, quindi non dipende da come MailerLite spazia
+        le virgole. Se un giorno importi a mano, ricordatelo.
+
+        Una revisione Codex (7 set) ha trovato che la prima versione lo staccava
+        dalla colonna gruppi ma **non** dal percorso `--group`, che e' proprio quello
+        consigliato qui sotto. Corretto, piu' un secondo buco della stessa famiglia:
+        riconosceva su una forma normalizzata e rimuoveva su un'altra, cosi' bastava
+        una virgola senza spazio per non accorgersene. `__tests__/brevo-import.test.ts`
+        copre entrambi — verificato che fallisca sulla versione precedente.
   - [ ] Ricostruire i 2 form embedded su WordPress («Guida Gratuita Prima BMX»,
         «gopro preset») puntandoli a Brevo. Finche' non stacchi i vecchi, quelli
         MailerLite continuano a funzionare: non c'e' finestra scoperta

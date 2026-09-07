@@ -28,7 +28,8 @@
 //
 // --group serve se hai esportato un gruppo per volta (MailerLite lo permette) e il
 // CSV quindi non ha una colonna gruppi: tutte le righe del file valgono per quel
-// gruppo. Puoi lanciarlo piu' volte sulla stessa cartella --out, i file si sommano.
+// gruppo. Lanciandolo piu' volte sulla stessa cartella --out i file si sommano: legge
+// quel che c'e' gia' e lo unisce per email, invece di sovrascriverlo.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -56,12 +57,20 @@ const ARTEFATTO_ID = '186569652817627119';
 /**
  * Il NOME del gruppo artefatto, per esteso.
  *
- * Va tolto dalla colonna gruppi PRIMA di spezzarla sulle virgole, perche' e' fatto
- * di virgole: spezzando per primo, quel nome unico si trasforma in quattro nomi che
- * combaciano con quattro liste vere, e i 32 contatti finirebbero sparpagliati nelle
- * liste di invio — l'esatto contrario di scioglierli. Match esatto sulla stringa,
- * niente euristiche: su questa colonna un'euristica non puo' distinguere un gruppo
- * dal nome concatenato da un contatto iscritto davvero a quattro gruppi.
+ * Il punto delicato di tutto lo script: questo nome e' fatto di virgole, le stesse
+ * che separano i gruppi. Trattandolo come quattro nomi, quei quattro combaciano con
+ * quattro liste vere e i 32 contatti finiscono sparpagliati nelle liste di invio —
+ * l'esatto contrario di scioglierli.
+ *
+ * Il riconoscimento lavora su TOKEN NORMALIZZATI, non sulla stringa grezza: si cerca
+ * una sequenza consecutiva di token che, normalizzata, combacia con le quattro parti
+ * qui sotto. Cosi' '...Call, Corsi...' e '...Call,Corsi...' sono la stessa cosa, e non
+ * dipende da come MailerLite ha deciso di spaziare le virgole nell'export.
+ *
+ * Limite noto e non risolvibile da qui: un contatto iscritto davvero a quei quattro
+ * gruppi, elencati in quest'ordine, e' indistinguibile dall'artefatto. Da una colonna
+ * gruppi unica l'informazione non c'e'. Per questo `tasks/brevo-dashboard.md` consiglia
+ * l'export un gruppo per volta, che e' l'unico modo non ambiguo.
  */
 const ARTEFATTO_NOME = 'Spot Submission, Coaching Call, Corsi, Prima BMX';
 
@@ -200,23 +209,29 @@ const aggiungi = (lista, contatto) => {
 };
 
 /**
- * Toglie l'artefatto dalla colonna gruppi e dice se c'era.
+ * Toglie l'artefatto da una lista di token gia' spezzata, e dice se c'era.
  *
- * Deve girare sulla stringa INTERA, prima di qualsiasi split: vedi il commento su
- * ARTEFATTO_NOME. Riconosce sia il nome per esteso sia l'id, se l'export li porta.
+ * Riconoscimento e rimozione avvengono sulla stessa base normalizzata: se si
+ * riconosce su una forma e si rimuove su un'altra, il caso in cui le due non
+ * combaciano passa per "nessun artefatto" e i contatti si sparpagliano in silenzio.
+ *
+ * Vale sia per la colonna gruppi sia per --group: e' proprio con --group che si
+ * passa il nome dell'artefatto per esteso, esportandolo come gruppo singolo.
  */
-function staccaArtefatto(raw) {
-  let resto = raw;
+function staccaArtefatto(token) {
+  const parti = ARTEFATTO_NOME.split(',').map(normKey).filter(Boolean);
+  const resto = [];
   let trovato = false;
 
-  for (const ago of [ARTEFATTO_NOME, ARTEFATTO_ID]) {
-    // Confronto normalizzato per non inciampare su spazi doppi o maiuscole,
-    // ma la rimozione avviene sulla stringa vera.
-    const i = normKey(resto).indexOf(normKey(ago));
-    if (i === -1) continue;
+  for (let i = 0; i < token.length; i++) {
+    // L'id secco, se l'export porta gli id invece dei nomi.
+    if (token[i].includes(ARTEFATTO_ID)) { trovato = true; continue; }
 
-    const re = new RegExp(ago.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    if (re.test(resto)) { resto = resto.replace(re, ''); trovato = true; }
+    // Una sequenza consecutiva di token che ricompone il nome dell'artefatto.
+    const combacia = parti.every((p, k) => normKey(token[i + k] ?? '') === p);
+    if (combacia) { trovato = true; i += parti.length - 1; continue; }
+
+    resto.push(token[i]);
   }
 
   return { resto, trovato };
@@ -239,14 +254,13 @@ for (const r of rows.slice(1)) {
     instagram: iInsta !== -1 ? (r[iInsta] ?? '').trim() : '',
   };
 
-  // L'artefatto esce PRIMA dello split, perche' il suo nome contiene virgole.
-  const { resto, trovato: toccaArtefatto } = forced
-    ? { resto: forced, trovato: false }
-    : staccaArtefatto(String(r[iGroups] ?? ''));
+  // I gruppi possono essere separati da virgola, punto e virgola o pipe a seconda
+  // di come e' stato fatto l'export. --group passa di qui come tutto il resto:
+  // e' il caso in cui e' PIU' probabile ricevere il nome dell'artefatto per esteso.
+  const token = (forced ?? String(r[iGroups] ?? ''))
+    .split(/[;|,]/).map((g) => g.trim()).filter(Boolean);
 
-  // Quel che resta puo' essere separato da virgola, punto e virgola o pipe a
-  // seconda di come e' stato fatto l'export.
-  const grezzi = resto.split(/[;|,]/).map((g) => g.trim()).filter(Boolean);
+  const { resto: grezzi, trovato: toccaArtefatto } = staccaArtefatto(token);
 
   const liste = new Set();
 
@@ -280,20 +294,46 @@ mkdirSync(outDir, { recursive: true });
 // la stessa forma e le automazioni possono usare {{ contact.NOME }} su entrambi.
 const HEADER = ['EMAIL', 'NOME', 'INSTAGRAM'];
 
+/**
+ * Somma a quel che c'e' gia', non sovrascrive.
+ *
+ * Serve perche' l'export consigliato e' un gruppo per volta: due lanci consecutivi
+ * sulla stessa --out possono ricadere sulla stessa lista (per dire, 'ChrispyMPS —
+ * Spot Submission' e 'Spot Submission' mappano entrambi su spot-submission). Con una
+ * scrittura secca il secondo lancio si mangia il primo senza dire niente.
+ *
+ * Chi arriva dopo vince sui campi: e' il dato piu' fresco.
+ */
+function unisciEsistente(file, contatti) {
+  if (!existsSync(file)) return contatti;
+
+  const righe = parseCsv(readFileSync(file, 'utf8')).slice(1);
+  const unito = new Map();
+  for (const [email, nome, instagram] of righe) {
+    if (email) unito.set(email.toLowerCase(), { email, nome: nome ?? '', instagram: instagram ?? '' });
+  }
+  for (const [k, v] of contatti) unito.set(k, v);
+  return unito;
+}
+
 const scritti = [];
 for (const [lista, contatti] of [...perLista.entries()].sort()) {
-  const out = [HEADER, ...[...contatti.values()].map((c) => [c.email, c.nome, c.instagram])];
-  const file = join(outDir, `${lista}.csv`);
+  const file  = join(outDir, `${lista}.csv`);
+  const tutti = unisciEsistente(file, contatti);
+  const out   = [HEADER, ...[...tutti.values()].map((c) => [c.email, c.nome, c.instagram])];
   writeFileSync(file, toCsv(out), 'utf8');
-  scritti.push([lista, contatti.size, file]);
+  scritti.push([lista, tutti.size, file, tutti.size - contatti.size]);
 }
 
 if (esclusi.length) {
-  writeFileSync(
-    join(outDir, '_esclusi.csv'),
-    toCsv([['EMAIL', 'STATO', 'MOTIVO'], ...esclusi]),
-    'utf8',
-  );
+  // Anche gli esclusi si sommano fra un lancio e l'altro: e' l'elenco di chi NON
+  // va importato, perderne meta' su un secondo export e' peggio che non averlo.
+  const file  = join(outDir, '_esclusi.csv');
+  const prima = existsSync(file) ? parseCsv(readFileSync(file, 'utf8')).slice(1) : [];
+  const unito = new Map(prima.map((r) => [String(r[0]).toLowerCase(), r]));
+  for (const r of esclusi) unito.set(r[0].toLowerCase(), r);
+
+  writeFileSync(file, toCsv([['EMAIL', 'STATO', 'MOTIVO'], ...unito.values()]), 'utf8');
 }
 
 // ---------------------------------------------------------------------------
@@ -305,8 +345,10 @@ for (const c of perLista.values()) for (const e of c.keys()) unici.add(e);
 
 console.log(`\nLetto  ${csvPath}  (${rows.length - 1} righe)\n`);
 console.log('Liste pronte da importare:');
-for (const [lista, n, file] of scritti) {
-  const nota = lista === LISTA_RESIDUO ? '   <- NON e\' una lista di invio, guardala' : '';
+for (const [lista, n, file, giaCera] of scritti) {
+  const nota = lista === LISTA_RESIDUO
+    ? '   <- NON e\' una lista di invio, guardala'
+    : (giaCera ? `   (${giaCera} da lanci precedenti)` : '');
   console.log(`  ${String(n).padStart(4)}  ${lista.padEnd(24)} ${file}${nota}`);
 }
 
