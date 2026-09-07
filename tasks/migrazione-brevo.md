@@ -69,6 +69,11 @@ Nessun deploy serve per tornare indietro. Finche' la variabile e' vuota e
       `app/api/rider/details/route.ts`, `app/api/admin/migrate-mailerlite/route.ts`
 - [x] `.env.example` — `NEWSLETTER_PROVIDER` + blocco `BREVO_*`
 - [x] `__tests__/newsletter.test.ts` — 10 test. Suite intera: 160/160 verdi, build OK
+- [x] *(7 set)* `scripts/brevo-import.mjs` — export MailerLite -> un CSV per lista Brevo.
+      Scioglie il gruppo artefatto e scarta chi non e' attivo. Vedi sotto.
+- [x] *(7 set)* `static-landing/email/doi-conferma.html` — template double opt-in,
+      `{{ doubleOptInUrl }}`, una sola azione
+- [x] *(7 set)* `tasks/brevo-dashboard.md` — sequenza dei click con i valori esatti
 
 Nota: `migrate-mailerlite/route.ts` **non e' stato cancellato**. L'audit lo segnava
 HIGH per auth rotta, ma usa gia' `isAdminAuthenticated()`: quel punto dell'audit e'
@@ -76,18 +81,35 @@ vecchio. Ripuntato sulla facade, serve a popolare Brevo in massa (Fase 4).
 
 ## Da fare — dashboard e DNS (richiede te)
 
-- [ ] **Fase 0 — verifica prima di procedere**
-  - [ ] Account Brevo free; confermare che l'editor **HTML custom** c'e' nel free
+Passo passo dei click, con i valori gia' pronti: **`tasks/brevo-dashboard.md`**.
+
+- [x] **Fase 0 — chiusa il 7 set**
+  - [x] Confermato: il free di Brevo **mette il proprio logo nel footer** e non e'
+        rimovibile. Serve Starter + add-on «Remove Brevo logo» — comunque sotto i
+        23,18 EUR attuali quando servira'. Con 72 iscritti si accetta.
+  - [x] Editor **HTML custom** presente nel free: e' il motivo per cui si sceglie Brevo
+  - [x] 300 email/giorno: con 72 iscritti sta larghissimo, DOI compresi
+  - [ ] Account Brevo free (lo crei tu — non posso creare account ne' inserire password)
   - [ ] Incollare `bmx-intel/newsletter/newsletter-2026-06-15-v2.html`, test a se stessi,
         controllare resa su Gmail web, Gmail app, Apple Mail
   - [ ] Verificare che MailerLite non abbia spostato l'HTML custom su un piano piu'
         economico del tuo -> **se si', downgrade e la migrazione si ferma qui**
-  - [ ] 300 email/giorno del free: 42 iscritti stanno larghi, ma contano anche i DOI
 
 - [ ] **Fase 1 — dominio**
   - [ ] DKIM Brevo su `chrispybmx.com` (DNS Hostinger)
-  - [ ] SPF: **estendere** il record esistente che serve Resend, non sostituirlo.
-        Due `v=spf1` sullo stesso dominio li rompono entrambi.
+  - [ ] SPF: **estendere** il record esistente, non sostituirlo. Due `v=spf1` sullo
+        stesso dominio li rompono entrambi. Record esatto in `tasks/brevo-dashboard.md`.
+
+        **Correzione (7 set):** una versione precedente di questa riga diceva che
+        l'SPF di root serve Resend. E' falso. Il record reale e'
+
+            v=spf1 +a +mx include:_spf.mlsend.com
+                   include:chrispybmx.com.spf.auto.dnssmarthost.net ~all
+
+        Dentro ci sono solo MailerLite e la webmail SiteGround. Resend manda con
+        MAIL FROM `send.chrispybmx.com`, che ha un SPF suo (`include:amazonses.com`)
+        e non viene toccato. La conclusione non cambia — si estende, non si sostituisce,
+        perche' c'e' SiteGround. Lookup dopo Brevo: 6 su 10.
   - [ ] Sender `christian@chrispybmx.com`, from_name `Christian — Chrispy BMX`
         (RULES #29: identita' fissa per la reputazione Gmail)
 
@@ -96,29 +118,45 @@ vecchio. Ripuntato sulla facade, serve a popolare Brevo in massa (Fase 4).
         solo 3 da env (`BREVO_LIST_NEWSLETTER`, `BREVO_LIST_SIGNUP`,
         `BREVO_LIST_SUBMIT_SPOT`): le altre 5 non sono scritte dal sito, servono a
         non perdere i contatti
-  - [ ] **Il gruppo misto da 32 non si ricrea**: quei contatti vanno smistati
-        nelle liste vere durante l'import (il CSV MailerLite riporta i gruppi)
+  - [ ] **Il gruppo misto da 32 non si ricrea**: lo smistamento lo fa
+        `scripts/brevo-import.mjs`. Chi sta nell'artefatto **e anche** in un gruppo
+        vero perde l'appartenenza all'artefatto; chi sta **solo** li' finisce in
+        `residuo-import.csv` e va deciso a mano — non infilato nella newsletter.
+        Serve una ottava lista `Residuo import 2026` che non riceve campagne.
+
+        Trappola trovata scrivendo lo script: il nome dell'artefatto **contiene
+        virgole** («Spot Submission, Coaching Call, Corsi, Prima BMX»). Spezzando la
+        colonna gruppi sulle virgole prima di riconoscerlo, quel nome unico diventa
+        quattro nomi che combaciano con quattro liste vere, e i 32 contatti finiscono
+        **sparpagliati nelle liste di invio** — l'opposto di scioglierli. Lo script
+        lo stacca per intero prima di qualsiasi split. Se un giorno importi a mano,
+        ricordatelo.
   - [ ] Ricostruire i 2 form embedded su WordPress («Guida Gratuita Prima BMX»,
         «gopro preset») puntandoli a Brevo. Finche' non stacchi i vecchi, quelli
         MailerLite continuano a funzionare: non c'e' finestra scoperta
-  - [ ] Template DOI; annotare l'id
-  - [ ] Copie Brevo di `static-landing/email/welcome-newsletter.html` e
-        `welcome-regolamento-maps.html` con `{$unsubscribe}` -> `{{ unsubscribe }}`.
-        **Non modificare gli originali**: sono in produzione su MailerLite finche' non stacchi.
-        Brevo blocca il salvataggio se il tag manca. RULES #30 vale uguale: il link
-        va dentro l'ultima `<td>`, mai fuori dalla table.
+  - [x] *(7 set)* Template DOI scritto: `static-landing/email/doi-conferma.html`.
+        Resta da caricarlo in Brevo e annotare l'id -> `BREVO_DOI_TEMPLATE_ID`
+  - [x] *(5 set, commit `20cc89e`)* Copie Brevo pronte:
+        `welcome-newsletter-v2.html` e `welcome-regolamento-maps-v2.html`, con
+        `{{ unsubscribe }}` gia' dentro l'ultima `<td>`. Restano da incollare in Brevo.
+        **Non modificare gli originali** `welcome-newsletter.html` e
+        `welcome-regolamento-maps.html`: sono in produzione su MailerLite finche' non
+        stacchi. Brevo blocca il salvataggio se il tag manca. RULES #30 vale uguale:
+        il link va dentro l'ultima `<td>`, mai fuori dalla table.
   - [ ] Ricreare **tutte e 4** le automazioni attive (vedi tabella nell'inventario).
         Le 3 spente — `Simple welcome email`, `gopro 12`, `Online course` — non si
         migrano
-  - [ ] **Le due welcome NON si copiano identiche**: 0% click su 18 invii. Vanno
-        riscritte mentre le ricrei, e' lo stesso lavoro fatto una volta sola
+  - [x] *(5 set)* **Le due welcome non si copiano identiche**: 0% click su 18 invii.
+        Gia' riscritte come `*-v2`: una sola richiesta invece di cinque link pari
 
-- [ ] **Fase 3 — parallelo (2-3 settimane)**
+- [ ] **Fase 3 — parallelo (~1 settimana, deciso il 7 set)**
   - [ ] Su Vercel: `BREVO_API_KEY`, i 3 `BREVO_LIST_*`, `NEWSLETTER_PROVIDER=both`
   - [ ] Lasciare `BREVO_DOI_TEMPLATE_ID` **vuoto** durante il parallelo: col DOI acceso
         ogni iscritto riceverebbe sia la welcome MailerLite sia la conferma Brevo
-  - [ ] Export CSV da MailerLite -> import in Brevo. Chi non ha mai confermato non va
-        importato come confermato.
+  - [ ] Export CSV da MailerLite -> `node scripts/brevo-import.mjs <file.csv>` ->
+        import in Brevo, un file per lista. Chi non ha mai confermato non va importato
+        come confermato: lo script lo scarta da solo in `_esclusi.csv`, insieme a
+        unsubscribed e bounced. Quel file **non si importa**.
   - [ ] Verificare che i nuovi iscritti arrivino in entrambi
 
 - [ ] **Fase 4 — cutover**

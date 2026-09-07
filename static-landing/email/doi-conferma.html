@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Conferma l'iscrizione</title>
+</head>
+<!--
+  doi-conferma — template Double Opt-In per Brevo, settembre 2026.
+
+  Va caricato in Brevo come Campaigns > Templates, poi il suo id numerico
+  finisce in BREVO_DOI_TEMPLATE_ID. Finche' quella env e' vuota, lib/brevo.ts
+  resta sul single opt-in (comportamento MailerLite attuale) e questo template
+  non viene mai spedito. Vedi GDPR-04.1 in SECURITY_PRIVACY_AUDIT.md.
+
+  {{ doubleOptInUrl }} e' il tag Brevo del link di conferma: senza, Brevo
+  rifiuta di usare il template come DOI. Non e' {{ unsubscribe }} — qui il
+  contatto NON e' ancora in lista, non c'e' niente da cui disiscriversi.
+
+  UNA sola azione. Nessun link concorrente, nessun menu di canali: la lezione
+  della v1 della welcome (0% click su 10 invii con cinque link equivalenti)
+  vale doppio qui, dove il click non e' un extra ma l'unico scopo della mail.
+
+  RULES #30: il link sta dentro l'ultima <td>, mai fuori dalla table.
+-->
+<body style="margin:0;padding:0;background:#0a0a0a;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0a0a0a;font-size:1px;line-height:1px;">
+    Un click e sei dentro. Senza conferma non ti arriva niente.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#111111;border:1px solid #2a2a2a;border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+
+          <tr>
+            <td style="background:#0a0a0a;padding:28px 32px 22px;border-bottom:1px solid #2a2a2a;">
+              <div style="font-family:'Courier New',Courier,monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#ff6a00;font-weight:bold;">
+                &#x2709;&#xFE0F; Ultimo passo
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:36px 32px 8px;">
+              <h1 style="margin:0;font-family:'Courier New',Courier,monospace;font-size:34px;line-height:1.15;color:#f3ead8;font-weight:bold;">
+                Confermi?<br><span style="color:#ff6a00;">Un click e sei dentro. &#x1F919;</span>
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:18px 32px 8px;font-size:16px;line-height:1.6;color:#cccccc;">
+              Ciao, sono <strong style="color:#f3ead8;">Chrispy</strong>. Hai chiesto di ricevere
+              <strong style="color:#f3ead8;">cinque cose dal mondo BMX</strong>, ogni luned&igrave; mattina.
+              <br><br>
+              Mi serve che confermi tu, cos&igrave; sono sicuro che l&apos;indirizzo &egrave; davvero il tuo.
+              <strong style="color:#f3ead8;">Finch&eacute; non clicchi non ti arriva niente.</strong>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:28px 32px 8px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background:#ff6a00;border-radius:10px;">
+                    <a href="{{ doubleOptInUrl }}"
+                       style="display:inline-block;padding:16px 40px;font-family:'Courier New',Courier,monospace;font-size:16px;font-weight:bold;letter-spacing:1px;color:#0a0a0a;text-decoration:none;">
+                      &#x2705; CONFERMO L&apos;ISCRIZIONE
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:8px 32px 28px;font-size:13px;line-height:1.5;color:#8a8a8a;">
+              Tre minuti a settimana. Zero fuffa, zero sponsor mascherati.
+            </td>
+          </tr>
+
+          <tr><td style="padding:0 32px;"><div style="height:1px;background:#2a2a2a;line-height:1px;">&nbsp;</div></td></tr>
+
+          <tr>
+            <td style="padding:24px 32px 32px;font-size:15px;line-height:1.6;color:#8a8a8a;">
+              Se non sei stato tu, non fare niente: senza il tuo click l&apos;indirizzo
+              non entra in nessuna lista e la cosa finisce qui.
+              <br><br>
+              &mdash; <strong style="color:#ff6a00;">Chrispy</strong>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background:#0a0a0a;padding:22px 32px;border-top:1px solid #2a2a2a;font-size:12px;line-height:1.6;color:#6a6a6a;">
+              Ricevi questa email perch&eacute; questo indirizzo &egrave; stato inserito nel form newsletter su
+              <a href="https://chrispybmx.com/newsletter/" style="color:#8a8a8a;text-decoration:underline;">chrispybmx.com</a>.
+              <br>
+              <a href="https://www.iubenda.com/privacy-policy/84160410" style="color:#8a8a8a;text-decoration:underline;">Privacy</a> &middot;
+              <a href="mailto:christian.ceresato@gmail.com" style="color:#8a8a8a;text-decoration:underline;">Scrivimi</a>
+              <br><br>
+              &copy; ChrispyBMX
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
