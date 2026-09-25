@@ -37,6 +37,16 @@ const nextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
+      { source: '/admin/session-reports/:path*', headers: [
+        { key: 'Cache-Control', value: 'private, no-store, max-age=0' },
+        { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        { key: 'Referrer-Policy', value: 'same-origin' },
+      ] },
+      { source: '/messaggi/:path*', headers: [
+        { key: 'Cache-Control', value: 'private, no-store, max-age=0' },
+        { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        { key: 'Referrer-Policy', value: 'same-origin' },
+      ] },
     ];
   },
   async rewrites() {

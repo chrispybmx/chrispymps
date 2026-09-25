@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLanguage } from './LanguageProvider';
 import { APP_CONFIG } from '@/lib/constants';
 
 interface Props {
@@ -10,13 +11,14 @@ interface Props {
 }
 
 export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
+  const { text: t } = useLanguage();
   const [open,   setOpen]   = useState(false);
   const [copied, setCopied] = useState(false);
 
   const url   = `${APP_CONFIG.url}/map/spot/${spotSlug}`;
   // La firma serve a far capire da dove arriva il link: in chat si vede solo il
   // dominio, che da solo non dice nulla a chi non conosce il progetto.
-  const text  = `${spotName}${city ? ` a ${city}` : ''} 🛹\n${APP_CONFIG.shareTagline}`;
+  const text  = `${spotName}${city ? ` · ${city}` : ''}\n${APP_CONFIG.shareTagline}`;
   const waUrl = `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`;
 
   const handleShare = async () => {
@@ -48,9 +50,9 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
           background: 'transparent',
           border: '1px solid var(--gray-600)',
-          borderRadius: 10,
+          borderRadius: 6,
           color: 'var(--gray-300)',
-          fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
+          fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600,
           padding: '13px 16px',
           cursor: 'pointer',
           letterSpacing: '0.06em',
@@ -63,7 +65,7 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
           <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
           <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
         </svg>
-        CONDIVIDI
+        {t('Condividi','Share')}
       </button>
 
       {/* ── Mini-menu desktop (appare solo se no Web Share API) ── */}
@@ -72,7 +74,7 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
           position: 'absolute', bottom: 'calc(100% - 20px)', left: 20, right: 20,
           background: '#1c1c1c',
           border: '1px solid var(--gray-700)',
-          borderRadius: 10,
+          borderRadius: 6,
           overflow: 'hidden',
           zIndex: 50,
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
@@ -85,7 +87,7 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
               background: 'none', border: 'none',
               borderBottom: '1px solid var(--gray-700)',
               color: copied ? '#00c851' : 'var(--bone)',
-              fontFamily: 'var(--font-mono)', fontSize: 13,
+              fontFamily: 'var(--font-mono)', fontSize: 14,
               padding: '13px 16px', cursor: 'pointer',
               transition: 'background 0.1s',
             }}
@@ -93,7 +95,7 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
           >
             <span style={{ fontSize: 16 }}>{copied ? '✓' : '🔗'}</span>
-            {copied ? 'Link copiato!' : 'Copia link'}
+            {copied ? t('Link copiato!', 'Link copied!') : t('Copia link', 'Copy link')}
           </button>
 
           {/* WhatsApp */}
@@ -106,7 +108,7 @@ export default function ShareSpotBtn({ spotName, spotSlug, city }: Props) {
               width: '100%', display: 'flex', alignItems: 'center', gap: 12,
               background: 'none',
               color: '#25D366',
-              fontFamily: 'var(--font-mono)', fontSize: 13,
+              fontFamily: 'var(--font-mono)', fontSize: 14,
               padding: '13px 16px',
               textDecoration: 'none',
               transition: 'background 0.1s',

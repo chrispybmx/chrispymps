@@ -1,8 +1,12 @@
 'use client';
+import MapIcon from '@/components/MapIcon';
+import type { SiteLanguage } from '@/lib/language';
+import { formatSpotDate } from '@/lib/spot-trust';
+import './spot-trust.css';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-interface Photo { url: string; credit_name?: string; source?: 'rider' | 'streetview' }
+interface Photo { url: string; credit_name?: string; source?: 'rider' | 'streetview'; created_at?: string }
 
 /* Easing "move" della skill ui-animation: usato solo DOPO il rilascio del dito.
    Durante il drag l'immagine resta agganciata al puntatore (nessuna transizione). */
@@ -11,7 +15,8 @@ const SWIPE_DISTANCE = 60;   // px minimi per cambiare foto
 const DISMISS_DISTANCE = 110; // px verso il basso per chiudere
 const VELOCITY = 0.5;         // px/ms: un flick veloce basta anche sotto soglia
 
-export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
+export default function PhotoCarousel({ photos, language = 'it' }: { photos: Photo[]; language?: SiteLanguage }) {
+  const text = (it: string, en: string) => language === 'en' ? en : it;
   const [idx,      setIdx]      = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const stripRef   = useRef<HTMLDivElement>(null);
@@ -46,6 +51,7 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
       {lightbox && (
         <Lightbox
           photos={photos}
+          language={language}
           startIdx={idx}
           onIndexChange={(i) => { setIdx(i); scrollTo(i); }}
           onClose={() => setLightbox(false)}
@@ -58,6 +64,7 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
         {/* Strip scroll-snap: scorribile con il dito, snap automatico */}
         <div
           ref={stripRef}
+          role="button" tabIndex={0} aria-label={text("Ingrandisci foto dello spot", "Enlarge spot photo")} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLightbox(true); } }}
           onScroll={onScroll}
           onTouchStart={e => {
             touchStartX.current = e.touches[0].clientX;
@@ -81,7 +88,7 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
             width: '100%',
-            height: 'clamp(300px, 75vw, 540px)',
+            height: 'clamp(300px, 60vw, 440px)',
             cursor: 'zoom-in',
           } as React.CSSProperties}
         >
@@ -104,36 +111,18 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
                 loading={i === 0 ? 'eager' : 'lazy'}
               />
-              {/* Origine — una foto presa da Street View non è una foto dello spot:
-                  dirlo apertamente evita che passi per documentazione vera. */}
-              {p.source === 'streetview' && (
-                <div style={{
-                  position: 'absolute', bottom: 10, left: 10, zIndex: 2,
-                  background: 'rgba(0,0,0,0.68)', border: '1px solid rgba(255,206,77,0.45)',
-                  borderRadius: 4, padding: '3px 8px',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ffce4d',
-                }}>
-                  🗺️ foto da mappa — serve uno scatto vero
-                </div>
-              )}
-              {/* Credit */}
-              {p.credit_name && (
-                <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: '#aaa', zIndex: 2 }}>
-                  📷 {p.credit_name}
-                </div>
-              )}
             </div>
           ))}
         </div>
 
         {/* Hint tap-per-ingrandire */}
-        <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '3px 8px', fontSize: 14, pointerEvents: 'none', zIndex: 2 }}>🔍</div>
+        <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '3px 8px', fontSize: 14, pointerEvents: 'none', zIndex: 2 }}><MapIcon name="search" size={18} /></div>
 
         {/* Frecce — solo dove c'è un puntatore fine (desktop). Su touch c'è lo swipe. */}
         {photos.length > 1 && (
           <>
-            <button onClick={e => { e.stopPropagation(); prev(); }} className="carousel-arrow" style={arrowStyle('left')} aria-label="Precedente">‹</button>
-            <button onClick={e => { e.stopPropagation(); next(); }} className="carousel-arrow" style={arrowStyle('right')} aria-label="Successiva">›</button>
+            <button onClick={e => { e.stopPropagation(); prev(); }} className="carousel-arrow" style={arrowStyle('left')} aria-label={text("Precedente", "Previous")}>‹</button>
+            <button onClick={e => { e.stopPropagation(); next(); }} className="carousel-arrow" style={arrowStyle('right')} aria-label={text("Successiva", "Next")}>›</button>
           </>
         )}
 
@@ -147,11 +136,13 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
         )}
       </div>
 
+      <PhotoCaption photo={photos[idx]} language={language} />
+
       {/* Thumbnail strip — solo con più foto */}
       {photos.length > 1 && (
         <div style={{ display: 'flex', gap: 3, padding: '4px 8px', background: '#050505', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
           {photos.map((p, i) => (
-            <button key={p.url} onClick={() => scrollTo(i)}
+            <button key={p.url} onClick={() => scrollTo(i)} aria-label={text(`Mostra foto ${i + 1}`, `Show photo ${i + 1}`)} aria-pressed={i === idx}
               style={{ flexShrink: 0, width: 44, height: 34, border: `2px solid ${i === idx ? 'var(--orange)' : 'transparent'}`, borderRadius: 3, padding: 0, cursor: 'pointer', background: '#111', overflow: 'hidden', opacity: i === idx ? 1 : 0.55, transition: 'opacity 0.15s, border-color 0.15s' }}>
               <img src={p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
             </button>
@@ -179,13 +170,15 @@ export default function PhotoCarousel({ photos }: { photos: Photo[] }) {
    commit dello stato solo al rilascio. Anima solo transform/opacity.
 ══════════════════════════════════════════════════════════════ */
 function Lightbox({
-  photos, startIdx, onIndexChange, onClose,
+  photos, startIdx, onIndexChange, onClose, language,
 }: {
   photos: Photo[];
+  language: SiteLanguage;
   startIdx: number;
   onIndexChange: (i: number) => void;
   onClose: () => void;
 }) {
+  const text = (it: string, en: string) => language === 'en' ? en : it;
   const [idx, setIdx] = useState(startIdx);
   const idxRef = useRef(startIdx);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -344,16 +337,16 @@ function Lightbox({
       </div>
 
       {/* Chiudi */}
-      <button onClick={onClose} aria-label="Chiudi"
+      <button onClick={onClose} aria-label={text("Chiudi", "Close")}
         style={{ position: 'absolute', top: 'calc(12px + env(safe-area-inset-top,0))', right: 14, background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '50%', width: 44, height: 44, fontSize: 20, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, backdropFilter: 'blur(6px)' }}>✕</button>
 
       {/* Frecce desktop (nascoste su touch) */}
       {photos.length > 1 && (
         <>
-          <button className="carousel-arrow" aria-label="Precedente"
+          <button className="carousel-arrow" aria-label={text("Precedente", "Previous")}
             onClick={() => { if (idxRef.current > 0) { const n = idxRef.current - 1; commitIdx(n); place(n, true); } }}
             style={lbArrow('left')}>‹</button>
-          <button className="carousel-arrow" aria-label="Successiva"
+          <button className="carousel-arrow" aria-label={text("Successiva", "Next")}
             onClick={() => { if (idxRef.current < photos.length - 1) { const n = idxRef.current + 1; commitIdx(n); place(n, true); } }}
             style={lbArrow('right')}>›</button>
         </>
@@ -368,12 +361,23 @@ function Lightbox({
         </div>
       )}
 
-      {/* Credit + contatore */}
-      <div style={{ position: 'absolute', top: 'calc(16px + env(safe-area-inset-top,0))', left: 16, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.55)', zIndex: 2 }}>
-        {idx + 1} / {photos.length}{photos[idx]?.credit_name ? `  ·  📷 ${photos[idx].credit_name}` : ''}
-      </div>
+      <PhotoCaption photo={photos[idx]} language={language} count={`${idx + 1} / ${photos.length}`} lightbox />
     </div>
   );
+}
+
+
+function PhotoCaption({ photo, language, count, lightbox = false }: { photo?: Photo; language: SiteLanguage; count?: string; lightbox?: boolean }) {
+  if (!photo) return null;
+  const date = formatSpotDate(photo.created_at, language);
+  const text = (it: string, en: string) => language === 'en' ? en : it;
+  if (!date && !photo.credit_name && photo.source !== 'streetview' && !count) return null;
+  return <div className={`cm-photo-caption${lightbox ? ' cm-photo-caption--lightbox' : ''}`}>
+    {count && <span>{count}</span>}
+    {photo.source === 'streetview' && <span className="cm-photo-source">Street View</span>}
+    {photo.credit_name && <span>{text('Foto: ', 'Photo: ')}{photo.credit_name}</span>}
+    {date && <time dateTime={photo.created_at}>{text('Caricata il ', 'Uploaded on ')}{date}</time>}
+  </div>;
 }
 
 function arrowStyle(side: 'left' | 'right'): React.CSSProperties {

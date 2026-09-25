@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { submitToIndexNow } from '@/lib/indexnow';
 import { APP_CONFIG, TIPI_SPOT_TUTTI, OSTACOLI_TUTTI } from '@/lib/constants';
+import { citySlug } from '@/lib/slugify';
 
 const Schema = z.object({
   id:          z.string().uuid(),
@@ -47,11 +48,12 @@ export async function POST(req: NextRequest) {
   // revalidate=300, senza questo la modifica non si vede per 5 minuti) e
   // segnala ai motori di ri-crawlare.
   if (updated?.slug) {
-    const cityPath = updated.city ? `/map/${updated.city.toLowerCase().replace(/\s+/g, '-')}` : null;
+    const cityPath = updated.city ? `/map/${citySlug(updated.city)}` : null;
     try {
       revalidatePath(`/map/spot/${updated.slug}`);
       revalidatePath('/');
       revalidatePath('/scopri');
+      revalidatePath('/sitemap.xml');
       if (cityPath) revalidatePath(cityPath);
     } catch (e) {
       console.error('[edit-spot] revalidate:', e);

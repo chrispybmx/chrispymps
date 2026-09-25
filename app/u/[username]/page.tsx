@@ -115,7 +115,7 @@ export async function generateMetadata({ params }: { params: { username: string 
   }
 
   const url         = `${APP_CONFIG.url}/u/${profile.username}`;
-  const title       = `@${profile.username} — Profilo Rider | Chrispy Maps`;
+  const title       = `@${profile.username} — Profilo Rider`;
   const spotsStr    = spotsCount ? `${spotsCount} spot pubblicati` : '';
   const bioStr      = profile.bio ? ` · ${profile.bio}` : '';
   const description = `Profilo di @${profile.username} su Chrispy Maps.${spotsStr ? ` ${spotsStr}.` : ''}${bioStr} Spot BMX, skate e scooter in Italia.`;

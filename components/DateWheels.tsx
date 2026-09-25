@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/components/LanguageProvider';
+
 import { useEffect, useMemo, useState } from 'react';
 
 interface Props {
@@ -15,6 +17,7 @@ const MESI = [
   'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
   'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
 ];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** Giorni del mese, con gli anni bisestili contati bene. */
 function giorniDelMese(anno: number, mese: number): number {
@@ -54,6 +57,7 @@ export default function DateWheels({ value, onChange, annoMin = 1950, id }: Prop
      verrebbe scartata al primo render e il campo non si riuscirebbe a
      compilare. Qui i pezzi restano, e `onChange` scatta solo quando ci sono
      tutti e tre. */
+  const { text } = useLanguage();
   const [gior, setGior] = useState(0);
   const [mese, setMese] = useState(0);
   const [anno, setAnno] = useState(0);
@@ -87,32 +91,32 @@ export default function DateWheels({ value, onChange, annoMin = 1950, id }: Prop
   return (
     <div style={{ display: 'flex', gap: 8 }} id={id}>
       <select
-        aria-label="Giorno"
+        aria-label={text("Giorno", "Day")}
         value={gior || ''}
         onChange={e => { const g = Number(e.target.value); setGior(g); propaga(g, mese, anno); }}
         style={selStyle}
       >
-        <option value="">gg</option>
+        <option value="">{text("gg", "dd")}</option>
         {giorni.map(g => <option key={g} value={g}>{g}</option>)}
       </select>
 
       <select
-        aria-label="Mese"
+        aria-label={text("Mese", "Month")}
         value={mese || ''}
         onChange={e => { const m = Number(e.target.value); setMese(m); propaga(gior, m, anno); }}
         style={{ ...selStyle, flex: 1.6 }}
       >
-        <option value="">mese</option>
-        {MESI.map((nome, i) => <option key={nome} value={i + 1}>{nome}</option>)}
+        <option value="">{text("mese", "month")}</option>
+        {MESI.map((nome, i) => <option key={nome} value={i + 1}>{text(nome, MONTHS[i])}</option>)}
       </select>
 
       <select
-        aria-label="Anno"
+        aria-label={text("Anno", "Year")}
         value={anno || ''}
         onChange={e => { const a = Number(e.target.value); setAnno(a); propaga(gior, mese, a); }}
         style={{ ...selStyle, flex: 1.2 }}
       >
-        <option value="">anno</option>
+        <option value="">{text("anno", "year")}</option>
         {anni.map(a => <option key={a} value={a}>{a}</option>)}
       </select>
     </div>

@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { supabaseServer } from '@/lib/supabase';
-import { CITTA_ITALIANE, APP_CONFIG } from '@/lib/constants';
+import { APP_CONFIG } from '@/lib/constants';
+import { citySlug, CITY_SLUG_RE } from '@/lib/slugify';
+import { getApprovedCityNames } from '@/lib/spot-cities';
 
 export const revalidate = 3600;
 
@@ -26,21 +28,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const supabase = supabaseServer();
 
-  // Pagine città — lista curata italiana (SEO storico) + città reali dai dati (world-wide)
-  const citySlugs = new Set(CITTA_ITALIANE.map((c) => c.value));
-  const { data: spotCities } = await supabase
-    .from('spots')
-    .select('city')
-    .eq('status', 'approved')
-    .not('city', 'is', null);
-  for (const row of spotCities ?? []) {
-    const slug = String(row.city)
-      .toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    if (slug) citySlugs.add(slug);
-  }
+  // Empty curated cities remain contribution pages, but are not indexed.
+  const citySlugs = new Set((await getApprovedCityNames()).map(citySlug).filter(slug => CITY_SLUG_RE.test(slug)));
   const cityPages: MetadataRoute.Sitemap = Array.from(citySlugs).map((slug) => ({
     url:             `${base}/map/${slug}`,
     lastModified:    new Date(),

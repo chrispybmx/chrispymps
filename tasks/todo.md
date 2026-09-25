@@ -407,3 +407,21 @@ Nuove soglie: <=30g verde · <=1 anno ok · <=2 anni giallo · oltre 2 anni "nes
 Cade anche il "debito" che segnalavo da tre giorni (la mappa tutta arancione a ottobre): non era un debito del prodotto, era la mia taratura.
 
 - [x] `lib/freshness.ts` ritarato, test riscritti (13 sul modulo, 122 in totale)
+
+## Critique UX 2026-09-25 — bug + Vicino a me (Claude)
+Codex lavora in parallelo alla chat session: non toccare lib/session-*, NotificationBell, ProfileClient, SessionInviteLink.
+1. [x] Lightbox in portal su document.body → verify: foto ingrandita, X cliccabile (elementFromPoint = bottone), desktop + mobile
+2. [x] SideMenu scrollabile → verify: mobile 375x812, Regole/Privacy/Contatti raggiungibili
+3. [x] Tap sulla maniglia: da chiuso apre, da aperto chiude → verify: tap in browser mobile
+4. [x] "Vicino a me" nel pannello + chip 10/25/50 km (sostituisce pannello raggio) → verify: tap → lista "Più vicini a te", chip filtrano, Ovunque azzera
+5. [x] Pannello raggio, bottone raggio e banner raggio rimossi; import orfani tolti → verify: tsc pulito, nessun riferimento morto
+6. [x] Vista iniziale sul grosso degli spot (taglio outlier), non Europa → verify: test unitario + screenshot mobile senza posizione
+7. [x] Banner cookie compatto sopra la bottom nav, non sopra → verify: mobile, "+ Aggiungi spot" visibile col banner aperto
+8. [x] Selezione spot non fa crollare il conteggio (124 → 1) → verify: selezione, contatore e "Altri risultati" stabili
+9. [x] aria-label Mappa/Lista/Espandi = testo visibile → verify: DOM
+10. [x] tsc + vitest + lint verdi → verify: output comandi
+
+Verificato su copia specchio in dev (:3200), mobile 375x812 e desktop, posizione simulata a Milano:
+Vicino a me → "5 spot entro 25 km", chip ok; selezione 25→25 con 24 altri; X foto = bottone (elementFromPoint);
+maniglia 64→309; menu scrollH 899 > 812, Contatti cliccabile; vista iniziale Italia. tsc 0, vitest 316/316, lint pulito.
+Aperto: col pannello chiuso il banner cookie (prima visita) copre l'intestazione del pannello. Punto 4 (pagina città) e 5 (polish) non fatti.

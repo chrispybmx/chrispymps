@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 interface LightboxProps {
   urls:       string[];
@@ -42,7 +43,10 @@ export default function Lightbox({ urls, initialIdx, onClose }: LightboxProps) {
     setIdx(i);
   }, []);
 
-  return (
+  /* Portal su body: dentro il pannello della mappa (z-index 15) la X finiva
+     sotto la topbar e il click in quel punto apriva "Aggiungi spot". */
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -65,6 +69,7 @@ export default function Lightbox({ urls, initialIdx, onClose }: LightboxProps) {
         <button
           onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onClose(); }}
+          aria-label="Chiudi foto"
           style={{
             background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '50%',
             width: 40, height: 40, fontSize: 20, color: '#fff', cursor: 'pointer',
@@ -143,7 +148,8 @@ export default function Lightbox({ urls, initialIdx, onClose }: LightboxProps) {
           ))}
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

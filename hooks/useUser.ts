@@ -15,8 +15,11 @@ export function useUser(): UserSession | null | undefined {
 
   useEffect(() => {
     let cancelled = false;
+    let authGeneration = 0;
 
     async function fromSession(session: { user: { id: string; email?: string; user_metadata?: Record<string, string> }; access_token: string } | null) {
+      const generation = ++authGeneration;
+      const current = () => !cancelled && generation === authGeneration;
       if (cancelled) return;
       if (!session?.user) { setUser(null); return; }
 
@@ -37,19 +40,19 @@ export function useUser(): UserSession | null | undefined {
       if (cachedUsername) {
         setUser({ id: uid, email: session.user.email ?? '', username: cachedUsername, accessToken: session.access_token });
         // Aggiorna cache in background senza bloccare
-        getProfile(uid).then(p => { if (p) try { localStorage.setItem(cacheKey, p.username); } catch {} }).catch(() => {});
+        getProfile(uid).then(p => { if (current() && p) try { localStorage.setItem(cacheKey, p.username); } catch {} }).catch(() => {});
         return;
       }
 
       // 3. Fallback DB (solo al primo login assoluto)
       try {
         const profile = await getProfile(uid);
-        if (cancelled) return;
+        if (!current()) return;
         if (!profile) { setUser(null); return; }
         try { localStorage.setItem(cacheKey, profile.username); } catch {}
         setUser({ id: uid, email: session.user.email ?? '', username: profile.username, accessToken: session.access_token });
       } catch {
-        if (!cancelled) setUser(null);
+        if (current()) setUser(null);
       }
     }
 
@@ -69,11 +72,15 @@ export function useUser(): UserSession | null | undefined {
     }
 
     // Sessione iniziale
+    const initialGeneration = authGeneration;
     sb.auth.getSession()
-      .then(({ data: { session } }) => fromSession(session))
+      .then(({ data: { session } }) => {
+        // An auth event may already have supplied a newer login/logout/token.
+        if (!cancelled && authGeneration === initialGeneration) return fromSession(session);
+      })
       .catch((err) => {
         console.error('[useUser] getSession() error:', err);
-        if (!cancelled) setUser(null);
+        if (!cancelled && authGeneration === initialGeneration) setUser(null);
       });
 
     // Ascolta i cambiamenti (login / logout)

@@ -12,7 +12,8 @@
  * segnale mostrabile ovunque: pin, card, scheda spot.
  */
 
-import type { SpotCondition } from './types';
+import type { SpotCondition } from '@/lib/types';
+import type { SiteLanguage } from '@/lib/language';
 
 export type FreshnessTone = 'fresh' | 'ok' | 'aging' | 'stale' | 'dead';
 
@@ -49,19 +50,21 @@ export function getFreshness(
   condition: SpotCondition,
   updatedAt?: string | null,
   now: Date = new Date(),
+  language: SiteLanguage = 'it',
 ): Freshness {
+  const text = (it: string, en: string) => language === 'en' ? en : it;
   /* Uno spot dichiarato bustato o demolito non "invecchia": la notizia
      è quella, e resta valida finché qualcuno non la smentisce. */
   if (condition === 'demolito') {
-    return { label: 'Demolito', short: 'demolito', color: COLORS.dead, tone: 'dead', days: null };
+    return { label: text('Demolito', 'Demolished'), short: text('demolito', 'demolished'), color: COLORS.dead, tone: 'dead', days: null };
   }
   if (condition === 'bustato') {
-    return { label: 'Bustato', short: 'bustato', color: COLORS.stale, tone: 'stale', days: null };
+    return { label: text('Bustato', 'Access issues'), short: text('bustato', 'access issues'), color: COLORS.stale, tone: 'stale', days: null };
   }
 
   const ts = updatedAt ? Date.parse(updatedAt) : NaN;
   if (Number.isNaN(ts)) {
-    return { label: 'Stato non confermato', short: '—', color: COLORS.dead, tone: 'dead', days: null };
+    return { label: text('Stato non confermato', 'Status not confirmed'), short: text('Da confermare', 'Not confirmed'), color: COLORS.dead, tone: 'dead', days: null };
   }
 
   const days = Math.max(0, Math.floor((now.getTime() - ts) / 86_400_000));
@@ -74,20 +77,20 @@ export function getFreshness(
      passare del tempo, e un segnale che si allarma da solo smette di essere
      un segnale. */
   if (days <= 30) {
-    return { label: days <= 1 ? 'Confermato da poco' : `Confermato ${days} giorni fa`, short: `${days}g`, color: COLORS.fresh, tone: 'fresh', days };
+    return { label: days <= 1 ? text('Confermato da poco', 'Recently confirmed') : text(`Confermato ${days} giorni fa`, `Confirmed ${days} days ago`), short: days === 0 ? text('oggi', 'today') : text(`${plural(days, 'giorno', 'giorni')} fa`, `${plural(days, 'day', 'days')} ago`), color: COLORS.fresh, tone: 'fresh', days };
   }
   if (days <= 365) {
     const m = Math.round(days / 30);
-    return { label: `Confermato ${plural(m, 'mese', 'mesi')} fa`, short: `${m}m`, color: COLORS.ok, tone: 'ok', days };
+    return { label: text(`Confermato ${plural(m, 'mese', 'mesi')} fa`, `Confirmed ${plural(m, 'month', 'months')} ago`), short: text(`${plural(m, 'mese', 'mesi')} fa`, `${plural(m, 'month', 'months')} ago`), color: COLORS.ok, tone: 'ok', days };
   }
   if (days <= 730) {
-    return { label: 'Confermato piu\' di un anno fa', short: '1a+', color: COLORS.aging, tone: 'aging', days };
+    return { label: text('Confermato piu\' di un anno fa', 'Confirmed over a year ago'), short: text('oltre un anno fa', 'over a year ago'), color: COLORS.aging, tone: 'aging', days };
   }
 
   const y = Math.floor(days / 365);
   return {
-    label: `Nessuno conferma da ${y} anni`,
-    short: `${y}a+`,
+    label: text(`Nessuno conferma da ${y} anni`, `Not confirmed for ${y} years`),
+    short: text(`${y} anni fa`, `${y} years ago`),
     color: COLORS.stale,
     tone: 'stale',
     days,

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
+import { useLanguage } from '@/components/LanguageProvider';
 
 interface BottomNavProps {
   /** Callback per aprire il modal aggiungi spot — opzionale.
@@ -13,6 +14,7 @@ interface BottomNavProps {
 }
 
 export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
+  const { text } = useLanguage();
   const pathname = usePathname();
   const router   = useRouter();
   const user     = useUser(); // undefined=loading, null=guest, UserSession=logged
@@ -22,7 +24,7 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
     else router.push('/map?add=1');
   };
 
-  const isMap       = !!pathname?.startsWith('/map');
+  const isMap       = (pathname === '/' || !!pathname?.startsWith('/map'));
   const isSfoglia   = !!pathname?.startsWith('/sfoglia');
   const isScopri    = !!pathname?.startsWith('/scopri');
   const isProfile   = !!pathname?.startsWith('/u/');
@@ -35,9 +37,8 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
           bottom: 0; left: 0; right: 0;
           height: calc(60px + env(safe-area-inset-bottom, 0px));
           padding-bottom: env(safe-area-inset-bottom, 0px);
-          background: rgba(8,8,8,0.97);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          background: var(--black);
+
           border-top: 1px solid rgba(255,255,255,0.06);
           display: flex;
           align-items: center;
@@ -53,10 +54,10 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
           align-items: center;
           gap: 4px;
           text-decoration: none;
-          color: #444;
+          color: var(--gray-400);
           font-family: var(--font-mono);
-          font-size: 9px;
-          letter-spacing: 0.06em;
+          font-size: 11px;
+          letter-spacing: 0;
           flex: 1;
           padding: 8px 0 4px;
           transition: color 0.15s;
@@ -71,77 +72,80 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
           flex-direction: column;
           align-items: center;
           flex: 1;
-          gap: 4px;
+          gap: 0;
         }
         .mbn-add {
-          width: 50px;
-          height: 50px;
+          width: 48px;
+          height: 44px;
           background: var(--orange);
-          border-radius: 14px;
-          border: none;
+          border-radius: 3px;
+          border: 1px solid #ad4200;
+          border-bottom-width: 3px;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           transition: transform 0.12s, opacity 0.12s;
           -webkit-tap-highlight-color: transparent;
-          box-shadow: 0 2px 16px rgba(255,106,0,0.35);
-          margin-top: -8px;
+          box-shadow: none;
+          margin-top: 0;
         }
-        .mbn-add:active { transform: scale(0.90); opacity: 0.85; }
+        .mbn-add:active { transform: translateY(2px); }
         .mbn-add-lbl {
           font-family: var(--font-mono);
-          font-size: 9px;
+          font-size: 11px;
+          white-space: nowrap;
+          line-height: 14px;
           color: var(--orange);
-          letter-spacing: 0.06em;
+          letter-spacing: 0;
         }
       `}</style>
 
-      <nav className="mobile-bnav" aria-label="Navigazione principale">
+      <nav className="mobile-bnav" aria-label={text('Navigazione principale', 'Main navigation')}>
 
         {/* MAPPA */}
-        <Link href="/map" className={`mbn-link${isMap ? ' active' : ''}`} aria-label="Mappa">
+        <Link href="/map" className={`mbn-link${isMap ? ' active' : ''}`} aria-label={text('Mappa', 'Map')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
             <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/>
             <path d="M8 2v16M16 6v16"/>
           </svg>
-          MAPPA
+          {text('Mappa', 'Map')}
         </Link>
 
         {/* SFOGLIA — scorri gli spot e salva quelli che ti piacciono */}
-        <Link href="/sfoglia" className={`mbn-link${isSfoglia ? ' active' : ''}`} aria-label="Sfoglia gli spot">
+        <Link href="/sfoglia" className={`mbn-link${isSfoglia ? ' active' : ''}`} aria-label={text('Sfoglia gli spot', 'Browse spots')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
             <rect x="6" y="3" width="12" height="16" rx="2"/>
             <path d="M3 7v10a2 2 0 0 0 1.2 1.8M21 7v10a2 2 0 0 1-1.2 1.8"/>
             <path d="M12 21v-1"/>
           </svg>
-          SFOGLIA
+          {text('Sfoglia', 'Browse')}
         </Link>
 
         {/* + SPOT — CTA centrale */}
         <div className="mbn-add-wrap">
-          <button className="mbn-add" onClick={handleAdd} aria-label="Aggiungi spot">
+          <button className="mbn-add cm-add-spot" onClick={handleAdd} aria-label={text('Aggiungi spot', 'Add spot')}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
           </button>
-          <span className="mbn-add-lbl">SPOT</span>
+          <span className="mbn-add-lbl">{text('Aggiungi spot', 'Add spot')}</span>
         </div>
 
         {/* SCOPRI */}
-        <Link href="/scopri" className={`mbn-link${isScopri ? ' active' : ''}`} aria-label="Scopri spot">
+        <Link href="/scopri" className={`mbn-link${isScopri ? ' active' : ''}`} aria-label={text('Scopri spot', 'Discover spots')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <path d="M14.5 8.5L16 8l-.5 1.5-5 5L9 15l.5-1.5 5-5z"/>
             <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>
           </svg>
-          SCOPRI
+          {text('Scopri', 'Discover')}
         </Link>
 
         {/* PROFILO — button per gestire il caricamento asincrono della sessione */}
         <button
           className={`mbn-link${isProfile ? ' active' : ''}`}
-          aria-label="Profilo"
+          aria-label={text('Profilo', 'Profile')}
           onClick={() => {
             if (user === undefined) return; // sessione ancora in caricamento, ignora il tap
             if (user) router.push(`/u/${user.username}`);
@@ -154,7 +158,7 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
             <circle cx="12" cy="8" r="4"/>
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
           </svg>
-          {user === undefined ? '···' : 'PROFILO'}
+          {user === undefined ? '···' : text('Profilo', 'Profile')}
         </button>
 
       </nav>

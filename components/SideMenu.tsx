@@ -1,4 +1,10 @@
 'use client';
+import { SESSION_INVITES_PUBLIC } from '@/lib/session-invites';
+import MapIcon from './MapIcon';
+import { useLanguage } from './LanguageProvider';
+import LanguageSwitch from './LanguageSwitch';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
+import { useRef } from 'react';
 
 import { useEffect, useState } from 'react';
 import { LINKS, APP_CONFIG } from '@/lib/constants';
@@ -16,22 +22,26 @@ interface SideMenuProps {
    cuore sulle card della mappa salvava in una cartella che dalla mappa non
    si poteva aprire. */
 const MENU_ITEMS = [
-  { href: '/map',      label: 'Mappa',    emoji: '🗺️' },
-  { href: '/sfoglia',   label: 'Sfoglia',   emoji: '🃏' },
-  { href: '/preferiti', label: 'Preferiti', emoji: '❤️' },
-  { href: '/events',   label: 'Eventi',   emoji: '📅' },
-  { href: '/news',       label: 'News',       emoji: '📰' },
-  { href: '/classifica', label: 'Classifica', emoji: '🏆' },
-  { href: '/cerca-spot', label: 'Cerca Spot', emoji: '📍' },
-  { href: '/sessioni',  label: 'Sessioni',   emoji: '🔴', liveOnly: true },
+  { href: '/map',      label: 'Mappa', labelEn: 'Map',    emoji: '🗺️' },
+  { href: '/sfoglia',   label: 'Sfoglia', labelEn: 'Browse',   emoji: '🃏' },
+  { href: '/preferiti', label: 'Preferiti', labelEn: 'Saved spots', emoji: '❤️' },
+  ...(SESSION_INVITES_PUBLIC ? [{ href: '/messaggi', label: 'Messaggi', labelEn: 'Messages', emoji: '' }] : []),
+  { href: '/events',   label: 'Eventi', labelEn: 'Events',   emoji: '📅' },
+  { href: '/news',       label: 'News', labelEn: 'News',       emoji: '📰' },
+  { href: '/classifica', label: 'Classifica', labelEn: 'Leaderboard', emoji: '🏆' },
+  { href: '/cerca-spot', label: 'Cerca Spot', labelEn: 'Find spots', emoji: '📍' },
+  { href: '/sessioni',  label: 'Sessioni', labelEn: 'Sessions',   emoji: '🔴', liveOnly: true },
   { divider: true },
-  { href: LINKS.youtube,   label: 'Tutorial',    emoji: '▶️', external: true },
-  { href: '/map/support',  label: 'Supporta',    emoji: '☕' },
-  { href: '/map/about',    label: 'Chi siamo',   emoji: '🏴' },
+  { href: LINKS.youtube,   label: 'Tutorial', labelEn: 'Tutorials',    emoji: '▶️', external: true },
+  { href: '/map/support',  label: 'Supporta', labelEn: 'Support',    emoji: '☕' },
+  { href: '/map/about',    label: 'Chi siamo', labelEn: 'About',   emoji: '🏴' },
 ];
 
 export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
+  const { text } = useLanguage();
   const user = useUser();
+  const menuRef = useRef<HTMLElement>(null);
+  useDialogFocus(open, menuRef, onClose);
 
   /* ── Rider in sessione adesso ──
      Le sessioni scadono dopo 3 ore, quindi lo stato normale della sezione è
@@ -64,20 +74,21 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  if (!open) return null;
   return (
     <>
       {open && (
         <div
           onClick={onClose}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 59, backdropFilter: 'blur(2px)' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 59, backdropFilter: 'none' }}
           aria-hidden="true"
         />
       )}
 
-      <nav
+      <nav ref={menuRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Menu principale"
+        aria-label={text('Menu principale', 'Main menu')}
         style={{
           position: 'fixed',
           top: 0, left: 0, bottom: 0,
@@ -88,9 +99,11 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
           transform: open ? 'translateX(0)' : 'translateX(-100%)',
           transition: 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
           display: 'flex', flexDirection: 'column',
+          overflowY: 'auto', overscrollBehavior: 'contain',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
+        <button className="cm-menu-close cm-icon-button" onClick={onClose} aria-label={text('Chiudi menu', 'Close menu')}><MapIcon name="close" /></button>
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--gray-700)' }}>
           <div style={{ marginBottom: 12 }}>
@@ -110,8 +123,8 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
                 <a href={`/u/${user.username}`} onClick={onClose} style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   @{user.username}
                 </a>
-                <button onClick={() => { signOut(); onClose(); }} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
-                  Esci →
+                <button onClick={() => { signOut(); onClose(); }} style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+                  {text('Esci', 'Sign out')} →
                 </button>
               </div>
             </div>
@@ -121,7 +134,7 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
               onClick={() => { onOpenAuth?.(); onClose(); }}
               style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 14, background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.3)', borderRadius: 6, color: 'var(--orange)', padding: '10px 14px', cursor: 'pointer', textAlign: 'left' }}
             >
-              🔑 Accedi / Registrati
+              {text('Accedi / Registrati', 'Sign in / Register')}
             </button>
           )}
         </div>
@@ -146,28 +159,28 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
                     padding: '14px 20px', color: 'var(--bone)', textDecoration: 'none',
                     fontFamily: 'var(--font-mono)', fontSize: 18, letterSpacing: '0.03em',
                     transition: 'background 0.1s, color 0.1s',
-                    borderLeft: '3px solid transparent',
+
                   }}
                   onMouseEnter={e => {
                     (e.currentTarget as HTMLElement).style.background = 'var(--gray-700)';
-                    (e.currentTarget as HTMLElement).style.borderLeftColor = 'var(--orange)';
+
                     (e.currentTarget as HTMLElement).style.color = 'var(--orange)';
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLElement).style.background = '';
-                    (e.currentTarget as HTMLElement).style.borderLeftColor = 'transparent';
+
                     (e.currentTarget as HTMLElement).style.color = 'var(--bone)';
                   }}
                 >
-                  <span aria-hidden="true" style={{ fontSize: 20, minWidth: 28 }}>{item.emoji}</span>
-                  <span>{item.label}</span>
+                  <span aria-hidden="true" style={{ fontSize: 20, minWidth: 28 }}><MapIcon name={({ Messaggi: 'message', Mappa: 'layers', Sfoglia: 'photo', Preferiti: 'heart', Eventi: 'calendar', News: 'news', Classifica: 'trophy', Tutorial: 'play' } as Record<string,string>)[item.label] ?? 'pin'} /></span>
+                  <span>{text(item.label, item.labelEn)}</span>
                   {'liveOnly' in item && item.liveOnly && !!liveRiders && (
                     <span style={{
-                      marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11,
+                      marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 14,
                       color: '#000', background: '#ff3b30', borderRadius: 10,
                       padding: '2px 8px', letterSpacing: '0.04em', whiteSpace: 'nowrap',
                     }}>
-                      {liveRiders} ORA
+                      {liveRiders} {text('ORA', 'NOW')}
                     </span>
                   )}
                   {'external' in item && item.external && (
@@ -179,17 +192,19 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
           })}
         </ul>
 
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--gray-700)' }}><div style={{ fontSize: 14, color: 'var(--gray-400)', marginBottom: 8 }}>{text('Lingua', 'Language')}</div><LanguageSwitch /></div>
+
         {/* Spot Radar toggle */}
         <SpotRadarToggle />
 
         {/* Footer */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--gray-700)', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', lineHeight: 1.6 }}>
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--gray-700)', fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.6 }}>
           <div>Chrispy Maps v1.0 — BETA</div>
-          <div>Community BMX Italia</div>
+          <div>{text('Community BMX, skate e scooter', 'BMX, skate and scooter community')}</div>
           <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <a href="/regole" style={{ color: 'var(--orange)', textDecoration: 'none' }}>Regole</a>
+            <a href="/regole" style={{ color: 'var(--orange)', textDecoration: 'none' }}>{text('Regole', 'Community rules')}</a>
             <a href="/privacy" style={{ color: 'var(--orange)', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="/map/about" style={{ color: 'var(--gray-500)', textDecoration: 'none' }}>Contatti</a>
+            <a href="/map/about" style={{ color: 'var(--gray-500)', textDecoration: 'none' }}>{text('Contatti', 'Contact')}</a>
           </div>
         </div>
       </nav>
@@ -201,6 +216,7 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
 const RADAR_KEY = 'cmaps_radar_enabled';
 
 function SpotRadarToggle() {
+  const { text } = useLanguage();
   const [enabled, setEnabled] = useState(false);
   const [denied, setDenied] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -247,19 +263,20 @@ function SpotRadarToggle() {
     <div style={{ padding: '12px 20px', borderTop: '1px solid var(--gray-700)' }}>
       <button
         onClick={toggle}
+        aria-pressed={enabled}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
           width: '100%', background: 'none', border: 'none',
           padding: 0, cursor: 'pointer', textAlign: 'left',
         }}
       >
-        <span style={{ fontSize: 20, minWidth: 28 }}>📡</span>
+        <span style={{ fontSize: 20, minWidth: 28 }}><MapIcon name="pin" /></span>
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>
             Spot Radar
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 2 }}>
-            Avvisami quando ci sono spot vicini
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', marginTop: 2 }}>
+            {text('Avvisami quando ci sono spot vicini', 'Let me know when spots are nearby')}
           </div>
         </div>
         <div style={{
@@ -278,8 +295,8 @@ function SpotRadarToggle() {
         </div>
       </button>
       {denied && (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#ff4444', marginTop: 6 }}>
-          Abilita la posizione nel browser per usare Spot Radar.
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', marginTop: 6 }}>
+          {text('Abilita la posizione nel browser per usare Spot Radar.', 'Enable location access in your browser to use Spot Radar.')}
         </div>
       )}
     </div>

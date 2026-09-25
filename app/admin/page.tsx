@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -23,5 +24,5 @@ export default async function AdminPage() {
 
   const pendingSpots = await getPendingSpots();
 
-  return <AdminDashboard initialSpots={pendingSpots} />;
+  return <>{process.env.SESSION_INVITES_ENABLED === 'true' && <nav style={{padding:'14px 24px',borderBottom:'1px solid #383634'}}><Link href="/admin/session-reports" prefetch={false} style={{color:'var(--orange)'}}>Segnalazioni session →</Link></nav>}<AdminDashboard initialSpots={pendingSpots} /></>;
 }

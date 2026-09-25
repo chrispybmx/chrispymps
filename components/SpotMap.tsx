@@ -5,6 +5,11 @@ import type { SpotMapPin, SpotType } from '@/lib/types';
 import { TIPI_SPOT, APP_CONFIG, PALETTE } from '@/lib/constants';
 import { getFreshness, needsConfirmation } from '@/lib/freshness';
 import 'leaflet/dist/leaflet.css';
+import { spotSymbol } from '@/lib/spot-symbols';
+import { computeGridClusters } from '@/lib/cluster-spots';
+import { coreBounds } from '@/lib/core-bounds';
+import type { MapView } from '@/lib/explore-state';
+import { useLanguage } from '@/components/LanguageProvider';
 
 let L: typeof import('leaflet') | null = null;
 
@@ -23,7 +28,9 @@ interface SpotMapProps {
   searchQuery:       string;
   onSpotClick:        (pin: SpotMapPin) => void;
   onAddSpotAt:        (lat: number, lon: number) => void;
-  flyTarget?:         { lat: number; lon: number; zoom?: number } | null;
+  flyTarget?:         { lat: number; lon: number; zoom?: number; exact?: boolean; bounds?: [number, number, number, number] } | null;
+  initialView?: MapView | null;
+  onViewChanged?: (view: MapView) => void;
   selectedPin?:       SpotMapPin | null;
   overlayOffsetPx?:   number;
   fitAllTrigger?:     number;
@@ -49,85 +56,24 @@ interface SpotMapProps {
 
 /* ── SVG pin individuale ── */
 function pinSvg(type: SpotType, condition: string, isSelected = false, updatedAt?: string | null): string {
-  const info  = TIPI_SPOT[type];
-  const color = condition === 'alive'   ? info.color
-              : condition === 'bustato' ? '#888'
-              : '#444';
-  const cross = condition !== 'alive' ? `
-    <line x1="9" y1="9" x2="21" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
-    <line x1="21" y1="9" x2="9" y2="21" stroke="${PALETTE.orange}" stroke-width="2" stroke-linecap="round"/>
-  ` : '';
-  const glow = condition === 'alive' ? `<circle cx="15" cy="15" r="13" fill="${color}" opacity="0.12"/>` : '';
-
-  /* Il corpo del pin resta del colore del TIPO: e' quello che distingue un
-     rail da un bowl a colpo d'occhio, e sostituirlo con la freschezza
-     perderebbe piu' di quanto guadagna. La freschezza si aggiunge come
-     bollino, e solo quando ha qualcosa da dire: sotto l'anno non compare.
-     Un segnale che si accende su tutti i pin torna a essere decorazione —
-     e' lo stesso motivo per cui le soglie sono a uno e due anni. */
-  const fresh  = condition === 'alive' ? getFreshness('alive', updatedAt) : null;
-  const bollino = fresh && needsConfirmation(fresh)
-    ? `<circle cx="24" cy="7" r="5.5" fill="${fresh.color}" stroke="#0a0a0a" stroke-width="1.5"/>`
-    : '';
-
-  const strokeColor = isSelected ? '#ff6a00' : '#0a0a0a';
-  const strokeWidth = isSelected ? 2.5 : 1.5;
-  const w = isSelected ? 38 : 30;
-  const h = isSelected ? 48 : 38;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 30 38">
-    ${glow}
-    <path d="M15 0C6.72 0 0 6.72 0 15c0 8.28 15 23 15 23S30 23.28 30 15C30 6.72 23.28 0 15 0z"
-          fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
-    <circle cx="15" cy="15" r="9" fill="rgba(0,0,0,0.22)"/>
-    <text x="15" y="15.5" text-anchor="middle" font-size="12" dominant-baseline="middle">${info.emoji}</text>
-    ${cross}
-    ${bollino}
-  </svg>`;
+  const fill = isSelected ? '#ff6a00' : '#181715';
+  const ink = isSelected ? '#181715' : '#f6f3ee';
+  const status = condition !== 'alive' ? '<path d="M27 7l8 8m0-8-8 8" stroke="#ff6a00" stroke-width="3"/>' : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 40 50"><path d="M20 47 5 29A19 19 0 1 1 35 29Z" fill="${fill}" stroke="#f6f3ee" stroke-width="2.5"/><g transform="translate(8 7)" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${spotSymbol(type)}"/></g>${status}</svg>`;
 }
-
 
 /* ── Clustering geografico a griglia adattiva allo zoom ──
    Celle più piccole = cluster più granulari e precisi. */
-function computeGridClusters(spots: SpotMapPin[], zoom: number) {
-  /* Dimensione cella in gradi geografici — ottimizzata per distribuzione mondiale */
-  const cellDeg =
-    zoom < 4  ? 5    :   // vista mondo: ~550 km per cella
-    zoom < 5  ? 2.5  :   // ~280 km
-    zoom < 6  ? 1.2  :   // ~130 km — continente (Europa intera)
-    zoom < 7  ? 0.6  :   // ~65 km  — paese (Italia = ~18 cluster)
-    zoom < 8  ? 0.3  :   // ~33 km  — regione
-    zoom < 9  ? 0.15 :   // ~17 km  — area metropolitana
-    zoom < 10 ? 0.07 :   // ~8 km   — città grande
-    zoom < 11 ? 0.03 :   // ~3 km   — quartiere
-                0.01;    // ~1 km   — pin quasi individuali
-
-  const cellMap = new Map<string, SpotMapPin[]>();
-  for (const s of spots) {
-    const key = `${Math.floor(s.lat / cellDeg)}_${Math.floor(s.lon / cellDeg)}`;
-    if (!cellMap.has(key)) cellMap.set(key, []);
-    cellMap.get(key)!.push(s);
-  }
-
-  return Array.from(cellMap.values()).map((pins) => {
-    /* Usa la città del primo spot come label (se disponibile) */
-    const city = pins.find(p => p.city)?.city ?? null;
-    return {
-      key:   `${pins[0].lat.toFixed(4)}_${pins[0].lon.toFixed(4)}`,
-      city,
-      lat:   pins.reduce((s, p) => s + p.lat, 0) / pins.length,
-      lon:   pins.reduce((s, p) => s + p.lon, 0) / pins.length,
-      count: pins.length,
-      spots: pins,
-    };
-  });
-}
 
 export default function SpotMap({
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
-  selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
+  initialView, onViewChanged, selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
   locateTrigger, onLocatingChange, onLocateError, onBoundsChanged, darkMap: darkMapProp, onUserLocated,
 }: SpotMapProps) {
+  const { text } = useLanguage();
+  const textRef = useRef(text);
+  textRef.current = text;
+  const zoomControlRef = useRef<import('leaflet').Control.Zoom | null>(null);
   const mapRef           = useRef<HTMLDivElement>(null);
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
   const markersRef       = useRef<import('leaflet').LayerGroup | null>(null);
@@ -138,12 +84,13 @@ export default function SpotMap({
   const onMapClickRef      = useRef(onMapClick);
   const onSpotClickRef     = useRef(onSpotClick);
   const onBoundsChangedRef = useRef(onBoundsChanged);
+  const onViewChangedRef = useRef(onViewChanged);
+  onViewChangedRef.current = onViewChanged;
   /* Memoization: refs dichiarati qui ma inizializzati dopo filtered/clusters */
   const pinMarkersRef    = useRef<Map<string, import('leaflet').Marker>>(new Map());
   const prevSelIdRef     = useRef<string | null>(null);
   const filteredRef      = useRef<SpotMapPin[]>([]);
   const selPinRef        = useRef<SpotMapPin | null>(null);
-  const pendingPopupRef  = useRef<string | null>(null); // pin id da aprire come popup dopo rebuild
   /* Refs per il fitAllTrigger effect — evita di aggiungere filterRegionBbox/searchQuery
      come dependency (causerebbero re-run ad ogni render) */
   const filterRegionBboxRef = useRef(filterRegionBbox);
@@ -171,6 +118,9 @@ export default function SpotMap({
       return (
         s.name.toLowerCase().includes(q) ||
         (s.city ?? '').toLowerCase().includes(q) ||
+        (s.country ?? '').toLowerCase().includes(q) ||
+        (s.region ?? '').toLowerCase().includes(q) ||
+        (s.country_code ?? '').toLowerCase().includes(q) ||
         (s.submitted_by_username ?? '').toLowerCase().includes(q)
       );
     }
@@ -184,11 +134,15 @@ export default function SpotMap({
   filteredRef.current = filtered;
   selPinRef.current   = selectedPin ?? null;
 
+  const [mapReady, setMapReady] = useState(false);
+
   /* ── Init mappa ── */
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
+    let cancelled = false;
     import('leaflet').then((leaflet) => {
+      if (cancelled || !mapRef.current || mapInstance.current) return;
       L = leaflet;
       delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -201,7 +155,7 @@ export default function SpotMap({
         center: APP_CONFIG.mapCenter,
         zoom:   APP_CONFIG.mapZoom,
         zoomControl: false,
-        attributionControl: false,   // gestiamo noi l'attribution nel frame VHS
+        attributionControl: true,
         maxBounds: L.latLngBounds([-85, -180], [85, 180]),
         maxBoundsViscosity: 1.0,     // blocco rigido ai bordi del mondo
         minZoom: 3,
@@ -217,13 +171,16 @@ export default function SpotMap({
           : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, noWrap: true, className: 'osm-tiles' }
       ).addTo(map);
 
-      L.control.zoom({ position: 'bottomleft' }).addTo(map);
+      zoomControlRef.current = L.control.zoom({ position: 'bottomleft', zoomInTitle: textRef.current('Ingrandisci', 'Zoom in'), zoomOutTitle: textRef.current('Riduci', 'Zoom out') }).addTo(map);
       markersRef.current  = L.layerGroup().addTo(map);
       mapInstance.current = map;
+      setMapReady(true);
 
       /* Aggiorna stato zoom React + emetti bounds */
       const emitBounds = () => {
         const b = map.getBounds();
+        const center = map.getCenter();
+        onViewChangedRef.current?.({lat:center.lat, lon:center.lng, zoom:map.getZoom()});
         onBoundsChangedRef.current?.({
           south: b.getSouth(), west: b.getWest(),
           north: b.getNorth(), east: b.getEast(),
@@ -238,9 +195,14 @@ export default function SpotMap({
          data-driven (più sotto) inquadra DOVE SONO gli spot — oggi Italia,
          domani il mondo — senza nulla di hardcoded.
          paddingBottomRight bottom = overlayOffsetPx (= panelHeight/2) + handle. */
-      const handleH = 82; // gradiente (36) + drag handle (46)
+      const handleH = overlayOffsetPx > 0 ? 64 : 0;
       const PLACEHOLDER_BOUNDS = L.latLngBounds([36.0, 6.0], [47.5, 19.0]);
-      map.fitBounds(PLACEHOLDER_BOUNDS, {
+      if (initialView) {
+        hasInitialFit.current = true;
+        map.setView([initialView.lat, initialView.lon], initialView.zoom, {animate:false});
+        setZoom(initialView.zoom);
+        emitBounds();
+      } else map.fitBounds(PLACEHOLDER_BOUNDS, {
         paddingTopLeft:     [20, 10],
         paddingBottomRight: [20, overlayOffsetPx + handleH],
         maxZoom: 7,
@@ -277,7 +239,7 @@ export default function SpotMap({
         }
       };
 
-      if (navigator.geolocation) void chiedibileInSilenzio().then((ok) => {
+      if (navigator.geolocation) void (initialView ? Promise.resolve(false) : chiedibileInSilenzio()).then((ok) => {
         if (!ok) return;
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -304,7 +266,7 @@ export default function SpotMap({
             if (!userMarkerRef.current) {
               userMarkerRef.current = L!.marker([latitude, longitude], { icon, zIndexOffset: 2000 })
                 .addTo(mapInstance.current!)
-                .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
+                .bindTooltip(textRef.current('Sei qui', 'You are here'), { permanent: false, direction: 'top' });
             } else {
               userMarkerRef.current.setLatLng([latitude, longitude]);
             }
@@ -323,6 +285,7 @@ export default function SpotMap({
     });
 
     return () => {
+      cancelled = true;
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
@@ -332,6 +295,20 @@ export default function SpotMap({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const observer = new ResizeObserver(() => mapInstance.current?.invalidateSize({ pan: false }));
+    observer.observe(mapRef.current);
+    return () => observer.disconnect();
+  }, [mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !mapInstance.current || !L) return;
+    zoomControlRef.current?.remove();
+    zoomControlRef.current = L.control.zoom({ position: 'bottomleft', zoomInTitle: text('Ingrandisci', 'Zoom in'), zoomOutTitle: text('Riduci', 'Zoom out') }).addTo(mapInstance.current);
+    userMarkerRef.current?.setTooltipContent(text('Sei qui', 'You are here'));
+  }, [mapReady, text]);
 
   /* ── Render marker al cambio di zoom / filtri ── */
   /* selectedPin NON è nelle deps: gestito separatamente in Effect 2 per evitare
@@ -347,19 +324,19 @@ export default function SpotMap({
         if (!L || !markersRef.current) return;
 
         /* Pallino arancione uniforme — sempre, anche per singoli spot */
-        const radius = Math.min(6 + Math.sqrt(c.count) * 1.6, 15);
-        const label  = c.count === 1 ? '' : String(c.count);
-        const fontSize = Math.max(9, 13 - String(c.count).length);
+        const radius = Math.min(14 + Math.sqrt(c.count), 21);
+        const label = c.count === 1 ? `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${spotSymbol(c.spots[0].type)}"/></svg>` : String(c.count);
+        const fontSize = 14;
         const html = `<div style="
           width:${radius * 2}px; height:${radius * 2}px;
-          background: rgba(255,106,0,0.9);
-          border: 1.5px solid rgba(255,255,255,0.9);
+          background: #181715;
+          border: 2px solid #f6f3ee;
           border-radius: 50%;
           display:flex; align-items:center; justify-content:center;
-          font-family:'VT323',monospace;
+          font-family:system-ui,sans-serif;
           font-size:${fontSize}px;
-          color:#000; font-weight:700;
-          box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+          color:#f6f3ee; font-weight:700;
+          box-shadow: none;
           cursor: pointer;
         ">${label}</div>`;
 
@@ -370,13 +347,13 @@ export default function SpotMap({
           iconAnchor:[radius, radius],
         });
 
-        const marker = L!.marker([c.lat, c.lon], { icon });
+        const marker = L!.marker([c.lat, c.lon], { icon, title: text(`${c.count} spot`, `${c.count} ${c.count === 1 ? 'spot' : 'spots'}`), alt: text(`${c.count} spot, ingrandisci la zona`, `${c.count} ${c.count === 1 ? 'spot' : 'spots'}, zoom into this area`) });
         const cityName = c.city
           ? c.city.charAt(0).toUpperCase() + c.city.slice(1)
-          : 'Zona';
+          : text('Zona', 'Area');
 
         marker.bindTooltip(
-          `<span style="font-family:monospace;font-size:12px"><b>${cityName}</b> · ${c.count} spot</span>`,
+          `<span style="font-family:monospace;font-size:12px"><b>${escapeMapLabel(cityName)}</b> · ${c.count} ${text('spot', c.count === 1 ? 'spot' : 'spots')}</span>`,
           { permanent: false, direction: 'top', offset: [0, -radius - 2] }
         );
 
@@ -389,7 +366,7 @@ export default function SpotMap({
             const targetPoint = mapInstance.current.project([c.lat, c.lon], targetZoom);
             const offsetPoint = targetPoint.add(L!.point(0, overlayOffsetPx));
             const offsetLL    = mapInstance.current.unproject(offsetPoint, targetZoom);
-            mapInstance.current.flyTo(offsetLL, targetZoom, { duration: 1.4, easeLinearity: 0.35 });
+            mapInstance.current.flyTo(offsetLL, targetZoom, { duration: 0.45, easeLinearity: 0.35 });
             onSpotClickRef.current(c.spots[0]);
           } else {
             /* Multi-spot → flyToBounds cinematico, stesso comportamento su mobile e desktop */
@@ -399,7 +376,7 @@ export default function SpotMap({
               paddingTopLeft:     [24, 24],
               paddingBottomRight: [24, padBottom],
               maxZoom: 16,
-              duration: 1.2,
+              duration: 0.45,
             });
           }
         });
@@ -425,58 +402,9 @@ export default function SpotMap({
           popupAnchor: [0, -(ph + 2)],
         });
 
-        const marker = L!.marker([pin.lat, pin.lon], { icon });
-        const tipo   = TIPI_SPOT[pin.type];
-
-        /* Popup: foto + nome + info + VEDI SPOT.
-           Desktop: appare al hover. Mobile: appare al tap.
-           Tutto il popup è cliccabile → naviga alla pagina spot. */
-        const imgHtml = pin.cover_url
-          ? `<img src="${pin.cover_url}"
-               style="width:100%;height:140px;object-fit:cover;display:block;border-radius:6px 6px 0 0"
-               loading="lazy" />`
-          : '';
-
-        const spotUrl = `/map/spot/${pin.slug}`;
-        const popupContent = `
-          <a href="${spotUrl}"
-             style="font-family:var(--font-display),sans-serif;min-width:180px;padding:0;
-                    overflow:hidden;border-radius:6px;cursor:pointer;display:block;
-                    text-decoration:none;color:inherit;-webkit-tap-highlight-color:transparent">
-            ${imgHtml}
-            <div style="padding:6px 10px 8px;background:#111">
-              <div style="font-family:var(--font-mono),monospace;font-size:18px;color:#ff6a00;line-height:1.2;margin-bottom:3px">${pin.name}</div>
-              ${pin.city ? `<div style="font-size:11px;color:#777;margin-bottom:2px">📍 ${pin.city}</div>` : ''}
-              <div style="font-size:11px;color:#888;margin-bottom:6px">${tipo.emoji} ${tipo.label}</div>
-              <div style="font-family:var(--font-mono),monospace;font-size:14px;
-                          color:#000;background:#ff6a00;padding:10px 14px;border-radius:4px;
-                          text-align:center;letter-spacing:0.04em">
-                VEDI SPOT →
-              </div>
-            </div>
-          </a>
-        `;
-
-        marker.bindPopup(popupContent, {
-          maxWidth: pin.cover_url ? 260 : 220,
-          closeButton: false,
-          className: 'spot-hover-popup',
-          autoPan: true,
-          interactive: true,
-          closeOnClick: false,
-        });
-
-        /* Click unificato: mobile e desktop → toggle popup. */
-        marker.on('click', () => {
-          if (marker.isPopupOpen()) {
-            marker.closePopup();
-            pendingPopupRef.current = null;
-          } else {
-            marker.openPopup();
-            pendingPopupRef.current = pin.id; // segna per riaprire se flyTo ricrea i marker
-            onSpotClickRef.current(pin);
-          }
-        });
+        const marker = L!.marker([pin.lat, pin.lon], { icon, title: pin.name, alt: `${pin.name}, ${TIPI_SPOT[pin.type].label}` });
+        // Un unico percorso per marker e lista: seleziona l’anteprima esistente.
+        marker.on('click', () => onSpotClickRef.current(pin));
 
         markersRef.current!.addLayer(marker);
         pinMarkersRef.current.set(pin.id, marker); // salva ref per Effect 2
@@ -485,22 +413,10 @@ export default function SpotMap({
 
     prevSelIdRef.current = selPinRef.current?.id ?? null;
 
-    /* ── Riapri popup dopo rebuild marker (flyTo cambia zoom → clearLayers → popup perso) ── */
-    if (pendingPopupRef.current && zoom >= CLUSTER_ZOOM) {
-      const pid = pendingPopupRef.current;
-      const pm = pinMarkersRef.current.get(pid);
-      if (pm) {
-        setTimeout(() => {
-          const m2 = pinMarkersRef.current.get(pid);
-          if (m2) m2.openPopup();
-          pendingPopupRef.current = null;
-        }, 300);
-      }
-    }
-
-    /* ── Auto-fit al primo render con spot ── */
-    if (!hasInitialFit.current && filtered.length > 0 && mapInstance.current && L) {
-      const bounds  = L.latLngBounds(filtered.map(s => [s.lat, s.lon] as [number, number]));
+    /* ── Auto-fit al primo render con spot: sul grosso degli spot, non sugli estremi ── */
+    const core = !hasInitialFit.current ? coreBounds(filtered) : null;
+    if (core && mapInstance.current && L) {
+      const bounds  = L.latLngBounds(core);
       const padBot  = overlayOffsetPx * 2 + 32;
       mapInstance.current.fitBounds(bounds, {
         paddingTopLeft:     [32, 32],
@@ -511,7 +427,7 @@ export default function SpotMap({
       hasInitialFit.current = true;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, clusters, zoom]); // selectedPin gestito in Effect 2
+  }, [filtered, clusters, zoom, mapReady, text]); // selectedPin gestito in Effect 2
 
   /* ── Effect 2: aggiorna SOLO l'icona del pin selezionato/deselezionato ── */
   /* Evita di ricreare tutti i marker ad ogni click: O(1) invece di O(n) */
@@ -553,7 +469,15 @@ export default function SpotMap({
     if (!mapInstance.current || !flyTarget || !L) return;
     const map  = mapInstance.current;
     const zoom = flyTarget.zoom ?? APP_CONFIG.mapZoomCity;
-    const isMobile = window.innerWidth < 768;
+    if (flyTarget.bounds) {
+      const [south, west, north, east] = flyTarget.bounds;
+      map.flyToBounds([[south, west], [north, east]], {
+        paddingTopLeft: [32, 48], paddingBottomRight: [32, overlayOffsetPx * 2 + 32],
+        maxZoom: 15, duration: .45,
+        animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      });
+      return;
+    }
 
     /* Calcola offset dinamico: panel_height / 2
        Logica: proiettiamo il pin in pixel, poi AGGIUNGIAMO l'offset a Y (spostiamo
@@ -562,30 +486,17 @@ export default function SpotMap({
        spazio visibile sopra il pannello. Sottrarre (vecchio codice) faceva l'opposto.
        overlayOffsetPx viene passato da MapClient come Math.round(panelHeight / 2),
        quindi traccia l'altezza reale del pannello anche quando l'utente lo trascina. */
-    const offset = overlayOffsetPx;
+    const offset = flyTarget.exact ? 0 : overlayOffsetPx;
 
     // Stessa animazione su mobile e desktop — lenta abbastanza da
     // permettere di seguire visivamente il percorso verso lo spot
     const targetPoint  = map.project([flyTarget.lat, flyTarget.lon], zoom);
     const offsetPoint  = targetPoint.add(L!.point(0, offset));
     const offsetLatLng = map.unproject(offsetPoint, zoom);
-    map.flyTo(offsetLatLng, zoom, { duration: 1.8, easeLinearity: 0.35 });
+    map.flyTo(offsetLatLng, zoom, { duration: 0.45, animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, easeLinearity: 0.35 });
 
-    /* Dopo flyTo: riapri il popup se un pin era stato cliccato.
-       Il cambio di zoom durante flyTo ricrea i marker (clearLayers),
-       distruggendo il popup aperto. Lo riapriamo sul nuovo marker. */
-    if (pendingPopupRef.current) {
-      const pendingId = pendingPopupRef.current;
-      map.once('moveend', () => {
-        const m = pinMarkersRef.current.get(pendingId);
-        if (m) {
-          requestAnimationFrame(() => m.openPopup());
-        }
-        pendingPopupRef.current = null;
-      });
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- overlayOffsetPx changes on drag; re-flying mid-drag would be jarring
-  }, [flyTarget]);
+  }, [flyTarget, mapReady]);
 
   /* ── Refit quando cambiano i filtri (fitAllTrigger incrementa in MapClient) ── */
   useEffect(() => {
@@ -602,7 +513,7 @@ export default function SpotMap({
     if (pins.length === 0) {
       if (hasRegion) {
         const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
-        mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 1.2 });
+        mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 0.45 });
       }
       return;
     }
@@ -614,28 +525,28 @@ export default function SpotMap({
       const targetPoint  = mapInstance.current.project([p.lat, p.lon], targetZoom);
       const offsetPoint  = targetPoint.add(L!.point(0, overlayOffsetPx));
       const offsetLatLng = mapInstance.current.unproject(offsetPoint, targetZoom);
-      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 1.2, easeLinearity: 0.35 });
+      mapInstance.current.flyTo(offsetLatLng, targetZoom, { duration: 0.45, easeLinearity: 0.35 });
       return;
     }
 
     /* Caso 2: filtro regione attivo */
     if (hasRegion) {
       const [latMin, lonMin, latMax, lonMax] = filterRegionBboxRef.current!;
-      mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 1.2 });
+      mapInstance.current.flyToBounds(L.latLngBounds([[latMin, lonMin], [latMax, lonMax]]), { ...pad, duration: 0.45 });
       return;
     }
 
     /* Caso 3: ricerca testuale */
     if (hasSearch) {
       const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
-      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 14, duration: 1.2 });
+      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 14, duration: 0.45 });
       return;
     }
 
     /* Caso 4: solo filtro categoria */
     {
       const bounds = L.latLngBounds(pins.map(s => [s.lat, s.lon] as [number, number]));
-      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 12, duration: 1.2 });
+      mapInstance.current.flyToBounds(bounds, { ...pad, maxZoom: 12, duration: 0.45 });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitAllTrigger]);
@@ -664,7 +575,10 @@ export default function SpotMap({
         const icon = L!.divIcon({ html: svg, className: '', iconSize: [16, 16], iconAnchor: [8, 8] });
         centerMarkerRef.current = L!.marker([radiusCenter.lat, radiusCenter.lon], { icon, zIndexOffset: 1000 }).addTo(mapInstance.current);
 
-        mapInstance.current.fitBounds(circleRef.current.getBounds(), { padding: [40, 40], maxZoom: 13 });
+        // Il pannello copre la metà bassa su mobile: il cerchio va inquadrato sopra.
+        mapInstance.current.fitBounds(circleRef.current.getBounds(), {
+          paddingTopLeft: [40, 40], paddingBottomRight: [40, overlayOffsetPx * 2 + 40], maxZoom: 13,
+        });
       }
     };
     if (mapInstance.current) tryDraw();
@@ -680,7 +594,7 @@ export default function SpotMap({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 1.4, easeLinearity: 0.35 });
+        mapInstance.current!.flyTo([latitude, longitude], APP_CONFIG.mapZoomCity, { duration: 0.45, easeLinearity: 0.35 });
 
         if (L) {
           const dotSvg = `<div style="
@@ -695,7 +609,7 @@ export default function SpotMap({
           } else {
             userMarkerRef.current = L.marker([latitude, longitude], { icon, zIndexOffset: 2000 })
               .addTo(mapInstance.current!)
-              .bindTooltip('📍 Sei qui', { permanent: false, direction: 'top' });
+              .bindTooltip(textRef.current('Sei qui', 'You are here'), { permanent: false, direction: 'top' });
           }
         }
         /* Da qui in poi il permesso c'e': le prossime visite possono
@@ -713,10 +627,10 @@ export default function SpotMap({
            chiedere niente e il bottone sembrava semplicemente rotto. */
         onLocateError?.(
           err.code === err.PERMISSION_DENIED
-            ? 'Posizione bloccata per questo sito. Sbloccala dal lucchetto accanto all\'indirizzo, poi riprova.'
+            ? textRef.current('Posizione bloccata per questo sito. Sbloccala dal lucchetto accanto all’indirizzo, poi riprova.', 'Location access is blocked for this site. Enable it in your browser’s site settings, then try again.')
             : err.code === err.TIMEOUT
-              ? 'Il GPS ci sta mettendo troppo. Riprova all\'aperto.'
-              : 'Non riesco a leggere la posizione.',
+              ? textRef.current('Il GPS ci sta mettendo troppo. Riprova all’aperto.', 'GPS is taking too long. Try again outdoors.')
+              : textRef.current('Non riesco a leggere la posizione.', 'Your location could not be determined.'),
         );
       },
       { enableHighAccuracy: true, timeout: 8000 }
@@ -750,12 +664,17 @@ export default function SpotMap({
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div
         ref={mapRef}
+        className={darkMapProp ? undefined : 'cm-cartography-warm'}
         style={{ width: '100%', height: '100%' }}
-        aria-label="Mappa spot BMX Italia"
+        aria-label={text('Mappa spot BMX, skate e scooter', 'BMX, skate and scooter spot map')}
         role="application"
       />
 
       {/* Bottoni ora gestiti da MapClient */}
     </div>
   );
+}
+
+function escapeMapLabel(value: string): string {
+  return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] ?? character));
 }

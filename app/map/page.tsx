@@ -5,7 +5,7 @@ import { safeJsonLd } from '@/lib/json-ld';
 
 export const metadata: Metadata = {
   title:       'Mappa Spot BMX, Skate & Scooter Italia',
-  description: 'Trova spot BMX, skatepark, park scooter e street spot in tutta Italia. Mappa interattiva community-driven con centinaia di spot verificati. Cerca per città, tipo e distanza.',
+  description: 'Trova spot BMX, skatepark, park scooter e street spot in tutta Italia. Foto e informazioni condivise dai rider. Cerca per città, tipo e distanza.',
   alternates: { canonical: APP_CONFIG.url },
   keywords: [
     'mappa spot BMX Italia', 'skatepark vicino a me', 'spot scooter Italia',
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   // metadata dell'anteprima quando si condivide il sito — non quelli del layout.
   openGraph: {
     title:       APP_CONFIG.shareTagline,
-    description: 'La mappa community per trovare spot BMX, skatepark e park scooter. Centinaia di spot verificati, aggiornati dai rider.',
+    description: 'La mappa community per trovare spot BMX, skatepark e park scooter. Foto e informazioni aggiornate dai rider.',
     url:         APP_CONFIG.url,
     images:      [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Chrispy Maps — la mappa freestyle' }],
   },
@@ -37,7 +37,7 @@ const mapJsonLd = {
   description: 'Mappa interattiva community-driven per trovare spot BMX, skatepark, park scooter e street spot in tutta Italia.',
   applicationCategory: 'SportsApplication',
   operatingSystem: 'Web, iOS, Android',
-  inLanguage: 'it-IT',
+  inLanguage: ['it-IT', 'en-GB'],
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
 };
 
@@ -56,7 +56,7 @@ export default async function MapPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(mapJsonLd) }}
       />
-      <MapClient initialSpots={[]} autoAdd={autoAdd} />
+      <MapClient initialSpots={[]} autoAdd={autoAdd} initialSpotSlug={typeof params.spot === 'string' ? params.spot : undefined} initialQuery={typeof params.q === 'string' ? params.q : undefined} />
     </>
   );
 }

@@ -93,6 +93,10 @@ export interface SpotMapPin {
   lat:       number;
   lon:       number;
   city?:     string;
+  region?: string;
+  country?: string;
+  country_code?: string;
+  approved_at?: string;
   condition: SpotCondition;
   /** Ultima conferma dello stato — alimenta lib/freshness.ts sulle card. */
   condition_updated_at?: string;

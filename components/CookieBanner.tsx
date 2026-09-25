@@ -30,36 +30,34 @@ export default function CookieBanner() {
 
   if (!visible) return null;
 
+  /* Sulle pagine con la bottom nav il banner sta SOPRA la nav, non la copre:
+     prima nascondeva "Aggiungi spot" proprio alla prima visita. */
   const hasNav = PAGES_WITH_NAV.some(p => pathname?.startsWith(p)) || pathname === '/';
-  const bottomPad = hasNav ? 'calc(68px + env(safe-area-inset-bottom))' : 'calc(14px + env(safe-area-inset-bottom))';
 
   return (
-    <div style={{
-      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+    <div className="cm-cookie" data-nav={hasNav} style={{
+      position: 'fixed', left: 0, right: 0, zIndex: 9999,
       background: 'var(--gray-800)', borderTop: '1px solid var(--gray-600)',
-      padding: '14px 20px', paddingBottom: bottomPad,
-      display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
-      animation: 'slideUp 0.3s ease-out',
-      boxShadow: '0 -4px 24px rgba(0,0,0,0.5)',
+      padding: '8px 12px 8px 16px',
+      display: 'flex', alignItems: 'center', gap: 12,
     }}>
       <p style={{
-        flex: 1, minWidth: 200, margin: 0,
-        fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.6,
+        flex: 1, minWidth: 0, margin: 0,
+        fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.4,
       }}>
-        Questo sito usa solo cookie tecnici necessari al funzionamento.{' '}
+        Il sito usa solo cookie tecnici.{' '}
         <a href="/privacy#cookie" style={{ color: 'var(--orange)', textDecoration: 'underline', textUnderlineOffset: 2 }}>Dettagli</a>
       </p>
       <button
         onClick={dismiss}
         style={{
           fontFamily: 'var(--font-mono)', fontSize: 14,
-          background: 'var(--orange)', color: '#000',
-          border: 'none', borderRadius: 6, padding: '10px 22px',
-          cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 700,
-          letterSpacing: '0.02em',
+          background: 'transparent', color: 'var(--bone)',
+          border: '1px solid var(--gray-600)', borderRadius: 3, padding: '0 14px', minHeight: 44,
+          cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 600, flexShrink: 0,
         }}
       >
-        HO CAPITO
+        Ho capito
       </button>
     </div>
   );

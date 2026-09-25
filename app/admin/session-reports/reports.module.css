@@ -1,0 +1,36 @@
+.page { height:100dvh; overflow-y:auto; background:#171715; color:#f1eee7; font-family:var(--font-ui),Arial,sans-serif; }
+.page a { color:#ff813b; text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
+.page a:hover { color:#ffa373; }
+.page a:focus-visible, .page summary:focus-visible { outline:2px solid #ff813b; outline-offset:4px; }
+.header { position:sticky; top:0; z-index:2; background:#171715; border-bottom:1px solid #41413c; }
+.header>div { max-width:1040px; margin:auto; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.header a { min-height:44px; display:inline-flex; align-items:center; font-size:15px; }
+.header span { font-weight:700; }
+.content { max-width:1000px; padding:32px 24px 64px; margin:auto; }
+.intro { margin-bottom:32px; max-width:740px; }
+.intro h1 { margin:8px 0 16px; font-size:clamp(28px,5vw,38px); line-height:1.1; letter-spacing:-.025em; }
+.intro p { line-height:1.6; font-size:16px; }
+.eyebrow { margin:0; color:#ff813b; font-weight:650; }
+.muted { color:#b5b5ab; line-height:1.6; }
+.report { border-top:1px solid #4c4c44; padding:28px 0 32px; }
+.reportTop { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px 24px; margin-bottom:24px; }
+.people { margin:0; font-size:18px; font-weight:650; overflow-wrap:anywhere; }
+.people span { font-weight:400; color:#b5b5ab; }
+.reportTop time, .messageTop time { color:#b5b5ab; font-size:14px; line-height:1.5; }
+.label { font-size:14px; color:#b5b5ab; margin:0 0 8px; font-weight:500; }
+.reason { white-space:pre-wrap; overflow-wrap:anywhere; font-size:18px; line-height:1.6; margin:0 0 24px; }
+.context { font-size:15px; line-height:1.6; margin-bottom:16px; }
+.context p { margin:4px 0; }
+.evidence { border-top:1px solid #35352f; }
+.evidence summary { cursor:pointer; min-height:48px; padding:14px 0; color:#f1eee7; font-weight:600; font-size:15px; }
+.evidenceBody { padding:0 0 4px; }
+.evidenceBody h3 { font-size:15px; margin:24px 0 8px; }
+.messages { list-style:none; margin:16px 0 0; padding:0; }
+.messages li { margin-top:20px; padding-left:16px; border-left:2px solid #53534a; }
+.messageTop { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 16px; font-size:15px; }
+.messageBody { white-space:pre-wrap; overflow-wrap:anywhere; font-size:16px; line-height:1.65; margin:8px 0 0; }
+.notice { padding:24px 0; border-top:1px solid #41413c; line-height:1.6; }
+.notice h2 { font-size:20px; }
+.pagination { display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px 24px; margin-top:24px; }
+.pagination a { display:inline-flex; min-height:44px; align-items:center; font-size:16px; }
+@media(max-width:540px) { .header>div { padding:8px 16px; } .header span { display:none; } .content { padding:24px 16px 48px; } .report { padding:24px 0; } .reportTop { margin-bottom:20px; } }

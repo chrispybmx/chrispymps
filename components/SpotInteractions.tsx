@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useLanguage } from '@/components/LanguageProvider';
 
 interface Comment {
   id:          string;
@@ -14,6 +15,7 @@ interface Comment {
 interface Props { spotId: string; spotSlug: string; }
 
 export default function SpotInteractions({ spotId, spotSlug }: Props) {
+  const { text: t, language } = useLanguage();
   const [comments,    setComments]   = useState<Comment[]>([]);
   const [commLoading, setCommLoad]   = useState(true);
   const [posting,     setPosting]    = useState(false);
@@ -110,7 +112,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
   const handleSubmitComment = async () => {
     if (!token) return;
     const text = commentText.trim();
-    if (text.length < 2) { setPostError('Scrivi almeno 2 caratteri.'); return; }
+    if (text.length < 2) { setPostError(t('Scrivi almeno 2 caratteri.', 'Write at least 2 characters.')); return; }
     setPosting(true); setPostError('');
     try {
       const res = await fetch(`/api/comments/${spotSlug}`, {
@@ -120,8 +122,8 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
       });
       const j = await res.json();
       if (j.ok) { setComments(prev => [...prev, j.data]); setCommentTxt(''); }
-      else { setPostError(j.error ?? 'Errore.'); }
-    } catch { setPostError('Errore di rete.'); }
+      else { setPostError(language === 'en' ? englishCommentError(res.status, j.error) : j.error ?? 'Errore.'); }
+    } catch { setPostError(t('Errore di rete.', 'Network error. Please try again.')); }
     finally { setPosting(false); }
   };
 
@@ -129,7 +131,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
   const handleSubmitReply = async () => {
     if (!token || !replyTo) return;
     const text = replyText.trim();
-    if (text.length < 2) { setReplyErr('Scrivi almeno 2 caratteri.'); return; }
+    if (text.length < 2) { setReplyErr(t('Scrivi almeno 2 caratteri.', 'Write at least 2 characters.')); return; }
     setReplyPost(true); setReplyErr('');
     try {
       const res = await fetch(`/api/comments/${spotSlug}`, {
@@ -141,8 +143,8 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
       if (j.ok) {
         setComments(prev => [...prev, j.data]);
         setReplyText(''); setReplyTo(null);
-      } else { setReplyErr(j.error ?? 'Errore.'); }
-    } catch { setReplyErr('Errore di rete.'); }
+      } else { setReplyErr(language === 'en' ? englishCommentError(res.status, j.error) : j.error ?? 'Errore.'); }
+    } catch { setReplyErr(t('Errore di rete.', 'Network error. Please try again.')); }
     finally { setReplyPost(false); }
   };
 
@@ -157,17 +159,17 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          commenti {comments.length > 0 ? `(${comments.length})` : ''}
+          {t('commenti', 'comments')} {comments.length > 0 ? `(${comments.length})` : ''}
         </span>
         <div style={{ flex: 1, height: 1, background: 'var(--gray-700)' }} />
       </div>
 
       {/* Lista */}
       {commLoading ? (
-        <div style={{ color: 'var(--gray-500)', fontSize: 13, fontFamily: 'var(--font-mono)', padding: '8px 0 16px' }}>Caricamento…</div>
+        <div style={{ color: 'var(--gray-500)', fontSize: 13, fontFamily: 'var(--font-mono)', padding: '8px 0 16px' }}>{t('Caricamento…', 'Loading…')}</div>
       ) : roots.length === 0 ? (
         <div style={{ color: 'var(--gray-600)', fontSize: 13, fontFamily: 'var(--font-mono)', padding: '12px 0 16px', textAlign: 'center' }}>
-          Nessun commento ancora — sii il primo!
+          {t('Nessun commento ancora — sii il primo!', 'No comments yet. Add the first one!')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
@@ -210,13 +212,14 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
                   borderLeft: '2px solid rgba(255,106,0,0.4)', paddingLeft: 12,
                 }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginBottom: 6 }}>
-                    ↩ Rispondi a <span style={{ color: 'var(--orange)' }}>@{replyTo.username}</span>
+                    ↩ {t('Rispondi a', 'Reply to')} <span style={{ color: 'var(--orange)' }}>@{replyTo.username}</span>
                   </div>
                   <textarea
                     autoFocus
                     value={replyText}
                     onChange={e => { setReplyText(e.target.value); setReplyErr(''); }}
-                    placeholder={`Rispondi a @${replyTo.username}…`}
+                    placeholder={t(`Rispondi a @${replyTo.username}…`, `Reply to @${replyTo.username}…`)}
+                    aria-label={t(`Risposta a @${replyTo.username}`, `Reply to @${replyTo.username}`)}
                     maxLength={500} rows={2}
                     style={{
                       width: '100%', background: '#0a0a0a', border: '1px solid var(--orange)',
@@ -233,7 +236,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
                       <button
                         onClick={() => { setReplyTo(null); setReplyText(''); }}
                         style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', background: 'none', border: '1px solid var(--gray-600)', borderRadius: 4, padding: '5px 10px', cursor: 'pointer' }}
-                      >Annulla</button>
+                      >{t('Annulla', 'Cancel')}</button>
                       <button
                         onClick={handleSubmitReply}
                         disabled={replyPosting || replyText.trim().length < 2}
@@ -243,7 +246,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
                           border: 'none', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 11,
                           padding: '5px 12px', cursor: 'pointer', textTransform: 'uppercase',
                         }}
-                      >{replyPosting ? '…' : 'Invia ↩'}</button>
+                      >{replyPosting ? '…' : t('Invia ↩', 'Send ↩')}</button>
                     </div>
                   </div>
                 </div>
@@ -257,13 +260,14 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
       {token ? (
         <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 10, padding: '12px 14px', marginBottom: 24 }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginBottom: 8 }}>
-            Commenta come <span style={{ color: 'var(--orange)' }}>@{username}</span>
+            {t('Commenta come', 'Comment as')} <span style={{ color: 'var(--orange)' }}>@{username}</span>
           </div>
           <textarea
             ref={textareaRef}
             value={commentText}
             onChange={e => { setCommentTxt(e.target.value); setPostError(''); }}
-            placeholder="Lascia un commento su questo spot…"
+            placeholder={t('Lascia un commento su questo spot…', 'Leave a comment about this spot…')}
+            aria-label={t('Commento sullo spot', 'Comment about this spot')}
             maxLength={500} rows={3}
             style={{
               width: '100%', background: '#0a0a0a', border: '1px solid var(--gray-600)',
@@ -288,20 +292,20 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
                 padding: '8px 18px', cursor: (posting || commentText.trim().length < 2) ? 'default' : 'pointer',
                 transition: 'background 0.15s', textTransform: 'uppercase', letterSpacing: '0.04em',
               }}
-            >{posting ? 'Invio…' : 'Pubblica →'}</button>
+            >{posting ? t('Invio…', 'Posting…') : t('Pubblica →', 'Post →')}</button>
           </div>
         </div>
       ) : (
         <div style={{ background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 10, padding: '16px 14px', textAlign: 'center', marginBottom: 24 }}>
           <p style={{ color: 'var(--gray-400)', fontSize: 14, marginBottom: 12 }}>
-            Accedi per commentare o mettere like
+            {t('Accedi per commentare o mettere like', 'Sign in to comment or like')}
           </p>
           <a href="/" style={{
             display: 'inline-block', background: 'var(--orange)', color: '#000',
             fontFamily: 'var(--font-mono)', fontSize: 12, padding: '8px 20px',
             borderRadius: 6, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.04em',
           }}>
-            Accedi / Registrati →
+            {t('Accedi / Registrati', 'Sign in / Register')} →
           </a>
         </div>
       )}
@@ -321,7 +325,8 @@ function CommentBubble({
   isReplyOpen: boolean;
   isReply?:    boolean;
 }) {
-  const dateStr = new Date(comment.created_at).toLocaleDateString('it-IT', {
+  const { text: t, locale } = useLanguage();
+  const dateStr = new Date(comment.created_at).toLocaleDateString(locale, {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 
@@ -353,6 +358,8 @@ function CommentBubble({
         <button
           onClick={token ? onLike : undefined}
           disabled={!token}
+          aria-pressed={liked}
+          aria-label={liked ? t('Rimuovi il like al commento', 'Unlike comment') : t('Mi piace questo commento', 'Like comment')}
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
             background: liked ? 'rgba(255,59,92,0.12)' : 'transparent',
@@ -382,11 +389,20 @@ function CommentBubble({
           >
             <span style={{ fontSize: 12 }}>↩</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: isReplyOpen ? 'var(--orange)' : 'var(--gray-500)' }}>
-              Rispondi
+              {t('Rispondi', 'Reply')}
             </span>
           </button>
         )}
       </div>
     </div>
   );
+}
+
+function englishCommentError(status: number, error: unknown): string {
+  if (status === 401) return 'Sign in again to post your comment.';
+  if (status === 404) return 'This spot or post is no longer available.';
+  if (typeof error === 'string' && /parent_id|padre/.test(error)) return 'The comment you are replying to is no longer available.';
+  if (status === 400) return 'Use between 2 and 500 characters.';
+  if (status === 429) return 'Please wait a moment before posting again.';
+  return 'Your comment could not be posted. Please try again.';
 }

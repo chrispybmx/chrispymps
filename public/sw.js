@@ -7,7 +7,7 @@
 // riceve header CSP e le fetch qui dentro non sono ristrette. Il CSP della
 // pagina governa solo la registrazione (worker-src), non il traffico interno.
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const STATIC_CACHE  = `chrispymaps-static-${CACHE_VERSION}`;
 const MAP_CACHE     = `chrispymaps-map-${CACHE_VERSION}`;
 const PAGE_CACHE    = `chrispymaps-pages-${CACHE_VERSION}`;
@@ -44,7 +44,8 @@ function isTile(url) {
    realtime — non va mai toccato. */
 function isSpotPhoto(url) {
   return url.hostname.endsWith('.supabase.co')
-      && url.pathname.startsWith('/storage/v1/object/public/spot-photos/');
+      && (url.pathname.startsWith('/storage/v1/object/public/spot-photos/')
+          || url.pathname.startsWith('/storage/v1/render/image/public/spot-photos/'));
 }
 
 // ===== INSTALL =====
@@ -78,6 +79,16 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
+  // Private invitations and chats never enter an offline/shared cache.
+  if (url.origin === self.location.origin &&
+      (url.pathname.startsWith('/messaggi') || url.pathname.startsWith('/api/session-invites'))) {
+    event.respondWith(fetch(request, { cache: 'no-store' }).catch(() =>
+      url.pathname.startsWith('/api/')
+        ? new Response(JSON.stringify({ ok:false, error:'Connessione assente. Riprova quando sei online.' }), {status:503,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
+        : paginaOffline()
+    ));
+    return;
+  }
   if (url.pathname.startsWith('/admin')) return;
   if (url.pathname.startsWith('/api/admin')) return;
 
@@ -107,7 +118,7 @@ self.addEventListener('fetch', (event) => {
      Ora si aspetta la rete, con un tetto di 2,5 secondi. Se risponde si vede
      l'elenco fresco; se e' lenta o assente si ripiega sull'ultima copia buona.
      L'offline resta, la freschezza torna. */
-  if (url.origin === self.location.origin && url.pathname === '/api/spots') {
+  if (url.origin === self.location.origin && ['/api/spots', '/api/spots/index'].includes(url.pathname)) {
     event.respondWith(reteConRipiego(request, DATA_CACHE, 2500));
     return;
   }
@@ -256,7 +267,10 @@ async function reteConRipiego(request, cacheName, msTimeout) {
   const cache = await caches.open(cacheName);
 
   const inArrivo = fetch(request).then((r) => {
-    if (r.ok) cache.put(request, r.clone());
+    if (r.ok) cache.put(request, r.clone()).then(async () => {
+      const keys = await cache.keys();
+      if (keys.length > 80) await Promise.all(keys.slice(0, keys.length - 80).filter(key => new URL(key.url).pathname !== '/api/spots/index').map(key => cache.delete(key)));
+    }).catch(() => {});
     return r;
   });
   inArrivo.catch(() => { /* gestita sotto */ });

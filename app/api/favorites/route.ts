@@ -2,102 +2,104 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
 
-/* GET /api/favorites — user's favorites */
-export async function GET(req: NextRequest) {
-  const auth  = req.headers.get('Authorization');
-  const token = auth?.replace('Bearer ', '').trim() ?? '';
+export const dynamic = 'force-dynamic';
+const headers = { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Authorization', 'X-Robots-Tag': 'noindex, nofollow' };
+const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers });
+const failure = (status = 500, code = 'UNAVAILABLE') => json({ ok: false, code, error: status === 401 ? 'Accedi di nuovo per continuare.' : status === 400 ? 'Richiesta non valida.' : status === 404 ? 'Spot non disponibile.' : 'Non è stato possibile aggiornare i preferiti. Riprova.' }, status);
+const tokenFrom = (req: NextRequest) => req.headers.get('authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
+type Admin = ReturnType<typeof supabaseAdmin>;
+type Photo = { id: string; url: string; position: number; credit_name?: string | null; source?: string | null; moderation_status?: string | null };
 
-  const sb = supabaseAdmin();
-
-  // Public view: fetch favorites for any user by user_id
-  const viewUserId = req.nextUrl.searchParams.get('user_id');
-  if (viewUserId && UUID_RE.test(viewUserId)) {
-    const { data: favRows } = await sb
-      .from('spot_favorites')
-      .select('spot_id')
-      .eq('user_id', viewUserId)
-      .order('created_at', { ascending: false });
-
-    if (!favRows || favRows.length === 0) return NextResponse.json({ ok: true, data: [], ids: [] });
-
-    const ids = favRows.map((r: { spot_id: string }) => r.spot_id);
-    const { data: spots } = await sb
-      .from('spots')
-      .select('id, slug, name, type, city, condition, spot_photos(url, position)')
-      .in('id', ids)
-      .eq('status', 'approved');
-
-    return NextResponse.json({ ok: true, data: spots ?? [], ids });
+async function publicSpots(admin: Admin, ids: string[]) {
+  const collected: Record<string, unknown>[] = [];
+  for (let index = 0; index < ids.length; index += 100) {
+    const { data, error } = await admin.from('spots')
+      .select('id,slug,name,type,city,condition,description,submitted_by_username,lat,lon,spot_photos(id,url,position,credit_name,source,moderation_status)')
+      .in('id', ids.slice(index, index + 100)).eq('status', 'approved');
+    if (error) throw error;
+    for (const spot of data ?? []) {
+      collected.push({ ...spot, spot_photos: ((spot.spot_photos ?? []) as Photo[])
+        .filter(photo => photo.moderation_status === 'approved' || photo.moderation_status == null)
+        .sort((a, b) => a.position - b.position)
+        .map(({ moderation_status: _status, ...photo }) => photo) });
+    }
   }
-
-  if (token) {
-    // Verify user — own favorites
-    const { data: { user } } = await sb.auth.getUser(token);
-    if (!user) return NextResponse.json({ ok: true, data: [], ids: [] });
-
-    const { data: favRows } = await sb
-      .from('spot_favorites')
-      .select('spot_id')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!favRows || favRows.length === 0) return NextResponse.json({ ok: true, data: [], ids: [] });
-
-    const ids = favRows.map((r: { spot_id: string }) => r.spot_id);
-    const { data: spots } = await sb
-      .from('spots')
-      .select('id, slug, name, type, city, condition, spot_photos(url, position)')
-      .in('id', ids)
-      .eq('status', 'approved');
-
-    return NextResponse.json({ ok: true, data: spots ?? [], ids });
-  }
-
-  /* Anonymous fallback: spot info by IDs */
-  const raw = req.nextUrl.searchParams.get('ids') ?? '';
-  const ids = raw.split(',').map(s => s.trim()).filter(s => UUID_RE.test(s)).slice(0, 50);
-  if (ids.length === 0) return NextResponse.json({ ok: true, data: [] });
-
-  const { data } = await sb
-    .from('spots')
-    .select('id, slug, name, type, city, condition, spot_photos(url, position)')
-    .in('id', ids)
-    .eq('status', 'approved');
-
-  return NextResponse.json({ ok: true, data: data ?? [] });
+  const order = new Map(ids.map((id, index) => [id, index]));
+  return collected.sort((a, b) => (order.get(a.id as string) ?? 0) - (order.get(b.id as string) ?? 0));
 }
 
-/* POST /api/favorites { spot_id } — toggle */
+/** Own favorites require verified auth; the existing public profile view remains available. */
+export async function GET(req: NextRequest) {
+  try {
+    const viewUserId = req.nextUrl.searchParams.get('user_id');
+    if (viewUserId !== null && !UUID_RE.test(viewUserId)) return failure(400, 'INVALID_INPUT');
+    const admin = supabaseAdmin();
+    let userId = viewUserId;
+    if (!viewUserId && req.headers.has('authorization')) {
+      const token = tokenFrom(req);
+      if (!token) return failure(401, 'UNAUTHORIZED');
+      const { data, error } = await admin.auth.getUser(token);
+      if (error || !data.user) return failure(401, 'UNAUTHORIZED');
+      userId = data.user.id;
+    }
+    if (userId) {
+      const ids: string[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await admin.from('spot_favorites').select('spot_id')
+          .eq('user_id', userId).order('created_at', { ascending: false }).order('spot_id', { ascending: true }).range(offset, offset + 499);
+        if (error) return failure();
+        ids.push(...(data ?? []).map(row => row.spot_id));
+        if (!data || data.length < 500) break;
+      }
+      if (!viewUserId && req.nextUrl.searchParams.get('ids_only') === '1') return json({ ok: true, ids });
+      const spots = await publicSpots(admin, ids);
+      // A public profile must not reveal identifiers of unapproved/unavailable spots.
+      return json({ ok: true, data: spots, ids: viewUserId ? spots.map(spot => spot.id) : ids });
+    }
+    const raw = req.nextUrl.searchParams.get('ids') ?? '';
+    const ids = [...new Set(raw.split(',').map(value => value.trim()).filter(value => UUID_RE.test(value)))].slice(0, 50);
+    const spots = await publicSpots(admin, ids);
+    return json({ ok: true, data: spots, ids: spots.map(spot => spot.id) });
+  } catch { return failure(); }
+}
+
+/** Desired state is idempotent. The old {spot_id} toggle remains compatible. */
 export async function POST(req: NextRequest) {
-  const auth  = req.headers.get('Authorization');
-  const token = auth?.replace('Bearer ', '').trim() ?? '';
-  if (!token) return NextResponse.json({ ok: false, error: 'Non autenticato' }, { status: 401 });
-
-  let body: { spot_id?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: 'Body non valido' }, { status: 400 }); }
-  const { spot_id } = body;
-  if (!spot_id || !UUID_RE.test(spot_id)) return NextResponse.json({ ok: false, error: 'spot_id non valido' }, { status: 400 });
-
-  const sb = supabaseAdmin();
-
-  // Verify user
-  const { data: { user }, error: authErr } = await sb.auth.getUser(token);
-  if (authErr || !user) return NextResponse.json({ ok: false, error: 'Token non valido' }, { status: 401 });
-
-  // Check if exists
-  const { data: existing } = await sb
-    .from('spot_favorites')
-    .select('id')
-    .eq('spot_id', spot_id)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (existing) {
-    await sb.from('spot_favorites').delete().eq('id', existing.id);
-    return NextResponse.json({ ok: true, isFaved: false });
-  } else {
-    const { error } = await sb.from('spot_favorites').insert({ spot_id, user_id: user.id });
-    if (error) return NextResponse.json({ ok: false, error: 'Errore inserimento' }, { status: 500 });
-    return NextResponse.json({ ok: true, isFaved: true });
-  }
+  try {
+    const token = tokenFrom(req);
+    if (!token) return failure(401, 'UNAUTHORIZED');
+    const admin = supabaseAdmin();
+    const { data, error: authError } = await admin.auth.getUser(token);
+    if (authError || !data.user) return failure(401, 'UNAUTHORIZED');
+    const raw = await req.text();
+    if (raw.length > 1024) return failure(400, 'INVALID_INPUT');
+    let body: unknown;
+    try { body = JSON.parse(raw); } catch { return failure(400, 'INVALID_INPUT'); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return failure(400, 'INVALID_INPUT');
+    const input = body as Record<string, unknown>;
+    if (typeof input.spot_id !== 'string' || !UUID_RE.test(input.spot_id)
+      || ('saved' in input && typeof input.saved !== 'boolean')
+      || Object.keys(input).some(key => key !== 'spot_id' && key !== 'saved')) return failure(400, 'INVALID_INPUT');
+    const spotId = input.spot_id;
+    const userId = data.user.id;
+    let desired = input.saved;
+    if (desired === undefined) {
+      const { data: existing, error } = await admin.from('spot_favorites').select('id').eq('spot_id', spotId).eq('user_id', userId).maybeSingle();
+      if (error) return failure();
+      desired = !existing;
+    }
+    if (!desired) {
+      const { error } = await admin.from('spot_favorites').delete().eq('user_id', userId).eq('spot_id', spotId);
+      if (error) return failure();
+      return json({ ok: true, isFaved: false });
+    }
+    const { data: spot, error: spotError } = await admin.from('spots').select('id').eq('id', spotId).eq('status', 'approved').maybeSingle();
+    if (spotError) return failure();
+    if (!spot) return failure(404, 'SPOT_UNAVAILABLE');
+    // The live unique constraint is not named in this repository; tolerate its
+    // duplicate-row code rather than depending on a guessed constraint name.
+    const { error } = await admin.from('spot_favorites').insert({ spot_id: spotId, user_id: userId });
+    if (error && error.code !== '23505') return failure();
+    return json({ ok: true, isFaved: true });
+  } catch { return failure(); }
 }

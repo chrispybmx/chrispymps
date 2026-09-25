@@ -1,8 +1,11 @@
 'use client';
 
+import { useLanguage } from '@/components/LanguageProvider';
+
 import { useState, useRef, useEffect } from 'react';
 import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
 import DateWheels from '@/components/DateWheels';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { TracciaFunnel } from '@/lib/funnel';
 import PersonalizzaMappa from '@/components/PersonalizzaMappa';
 import { REGIONI_ITALIA } from '@/lib/constants';
@@ -18,6 +21,9 @@ interface AuthModalProps {
 type Tab = 'accedi' | 'registrati';
 
 export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSuccess }: AuthModalProps) {
+  const { text } = useLanguage();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(open, dialogRef, onClose);
   const [tab,     setTab]     = useState<Tab>(defaultTab);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -103,10 +109,10 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   }, [open, tab]);
 
   const handleSignUp = async () => {
-    if (!regUsername || !regEmail || !regPassword) { setError('Compila tutti i campi.'); traccia.current?.errore('campi vuoti'); return; }
-    if (regUsername.length < 3) { setError('Username troppo corto (min 3 caratteri).'); traccia.current?.errore('username corto'); return; }
-    if (regPassword.length < 6) { setError('Password troppo corta (min 6 caratteri).'); traccia.current?.errore('password corta'); return; }
-    if (!birthDate) { setError('Manca la data di nascita.'); traccia.current?.errore('data mancante'); return; }
+    if (!regUsername || !regEmail || !regPassword) { setError(text("Compila tutti i campi.", "Complete all fields.")); traccia.current?.errore('campi vuoti'); return; }
+    if (regUsername.length < 3) { setError(text("Username troppo corto (min 3 caratteri).", "Your username must be at least 3 characters.")); traccia.current?.errore('username corto'); return; }
+    if (regPassword.length < 6) { setError(text("Password troppo corta (min 6 caratteri).", "Your password must be at least 6 characters.")); traccia.current?.errore('password corta'); return; }
+    if (!birthDate) { setError(text("Manca la data di nascita.", "Enter your date of birth.")); traccia.current?.errore('data mancante'); return; }
     setLoading(true); setError(null);
     traccia.current?.inviato();
     try {
@@ -115,21 +121,21 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
       setDone(result);
       if (result === 'ok' && onSuccess) onSuccess();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Errore sconosciuto';
+      const msg = e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.");
       traccia.current?.errore(msg);
       setError(msg);
     } finally { setLoading(false); }
   };
 
   const handleSignIn = async () => {
-    if (!loginEmail || !loginPassword) { setError('Inserisci email e password.'); return; }
+    if (!loginEmail || !loginPassword) { setError(text("Inserisci email e password.", "Enter your email and password.")); return; }
     setLoading(true); setError(null);
     try {
       await signIn(loginEmail, loginPassword);
-      handleClose();
       if (onSuccess) onSuccess();
+      handleClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore sconosciuto');
+      setError(e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong."));
     } finally { setLoading(false); }
   };
 
@@ -143,20 +149,20 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     fontSize: 15, padding: '10px 12px', outline: 'none',
   };
   const lbl: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+    fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)',
     textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5,
   };
 
   return (
     <>
       {/* Overlay */}
-      <div onClick={handleClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99, backdropFilter: 'blur(4px)' }} />
+      <div onClick={handleClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99, backdropFilter: 'none' }} />
 
       {/* Modal */}
-      <div style={{
+      <div ref={dialogRef} className="cm-auth-dialog" role="dialog" aria-modal="true" aria-label={text("Accedi a Chrispy Maps", "Sign in to Chrispy Maps")} style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         background: 'var(--gray-800)', borderTop: '2px solid var(--orange)',
-        borderRadius: '16px 16px 0 0', zIndex: 100,
+        borderRadius: '8px 8px 0 0', zIndex: 100,
         maxHeight: '92dvh', overflowY: 'auto',
         paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
         animation: 'slideUp 0.28s ease-out',
@@ -166,9 +172,9 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 14px', borderBottom: '1px solid var(--gray-700)' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)' }}>
-            🏴 CHRISPY MAPS
+            Chrispy Maps
           </div>
-          <button onClick={handleClose} className="btn-ghost" style={{ fontSize: 20 }}>✕</button>
+          <button onClick={handleClose} aria-label={text("Chiudi accesso", "Close sign-in")} className="btn-ghost" style={{ fontSize: 20 }}>✕</button>
         </div>
 
         {/* Done: email confirmation needed */}
@@ -176,17 +182,17 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
           <div style={{ padding: '40px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 10 }}>
-              CONTROLLA LA TUA EMAIL
+              {text("CONTROLLA LA TUA EMAIL", "CHECK YOUR EMAIL")}
             </div>
             <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 24 }}>
-              Ti abbiamo inviato un link di conferma a<br />
+              {text("Ti abbiamo inviato un link di conferma a", "We sent a confirmation link to")}<br />
               <strong style={{ color: 'var(--orange)' }}>{regEmail}</strong>
             </p>
-            <p style={{ color: 'var(--gray-400)', fontSize: 13 }}>
-              Dopo la conferma potrai accedere e aggiungere spot.
+            <p style={{ color: 'var(--gray-400)', fontSize: 14 }}>
+              {text("Dopo la conferma potrai accedere e aggiungere spot.", "Once confirmed, you can sign in and add spots.")}
             </p>
             <button onClick={handleClose} className="btn-primary" style={{ marginTop: 24, width: '100%', justifyContent: 'center' }}>
-              OK, ho capito
+              {text("OK, ho capito", "Got it")}
             </button>
           </div>
         )}
@@ -216,7 +222,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                     transition: 'color 0.15s',
                   }}
                 >
-                  {t === 'accedi' ? '🔑 Accedi' : '🏴 Registrati'}
+                  {t === 'accedi' ? text("Accedi", "Sign in") : text("Registrati", "Sign up")}
                 </button>
               ))}
             </div>
@@ -226,7 +232,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
               <div style={{ display: 'grid', gap: 16 }}>
                 <div>
                   <label style={lbl}>Email</label>
-                  <input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="la-tua@email.com" onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
+                  <input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} onKeyDown={e => e.key === 'Enter' && handleSignIn()} />
                 </div>
                 <div>
                   <label style={lbl}>Password</label>
@@ -235,35 +241,35 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                 <div style={{ textAlign: 'right', marginTop: -8 }}>
                   <button
                     onClick={async () => {
-                      if (!loginEmail) { setError('Inserisci la tua email prima.'); return; }
+                      if (!loginEmail) { setError(text("Inserisci la tua email prima.", "Enter your email first.")); return; }
                       setResetting(true); setError(null);
                       try {
                         await resetPassword(loginEmail);
                         setResetSent(true);
                       } catch (e) {
-                        setError(e instanceof Error ? e.message : 'Errore invio email');
+                        setError(e instanceof Error ? e.message : text("Errore invio email", "Could not send the email."));
                       }
                       setResetting(false);
                     }}
                     disabled={resetting}
-                    style={{ background: 'none', border: 'none', color: 'var(--gray-500)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, padding: 0 }}
+                    style={{ background: 'none', border: 'none', color: 'var(--gray-500)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 14, padding: 0 }}
                   >
-                    {resetting ? '⏳...' : 'Ho dimenticato la password'}
+                    {resetting ? '⏳...' : text("Ho dimenticato la password", "Forgot your password?")}
                   </button>
                 </div>
                 {resetSent && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#00c851', background: 'rgba(0,200,81,0.08)', border: '1px solid rgba(0,200,81,0.2)', borderRadius: 4, padding: '8px 12px', textAlign: 'center' }}>
-                    📬 Email inviata! Controlla la posta per il link di reset.
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#00c851', background: 'rgba(0,200,81,0.08)', border: '1px solid rgba(0,200,81,0.2)', borderRadius: 4, padding: '8px 12px', textAlign: 'center' }}>
+                    {text("📬 Email inviata! Controlla la posta per il link di reset.", "📬 Email sent! Check your inbox for the reset link.")}
                   </div>
                 )}
                 {error && <Err msg={error} />}
                 <button onClick={handleSignIn} disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: loading ? 0.6 : 1 }}>
-                  {loading ? '⏳ Accesso...' : '🔑 ENTRA'}
+                  {loading ? text("⏳ Accesso...", "⏳ Signing in...") : text("Accedi", "Sign in")}
                 </button>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
-                  Non hai un account?{' '}
-                  <button onClick={() => { setTab('registrati'); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                    Registrati →
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', textAlign: 'center' }}>
+                  {text("Non hai un account?", "No account yet?")}{' '}
+                  <button onClick={() => { setTab('registrati'); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 14 }}>
+                    {text("Registrati →", "Sign up →")}
                   </button>
                 </p>
               </div>
@@ -280,44 +286,44 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                       style={{ ...inp, paddingLeft: 28, borderColor: usernameOk === false ? '#ff4444' : usernameOk === true ? '#00c851' : 'var(--gray-600)' }}
                       value={regUsername}
                       onChange={e => onUsernameChange(e.target.value)}
-                      placeholder="es. chrispy_bmx"
+                      placeholder={text("es. chrispy_bmx", "e.g. chrispy_bmx")}
                       maxLength={30}
                     />
                     <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>@</span>
-                    {checkingUn && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontSize: 12 }}>...</span>}
+                    {checkingUn && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontSize: 14 }}>...</span>}
                     {!checkingUn && usernameOk === true && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#00c851' }}>✓</span>}
                     {!checkingUn && usernameOk === false && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#ff4444' }}>✗</span>}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 4 }}>
-                    Solo lettere, numeri e _. Min 3 caratteri.
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', marginTop: 4 }}>
+                    {text("Solo lettere, numeri e _. Min 3 caratteri.", "Letters, numbers and _ only. At least 3 characters.")}
                   </div>
-                  {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff4444', marginTop: 2 }}>Username già in uso</div>}
+                  {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', marginTop: 2 }}>{text("Username già in uso", "Username already taken")}</div>}
                 </div>
                 <div>
                   <label style={lbl}>Email *</label>
-                  <input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="la-tua@email.com" />
+                  <input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} />
                 </div>
                 <div>
-                  <label style={lbl}>Password * (min 6 caratteri)</label>
+                  <label style={lbl}>{text("Password * (min 6 caratteri)", "Password * (at least 6 characters)")}</label>
                   <input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
                 </div>
                 {/* Data di nascita — rondelle, niente tastiera */}
                 <div>
-                  <label style={lbl}>Data di nascita *</label>
+                  <label style={lbl}>{text("Data di nascita *", "Date of birth *")}</label>
                   <DateWheels value={birthDate} onChange={setBirthDate} annoMin={1950} />
                 </div>
 
                 {/* Regione — un tap, o la si rileva */}
                 <div>
-                  <label style={lbl}>Dove giri di solito</label>
+                  <label style={lbl}>{text("Dove giri di solito", "Where you usually ride")}</label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <select
                       value={region}
                       onChange={e => setRegion(e.target.value)}
                       style={{ ...inp, flex: 1, appearance: 'none', WebkitAppearance: 'none' } as React.CSSProperties}
-                      aria-label="Regione"
+                      aria-label={text("Regione", "Region")}
                     >
-                      <option value="">Scegli la regione</option>
+                      <option value="">{text("Scegli la regione", "Choose a region")}</option>
                       {REGIONI_ITALIA.map(r => (
                         <option key={r.label} value={r.label}>{r.emoji} {r.label}</option>
                       ))}
@@ -326,7 +332,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                       type="button"
                       onClick={rilevaRegione}
                       disabled={rilevando}
-                      title="Suggerisci dalla posizione attuale"
+                      title={text("Suggerisci dalla posizione attuale", "Suggest from your current location")}
                       style={{
                         flexShrink: 0, padding: '0 14px',
                         background: 'transparent', border: '1px solid var(--gray-600)',
@@ -337,8 +343,8 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                       {rilevando ? '…' : '📍'}
                     </button>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 4, lineHeight: 1.5 }}>
-                    La regione dove giri di solito, non dove ti trovi adesso. Il 📍 la suggerisce, puoi cambiarla.
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', marginTop: 4, lineHeight: 1.5 }}>
+                    {text("La regione dove giri di solito, non dove ti trovi adesso. Il 📍 la suggerisce, puoi cambiarla.", "The region where you usually ride, which may differ from your current location. Tap 📍 for a suggestion, then change it if needed.")}
                   </div>
                 </div>
 
@@ -347,29 +353,29 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
                     <input type="checkbox" checked={newsletter} onChange={e => setNewsletter(e.target.checked)}
                       style={{ marginTop: 2, accentColor: 'var(--orange)', width: 16, height: 16, flexShrink: 0 }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', lineHeight: 1.5 }}>
-                      Voglio ricevere la newsletter BMX di Chrispy Maps
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.5 }}>
+                      {text("Voglio ricevere la newsletter BMX di Chrispy Maps", "I want to receive the Chrispy Maps BMX newsletter")}
                     </span>
                   </label>
                 )}
                 {birthDate && !puoRicevereMarketing(birthDate) && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', lineHeight: 1.6 }}>
-                    Sotto i {ETA_MINIMA_MARKETING} anni non inviamo newsletter. L'account funziona uguale.
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', lineHeight: 1.6 }}>
+                    {text(`Sotto i ${ETA_MINIMA_MARKETING} anni non inviamo newsletter. L'account funziona uguale.`, `We do not send newsletters to riders under ${ETA_MINIMA_MARKETING}. Your account still works as usual.`)}
                   </div>
                 )}
                 {error && <Err msg={error} />}
                 <button onClick={handleSignUp} disabled={loading || usernameOk === false} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: (loading || usernameOk === false) ? 0.6 : 1 }}>
-                  {loading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT'}
+                  {loading ? text("⏳ Registrazione...", "⏳ Creating account...") : text("Crea account", "Create account")}
                 </button>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6 }}>
-                  Cliccando su "Crea Account" accetti la nostra{' '}
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6 }}>
+                  {text("Cliccando su \"Crea Account\" accetti la nostra", "By clicking \"Create account\", you accept our")}{' '}
                   <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>
-                  {' '}e dichiari di avere almeno 14 anni.
+                  {' '}{text("e dichiari di avere almeno 14 anni.", "and confirm that you are at least 14 years old.")}
                 </p>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
-                  Hai già un account?{' '}
-                  <button onClick={() => { setTab('accedi'); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                    Accedi →
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', textAlign: 'center' }}>
+                  {text("Hai già un account?", "Already have an account?")}{' '}
+                  <button onClick={() => { setTab('accedi'); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 14 }}>
+                    {text("Accedi →", "Sign in →")}
                   </button>
                 </p>
               </div>
@@ -383,10 +389,9 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
 
 function Err({ msg }: { msg: string }) {
   return (
-    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '8px 12px' }}>
+    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '8px 12px' }}>
       ⚠ {msg}
     </div>
   );
 }
-
 

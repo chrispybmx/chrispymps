@@ -4,7 +4,7 @@ import { ScriviPostBtn } from '@/components/CommunityActions';
 import { supabaseServer } from '@/lib/supabase';
 
 export const metadata: Metadata = {
-  title: 'News BMX Italia — Aggiornamenti Spot e Community | Chrispy Maps',
+  title: 'News BMX Italia — Aggiornamenti Spot e Community',
   description: 'Ultime notizie, aggiornamenti spot, nuovi skatepark e contenuti dalla community BMX italiana su Chrispy Maps.',
   alternates: { canonical: 'https://maps.chrispybmx.com/news' },
   keywords: ['news BMX Italia', 'aggiornamenti skatepark', 'community BMX', 'nuovi spot BMX'],

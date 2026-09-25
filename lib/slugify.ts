@@ -35,5 +35,11 @@ export function spotSlug(name: string, city: string | undefined, id: string): st
  * "Reggio Calabria" → "reggio-calabria"
  */
 export function citySlug(city: string): string {
-  return slugify(city);
+  return city
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
+
+export const CITY_SLUG_RE = /^[a-z0-9-]{1,60}$/;

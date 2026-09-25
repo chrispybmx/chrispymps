@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Chrispy Maps',
+  title: 'Privacy Policy',
   description:
     'Informativa sulla privacy ai sensi dell\'Art. 13 GDPR per Chrispy Maps (maps.chrispybmx.com). Titolare: Christian Ceresato.',
   alternates: { canonical: 'https://maps.chrispybmx.com/privacy' },

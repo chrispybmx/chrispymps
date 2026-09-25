@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/components/LanguageProvider';
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, OSTACOLI, DIFFICOLTA, CONDIZIONI, DEBOUNCE_USERNAME_MS, GPS_TIMEOUT_MS } from '@/lib/constants';
 import { reverseGeocode } from '@/lib/geocoding';
@@ -8,6 +10,7 @@ import PhotoUpload from './PhotoUpload';
 import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
+import { createPhotoUploadBatch } from '@/lib/photo-upload-batch';
 
 interface AddSpotModalProps {
   open:        boolean;
@@ -26,6 +29,7 @@ const STEP_LABEL: Record<Step, string> = {
   dettagli:  '3 — Dettagli',
   successo:  '',
 };
+const STEP_LABEL_EN: Record<Step, string> = { posizione: '1 — Location', foto: '2 — Photos', dettagli: '3 — Details', successo: '' };
 
 const inp: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
@@ -34,7 +38,7 @@ const inp: React.CSSProperties = {
   fontSize: 15, padding: '10px 12px', outline: 'none',
 };
 const lbl: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)',
+  fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)',
   textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6,
 };
 
@@ -105,6 +109,7 @@ function LocationMapPicker({
   onPick: (lat: number, lon: number) => void;
   height?: number;
 }) {
+  const { text } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<import('leaflet').Map | null>(null);
   const markerRef    = useRef<import('leaflet').Marker | null>(null);
@@ -185,10 +190,10 @@ function LocationMapPicker({
       <div style={{
         position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
         background: 'rgba(10,10,10,0.82)', borderRadius: 4, padding: '3px 10px',
-        fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--orange)',
+        fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)',
         pointerEvents: 'none', whiteSpace: 'nowrap',
       }}>
-        {lat != null ? `📍 ${lat.toFixed(5)}, ${lon!.toFixed(5)}` : 'Clicca sulla mappa per posizionare il pin'}
+        {lat != null ? `📍 ${lat.toFixed(5)}, ${lon!.toFixed(5)}` : text("Clicca sulla mappa per posizionare il pin", "Tap the map to place the pin")}
       </div>
     </div>
   );
@@ -198,6 +203,7 @@ function LocationMapPicker({
    MAIN COMPONENT
 ══════════════════════════════════════════════ */
 export default function AddSpotModal({ open, onClose, initialLat, initialLon }: AddSpotModalProps) {
+  const { text } = useLanguage();
   const user      = useUser();
   const isLoading = user === undefined;
 
@@ -222,6 +228,17 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [photos, setPhotos] = useState<File[]>([]);
   const [preUploadedUrls, setPreUploadedUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const photoUploadBatch = useRef(createPhotoUploadBatch<File>());
+
+  useEffect(() => {
+    if (!open) {
+      photoUploadBatch.current.invalidate();
+      setPreUploadedUrls([]); setUploading(false); setUploadError(null);
+    }
+    const batch = photoUploadBatch.current;
+    return () => batch.invalidate();
+  }, [open]);
 
   /* Compress image client-side before upload (5MB → ~300KB) */
   const compressImage = useCallback(async (file: File): Promise<Blob> => {
@@ -256,31 +273,29 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   /* Pre-upload photos as soon as selected — runs in background while user fills step 3 */
   const handlePhotosChange = useCallback(async (files: File[]) => {
     setPhotos(files);
+    photoUploadBatch.current.invalidate();
+    setPreUploadedUrls([]); setUploading(false); setUploadError(null);
     if (!user || files.length === 0) return;
 
     setUploading(true);
-    try {
-      const { data: { session } } = await supabaseBrowser().auth.getSession();
-      if (!session?.access_token) return;
-
-      const urls = await Promise.all(
-        files.map(async (file) => {
-          const compressed = await compressImage(file);
-          const fd = new FormData();
-          fd.append('file', new File([compressed], file.name, { type: 'image/jpeg' }));
-          fd.append('access_token', session.access_token);
-          fd.append('purpose', 'general');
-          try {
-            const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
-            const j = await res.json();
-            return j.ok ? j.url : null;
-          } catch { return null; }
-        })
-      );
-      setPreUploadedUrls(urls.filter((u): u is string => u !== null));
-    } catch {}
-    finally { setUploading(false); }
-  }, [user, compressImage]);
+    const sessionRequest = Promise.resolve().then(() => supabaseBrowser().auth.getSession());
+    const result = await photoUploadBatch.current.run(files, async file => {
+      const { data: { session } } = await sessionRequest;
+      if (!session?.access_token) return null;
+      const compressed = await compressImage(file);
+      const fd = new FormData();
+      fd.append('file', new File([compressed], file.name, { type: 'image/jpeg' }));
+      fd.append('access_token', session.access_token);
+      fd.append('purpose', 'general');
+      const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
+      const j = await res.json();
+      return res.ok && j.ok ? j.url : null;
+    });
+    if (!result) return; // The selection changed or the dialog closed while uploading.
+    setUploading(false);
+    setPreUploadedUrls(result.urls);
+    if (result.failed) setUploadError(text("Caricamento foto incompleto. I file sono ancora selezionati: riprova oppure invia lo spot per ricaricarli tutti.", "Some photos did not upload. Your files are still selected: retry, or submit the spot to upload them all again."));
+  }, [user, compressImage, text]);
 
   /* Step 3 */
   const [name,        setName]        = useState('');
@@ -354,6 +369,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
   /* Reset */
   const handleClose = useCallback(() => {
+    photoUploadBatch.current.invalidate();
     setStep('posizione');
     setLat(initialLat ?? null); setLon(initialLon ?? null); setCity(''); setCountry(''); setCountryCode('');
     /* 'gps' e non null: il selettore di metodo non esiste più, quindi null
@@ -366,7 +382,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setName(''); setType(''); setOstacoli([]); setDescription(''); setNotes('');
     setError(null); setSubmitting(false);
     setNearbySpots([]); setNearbyDismissed(false);
-    setPreUploadedUrls([]); setUploading(false);
+    setPreUploadedUrls([]); setUploading(false); setUploadError(null);
     setAuthError(null); setAuthDone(null);
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
@@ -385,12 +401,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       trimmed.startsWith('https://goo.gl/maps/');
 
     if (isShortLink) {
-      setCoordError('⏳ Risolvo il link…');
+      setCoordError(text("⏳ Risolvo il link…", "⏳ Opening the map link…"));
       try {
         const res = await fetch(`/api/resolve-gmaps?url=${encodeURIComponent(trimmed)}`);
         const json = await res.json();
         if (!json.ok) {
-          setCoordError(json.error ?? 'Impossibile risolvere il link. Prova con le coordinate dirette.');
+          setCoordError(json.error ?? text("Impossibile risolvere il link. Prova con le coordinate dirette.", "Could not read this link. Try entering the coordinates directly."));
           return;
         }
         setCoordError(null);
@@ -398,7 +414,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         fetchCity(json.lat, json.lon);
         return;
       } catch {
-        setCoordError('Errore di rete. Prova con le coordinate dirette.');
+        setCoordError(text("Errore di rete. Prova con le coordinate dirette.", "Connection error. Try entering the coordinates directly."));
         return;
       }
     }
@@ -406,12 +422,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     // URL lungo o coordinate testuali
     const parsed = parseCoordInput(trimmed);
     if (!parsed) {
-      setCoordError('Formato non riconosciuto. Incolla il link di Google Maps o scrivi "lat, lon".');
+      setCoordError(text("Formato non riconosciuto. Incolla il link di Google Maps o scrivi \"lat, lon\".", "Format not recognised. Paste a Google Maps link or enter \"lat, lon\"."));
       return;
     }
     const { lat: pLat, lon: pLon } = parsed;
     if (pLat < -90 || pLat > 90 || pLon < -180 || pLon > 180) {
-      setCoordError('Coordinate non valide.');
+      setCoordError(text("Coordinate non valide.", "Invalid coordinates."));
       return;
     }
     setLat(pLat); setLon(pLon);
@@ -476,14 +492,14 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     try {
       const { data: { session } } = await supabaseBrowser().auth.getSession();
       if (!session?.access_token) {
-        setError('Sessione scaduta. Chiudi il modal, ricarica la pagina e riprova.');
+        setError(text("Sessione scaduta. Chiudi il modal, ricarica la pagina e riprova.", "Your sign-in expired. Close this window, reload the page and try again."));
         return;
       }
-      // If pre-upload finished, send URLs. Otherwise fallback to FormData with files.
-      const hasPreUploaded = preUploadedUrls.length > 0;
+      // Only a complete upload of this exact selection can replace its files.
+      const photoUrls = photoUploadBatch.current.urlsFor(photos);
 
       let res: Response;
-      if (hasPreUploaded) {
+      if (photoUrls) {
         // Fast path: photos already uploaded, just send URLs
         res = await fetch('/api/submit-spot', {
           method: 'POST',
@@ -497,7 +513,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             description: description || undefined,
             guardians: notes || undefined,
             difficulty: difficulty || undefined,
-            photo_urls: preUploadedUrls,
+            photo_urls: photoUrls,
             access_token: session.access_token,
           }),
         });
@@ -519,11 +535,11 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         res = await fetch('/api/submit-spot', { method: 'POST', body: fd });
       }
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error ?? 'Errore durante l\'invio.');
+      if (!json.ok) throw new Error(json.error ?? text("Errore durante l'invio.", "Could not submit the spot."));
       navigator.vibrate?.([30, 60, 30]);
       setStep('successo');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore sconosciuto. Riprova.');
+      setError(err instanceof Error ? err.message : text("Errore sconosciuto. Riprova.", "Something went wrong. Try again."));
     } finally { setSubmitting(false); }
   };
 
@@ -542,21 +558,21 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   };
 
   const handleSignUp = async () => {
-    if (!regUsername || !regEmail || !regPassword) { setAuthError('Compila tutti i campi.'); return; }
-    if (regUsername.length < 3) { setAuthError('Username min 3 caratteri.'); return; }
-    if (regPassword.length < 6) { setAuthError('Password min 6 caratteri.'); return; }
-    if (!ageConfirmed2) { setAuthError('Devi confermare di avere almeno 14 anni.'); return; }
+    if (!regUsername || !regEmail || !regPassword) { setAuthError(text("Compila tutti i campi.", "Complete all fields.")); return; }
+    if (regUsername.length < 3) { setAuthError(text("Username min 3 caratteri.", "Your username must be at least 3 characters.")); return; }
+    if (regPassword.length < 6) { setAuthError(text("Password min 6 caratteri.", "Your password must be at least 6 characters.")); return; }
+    if (!ageConfirmed2) { setAuthError(text("Devi confermare di avere almeno 14 anni.", "Confirm that you are at least 14 years old.")); return; }
     setAuthLoading(true); setAuthError(null);
     try { const result = await signUp(regEmail, regPassword, regUsername, { newsletter: newsletterOptIn2 }); setAuthDone(result); }
-    catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto'); }
+    catch (e) { setAuthError(e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.")); }
     finally { setAuthLoading(false); }
   };
 
   const handleSignIn = async () => {
-    if (!loginEmail || !loginPassword) { setAuthError('Inserisci email e password.'); return; }
+    if (!loginEmail || !loginPassword) { setAuthError(text("Inserisci email e password.", "Enter your email and password.")); return; }
     setAuthLoading(true); setAuthError(null);
     try { await signIn(loginEmail, loginPassword); }
-    catch (e) { setAuthError(e instanceof Error ? e.message : 'Errore sconosciuto'); }
+    catch (e) { setAuthError(e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.")); }
     finally { setAuthLoading(false); }
   };
 
@@ -569,13 +585,13 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   return (
     <>
       <div onClick={handleClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 69, backdropFilter: 'blur(4px)' }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 69, backdropFilter: 'none' }}
         aria-hidden />
 
-      <div role="dialog" aria-modal aria-label="Aggiungi spot BMX" style={{
+      <div role="dialog" aria-modal aria-label={text("Aggiungi spot BMX", "Add a BMX spot")} style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         background: 'var(--gray-800)', borderTop: '2px solid var(--orange)',
-        borderRadius: '16px 16px 0 0', zIndex: 70,
+        borderRadius: '8px 8px 0 0', zIndex: 70,
         maxHeight: '92dvh', overflowY: 'auto', overscrollBehavior: 'contain',
         animation: 'slideUp 0.3s ease-out',
         paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
@@ -585,14 +601,14 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 14px', borderBottom: '1px solid var(--gray-700)' }}>
           <div>
-            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--orange)', margin: 0 }}>🏴 AGGIUNGI SPOT</h2>
+            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--orange)', margin: 0 }}>{text("Aggiungi spot", "Add spot")}</h2>
             {user && step !== 'successo' && (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginTop: 2 }}>
-                {STEP_LABEL[step]}
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', marginTop: 2 }}>
+                {text(STEP_LABEL[step], STEP_LABEL_EN[step])}
               </div>
             )}
           </div>
-          <button onClick={handleClose} className="btn-ghost" aria-label="Chiudi" style={{ fontSize: 20 }}>✕</button>
+          <button onClick={handleClose} className="btn-ghost" aria-label={text("Chiudi", "Close")} style={{ fontSize: 20 }}>✕</button>
         </div>
 
         {/* Progress */}
@@ -607,7 +623,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           {/* Loading */}
           {isLoading && (
             <div style={{ textAlign: 'center', padding: '48px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-400)' }}>
-              Caricamento...
+              {text("Caricamento...", "Loading...")}
             </div>
           )}
 
@@ -616,19 +632,19 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
             authDone === 'confirm_email' ? (
               <div style={{ textAlign: 'center', padding: '32px 0 40px' }}>
                 <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 10 }}>CONTROLLA LA TUA EMAIL</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--orange)', marginBottom: 10 }}>{text("CONTROLLA LA TUA EMAIL", "CHECK YOUR EMAIL")}</div>
                 <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 24 }}>
-                  Link inviato a <strong style={{ color: 'var(--orange)' }}>{regEmail}</strong>.<br />
-                  Dopo la conferma, accedi qui.
+                  {text("Link inviato a", "Link sent to")} <strong style={{ color: 'var(--orange)' }}>{regEmail}</strong>.<br />
+                  {text("Dopo la conferma, accedi qui.", "After confirming, sign in here.")}
                 </p>
                 <button onClick={() => { setAuthDone(null); setAuthTab('accedi'); }} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                  🔑 Vai ad Accedi
+                  {text("Vai ad Accedi", "Go to sign-in")}
                 </button>
               </div>
             ) : (
               <div>
                 <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, marginBottom: 18 }}>
-                  Accedi o crea un account — il tuo <strong style={{ color: 'var(--orange)' }}>@username</strong> apparirà sullo spot.
+                  {text("Accedi o crea un account — il tuo", "Sign in or create an account — your")} <strong style={{ color: 'var(--orange)' }}>@username</strong> {text("apparirà sullo spot.", "will appear on the spot.")}
                 </p>
 
                 <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--gray-700)' }}>
@@ -640,43 +656,43 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       borderBottom: `2px solid ${authTab === t ? 'var(--orange)' : 'transparent'}`,
                       cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em',
                     }}>
-                      {t === 'accedi' ? '🔑 Accedi' : '🏴 Registrati'}
+                      {t === 'accedi' ? text("Accedi", "Sign in") : text("Registrati", "Sign up")}
                     </button>
                   ))}
                 </div>
 
                 {authTab === 'accedi' && (
                   <div style={{ display: 'grid', gap: 14 }}>
-                    <div><label style={lbl}>Email</label><input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="la-tua@email.com" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
+                    <div><label style={lbl}>Email</label><input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
                     <div><label style={lbl}>Password</label><input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
                     {authError && <ErrBox msg={authError} />}
                     {resetSent && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#00c851', background: 'rgba(0,200,81,0.08)', border: '1px solid rgba(0,200,81,0.2)', borderRadius: 6, padding: '10px 14px' }}>
-                        ✅ Email inviata! Controlla la casella e clicca il link per reimpostare la password. Scade in 1 ora.
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#00c851', background: 'rgba(0,200,81,0.08)', border: '1px solid rgba(0,200,81,0.2)', borderRadius: 6, padding: '10px 14px' }}>
+                        {text("✅ Email inviata! Controlla la casella e clicca il link per reimpostare la password. Scade in 1 ora.", "✅ Email sent! Check your inbox and follow the password reset link. It expires in 1 hour.")}
                       </div>
                     )}
                     <button onClick={handleSignIn} disabled={authLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', opacity: authLoading ? 0.6 : 1 }}>
-                      {authLoading ? '⏳ Accesso...' : '🔑 ENTRA'}
+                      {authLoading ? text("⏳ Accesso...", "⏳ Signing in...") : text("Accedi", "Sign in")}
                     </button>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', margin: 0 }}>
-                        Non hai un account?{' '}
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', margin: 0 }}>
+                        {text("Non hai un account?", "No account yet?")}{' '}
                         <button onClick={() => { setAuthTab('registrati'); setAuthError(null); }}
-                          style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                          Registrati →
+                          style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 14 }}>
+                          {text("Registrati →", "Sign up →")}
                         </button>
                       </p>
                       <button
                         disabled={resetLoading}
                         onClick={async () => {
-                          if (!loginEmail) { setAuthError('Inserisci la tua email per reimpostare la password.'); return; }
+                          if (!loginEmail) { setAuthError(text("Inserisci la tua email per reimpostare la password.", "Enter your email to reset your password.")); return; }
                           setResetLoading(true); setAuthError(null);
                           try { await resetPassword(loginEmail); setResetSent(true); }
                           catch (e: any) { setAuthError(e.message); }
                           finally { setResetLoading(false); }
                         }}
-                        style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13, textDecoration: 'underline', opacity: resetLoading ? 0.5 : 1 }}>
-                        {resetLoading ? '⏳...' : '🔑 Password dimenticata?'}
+                        style={{ background: 'none', border: 'none', color: 'var(--orange)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 14, textDecoration: 'underline', opacity: resetLoading ? 0.5 : 1 }}>
+                        {resetLoading ? '⏳...' : text("Password dimenticata?", "Forgot password?")}
                       </button>
                     </div>
                   </div>
@@ -690,22 +706,22 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                         <input type="text"
                           style={{ ...inp, paddingLeft: 28, borderColor: usernameOk === false ? '#ff4444' : usernameOk === true ? '#00c851' : 'var(--gray-600)' }}
                           value={regUsername} onChange={e => onUsernameChange(e.target.value)}
-                          placeholder="es. chrispy_bmx" maxLength={30} />
+                          placeholder={text("es. chrispy_bmx", "e.g. chrispy_bmx")} maxLength={30} />
                         <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>@</span>
-                        {checkingUn && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontSize: 12 }}>...</span>}
+                        {checkingUn && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontSize: 14 }}>...</span>}
                         {!checkingUn && usernameOk === true  && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#00c851' }}>✓</span>}
                         {!checkingUn && usernameOk === false && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#ff4444' }}>✗</span>}
                       </div>
-                      {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#ff4444', marginTop: 2 }}>Username già in uso</div>}
+                      {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', marginTop: 2 }}>{text("Username già in uso", "Username already taken")}</div>}
                     </div>
-                    <div><label style={lbl}>Email *</label><input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="la-tua@email.com" /></div>
-                    <div><label style={lbl}>Password * (min 6 caratteri)</label><input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} /></div>
+                    <div><label style={lbl}>Email *</label><input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} /></div>
+                    <div><label style={lbl}>{text("Password * (min 6 caratteri)", "Password * (at least 6 characters)")}</label><input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} /></div>
                     <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
                       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
                         <input type="checkbox" checked={ageConfirmed2} onChange={e => setAgeConfirmed2(e.target.checked)}
                           style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.5 }}>
-                          Confermo di avere almeno 14 anni <span style={{ color: 'var(--orange)' }}>*</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', lineHeight: 1.5 }}>
+                          {text("Confermo di avere almeno 14 anni", "I confirm that I am at least 14 years old")} <span style={{ color: 'var(--orange)' }}>*</span>
                         </span>
                       </label>
                     </div>
@@ -713,18 +729,18 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
                         <input type="checkbox" checked={newsletterOptIn2} onChange={e => setNewsletterOptIn2(e.target.checked)}
                           style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.5 }}>
-                          Ricevi la newsletter weekly Chrispy BMX <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>(facoltativo, disiscrizione con un click)</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', lineHeight: 1.5 }}>
+                          {text("Ricevi la newsletter weekly Chrispy BMX", "Get the weekly Chrispy BMX newsletter")} <span style={{ fontSize: 14, color: 'var(--gray-400)' }}>{text("(facoltativo, disiscrizione con un click)", "(optional, unsubscribe with one click)")}</span>
                         </span>
                       </label>
                     </div>
                     {authError && <ErrBox msg={authError} />}
                     <button onClick={handleSignUp} disabled={authLoading || usernameOk === false} className="btn-primary"
                       style={{ width: '100%', justifyContent: 'center', opacity: (authLoading || usernameOk === false) ? 0.6 : 1 }}>
-                      {authLoading ? '⏳ Registrazione...' : '🏴 CREA ACCOUNT'}
+                      {authLoading ? text("⏳ Registrazione...", "⏳ Creating account...") : text("Crea account", "Create account")}
                     </button>
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6, margin: 0 }}>
-                      Registrandoti accetti la <a href="/privacy" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>.
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6, margin: 0 }}>
+                      {text("Registrandoti accetti la", "By signing up, you accept the")} <a href="/privacy" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>.
                     </p>
                   </div>
                 )}
@@ -741,7 +757,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--orange)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, color: '#000', flexShrink: 0 }}>
                   {user.username[0].toUpperCase()}
                 </div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)' }}>@{user.username}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>@{user.username}</span>
               </div>
 
               {/* ── GPS path ── */}
@@ -759,22 +775,22 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                           borderRadius: 8, padding: '16px 14px', textAlign: 'center',
                         }}>
                           <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', marginBottom: 6 }}>
-                            Prendiamo la posizione dello spot dal tuo telefono
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', marginBottom: 6 }}>
+                            {text("Prendiamo la posizione dello spot dal tuo telefono", "Use your phone to locate the spot")}
                           </div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.6 }}>
-                            Tocca <strong style={{ color: 'var(--orange)' }}>&quot;Consenti&quot;</strong> quando appare il dialog — serve solo per piazzare il pin, non ti tracciamo.
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.6 }}>
+                            {text("Tocca", "Tap")} <strong style={{ color: 'var(--orange)' }}>{text("\"Consenti\"", "\"Allow\"")}</strong> {text("quando appare il dialog — serve solo per piazzare il pin, non ti tracciamo.", "when prompted — this only places the spot pin. We do not track you.")}
                           </div>
                         </div>
                         <button onClick={() => getGPS()} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                          📍 SONO QUI, PRENDI LA POSIZIONE
+                          {text("Usa la mia posizione", "Use my location")}
                         </button>
                       </>
                     )
                   )}
                   {gpsState === 'loading' && (
                     <div style={{ textAlign: 'center', padding: '24px 0', fontFamily: 'var(--font-mono)', color: 'var(--orange)', fontSize: 14 }}>
-                      ⏳ Rilevamento GPS in corso...
+                      {text("⏳ Rilevamento GPS in corso...", "⏳ Finding your location...")}
                     </div>
                   )}
                   {gpsState === 'denied' && (
@@ -782,48 +798,48 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       <div style={{
                         background: 'rgba(255,80,50,0.08)', border: '1px solid rgba(255,80,50,0.25)',
                         borderRadius: 8, padding: '12px 14px',
-                        fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6b6b', lineHeight: 1.7,
+                        fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff6b6b', lineHeight: 1.7,
                       }}>
-                        <div style={{ marginBottom: 6 }}>⚠ Permesso posizione bloccato.</div>
-                        <div style={{ color: 'var(--gray-300)', fontSize: 11 }}>
+                        <div style={{ marginBottom: 6 }}>{text("⚠ Permesso posizione bloccato.", "⚠ Location permission is blocked.")}</div>
+                        <div style={{ color: 'var(--gray-300)', fontSize: 14 }}>
                           <strong style={{ color: 'var(--bone)' }}>📱 iPhone/Safari:</strong><br />
-                          Impostazioni → Privacy → Servizi di localizzazione → Safari → <em>Mentre si usa l&apos;app</em>
+                          {text("Impostazioni → Privacy → Servizi di localizzazione → Safari →", "Settings → Privacy → Location Services → Safari →")} <em>{text("Mentre si usa l'app", "While Using the App")}</em>
                         </div>
-                        <div style={{ color: 'var(--gray-300)', fontSize: 11, marginTop: 6 }}>
+                        <div style={{ color: 'var(--gray-300)', fontSize: 14, marginTop: 6 }}>
                           <strong style={{ color: 'var(--bone)' }}>🤖 Android/Chrome:</strong><br />
-                          Tocca il lucchetto nella barra URL → Autorizzazioni → Posizione → Consenti
+                          {text("Tocca il lucchetto nella barra URL → Autorizzazioni → Posizione → Consenti", "Tap the site controls in the address bar → Permissions → Location → Allow")}
                         </div>
                       </div>
                       <button onClick={() => { setGpsState('idle'); getGPS(); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
-                        🔄 Riprova GPS
+                        {text("🔄 Riprova GPS", "🔄 Retry GPS")}
                       </button>
                       <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
-                        🗺️ Inserisci posizione manualmente
+                        {text("🗺️ Inserisci posizione manualmente", "🗺️ Enter location manually")}
                       </button>
                     </>
                   )}
                   {gpsState === 'timeout' && (
                     <>
-                      <ErrBox msg="GPS troppo lento. Spostati all'aperto o in un posto con segnale migliore e riprova." />
+                      <ErrBox msg={text("GPS troppo lento. Spostati all'aperto o in un posto con segnale migliore e riprova.", "GPS is taking too long. Move outdoors or somewhere with a better signal and try again.")} />
                       <button onClick={() => { getGPS(); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
-                        🔄 Riprova GPS
+                        {text("🔄 Riprova GPS", "🔄 Retry GPS")}
                       </button>
                       <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
-                        🗺️ Inserisci posizione manualmente
+                        {text("🗺️ Inserisci posizione manualmente", "🗺️ Enter location manually")}
                       </button>
                     </>
                   )}
                   {gpsState === 'error' && (
                     <>
-                      <ErrBox msg="GPS non disponibile su questo dispositivo. Usa il link Google Maps." />
+                      <ErrBox msg={text("GPS non disponibile su questo dispositivo. Usa il link Google Maps.", "GPS is unavailable on this device. Use a Google Maps link.")} />
                       <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} className="btn-secondary" style={{ justifyContent: 'center' }}>
-                        🗺️ Inserisci posizione manualmente
+                        {text("🗺️ Inserisci posizione manualmente", "🗺️ Enter location manually")}
                       </button>
                     </>
                   )}
                   {/* Via di fuga per chi NON è sullo spot — piccola, sotto tutto. */}
                   <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} style={backLink}>
-                    Non sono nello spot — inserisci le coordinate →
+                    {text("Non sono nello spot — inserisci le coordinate →", "I am not at the spot — enter coordinates →")}
                   </button>
                 </div>
               )}
@@ -832,16 +848,16 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               {locMode === 'coords' && !hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div>
-                    <label style={lbl}>Link Google Maps o coordinate</label>
+                    <label style={lbl}>{text("Link Google Maps o coordinate", "Google Maps link or coordinates")}</label>
                     <textarea
                       style={{ ...inp, resize: 'none', fontSize: 14, lineHeight: 1.5 }}
                       rows={3}
                       value={coordInput}
                       onChange={e => { setCoordInput(e.target.value); setCoordError(null); }}
-                      placeholder={"https://maps.google.com/?q=...\noppure\n45.4384, 10.9916\noppure\n45°26'18.2\"N 10°59'29.8\"E"}
+                      placeholder={text("https://maps.google.com/?q=...\noppure\n45.4384, 10.9916\noppure\n45°26'18.2\"N 10°59'29.8\"E", "https://maps.google.com/?q=...\nor\n45.4384, 10.9916\nor\n45°26'18.2\"N 10°59'29.8\"E")}
                       autoFocus
                     />
-                    {coordError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#ff6a00', marginTop: 4 }}>⚠ {coordError}</div>}
+                    {coordError && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff6a00', marginTop: 4 }}>⚠ {coordError}</div>}
                   </div>
                   <button
                     onClick={handleConfirmCoords}
@@ -849,10 +865,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     className="btn-primary"
                     style={{ width: '100%', justifyContent: 'center', opacity: !coordInput.trim() ? 0.4 : 1 }}
                   >
-                    📍 Conferma posizione
+                    {text("Conferma posizione", "Confirm location")}
                   </button>
                   <button onClick={() => { setLocMode('gps'); setCoordInput(''); setCoordError(null); }} style={backLink}>
-                    ← Sono nello spot, usa il GPS
+                    {text("← Sono nello spot, usa il GPS", "← I am at the spot, use GPS")}
                   </button>
                 </div>
               )}
@@ -862,14 +878,14 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#00c851', marginBottom: 2 }}>✅ Posizione confermata</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)' }}>{lat!.toFixed(5)}, {lon!.toFixed(5)}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#00c851', marginBottom: 2 }}>{text("✅ Posizione confermata", "✅ Location confirmed")}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)' }}>{lat!.toFixed(5)}, {lon!.toFixed(5)}</div>
                     </div>
                     <button
                       onClick={() => { setLat(null); setLon(null); setCoordInput(''); setCoordError(null); setGpsState('idle'); setLocMode('gps'); }}
-                      style={{ background: 'none', border: 'none', color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer' }}
+                      style={{ background: 'none', border: 'none', color: 'var(--orange)', fontFamily: 'var(--font-mono)', fontSize: 14, cursor: 'pointer' }}
                     >
-                      Rileva di nuovo →
+                      {text("Rileva di nuovo →", "Locate again →")}
                     </button>
                   </div>
 
@@ -884,13 +900,13 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     }}
                     style={backLink}
                   >
-                    Non sono nello spot — ho le coordinate →
+                    {text("Non sono nello spot — ho le coordinate →", "I am not at the spot — I have coordinates →")}
                   </button>
 
                   {/* ── NEARBY SPOTS — duplicate detection ── */}
                   {nearbyLoading && (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textAlign: 'center', padding: '8px 0' }}>
-                      Controllo spot vicini...
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', textAlign: 'center', padding: '8px 0' }}>
+                      {text("Controllo spot vicini...", "Checking nearby spots...")}
                     </div>
                   )}
 
@@ -901,11 +917,11 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       borderRadius: 8, overflow: 'hidden',
                     }}>
                       <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,106,0,0.15)' }}>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--orange)', marginBottom: 4 }}>
-                          ⚠️ Spot vicini trovati ({nearbySpots.length})
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', marginBottom: 4 }}>
+                          {text(`⚠️ Spot vicini trovati (${nearbySpots.length})`, `⚠️ Nearby spots found (${nearbySpots.length})`)}
                         </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', lineHeight: 1.5 }}>
-                          Ci sono già spot entro 150m. Il tuo è uno di questi o un ostacolo diverso?
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.5 }}>
+                          {text("Ci sono già spot entro 150m. Il tuo è uno di questi o un ostacolo diverso?", "There are already spots within 150 m. Is yours one of these, or a different obstacle?")}
                         </div>
                       </div>
 
@@ -932,10 +948,10 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                               </div>
                               {/* Info */}
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {ns.name}
                                 </div>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)' }}>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)' }}>
                                   {tipo.emoji} {tipo.label} · {ns.distance}m · {ns.city ?? ''}
                                 </div>
                               </div>
@@ -944,14 +960,14 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                                 href={`/map/spot/${ns.slug}`}
                                 onClick={e => e.stopPropagation()}
                                 style={{
-                                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                                  fontFamily: 'var(--font-mono)', fontSize: 14,
                                   color: 'var(--orange)', textDecoration: 'none',
                                   border: '1px solid rgba(255,106,0,0.4)',
                                   borderRadius: 4, padding: '4px 8px',
                                   whiteSpace: 'nowrap', flexShrink: 0,
                                 }}
                               >
-                                È QUESTO →
+                                {text("È QUESTO →", "THIS IS IT →")}
                               </a>
                             </div>
                           );
@@ -963,9 +979,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                         <button
                           onClick={() => setNearbyDismissed(true)}
                           className="btn-primary"
-                          style={{ flex: 1, justifyContent: 'center', fontSize: 12, padding: '10px' }}
+                          style={{ flex: 1, justifyContent: 'center', fontSize: 14, padding: '10px' }}
                         >
-                          🆕 È UN ALTRO SPOT — CONTINUA
+                          {text("🆕 È UN ALTRO SPOT — CONTINUA", "🆕 IT IS A DIFFERENT SPOT — CONTINUE")}
                         </button>
                       </div>
                     </div>
@@ -974,7 +990,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   {/* Avanti button — shown when no nearby or dismissed */}
                   {(nearbySpots.length === 0 || nearbyDismissed) && !nearbyLoading && (
                     <button onClick={() => setStep('foto')} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                      Avanti — Foto →
+                      {text("Avanti — Foto →", "Next — Photos →")}
                     </button>
                   )}
                 </div>
@@ -986,28 +1002,29 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           {!isLoading && user && step === 'foto' && (
             <div style={{ display: 'grid', gap: 20 }}>
               <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-                Carica almeno una foto dello spot. La prima sarà la cover.
+                {text("Carica almeno una foto dello spot. La prima sarà la cover.", "Upload at least one photo of the spot. The first becomes its cover.")}
                 {photos.length === 0 && (
-                  <span style={{ display: 'block', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)' }}>
-                    * Almeno una foto è obbligatoria
+                  <span style={{ display: 'block', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)' }}>
+                    {text("* Almeno una foto è obbligatoria", "* At least one photo is required")}
                   </span>
                 )}
               </p>
               <PhotoUpload photos={photos} onChange={handlePhotosChange} />
+              {uploadError && <div role="status"><ErrBox msg={uploadError} /><button type="button" className="btn-secondary" onClick={() => handlePhotosChange(photos)}>{text("Riprova caricamento foto", "Retry photo upload")}</button></div>}
               {preUploadedUrls.length > 0 && !uploading && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#00c851', textAlign: 'center' }}>
-                  ✓ {preUploadedUrls.length} foto pronte
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#00c851', textAlign: 'center' }}>
+                  {text(`✓ ${preUploadedUrls.length} foto pronte`, `✓ ${preUploadedUrls.length} photos ready`)}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setStep('posizione')} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
+                <button onClick={() => setStep('posizione')} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>{text("← Indietro", "← Back")}</button>
                 <button
                   onClick={() => setStep('dettagli')}
                   disabled={photos.length === 0}
                   className="btn-primary"
                   style={{ flex: 2, justifyContent: 'center', opacity: photos.length === 0 ? 0.4 : 1 }}
                 >
-                  Avanti — Dettagli →
+                  {text("Avanti — Dettagli →", "Next — Details →")}
                 </button>
               </div>
             </div>
@@ -1017,12 +1034,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           {!isLoading && user && step === 'dettagli' && (
             <div style={{ display: 'grid', gap: 18 }}>
               <div>
-                <label style={lbl}>Nome spot *</label>
+                <label style={lbl}>{text("Nome spot *", "Spot name *")}</label>
                 <input type="text" style={inp} value={name} onChange={e => setName(e.target.value)}
-                  placeholder='es. "Gradoni Piazza Bra"' maxLength={100} />
+                  placeholder={text("es. \"Gradoni Piazza Bra\"", "e.g. \"Piazza Bra steps\"")} maxLength={100} />
               </div>
               <div>
-                <label style={lbl}>Tipo *</label>
+                <label style={lbl}>{text("Tipo *", "Type *")}</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                   {TIPI_SPOT_SELEZIONABILI.map(([t, info]) => (
                     <button key={t} onClick={() => setType(t)} style={{
@@ -1031,7 +1048,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       borderRadius: 2,
                       background: type === t ? info.color : 'transparent',
                       color: type === t ? 'var(--black)' : 'var(--bone)',
-                      fontFamily: 'var(--font-mono)', fontSize: 13, cursor: 'pointer', transition: 'all 0.1s',
+                      fontFamily: 'var(--font-mono)', fontSize: 14, cursor: 'pointer', transition: 'all 0.1s',
                     }}>
                       {info.emoji} {info.label}
                     </button>
@@ -1039,9 +1056,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               </div>
               <div>
-                <label style={lbl}>Cosa c&apos;è (opzionale)</label>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
-                  Scegline quanti vuoi. Serve a chi cerca un rail o un bank.
+                <label style={lbl}>{text("Cosa c'è (opzionale)", "Obstacles (optional)")}</label>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', marginTop: 2 }}>
+                  {text("Scegline quanti vuoi. Serve a chi cerca un rail o un bank.", "Select all that apply. This helps riders looking for a rail or a bank.")}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                   {(Object.entries(OSTACOLI) as [Ostacolo, typeof OSTACOLI[Ostacolo]][]).map(([o, info]) => {
@@ -1058,30 +1075,30 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                           borderRadius: 2,
                           background: scelto ? 'var(--orange)' : 'transparent',
                           color: scelto ? 'var(--black)' : 'var(--bone)',
-                          fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer', transition: 'all 0.1s',
+                          fontFamily: 'var(--font-mono)', fontSize: 14, cursor: 'pointer', transition: 'all 0.1s',
                         }}
                       >
-                        {info.emoji} {info.label}
+                        {info.emoji} {text(info.label, o === 'stairs' ? 'Stairs' : o === 'curb' ? 'Curb' : info.label)}
                       </button>
                     );
                   })}
                 </div>
               </div>
               <div>
-                <label style={lbl}>Descrizione (opzionale)</label>
+                <label style={lbl}>{text("Descrizione (opzionale)", "Description (optional)")}</label>
                 <textarea style={{ ...inp, resize: 'vertical' }} rows={2}
                   value={description} onChange={e => setDescription(e.target.value)}
-                  placeholder='Es. "Gradoni in marmo, fondo buono. Presente anche un ledge."'
+                  placeholder={text("Es. \"Gradoni in marmo, fondo buono. Presente anche un ledge.\"", "e.g. \"Marble steps, good ground. There is also a ledge.\"")}
                   maxLength={500} />
               </div>
               <div>
-                <label style={lbl}>Note accesso (opzionale)</label>
+                <label style={lbl}>{text("Note accesso (opzionale)", "Access notes (optional)")}</label>
                 <input type="text" style={inp} value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder='Es. "Security alle 18" / "Sempre libero"' maxLength={200} />
+                  placeholder={text("Es. \"Security alle 18\" / \"Sempre libero\"", "e.g. \"Security after 6 pm\" / \"Always open\"")} maxLength={200} />
               </div>
 
               <div>
-                <label style={lbl}>Livello difficoltà (opzionale)</label>
+                <label style={lbl}>{text("Livello difficoltà (opzionale)", "Difficulty (optional)")}</label>
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                   {DIFFICOLTA.map(d => (
                     <button
@@ -1094,7 +1111,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                         borderRadius: 2,
                         background: difficulty === d.value ? 'rgba(255,106,0,0.15)' : 'transparent',
                         color: difficulty === d.value ? 'var(--orange)' : 'var(--bone)',
-                        fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
+                        fontFamily: 'var(--font-mono)', fontSize: 14, cursor: 'pointer',
                         textTransform: 'uppercase', letterSpacing: '0.05em',
                       }}
                     >
@@ -1104,23 +1121,24 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               </div>
 
+              {uploadError && <div role="status"><ErrBox msg={uploadError} /><button type="button" className="btn-secondary" disabled={submitting} onClick={() => handlePhotosChange(photos)}>{text("Riprova caricamento foto", "Retry photo upload")}</button></div>}
               {error && <ErrBox msg={error} />}
 
               <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', lineHeight: 1.6, margin: 0 }}>
-                  Inviando, il tuo @username, le foto e le coordinate GPS saranno visibili sulla mappa dopo approvazione. La tua email resta privata. Le foto non devono contenere volti o targhe.
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.6, margin: 0 }}>
+                  {text("Inviando, il tuo @username, le foto e le coordinate GPS saranno visibili sulla mappa dopo approvazione. La tua email resta privata. Le foto non devono contenere volti o targhe.", "After approval, your @username, photos and GPS coordinates will appear on the map. Your email stays private. Photos must not contain faces or licence plates.")}
                 </p>
               </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { setStep('foto'); setError(null); }} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>← Indietro</button>
+                <button onClick={() => { setStep('foto'); setError(null); }} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>{text("← Indietro", "← Back")}</button>
                 <button
                   onClick={handleSubmit}
                   disabled={!name.trim() || !type || submitting}
                   className="btn-primary"
                   style={{ flex: 2, justifyContent: 'center', opacity: (!name.trim() || !type || submitting) ? 0.5 : 1 }}
                 >
-                  {submitting ? '⏳ Invio...' : '🏴 INVIA SPOT'}
+                  {submitting ? text("⏳ Invio...", "⏳ Sending...") : text("Invia spot", "Submit spot")}
                 </button>
               </div>
             </div>
@@ -1130,18 +1148,18 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           {step === 'successo' && (
             <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
               <div style={{ fontSize: 60, marginBottom: 16 }}>🏴</div>
-              <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--orange)', marginBottom: 10 }}>SPOT INVIATO!</h3>
+              <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--orange)', marginBottom: 10 }}>{text("SPOT INVIATO!", "SPOT SUBMITTED!")}</h3>
               <p style={{ color: 'var(--bone)', lineHeight: 1.6, marginBottom: 12 }}>
-                Grazie <strong style={{ color: 'var(--orange)' }}>@{user?.username}</strong>!
+                {text("Grazie", "Thanks")} <strong style={{ color: 'var(--orange)' }}>@{user?.username}</strong>!
               </p>
               <div style={{ background: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.25)', borderRadius: 8, padding: '14px 16px', marginBottom: 24, textAlign: 'left' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', marginBottom: 6 }}>⏳ IN REVISIONE</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', marginBottom: 6 }}>{text("⏳ IN REVISIONE", "⏳ AWAITING REVIEW")}</div>
                 <p style={{ color: 'var(--bone)', fontSize: 14, lineHeight: 1.5, margin: 0 }}>
-                  Lo spot apparirà sulla mappa entro 24-48 ore, dopo la mia revisione manuale.
+                  {text("Lo spot apparirà sulla mappa entro 24-48 ore, dopo la mia revisione manuale.", "The spot will appear on the map within 24–48 hours, after my manual review.")}
                 </p>
               </div>
               <button onClick={handleClose} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                Torna alla mappa
+                {text("Torna alla mappa", "Back to the map")}
               </button>
             </div>
           )}
@@ -1155,13 +1173,13 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
 const backLink: React.CSSProperties = {
   background: 'none', border: 'none', color: 'var(--gray-400)',
-  fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
+  fontFamily: 'var(--font-mono)', fontSize: 14, cursor: 'pointer',
   padding: '4px 0', textAlign: 'left' as const,
 };
 
 function ErrBox({ msg }: { msg: string }) {
   return (
-    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '10px 12px' }}>
+    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '10px 12px' }}>
       ⚠ {msg}
     </div>
   );

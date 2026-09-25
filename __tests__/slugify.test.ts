@@ -58,7 +58,19 @@ describe('citySlug', () => {
     expect(citySlug('Reggio Calabria')).toBe('reggio-calabria');
   });
 
-  it("Valle d'Aosta → valle-daosta", () => {
-    expect(citySlug("Valle d'Aosta")).toBe('valle-daosta');
+  it("Valle d'Aosta mantiene i separatori della sitemap", () => {
+    expect(citySlug("Valle d'Aosta")).toBe('valle-d-aosta');
+  });
+
+  it.each([
+    ['Châtel', 'chatel'],
+    ["Sant'Angelo Lodigiano", 'sant-angelo-lodigiano'],
+    ['Sant’Angelo Lodigiano', 'sant-angelo-lodigiano'],
+    ['Châ tel', 'cha-tel'],
+    ['Reggio-Emilia', 'reggio-emilia'],
+    ['  Forlì  ', 'forli'],
+  ])('%s produce %s', (name, expected) => {
+    expect(citySlug(name)).toBe(expected);
+    expect(citySlug(name.normalize('NFD'))).toBe(expected);
   });
 });

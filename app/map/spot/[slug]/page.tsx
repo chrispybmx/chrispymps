@@ -1,12 +1,14 @@
+import SessionInviteLink from '@/components/SessionInviteLink';
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
-import { TIPI_SPOT, OSTACOLI, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
 import { getFreshness } from '@/lib/freshness';
-import type { Ostacolo, Spot } from '@/lib/types';
+import { citySlug, CITY_SLUG_RE } from '@/lib/slugify';
+import type { Spot, SpotCondition } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
 import PhotoCarousel from '@/components/PhotoCarousel';
 import SupportStrip from '@/components/SupportStrip';
@@ -15,7 +17,11 @@ import SpotContributeCTA from '@/components/SpotContributeCTA';
 import SpotLikeBtn from '@/components/SpotLikeBtn';
 import SpotPageActions, { SpotStarRating } from '@/components/SpotPageActions';
 import SpotOwnerActions from '@/components/SpotOwnerActions';
-import SpotPageShell from './SpotPageShell';
+import SpotPageShell from '@/app/map/spot/[slug]/SpotPageShell';
+import MapIcon from '@/components/MapIcon';
+import { getSiteLanguage } from '@/lib/language-server';
+import { conditionText, formatSpotDate, type SpotStatusHistoryItem } from '@/lib/spot-trust';
+import { BeforeYouRide, SpotStatusHistory } from '@/components/SpotTrustInfo';
 
 export const revalidate = 300;
 
@@ -34,7 +40,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
      supabase-js legge la stringa letterale, non un template. */
   const withSource = await supabase
     .from('spots')
-    .select('*, likes_count, spot_photos(id, url, position, credit_name, source, moderation_status)')
+    .select('*, likes_count, spot_photos(id, url, position, credit_name, source, created_at, moderation_status)')
     .eq('slug', slug)
     .eq('status', 'approved')
     .single();
@@ -44,7 +50,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
   if (withSource.error) {
     const legacy = await supabase
       .from('spots')
-      .select('*, likes_count, spot_photos(id, url, position, credit_name, moderation_status)')
+      .select('*, likes_count, spot_photos(id, url, position, credit_name, created_at, moderation_status)')
       .eq('slug', slug)
       .eq('status', 'approved')
       .single();
@@ -68,6 +74,26 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
   return data as unknown as Spot;
 });
 
+
+/** Public history only: never read auth user metadata or contact details. */
+async function getSpotHistory(spotId: string): Promise<SpotStatusHistoryItem[]> {
+  const sb = supabaseServer();
+  const { data, error } = await sb.from('spot_status_updates')
+    .select('id, user_id, condition, note, created_at')
+    .eq('spot_id', spotId).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(3);
+  if (error || !data?.length) return [];
+  const ids = [...new Set(data.map(row => row.user_id).filter((id): id is string => typeof id === 'string'))];
+  const usernames = new Map<string, string>();
+  if (ids.length) {
+    const { data: profiles } = await sb.from('profiles').select('id, username').in('id', ids);
+    for (const profile of profiles ?? []) if (profile.username) usernames.set(profile.id, profile.username);
+  }
+  return data.filter(row => Object.hasOwn(CONDIZIONI, row.condition)).map(row => ({
+    id: row.id, condition: row.condition as SpotCondition, note: row.note,
+    created_at: row.created_at, username: usernames.get(row.user_id) ?? null,
+  }));
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // notFound() QUI (oltre che nel componente) contro il soft-404: serve la 404
   // page con noindex/nofollow invece di metadata inventati su slug inesistenti.
@@ -76,18 +102,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // shell prima che notFound() possa impostare il 404 (misurato su Next 14.2.35).
   const spot = await getSpot(params.slug);
   if (!spot) notFound();
+  const language = getSiteLanguage();
+  const text = (it: string, en: string) => language === 'en' ? en : it;
   const tipo  = TIPI_SPOT[spot.type];
   const cover = spot.spot_photos?.[0]?.url;
-  const city  = spot.city ?? 'Italia';
-  const title = `${spot.name} — Spot ${tipo.label} a ${city}`;
-  const desc  = spot.description
-    ? `${spot.description} Spot ${tipo.label} a ${city}.`
-    : `${spot.name} è uno spot ${tipo.label} a ${city}. Trova foto, condizione attuale e coordinate GPS su Chrispy Maps.`;
+  const place = spot.city || spot.country || spot.country_code || '';
+  const location = place ? text(` a ${place}`, ` in ${place}`) : '';
+  const title = text(`${spot.name} · Spot ${tipo.label}${location}`, `${spot.name} · ${tipo.label} spot${location}`);
+  const desc = spot.description || text(
+    `${spot.name}, spot ${tipo.label}${location}. Foto, segnalazioni dei rider e indicazioni su Chrispy Maps.`,
+    `${spot.name}, a ${tipo.label} spot${location}. Photos, rider reports and directions on Chrispy Maps.`,
+  );
   const url   = `${APP_CONFIG.url}/map/spot/${spot.slug}`;
   return {
     title, description: desc,
     alternates: { canonical: url },
-    keywords: [`spot BMX ${city}`, `${tipo.label} ${city}`, spot.name],
+    keywords: [`BMX spot ${place}`.trim(), `${tipo.label} ${place}`.trim(), spot.name],
     openGraph: { title, description: desc, url, images: [{ url: cover ?? '/opengraph-image', width: 1200, height: 630 }], type: 'article' },
     twitter: { card: 'summary_large_image', title, description: desc, images: [cover ?? '/opengraph-image'] },
   };
@@ -97,16 +127,17 @@ export default async function SpotPage({ params, searchParams }: Props) {
   const spot = await getSpot(params.slug);
   if (!spot) notFound();
 
+  const language = getSiteLanguage();
+  const text = (it: string, en: string) => language === 'en' ? en : it;
+  const history = await getSpotHistory(spot.id);
   const tipo   = TIPI_SPOT[spot.type];
-  const cond   = CONDIZIONI[spot.condition];
   /* Il badge non dice più solo "alive": dice da quanto tempo nessuno lo conferma.
      Vedi lib/freshness.ts — la condizione da sola valeva 116 spot su 116. */
-  const fresh  = getFreshness(spot.condition, spot.condition_updated_at);
+  const fresh  = getFreshness(spot.condition, spot.condition_updated_at, new Date(), language);
   const photos = spot.spot_photos ?? [];
-  /* Filtrati contro OSTACOLI: un valore sconosciuto nel database — per esempio
-     rimasto da una versione futura o da un import — non deve far esplodere la
-     pagina con OSTACOLI[o].emoji su undefined. */
-  const ostacoli = ((spot.ostacoli ?? []) as Ostacolo[]).filter(o => OSTACOLI[o]);
+  const cityPath = spot.city ? citySlug(spot.city) : '';
+  const country = spot.country_code && /^[a-z]{2}$/i.test(spot.country_code)
+    ? spot.country_code.toUpperCase() : spot.country || undefined;
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
 
   const isYouTube = spot.youtube_url && /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(spot.youtube_url);
@@ -115,90 +146,75 @@ export default async function SpotPage({ params, searchParams }: Props) {
     : null;
 
   return (
-    <main style={{
+    <main className="cm-detail-page" style={{
       background: 'var(--black)', minHeight: '100dvh',
       maxWidth: 680, margin: '0 auto',
       paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px))',
     }}>
 
       {/* ── HEADER STICKY ── */}
-      <div style={{
+      <div className="cm-detail-header" style={{
         position: 'sticky', top: 0, zIndex: 20,
-        background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(8px)',
+        background: 'var(--black)',
         borderBottom: '1px solid var(--gray-700)',
         padding: '12px 16px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <Link
           href={searchParams.from === 'jamroma' ? '/jamroma' : '/'}
-          style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}
+          style={{ color: 'var(--gray-400)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 14 }}
         >
-          {searchParams.from === 'jamroma' ? '← Jam Roma' : '← Mappa'}
+          {searchParams.from === 'jamroma' ? '← Jam Roma' : text('← Mappa', '← Map')}
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Stato + freschezza — un solo segnale */}
-          <span title={fresh.label} style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10,
+          <span className="cm-detail-condition" title={fresh.label} style={{
+            fontFamily: 'var(--font-mono)', fontSize: 14,
             color: fresh.color, background: `${fresh.color}18`,
-            padding: '3px 8px', borderRadius: 10,
+            padding: '3px 8px', borderRadius: 6,
             border: `1px solid ${fresh.color}44`,
             display: 'inline-flex', alignItems: 'center', gap: 5,
           }}>
-            {cond.label.toUpperCase()}
-            {fresh.days !== null && (
-              <span style={{ opacity: 0.75 }}>· {fresh.short}</span>
-            )}
+            <strong>{conditionText(spot.condition, language)}</strong>
+            <span>{fresh.days !== null ? fresh.short : spot.condition === 'alive' ? text('Da confermare', 'Not confirmed') : formatSpotDate(spot.condition_updated_at, language)}</span>
           </span>
           {/* 🔥 Like + ❤️ Save — client component */}
           <SpotPageActions spotId={spot.id} initialLikes={spot.likes_count ?? 0} />
         </div>
       </div>
 
-      {/* ── TITOLO + TIPO ── */}
-      <div style={{ padding: '20px 20px 0' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tipo.color, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          {tipo.emoji} {tipo.label}
+      <div className="cm-detail-layout">
+        <div className="cm-detail-gallery">
+      {/* ── FOTO ── */}
+      {photos.length > 0 ? (
+        <PhotoCarousel language={language} photos={photos.map(p => ({ url: p.url, credit_name: p.credit_name ?? undefined, source: p.source, created_at: p.created_at }))} />
+      ) : <div className="cm-photo-empty"><MapIcon name="photo" size={32} /><p>{text('Nessuna foto disponibile', 'No photos available')}</p></div>}
+
         </div>
-        {/* Cosa c'e' sullo spot. E' l'informazione che fa decidere se vale la
-            pena prendere la bici — piu' della categoria, che dice solo dove sei. */}
-        {ostacoli.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
-            {ostacoli.map(o => (
-              <span key={o} style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11,
-                color: 'var(--bone)', background: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                padding: '3px 9px', borderRadius: 12,
-              }}>
-                {OSTACOLI[o].emoji} {OSTACOLI[o].label}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="cm-detail-content">
+      {/* ── TITOLO + TIPO ── */}
+      <div className="cm-detail-title" style={{ padding: '20px 20px 0' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: tipo.color, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <MapIcon name={spot.type} size={18} /> {tipo.label}
+        </div>
         <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 28, color: 'var(--orange)', margin: '0 0 8px', lineHeight: 1.15 }}>
           {spot.name}
         </h1>
         {spot.city && (
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginBottom: 16 }}>
-            📍 {spot.city}{spot.region ? `, ${spot.region}` : ''}
-            {spot.difficulty && <span style={{ color: '#ffce4d', marginLeft: 8 }}>⚡ {spot.difficulty.toUpperCase()}</span>}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', marginBottom: 16 }}>
+            {spot.city}{spot.region ? `, ${spot.region}` : ''}
           </div>
         )}
       </div>
 
-      {/* ── FOTO ── */}
-      {photos.length > 0 && (
-        <PhotoCarousel photos={photos.map(p => ({ url: p.url, credit_name: p.credit_name ?? undefined, source: p.source }))} />
-      )}
-
-      <div style={{ padding: '16px 20px 0' }}>
+      <div className="cm-detail-body" style={{ padding: '16px 20px 0' }}>
 
         {/* ── PUBLISHER — grande con avatar ── */}
         {spot.submitted_by_username && (
-          <Link href={`/u/${spot.submitted_by_username}`} style={{
+          <Link className="cm-detail-contributor" href={`/u/${spot.submitted_by_username}`} style={{
             textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12,
             padding: '12px 14px', marginBottom: 16,
-            background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 10,
+            background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 6,
           }}>
             <div style={{
               width: 40, height: 40, borderRadius: '50%', background: 'var(--orange)',
@@ -211,12 +227,14 @@ export default async function SpotPage({ params, searchParams }: Props) {
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--orange)', fontWeight: 700 }}>
                 @{spot.submitted_by_username}
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 1 }}>
-                ha pubblicato questo spot →
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', marginTop: 1 }}>
+                {text('ha pubblicato questo spot →', 'added this spot →')}
               </div>
             </div>
           </Link>
         )}
+
+        {spot.submitted_by_user_id && spot.submitted_by_username && <SessionInviteLink recipient={spot.submitted_by_username} spotId={spot.id} />}
 
         {/* ── DESCRIZIONE ── */}
         {spot.description && (
@@ -225,33 +243,19 @@ export default async function SpotPage({ params, searchParams }: Props) {
           </p>
         )}
 
-        {/* Meta info */}
-        {(spot.surface || spot.guardians) && (
-          <div style={{
-            padding: '12px 14px', marginBottom: 16,
-            background: 'var(--gray-800)', borderRadius: 8,
-            border: '1px solid var(--gray-700)',
-            fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', lineHeight: 1.6,
-          }}>
-            {spot.surface && <div>Superficie: <span style={{ color: 'var(--bone)' }}>{spot.surface}</span></div>}
-            {spot.guardians && <div>⚠️ {spot.guardians}</div>}
-          </div>
-        )}
-
-        {/* ── STELLE ── */}
-        <SpotStarRating spotId={spot.id} />
+        <BeforeYouRide spot={spot} language={language} />
 
         {/* ── PORTAMI QUI — grande, prominente ── */}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+        <a className="cm-directions" href={mapsUrl} target="_blank" rel="noopener noreferrer"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '14px', borderRadius: 10, marginBottom: 16,
+            padding: '14px', borderRadius: 6, marginBottom: 16,
             background: 'var(--orange)', color: '#000',
             fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
             textDecoration: 'none', letterSpacing: '0.04em',
-            boxShadow: '0 4px 20px rgba(255,106,0,0.3)',
+            boxShadow: 'none',
           }}>
-          📍 PORTAMI QUI
+          <MapIcon name="route" /> {text("Apri indicazioni", "Get directions")}
         </a>
 
         {/* ── CONDIVIDI ── */}
@@ -265,8 +269,11 @@ export default async function SpotPage({ params, searchParams }: Props) {
           spotName={spot.name}
           currentCondition={spot.condition}
           photoCount={photos.length}
+          streetViewCover={photos[0]?.source === 'streetview'}
           lastConfirmedAt={spot.condition_updated_at}
         />
+
+        <SpotStatusHistory items={history} language={language} />
 
         {/* ── AZIONI PROPRIETARIO (modifica/elimina) — visibile solo all'owner ── */}
         <SpotOwnerActions
@@ -291,11 +298,14 @@ export default async function SpotPage({ params, searchParams }: Props) {
         )}
       </div>
 
+        <div className="cm-detail-ratings"><SpotStarRating spotId={spot.id} /></div>
+        </div>
+      </div>
       {/* ── COMMENTI ── */}
       <SpotInteractions spotId={spot.id} spotSlug={spot.slug} />
 
-      <div style={{ textAlign: 'center', padding: '16px 20px 4px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-600)' }}>
-        {fresh.label.toLowerCase()} · {new Date(spot.condition_updated_at).toLocaleDateString('it-IT')}
+      <div style={{ textAlign: 'center', padding: '16px 20px 4px', fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-600)' }}>
+        {fresh.label}{formatSpotDate(spot.condition_updated_at, language) ? ` · ${formatSpotDate(spot.condition_updated_at, language)}` : ''}
       </div>
 
       <SupportStrip />
@@ -303,10 +313,10 @@ export default async function SpotPage({ params, searchParams }: Props) {
       <script type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd({
           '@context': 'https://schema.org', '@type': ['SportsActivityLocation', 'Place'],
-          name: spot.name, description: spot.description ?? `Spot ${tipo.label} a ${spot.city ?? 'Italia'}`,
+          name: spot.name, description: spot.description ?? `${tipo.label}${spot.city ? ` · ${spot.city}` : ''}`,
           url: `${APP_CONFIG.url}/map/spot/${spot.slug}`,
           geo: { '@type': 'GeoCoordinates', latitude: spot.lat, longitude: spot.lon },
-          address: { '@type': 'PostalAddress', addressLocality: spot.city ?? '', addressCountry: 'IT' },
+          address: { '@type': 'PostalAddress', addressLocality: spot.city ?? '', addressCountry: country },
           image: photos.map(p => p.url),
         })}}
       />
@@ -314,9 +324,9 @@ export default async function SpotPage({ params, searchParams }: Props) {
         dangerouslySetInnerHTML={{ __html: safeJsonLd({
           '@context': 'https://schema.org', '@type': 'BreadcrumbList',
           itemListElement: [
-            { '@type': 'ListItem', position: 1, name: 'Mappa', item: APP_CONFIG.url },
-            ...(spot.city ? [{ '@type': 'ListItem', position: 2, name: spot.city, item: `${APP_CONFIG.url}/map/${spot.city.toLowerCase().replace(/\s+/g, '-')}` }] : []),
-            { '@type': 'ListItem', position: spot.city ? 3 : 2, name: spot.name, item: `${APP_CONFIG.url}/map/spot/${spot.slug}` },
+            { '@type': 'ListItem', position: 1, name: text('Mappa', 'Map'), item: APP_CONFIG.url },
+            ...(CITY_SLUG_RE.test(cityPath) ? [{ '@type': 'ListItem', position: 2, name: spot.city, item: `${APP_CONFIG.url}/map/${cityPath}` }] : []),
+            { '@type': 'ListItem', position: CITY_SLUG_RE.test(cityPath) ? 3 : 2, name: spot.name, item: `${APP_CONFIG.url}/map/spot/${spot.slug}` },
           ],
         })}}
       />

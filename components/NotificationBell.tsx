@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { SESSION_INVITES_PUBLIC } from '@/lib/session-invites';
+import MapIcon from './MapIcon';
 
 interface Notification {
   id:         string;
@@ -34,27 +36,37 @@ export default function NotificationBell({ token }: { token: string }) {
   const [open,          setOpen]          = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread,        setUnread]        = useState(0);
+  const [sessionUnread, setSessionUnread] = useState(0);
+  const totalUnread = unread + sessionUnread;
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const res = await fetch('/api/notifications', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const j = await res.json();
-      if (j.ok) {
-        setNotifications(j.data);
-        setUnread(j.unreadCount);
-      }
-    } catch { /* silenzioso */ }
-  }, [token]);
-
-  /* Fetch all'avvio + polling ogni 60s */
   useEffect(() => {
-    fetchNotifications();
-    const id = setInterval(fetchNotifications, 60_000);
-    return () => clearInterval(id);
-  }, [fetchNotifications]);
+    let active = true;
+    let running = false;
+    let controller: AbortController | null = null;
+    setNotifications([]); setUnread(0); setSessionUnread(0);
+    const refresh = async () => {
+      if (document.hidden || running) return;
+      running = true;
+      controller = new AbortController();
+      const options = { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' as const, signal: controller.signal };
+      await Promise.allSettled([
+        fetch('/api/notifications', options).then(r => r.json()).then(j => {
+          if (active && j.ok) { setNotifications(j.data); setUnread(j.unreadCount); }
+        }),
+        ...(SESSION_INVITES_PUBLIC ? [
+          fetch('/api/session-invites', options).then(r => r.json()).then(j => {
+            if (active && j.ok) setSessionUnread(typeof j.unreadCount === 'number' ? j.unreadCount : j.data.filter((item: {unread:boolean}) => item.unread).length);
+          }),
+        ] : []),
+      ]);
+      running = false;
+    };
+    void refresh();
+    const timer = setInterval(refresh, 60_000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { active = false; controller?.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+  }, [token]);
 
   /* Chiudi toccando/cliccando fuori dal dropdown — mousedown + touchstart per mobile */
   useEffect(() => {
@@ -79,10 +91,11 @@ export default function NotificationBell({ token }: { token: string }) {
     /* Segna tutto come letto quando apre e ci sono non lette */
     if (!wasOpen && unread > 0) {
       try {
-        await fetch('/api/notifications', {
+        const response = await fetch('/api/notifications', {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (!response.ok) return;
         setUnread(0);
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       } catch { /* silenzioso */ }
@@ -96,14 +109,14 @@ export default function NotificationBell({ token }: { token: string }) {
       {/* ── Pulsante campanella ── */}
       <button
         onClick={handleOpen}
-        aria-label={`Notifiche${unread > 0 ? ` (${unread} non lette)` : ''}`}
+        aria-label={`Notifiche${totalUnread > 0 ? ` (${totalUnread} non lette)` : ''}`}
         style={{
           fontFamily: 'var(--font-mono)', fontSize: 18,
           padding: '0',
-          width: 40, height: 40,
-          border: `1px solid ${unread > 0 ? 'rgba(255,106,0,0.7)' : 'transparent'}`,
+          width: 44, height: 44,
+          border: `1px solid ${totalUnread > 0 ? 'rgba(255,106,0,0.7)' : 'transparent'}`,
           borderRadius: 4,
-          background: unread > 0 ? 'rgba(255,106,0,0.12)' : 'transparent',
+          background: totalUnread > 0 ? 'rgba(255,106,0,0.12)' : 'transparent',
           color: 'var(--bone)',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -113,8 +126,8 @@ export default function NotificationBell({ token }: { token: string }) {
           transition: 'border-color 0.2s, background 0.2s',
         } as React.CSSProperties}
       >
-        🔔
-        {unread > 0 && (
+        <MapIcon name="bell" />
+        {totalUnread > 0 && (
           <span style={{
             position: 'absolute', top: -5, right: -5,
             background: 'var(--orange)', color: '#000',
@@ -123,7 +136,7 @@ export default function NotificationBell({ token }: { token: string }) {
             textAlign: 'center', padding: '0 3px',
             fontFamily: 'var(--font-mono)',
           }}>
-            {unread > 9 ? '9+' : unread}
+            {totalUnread > 9 ? '9+' : totalUnread}
           </span>
         )}
       </button>
@@ -167,6 +180,9 @@ export default function NotificationBell({ token }: { token: string }) {
             >✕</button>
           </div>
 
+          {SESSION_INVITES_PUBLIC && <a href="/messaggi" onClick={() => setOpen(false)} style={{display:'flex',alignItems:'center',gap:10,padding:'16px',minHeight:48,color:'var(--bone)',borderBottom:'1px solid var(--gray-700)',textDecoration:'none'}}>
+            <MapIcon name="message" size={20} /><span>Inviti e messaggi{sessionUnread > 0 ? ` · ${sessionUnread} da leggere` : ''}</span>
+          </a>}
           {/* Lista */}
           {notifications.length === 0 ? (
             <div style={{

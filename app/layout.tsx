@@ -1,14 +1,13 @@
 import type { Metadata, Viewport } from 'next';
-import { VT323, Barlow_Condensed } from 'next/font/google';
+import { Barlow_Condensed } from 'next/font/google';
 import './globals.css';
 import { APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
-import VhsOverlay from '@/components/VhsOverlay';
 import { ToastProvider } from '@/components/Toast';
 import CookieBanner from '@/components/CookieBanner';
+import { LanguageProvider } from '@/components/LanguageProvider';
 
-const vt323 = VT323({ weight: '400', subsets: ['latin'], display: 'swap', variable: '--font-mono' });
-const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--font-display' });
+const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--font-brand' });
 
 export const metadata: Metadata = {
   title: {
@@ -134,10 +133,10 @@ const organizationJsonLd = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="it" className={`${vt323.variable} ${barlow.variable}`}>
+    <html lang="it" className={barlow.variable}>
       <head>
         {/* Service Worker — external file per CSP (no unsafe-inline) */}
-        <script src="/register-sw.js" defer />
+        {process.env.NODE_ENV === 'production' && <script src="/register-sw.js" defer />}
         {/* JSON-LD WebSite */}
         <script
           type="application/ld+json"
@@ -156,11 +155,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="ai-keywords" content="spot BMX Italia, skatepark Italia, park scooter Italia, mappa spot BMX, Chrispy Maps, BMX freestyle Italia, street spot BMX, bowl skate Italia" />
       </head>
       <body>
-        <ToastProvider>
-          <VhsOverlay />
+        <LanguageProvider><ToastProvider>
           {children}
           <CookieBanner />
-        </ToastProvider>
+        </ToastProvider></LanguageProvider>
       </body>
     </html>
   );

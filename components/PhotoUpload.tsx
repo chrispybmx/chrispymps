@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/components/LanguageProvider';
+
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { APP_CONFIG } from '@/lib/constants';
 import { compressImage } from '@/lib/compress-image';
@@ -14,6 +16,7 @@ const MAX_SIZE_MB = 5;
 const ACCEPTED    = 'image/*'; // let iOS convert HEIC→JPEG automatically
 
 export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.maxPhotos }: PhotoUploadProps) {
+  const { text } = useLanguage();
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef  = useRef<HTMLInputElement>(null);
   const [error,    setError]    = useState<string | null>(null);
@@ -43,19 +46,19 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
     const valid: File[] = [];
     for (const f of arr) {
       if (!f.type.startsWith('image/')) {
-        setError(`Formato non supportato: ${f.name}. Usa una foto.`);
+        setError(text(`Formato non supportato: ${f.name}. Usa una foto.`, `Unsupported format: ${f.name}. Choose a photo.`));
         continue;
       }
       const compressed = await compressImage(f);
       if (compressed.size > MAX_SIZE_MB * 1024 * 1024) {
-        setError(`${f.name} supera ${MAX_SIZE_MB}MB anche dopo compressione.`);
+        setError(text(`${f.name} supera ${MAX_SIZE_MB}MB anche dopo compressione.`, `${f.name} is still larger than ${MAX_SIZE_MB} MB after compression.`));
         continue;
       }
       valid.push(compressed);
     }
     const updated = [...photos, ...valid].slice(0, maxPhotos);
     onChange(updated);
-  }, [photos, onChange, maxPhotos]);
+  }, [photos, onChange, maxPhotos, text]);
 
   const removePhoto = useCallback((idx: number) => {
     const removed = photos[idx];
@@ -85,7 +88,7 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
               position: 'relative', width: 80, height: 80, borderRadius: 4, overflow: 'hidden',
               border: idx === 0 ? '2px solid var(--orange)' : '1px solid var(--gray-600)',
             }}>
-              <img src={getObjectUrl(file)} alt={`Foto ${idx + 1}`}
+              <img src={getObjectUrl(file)} alt={text(`Foto ${idx + 1}`, `Photo ${idx + 1}`)}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               {idx === 0 && (
                 <div style={{
@@ -98,7 +101,7 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
                 position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)',
                 border: 'none', color: '#fff', width: 20, height: 20, borderRadius: '50%',
                 cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }} aria-label={`Rimuovi foto ${idx + 1}`}>✕</button>
+              }} aria-label={text(`Rimuovi foto ${idx + 1}`, `Remove photo ${idx + 1}`)}>✕</button>
             </div>
           ))}
         </div>
@@ -129,7 +132,7 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
             >
               <span style={{ fontSize: 24 }}>📸</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: '#000', letterSpacing: '0.04em' }}>
-                SCATTA LA FOTO
+                {text("SCATTA LA FOTO", "TAKE A PHOTO")}
               </span>
             </button>
 
@@ -143,7 +146,7 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              aggiungi dalla galleria
+              {text("aggiungi dalla galleria", "add from your gallery")}
             </button>
           </div>
         ) : (
@@ -162,10 +165,10 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
           >
             <div style={{ fontSize: 28, marginBottom: 6 }}>📷</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)' }}>
-              Clicca o trascina una foto
+              {text("Clicca o trascina una foto", "Click or drop a photo here")}
             </div>
             <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>
-              {photos.length === 0 ? 'Prima foto = cover' : `${remaining} slot rimasti`}
+              {photos.length === 0 ? text("Prima foto = cover", "First photo = cover") : text(`${remaining} slot rimasti`, `${remaining} remaining`)}
               {' · '}JPG/PNG/WebP/HEIC · max {MAX_SIZE_MB}MB
             </div>
           </div>
@@ -175,13 +178,13 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
       {/* Info slot rimasti su mobile (dopo la prima foto) */}
       {isMobile && remaining > 0 && photos.length > 0 && (
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textAlign: 'center', marginTop: 6 }}>
-          {remaining} slot rimasti · max {maxPhotos} foto
+          {text(`${remaining} slot rimasti · max ${maxPhotos} foto`, `${remaining} remaining · up to ${maxPhotos} photos`)}
         </div>
       )}
 
       {remaining === 0 && (
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textAlign: 'center' }}>
-          Massimo {maxPhotos} foto raggiunto
+          {text(`Massimo ${maxPhotos} foto raggiunto`, `Maximum of ${maxPhotos} photos reached`)}
         </div>
       )}
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/components/LanguageProvider';
+
 import { useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { DISCIPLINE, ANNO_INIZIO_MINIMO, type DisciplinaKey } from '@/lib/rider-profile';
@@ -21,6 +23,7 @@ interface Props {
  * Si può saltare. Un dato mancante vale meno di un iscritto perso.
  */
 export default function PersonalizzaMappa({ username, onFinito }: Props) {
+  const { text } = useLanguage();
   const [scelte, setScelte] = useState<DisciplinaKey[]>([]);
   const [anno,   setAnno]   = useState<number | ''>('');
   const [salvando, setSalvando] = useState(false);
@@ -56,17 +59,17 @@ export default function PersonalizzaMappa({ username, onFinito }: Props) {
       <div style={{ textAlign: 'center', marginBottom: 22 }}>
         <div style={{ fontSize: 44, marginBottom: 10 }}>🏴</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--orange)', marginBottom: 6 }}>
-          Ci sei, @{username}
+          {text("Ci sei, @", "You're in, @")}{username}
         </div>
         <p style={{ color: 'var(--gray-400)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          Due cose e la mappa parla la tua lingua.
+          {text("Due cose e la mappa parla la tua lingua.", "Two quick choices to personalise your map.")}
         </p>
       </div>
 
       {/* Discipline */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-          Con cosa giri
+          {text("Con cosa giri", "What you ride")}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {DISCIPLINE.map(d => {
@@ -88,23 +91,23 @@ export default function PersonalizzaMappa({ username, onFinito }: Props) {
                   transition: 'border-color 0.12s, background 0.12s',
                 }}
               >
-                <span style={{ fontSize: 18 }}>{d.emoji}</span> {d.label}
+                <span style={{ fontSize: 18 }}>{d.emoji}</span> {text(d.label, d.key === 'altro' ? 'Other' : d.label)}
               </button>
             );
           })}
         </div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', marginTop: 6 }}>
-          Puoi sceglierne più di una.
+          {text("Puoi sceglierne più di una.", "Choose as many as you like.")}
         </div>
       </div>
 
       {/* Anno di inizio — una rondella, dato vero */}
       <div style={{ marginBottom: 26 }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-          Da che anno giri
+          {text("Da che anno giri", "What year did you start riding?")}
         </div>
         <select
-          aria-label="Anno di inizio"
+          aria-label={text("Anno di inizio", "Year you started")}
           value={anno}
           onChange={e => setAnno(e.target.value ? Number(e.target.value) : '')}
           style={{
@@ -115,7 +118,7 @@ export default function PersonalizzaMappa({ username, onFinito }: Props) {
             appearance: 'none', WebkitAppearance: 'none',
           }}
         >
-          <option value="">Scegli l&apos;anno</option>
+          <option value="">{text("Scegli l'anno", "Choose a year")}</option>
           {anni.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
       </div>
@@ -126,7 +129,7 @@ export default function PersonalizzaMappa({ username, onFinito }: Props) {
         className="btn-primary"
         style={{ width: '100%', justifyContent: 'center' }}
       >
-        {salvando ? 'Salvo…' : 'FATTO →'}
+        {salvando ? text("Salvo…", "Saving…") : text("FATTO →", "DONE →")}
       </button>
 
       <button
@@ -137,7 +140,7 @@ export default function PersonalizzaMappa({ username, onFinito }: Props) {
           cursor: 'pointer', padding: '8px',
         }}
       >
-        lo faccio dopo
+        {text("lo faccio dopo", "I'll do this later")}
       </button>
     </div>
   );
