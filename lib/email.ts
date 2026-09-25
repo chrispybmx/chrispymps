@@ -48,7 +48,7 @@ export async function sendAdminNotification(spot: Spot, contributor: Contributor
   const eContribEmail = escapeHtml(contributor.email);
   const eInstagram = escapeHtml(contributor.instagram_handle);
 
-  await resend().emails.send({
+  const { error } = await resend().emails.send({
     from:    FROM_EMAIL,
     to:      APP_CONFIG.adminEmail,
     subject: `🏴 Nuovo spot: ${eName} (${eCity})`,
@@ -96,6 +96,7 @@ export async function sendAdminNotification(spot: Spot, contributor: Contributor
 </div></body></html>
     `.trim(),
   });
+  if (error) throw new Error(`Resend admin notification: ${error.message}`);
 }
 
 // ===== EMAIL AL CONTRIBUTOR: conferma ricezione =====

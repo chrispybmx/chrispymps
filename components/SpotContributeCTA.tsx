@@ -10,10 +10,11 @@ interface Props {
   spotName: string;
   currentCondition: SpotCondition;
   photoCount: number;
+  streetViewCover?: boolean;
   lastConfirmedAt?: string;
 }
 
-export default function SpotContributeCTA({ spotId, spotName, currentCondition, photoCount, lastConfirmedAt }: Props) {
+export default function SpotContributeCTA({ spotId, spotName, currentCondition, photoCount, streetViewCover = false, lastConfirmedAt }: Props) {
   const [photoOpen, setPhotoOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
 
@@ -43,7 +44,7 @@ export default function SpotContributeCTA({ spotId, spotName, currentCondition, 
             transition: 'transform 0.1s',
           }}
         >
-          📸 {photoCount === 0 ? 'AGGIUNGI PRIMA FOTO' : 'AGGIUNGI FOTO'}
+          📸 {photoCount === 0 ? 'AGGIUNGI PRIMA FOTO' : streetViewCover ? 'FOTO DAL POSTO' : 'AGGIUNGI FOTO'}
         </button>
 
         {/* CONFIRM STATUS — secondary CTA */}
@@ -72,7 +73,7 @@ export default function SpotContributeCTA({ spotId, spotName, currentCondition, 
       </div>
 
       {/* Hint for empty spots */}
-      {photoCount === 0 && (
+      {(photoCount === 0 || streetViewCover) && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '12px 14px', marginBottom: 20,
@@ -82,9 +83,9 @@ export default function SpotContributeCTA({ spotId, spotName, currentCondition, 
         }}>
           <span style={{ fontSize: 20, flexShrink: 0 }}>📷</span>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)', lineHeight: 1.5 }}>
-            Questo spot non ha ancora foto.
+            {streetViewCover ? 'La copertina arriva da Street View.' : 'Questo spot non ha ancora foto.'}
             <br />
-            <strong style={{ color: 'var(--orange)' }}>Sii il primo a documentarlo!</strong>
+            <strong style={{ color: 'var(--orange)' }}>{streetViewCover ? 'Ci sei stato? Aggiungi una foto dal posto.' : 'Sii il primo a documentarlo!'}</strong>
           </div>
         </div>
       )}

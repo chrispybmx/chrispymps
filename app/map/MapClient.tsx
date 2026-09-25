@@ -20,6 +20,7 @@ import { miniatura } from '@/lib/immagini';
 import NearbyEventBanner from '@/components/NearbyEventBanner';
 import AuthErrorBanner from '@/components/AuthErrorBanner';
 import { findNearby } from '@/lib/nearby-radar';
+import { loadMapSpots } from '@/lib/map-spots';
 
 /* ── Haversine ── */
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -96,6 +97,8 @@ function DEFAULT_PANEL_H() {
 export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   const [spots, setSpots]    = useState<SpotMapPin[]>(initialSpots);
   const [spotsLoading, setSpotsLoading] = useState(initialSpots.length === 0);
+  const [spotsError, setSpotsError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   // Stable random seed per session — shuffle order changes per visit, not per render
   const shuffleSeed = useRef(Math.random());
@@ -103,12 +106,28 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
   // Fetch spots client-side for instant page load
   useEffect(() => {
     if (initialSpots.length > 0) return; // already have server data
-    fetch('/api/spots')
-      .then(r => r.json())
-      .then(j => { if (j.ok) setSpots(j.data ?? []); })
-      .catch(() => {})
-      .finally(() => setSpotsLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const controller = new AbortController();
+    let active = true;
+    setSpotsLoading(true);
+    setSpotsError(null);
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+
+    loadMapSpots(controller.signal)
+      .then(data => { if (active) setSpots(data); })
+      .catch(() => {
+        if (active) setSpotsError('Non riesco a caricare gli spot. Controlla la connessione e riprova.');
+      })
+      .finally(() => {
+        window.clearTimeout(timeout);
+        if (active) setSpotsLoading(false);
+      });
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [initialSpots, loadAttempt]);
   const user = useUser();
   const { toast } = useToast();
   const { isFav, toggleFav: toggleFavHook } = useFavorites();
@@ -701,7 +720,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                 RICERCA PER RAGGIO
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', marginTop: 3 }}>
-                {radiusCenter
+                {spotsLoading ? 'Caricamento spot...' : spotsError ? 'Spot non disponibili' : radiusCenter
                   ? `${spotsInRadius.length} spot nel raggio di ${radiusKm} km`
                   : 'Scegli il centro con GPS o città'}
               </div>
@@ -943,7 +962,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           color: 'var(--orange)', letterSpacing: '0.05em',
           textTransform: 'uppercase',
         }}>
-          {panelSpots.length} spot
+          {spotsLoading ? 'Caricamento...' : spotsError ? 'Ricarica spot' : `${panelSpots.length} spot`}
         </span>
       </div>
 
@@ -1032,7 +1051,20 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
           {/* Pannello scroll */}
           {panelHeight > 90 && (
             <div style={{ flex: 1, overflow: 'hidden' }}>
-              <SpotListPanel
+              {spotsLoading || spotsError ? (
+                <div role={spotsError ? 'alert' : 'status'} aria-live="polite" style={{
+                  padding: '24px 20px', minHeight: 160, overflowY: 'auto', height: '100%',
+                  fontFamily: 'var(--font-mono)', textAlign: 'center', color: 'var(--bone)',
+                }}>
+                  <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 16px' }}>
+                    {spotsError ?? 'Caricamento spot...'}
+                  </p>
+                  {spotsError && <button type="button" onClick={() => setLoadAttempt(n => n + 1)} style={{
+                    padding: '12px 20px', minHeight: 44, borderRadius: 6, border: 'none',
+                    background: 'var(--orange)', color: 'var(--black)', font: 'inherit', cursor: 'pointer',
+                  }}>Riprova</button>}
+                </div>
+              ) : <SpotListPanel
                 spots={panelSpots}
                 activeId={activeListId}
                 expandedId={expandedId}
@@ -1058,7 +1090,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
                   const added = toggleFavHook(id);
                   toast(added ? 'Aggiunto ai preferiti' : 'Rimosso dai preferiti', added ? 'success' : 'info');
                 }}
-              />
+              />}
             </div>
           )}
         </div>
@@ -1081,7 +1113,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
       <BottomNav onAddSpot={openAddSpot} onOpenAuth={() => setAuthOpen(true)} />
 
       {/* ── BENVENUTO — prima visita, una schermata sola ── */}
-      <OnboardingHints
+      {!spotsLoading && !spotsError && <OnboardingHints
         totalSpots={spots.length}
         nearbyCount={nearbyCount}
         nearest={nearestOverall ? { name: nearestOverall.spot.name, km: nearestOverall.km } : null}
@@ -1092,7 +1124,7 @@ export default function MapClient({ initialSpots, autoAdd }: MapClientProps) {
         }}
         /* Stesso percorso del tasto GPS: un solo posto che chiede la posizione. */
         onAttivaPosizione={() => setLocateTrigger(n => n + 1)}
-      />
+      />}
     </div>
   );
 }
@@ -1727,4 +1759,3 @@ function MapBtn({
     </button>
   );
 }
-

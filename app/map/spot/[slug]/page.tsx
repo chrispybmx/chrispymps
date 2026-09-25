@@ -6,6 +6,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, OSTACOLI, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
 import { getFreshness } from '@/lib/freshness';
+import { citySlug, CITY_SLUG_RE } from '@/lib/slugify';
 import type { Ostacolo, Spot } from '@/lib/types';
 import SpotInteractions from '@/components/SpotInteractions';
 import PhotoCarousel from '@/components/PhotoCarousel';
@@ -103,6 +104,9 @@ export default async function SpotPage({ params, searchParams }: Props) {
      Vedi lib/freshness.ts — la condizione da sola valeva 116 spot su 116. */
   const fresh  = getFreshness(spot.condition, spot.condition_updated_at);
   const photos = spot.spot_photos ?? [];
+  const cityPath = spot.city ? citySlug(spot.city) : '';
+  const country = spot.country_code && /^[a-z]{2}$/i.test(spot.country_code)
+    ? spot.country_code.toUpperCase() : spot.country || undefined;
   /* Filtrati contro OSTACOLI: un valore sconosciuto nel database — per esempio
      rimasto da una versione futura o da un import — non deve far esplodere la
      pagina con OSTACOLI[o].emoji su undefined. */
@@ -265,6 +269,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
           spotName={spot.name}
           currentCondition={spot.condition}
           photoCount={photos.length}
+          streetViewCover={photos[0]?.source === 'streetview'}
           lastConfirmedAt={spot.condition_updated_at}
         />
 
@@ -306,7 +311,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
           name: spot.name, description: spot.description ?? `Spot ${tipo.label} a ${spot.city ?? 'Italia'}`,
           url: `${APP_CONFIG.url}/map/spot/${spot.slug}`,
           geo: { '@type': 'GeoCoordinates', latitude: spot.lat, longitude: spot.lon },
-          address: { '@type': 'PostalAddress', addressLocality: spot.city ?? '', addressCountry: 'IT' },
+          address: { '@type': 'PostalAddress', addressLocality: spot.city ?? '', addressCountry: country },
           image: photos.map(p => p.url),
         })}}
       />
@@ -315,8 +320,8 @@ export default async function SpotPage({ params, searchParams }: Props) {
           '@context': 'https://schema.org', '@type': 'BreadcrumbList',
           itemListElement: [
             { '@type': 'ListItem', position: 1, name: 'Mappa', item: APP_CONFIG.url },
-            ...(spot.city ? [{ '@type': 'ListItem', position: 2, name: spot.city, item: `${APP_CONFIG.url}/map/${spot.city.toLowerCase().replace(/\s+/g, '-')}` }] : []),
-            { '@type': 'ListItem', position: spot.city ? 3 : 2, name: spot.name, item: `${APP_CONFIG.url}/map/spot/${spot.slug}` },
+            ...(CITY_SLUG_RE.test(cityPath) ? [{ '@type': 'ListItem', position: 2, name: spot.city, item: `${APP_CONFIG.url}/map/${cityPath}` }] : []),
+            { '@type': 'ListItem', position: CITY_SLUG_RE.test(cityPath) ? 3 : 2, name: spot.name, item: `${APP_CONFIG.url}/map/spot/${spot.slug}` },
           ],
         })}}
       />

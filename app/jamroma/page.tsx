@@ -4,7 +4,7 @@ import { safeJsonLd } from '@/lib/json-ld';
 import JamRomaClient from './JamRomaClient';
 
 export const metadata: Metadata = {
-  title: `${JAM_ROMA.title} — ${JAM_ROMA.subtitle} | Chrispy Maps`,
+  title: `${JAM_ROMA.title} — ${JAM_ROMA.subtitle}`,
   description: `${JAM_ROMA.title}: ${JAM_ROMA.subtitle}. ${JAM_ROMA.dateLabel}, ${JAM_ROMA.locationLabel}. Mappa live, spot e partecipanti.`,
   alternates: { canonical: 'https://maps.chrispybmx.com/jamroma' },
   openGraph: {

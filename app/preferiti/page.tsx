@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import PreferiteClient from './PreferiteClient';
 
 export const metadata: Metadata = {
-  title: 'I miei spot preferiti | Chrispy Maps',
+  title: 'I miei spot preferiti',
   description: 'I tuoi spot BMX, skate e scooter salvati su Chrispy Maps.',
   robots: { index: false, follow: false },
 };

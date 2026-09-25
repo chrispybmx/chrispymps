@@ -6,6 +6,7 @@ import { sendApprovalEmail } from '@/lib/email';
 import { onSpotApproved } from '@/lib/xp';
 import { submitToIndexNow } from '@/lib/indexnow';
 import { APP_CONFIG } from '@/lib/constants';
+import { citySlug } from '@/lib/slugify';
 
 /**
  * GET — NON approva piu'. Porta alla pagina di conferma.
@@ -180,11 +181,12 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
   // Invalida le pagine cachate: senza questo un nuovo spot approvato non appare
   // su mappa/home per un massimo di 5 minuti (ISR revalidate=300) e sembra che
   // l'approvazione non abbia funzionato.
-  const cityPath = spot.city ? `/map/${spot.city.toLowerCase().replace(/\s+/g, '-')}` : null;
+  const cityPath = spot.city ? `/map/${citySlug(spot.city)}` : null;
   try {
     revalidatePath(`/map/spot/${spot.slug}`);
     revalidatePath('/');
     revalidatePath('/scopri');
+    revalidatePath('/sitemap.xml');
     if (cityPath) revalidatePath(cityPath);
   } catch (e) {
     console.error('[approve] revalidate:', e);

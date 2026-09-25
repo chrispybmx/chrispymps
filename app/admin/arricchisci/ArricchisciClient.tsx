@@ -14,9 +14,10 @@ export interface SpotRow {
   description: string;
   youtube_url: string;
   cover: string | null;
+  streetViewCover: boolean;
 }
 
-type Filtro = 'da-fare' | 'senza-descrizione' | 'senza-video' | 'tutti';
+type Filtro = 'da-fare' | 'senza-descrizione' | 'senza-video' | 'streetview' | 'tutti';
 
 const MIN_DESC = 80; // sotto questa soglia la pagina resta troppo sottile per la SEO
 
@@ -41,8 +42,9 @@ export default function ArricchisciClient({ initialSpots }: { initialSpots: Spot
     switch (filtro) {
       case 'senza-descrizione': return spots.filter(s => !descOk(s));
       case 'senza-video':       return spots.filter(s => !videoOk(s));
+      case 'streetview':        return spots.filter(s => s.streetViewCover);
       case 'tutti':             return spots;
-      default:                  return spots.filter(s => !descOk(s) || !videoOk(s));
+      default:                  return spots.filter(s => !descOk(s) || !videoOk(s) || s.streetViewCover);
     }
   }, [spots, filtro]);
 
@@ -50,7 +52,8 @@ export default function ArricchisciClient({ initialSpots }: { initialSpots: Spot
     tot:       spots.length,
     senzaDesc: spots.filter(s => !descOk(s)).length,
     senzaVid:  spots.filter(s => !videoOk(s)).length,
-    completi:  spots.filter(s => descOk(s) && videoOk(s)).length,
+    streetview: spots.filter(s => s.streetViewCover).length,
+    completi:  spots.filter(s => descOk(s) && videoOk(s) && !s.streetViewCover).length,
   }), [spots]);
 
   const update = (id: string, patch: Partial<SpotRow>) => {
@@ -97,7 +100,7 @@ export default function ArricchisciClient({ initialSpots }: { initialSpots: Spot
               ✍️ ARRICCHISCI SPOT
             </h1>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)', marginTop: 3 }}>
-              descrizione + video = pagine che si posizionano su Google
+              Foto dal posto, descrizioni e video
             </div>
           </div>
           <Link href="/admin" style={{ color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 13, textDecoration: 'none' }}>
@@ -110,6 +113,7 @@ export default function ArricchisciClient({ initialSpots }: { initialSpots: Spot
           <span style={{ color: '#00c851' }}>✓ completi {stats.completi}/{stats.tot}</span>
           <span style={{ color: '#ffce4d' }}>senza descrizione {stats.senzaDesc}</span>
           <span style={{ color: '#ff6b6b' }}>senza video {stats.senzaVid}</span>
+          <span style={{ color: 'var(--orange)' }}>copertina Street View {stats.streetview}</span>
         </div>
         <div style={{ height: 3, background: 'var(--gray-700)', borderRadius: 2, overflow: 'hidden', marginBottom: 12 }}>
           <div style={{
@@ -121,9 +125,10 @@ export default function ArricchisciClient({ initialSpots }: { initialSpots: Spot
         {/* Filtri */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {([
-            ['da-fare',           `Da fare (${spots.filter(s => !descOk(s) || !videoOk(s)).length})`],
+            ['da-fare',           `Da fare (${spots.filter(s => !descOk(s) || !videoOk(s) || s.streetViewCover).length})`],
             ['senza-descrizione', `Senza descrizione (${stats.senzaDesc})`],
             ['senza-video',       `Senza video (${stats.senzaVid})`],
+            ['streetview',        `Street View (${stats.streetview})`],
             ['tutti',             `Tutti (${stats.tot})`],
           ] as [Filtro, string][]).map(([f, label]) => (
             <button key={f} onClick={() => setFiltro(f)} style={{
@@ -183,6 +188,9 @@ export default function ArricchisciClient({ initialSpots }: { initialSpots: Spot
               </div>
 
               {/* Descrizione */}
+              {s.streetViewCover && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', margin: '0 0 12px' }}>
+                Copertina da Street View. <a href={`/map/spot/${s.slug}`} style={{ color: 'inherit' }}>Aggiungi una foto dal posto</a>
+              </p>}
               <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Descrizione — com&apos;è lo spot, il fondo, cosa ci puoi fare
               </label>

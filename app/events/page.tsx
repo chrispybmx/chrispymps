@@ -5,7 +5,7 @@ import { ProponiEventoBtn } from '@/components/CommunityActions';
 import { supabaseServer } from '@/lib/supabase';
 
 export const metadata: Metadata = {
-  title: 'Eventi BMX Italia — Gare, Jam e Contest | Chrispy Maps',
+  title: 'Eventi BMX Italia — Gare, Jam e Contest',
   description: 'Gare, jam, contest e raduni BMX, skate e scooter in Italia. Calendario eventi della community su Chrispy Maps.',
   alternates: { canonical: 'https://maps.chrispybmx.com/events' },
   keywords: ['eventi BMX Italia', 'gare BMX', 'jam BMX', 'contest skate Italia', 'raduni scooter'],

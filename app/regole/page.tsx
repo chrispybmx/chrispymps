@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     'Come funziona Chrispy Maps: cosa entra in mappa, cosa no, e cosa succede quando uno spot viene rifiutato.',
   alternates: { canonical: 'https://maps.chrispybmx.com/regole' },
   openGraph: {
-    title: 'Le regole della mappa | Chrispy Maps',
+    title: 'Le regole della mappa',
     description: 'Cosa entra in mappa, cosa no, e perché.',
     url: 'https://maps.chrispybmx.com/regole',
     siteName: 'Chrispy Maps',

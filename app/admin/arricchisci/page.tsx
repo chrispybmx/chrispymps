@@ -19,7 +19,7 @@ async function getSpots(): Promise<SpotRow[]> {
   const supabase = supabaseAdmin();
   const { data } = await supabase
     .from('spots')
-    .select('id, slug, name, city, type, description, youtube_url, spot_photos(url, position)')
+    .select('id, slug, name, city, type, description, youtube_url, spot_photos(url, position, source)')
     .eq('status', 'approved')
     .order('city', { ascending: true });
 
@@ -32,6 +32,7 @@ async function getSpots(): Promise<SpotRow[]> {
     description: s.description ?? '',
     youtube_url: s.youtube_url ?? '',
     cover:       (s.spot_photos ?? []).sort((a: any, b: any) => a.position - b.position)[0]?.url ?? null,
+    streetViewCover: s.spot_photos?.[0]?.source === 'streetview',
   }));
 }
 

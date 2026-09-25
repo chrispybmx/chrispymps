@@ -63,7 +63,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!article) notFound();
 
   const url         = `${APP_CONFIG.url}/news/${article.slug}`;
-  const title       = `${article.title} | Chrispy Maps`;
+  const title       = article.title;
   const description = article.excerpt ?? `Leggi "${article.title}" su Chrispy Maps — news BMX, skate e scooter dall'Italia.`;
   const tags        = article.tags ? article.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const coverImg    = article.cover_url ?? '/opengraph-image';

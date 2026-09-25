@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { supabaseServer, supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
 import { TIPI_SPOT_TUTTI, OSTACOLI_TUTTI } from '@/lib/constants';
+import { citySlug } from '@/lib/slugify';
 
 /**
  * Invalida le pagine che mostrano uno spot. Senza questo la pagina spot (ISR,
@@ -16,7 +17,8 @@ function revalidateSpot(slug?: string | null, city?: string | null) {
     if (slug) revalidatePath(`/map/spot/${slug}`);
     revalidatePath('/');
     revalidatePath('/scopri');
-    if (city) revalidatePath(`/map/${city.toLowerCase().replace(/\s+/g, '-')}`);
+    revalidatePath('/sitemap.xml');
+    if (city) revalidatePath(`/map/${citySlug(city)}`);
   } catch (e) {
     console.error('[spots] revalidate:', e);
   }
