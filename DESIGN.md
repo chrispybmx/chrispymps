@@ -16,7 +16,7 @@ Testata con ricerca, filtri e Aggiungi spot; categorie frequenti nella seconda r
 
 ## Mappa mobile
 
-Testata compatta con marchio, ricerca e filtri. Pannello inferiore con tre stati: Mappa (ridotto), Lista e lista estesa; anche trascinabile. La selezione lascia una zona di mappa libera sopra la fotografia. La navigazione inferiore conserva le destinazioni esistenti e mette Aggiungi spot al centro. Altezza e posizione tengono conto delle aree sicure del telefono.
+Testata compatta con marchio, ricerca e filtri. Pannello inferiore con una sola maniglia etichettata «Spot in questa zona»: parte ridotto e si apre con tocco, trascinamento o tastiera. Nessun selettore Mappa/Lista/Espandi. I risultati seguono la zona della mappa; i filtri di distanza restano nel pannello Filtri. «Vicino a me» centra la posizione senza applicare un raggio implicito. La selezione lascia una zona di mappa libera sopra la fotografia. La navigazione inferiore conserva le destinazioni esistenti e mette Aggiungi spot al centro. Altezza e posizione tengono conto delle aree sicure del telefono.
 
 ## Dettaglio spot
 
@@ -50,7 +50,7 @@ Se Aggiungi spot richiede l’accesso, l’intenzione viene mantenuta fino al su
 
 ## Pulsanti con carattere
 
-I comandi principali recuperano una presenza fisica: angoli da 3 px, bordo inferiore netto e pressione verticale di 2 px. L’interlacciato resta solo su Aggiungi spot. Filtri passa a superficie arancione quando attivo. Gli stati del pannello Mappa, Lista ed Espandi hanno aree da almeno 44 px e selezione a superficie chiara, distinta dall’arancione delle azioni. Nessun nuovo effetto continuo.
+I comandi principali recuperano una presenza fisica: angoli da 3 px, bordo inferiore netto e pressione verticale di 2 px. L’interlacciato resta solo su Aggiungi spot. Filtri passa a superficie arancione quando attivo. La maniglia del pannello mobile è un unico pulsante largo quanto il pannello, alto almeno 76 px, con testo e freccia che indica apertura o chiusura. Nessun nuovo effetto continuo.
 
 ## Affidabilità dei percorsi principali
 

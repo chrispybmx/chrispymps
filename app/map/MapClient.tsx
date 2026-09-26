@@ -86,13 +86,11 @@ const topOffset_MOBILE  = 116;  // topbar only (filter bar hidden on mobile)
 const topOffset_DESKTOP = 120; // topbar + filter bar
 /** Raggio entro cui uno spot conta come "nella tua zona". */
 const NEARBY_KM       = 25;
-const PANEL_MIN       = 64;
-const PANEL_SNAP      = 140;
-const EXPANDED_CARD_H = 0; // not used — expanded cards open to 92% viewport
+const PANEL_MIN       = 76;
 function DEFAULT_PANEL_H() {
   return typeof window !== 'undefined'
-    ? Math.min(340, Math.max(220, window.innerHeight * 0.38))
-    : 260;
+    ? Math.max(200, window.innerHeight - 208)
+    : 400;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -172,55 +170,46 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
   }, [autoAdd, user]);
 
   /* ── Pannello ridimensionabile ── */
-  const [panelHeight,   setPanelHeight]   = useState<number>(320);
-  const [panelSnapping, setPanelSnapping] = useState(false); // true durante animazione snap
-  useEffect(() => { setPanelHeight(DEFAULT_PANEL_H()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const dragState  = useRef<{ startY: number; startH: number } | null>(null);
-  const didDragRef = useRef(false); // distingue tap da drag sul grip
+  const [panelHeight, setPanelHeight] = useState(PANEL_MIN);
+  const dragState = useRef<{ startY: number; startH: number } | null>(null);
+  const didDragRef = useRef(false);
 
   const snapTo = useCallback((h: number) => {
-    setPanelSnapping(true);
-    setPanelHeight(h);
-    setTimeout(() => setPanelSnapping(false), 260);
+    setPanelHeight(Math.max(PANEL_MIN, Math.min(h, DEFAULT_PANEL_H())));
   }, []);
 
-  const onDragStart = useCallback((e: React.PointerEvent) => {
+  const onDragStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    initialScrollRef.current = listScrollRef.current;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragState.current = { startY: e.clientY, startH: panelHeight };
     didDragRef.current = false;
   }, [panelHeight]);
 
-  const onDragMove = useCallback((e: React.PointerEvent) => {
+  const onDragMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     if (!dragState.current) return;
     const delta = dragState.current.startY - e.clientY;
     if (Math.abs(delta) > 6) didDragRef.current = true;
-    const newH  = Math.min(
-      Math.max(200, window.innerHeight - 196),
-      Math.max(PANEL_MIN, dragState.current.startH + delta),
-    );
-    setPanelHeight(newH);
-  }, []);
-
-  const onDragEnd = useCallback((e: React.PointerEvent) => {
-    if (!dragState.current) return;
-    const startH  = dragState.current.startH;
-    const h       = startH + (dragState.current.startY - e.clientY);
-    const wasTap  = !didDragRef.current;
-    dragState.current  = null;
-    didDragRef.current = false;
-    if (wasTap) {
-      // Tap: da chiuso apre, da espanso torna a default, altrimenti chiude.
-      // startH è l'altezza al tocco: panelHeight qui sarebbe quella del primo render.
-      if (startH <= PANEL_MIN + 10 || startH > window.innerHeight * 0.75) snapTo(DEFAULT_PANEL_H());
-      else snapTo(PANEL_MIN);
-    } else if (h < PANEL_SNAP)               snapTo(PANEL_MIN);
-    else if (h > window.innerHeight * 0.75) snapTo(Math.round(Math.max(200, window.innerHeight - 196)));
-    else                                    snapTo(DEFAULT_PANEL_H());
+    snapTo(dragState.current.startH + delta);
   }, [snapTo]);
 
-  /* ── Raggio ── dichiarati PRIMA di filtered che li usa ──
-     Il centro è sempre la posizione del rider: il raggio vive dentro
-     "Vicino a me" (chip 10/25/50 km), non più in un pannello a parte. */
+  const onDragEnd = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragState.current) return;
+    const { startY, startH } = dragState.current;
+    dragState.current = null;
+    if (!didDragRef.current) return; // The native click handles taps and keyboard activation.
+    const delta = startY - e.clientY;
+    const shouldOpen = Math.abs(delta) > 40 ? delta > 0 : startH + delta > (PANEL_MIN + DEFAULT_PANEL_H()) / 2;
+    snapTo(shouldOpen ? DEFAULT_PANEL_H() : PANEL_MIN);
+  }, [snapTo]);
+
+  const onDragCancel = useCallback(() => {
+    if (dragState.current) snapTo(dragState.current.startH);
+    dragState.current = null;
+    didDragRef.current = false;
+  }, [snapTo]);
+
+  /* Il raggio resta un filtro facoltativo. La navigazione normale segue la mappa. */
   const [radiusMode,      setRadiusMode]      = useState(false);
   const [radiusCenter,    setRadiusCenter]    = useState<{ lat: number; lon: number } | null>(null);
   const [radiusKm,        setRadiusKm]        = useState(10);
@@ -233,20 +222,6 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
      Serve a ordinare il pannello per vicinanza e a scrivere le distanze sulle card:
      senza, la prima domanda del rider («c'è qualcosa vicino a me?») resta senza risposta. */
   const [userPos, setUserPos] = useState<{ lat: number; lon: number } | null>(null);
-
-  /* ── Auto-hide bottoni mappa ── */
-  /* I bottoni si nascondono quando il pannello è alto (> 62% vh).
-     Toccando il bordo destro si rivelano per 4 secondi. */
-  const [btnsRevealed,  setBtnsRevealed] = useState(false);
-  const btnsRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const revealButtons = useCallback(() => {
-    if (btnsRevealTimerRef.current) clearTimeout(btnsRevealTimerRef.current);
-    setBtnsRevealed(true);
-    btnsRevealTimerRef.current = setTimeout(() => setBtnsRevealed(false), 4000);
-  }, []);
-  useEffect(() => () => {
-    if (btnsRevealTimerRef.current) clearTimeout(btnsRevealTimerRef.current);
-  }, []);
 
   /* ── Stile mappa (chiaro/scuro) ── */
   /* Chiara di default. Era stata messa scura per uniformarla alla UI, ma
@@ -321,6 +296,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     const check = () => {
       setIsDesktop(window.innerWidth >= 768);
       setWindowH(window.innerHeight);
+      setPanelHeight(h => Math.max(PANEL_MIN, Math.min(h, DEFAULT_PANEL_H())));
     };
     check();
     window.addEventListener('resize', check);
@@ -347,7 +323,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
         setFilterCondition(saved.condition); setFilterDifficulty(saved.difficulty); setFilterOstacolo(saved.obstacle);
         setSearchQuery(saved.search); setActiveListId(saved.selected); setExpandedId(saved.expanded);
         setInitialView(saved.view); setCurrentView(saved.view);
-        setPanelHeight(Math.min(saved.panelHeight, Math.max(200, window.innerHeight - 196)));
+        setPanelHeight(saved.panelHeight <= 90 ? PANEL_MIN : saved.expanded ? Math.min(saved.panelHeight, DEFAULT_PANEL_H()) : DEFAULT_PANEL_H());
         returnViewRef.current = saved.returnView; returnBoundsRef.current = saved.returnBounds;
         listScrollRef.current = saved.scrollTop; initialScrollRef.current = saved.scrollTop; returnScrollRef.current = saved.returnScroll;
         setVisibleCount(Math.max(32, Math.ceil(Math.max(saved.scrollTop, saved.returnScroll) / 100) + 16));
@@ -480,7 +456,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     return spots.filter(s => haversineKm(userPos.lat, userPos.lon, s.lat, s.lon) <= NEARBY_KM).length;
   }, [userPos, spots]);
 
-  const filtersActive = !!(filterType || filterRegion || filterCondition || filterDifficulty || filterOstacolo || searchQuery);
+  const filtersActive = !!(filterType || filterRegion || filterCondition || filterDifficulty || filterOstacolo || searchQuery || radiusMode);
 
   /* Pin selezionato sulla mappa (marker ingrandito + orange outline) */
   const selectedPin = useMemo(() =>
@@ -515,35 +491,41 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     // sugli spot reali della regione → zoom calibrato sui dati, non sul centro bbox
   }, []);
 
-  // Il click sulla mappa NON imposta più il centro del raggio —
-  // il centro si sceglie solo tramite GPS o selezione città nel pannello
-  const handleMapClick = useCallback((lat: number, lon: number) => {
-    /* intenzionalmente vuoto: radius center viene da GPS o city picker */
-    void lat; void lon;
-  }, []);
+  const handleMapClick = useCallback(() => {
+    setExpandedId(null); setActiveListId(null);
+    returnViewRef.current = null; returnBoundsRef.current = null;
+    initialScrollRef.current = 0;
+    snapTo(PANEL_MIN);
+  }, [snapTo]);
 
-  /* "Vicino a me": null = tutti gli spot sulla mappa, altrimenti raggio in km
-     attorno alla posizione del rider. */
   const setNearRadius = useCallback((km: number | null) => {
-    if (km === null || !userPos) { setRadiusMode(false); setRadiusCenter(null); return; }
-    setRadiusCenter(userPos);
+    const origin = userPos ?? radiusCenter;
+    if (km === null || !origin) { setRadiusMode(false); setRadiusCenter(null); return; }
+    setRadiusCenter(origin);
     setRadiusKm(km);
     setRadiusMode(true);
-  }, [userPos]);
+    setExpandedId(null); setActiveListId(null);
+    setSearchQuery(''); setFilterRegion(null);
+  }, [userPos, radiusCenter]);
 
-  /* Il tap su "Vicino a me" chiede la posizione e, appena arriva, mostra la
-     zona (NEARBY_KM): lo zoom da città del GPS da solo lascia spesso la lista
-     vuota, e "0 spot" non risponde alla domanda. */
+  // Apply the location intent only after GPS succeeds. A denial leaves the exploration intact.
   const nearPendingRef = useRef(false);
   const askNearMe = useCallback(() => {
     nearPendingRef.current = true;
     setLocateTrigger(n => n + 1);
   }, []);
-  useEffect(() => {
-    if (!userPos || !nearPendingRef.current) return;
+  const handleUserLocated = useCallback((position: { lat: number; lon: number }) => {
+    setUserPos(position);
+    if (!nearPendingRef.current) return;
     nearPendingRef.current = false;
-    setNearRadius(NEARBY_KM);
-  }, [userPos, setNearRadius]);
+    skipFilterFitRef.current = !!(searchQuery || filterRegion);
+    setRadiusMode(false); setRadiusCenter(null);
+    setSearchQuery(''); setFilterRegion(null);
+    setExpandedId(null); setActiveListId(null);
+    returnViewRef.current = null; returnBoundsRef.current = null;
+    initialScrollRef.current = 0;
+    snapTo(PANEL_MIN);
+  }, [snapTo, searchQuery, filterRegion]);
 
   /* Click su uno spot (da mappa o da lista) → espandi card + vola mappa
      Zoom 13: mostra il quartiere/zona, non solo il singolo marciapiede,
@@ -624,7 +606,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     setExpandedId(null); setActiveListId(null);
     returnViewRef.current = null; returnBoundsRef.current = null;
     initialScrollRef.current = 0;
-    snapTo(DEFAULT_PANEL_H());
+    snapTo(PANEL_MIN);
     const citySpots = spots.filter(s =>
       s.city?.trim().toLocaleLowerCase('it') === city.trim().toLocaleLowerCase('it') &&
       haversineKm(lat, lon, s.lat, s.lon) < 50 &&
@@ -648,7 +630,6 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
 
   /* Bottoni mappa: nascosti quando il pannello è alto (>62% vh) */
   const autoHidden = !isDesktop && panelHeight > windowH * 0.62;
-  const showBtns   = !autoHidden || btnsRevealed;
 
   return (
     <div className="cm-map-app" style={{ height: '100dvh', overflow: 'hidden', '--map-sheet-height': `${panelHeight}px` } as React.CSSProperties}>
@@ -672,6 +653,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
         onCitySelect={handleCitySelect}
         onSpotSelect={handleSearchSpot}
         onOpenAuth={() => setAuthOpen(true)}
+        proximity={{ activeRadius: radiusMode ? radiusKm : null, hasLocation: !!(userPos || radiusCenter), isLocating, onRadiusChange: setNearRadius, onLocate: askNearMe }}
       />
 
       {/* ── MAPPA — schermo intero sotto topbar ── */}
@@ -702,61 +684,18 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
           onLocateError={(m) => { nearPendingRef.current = false; toast(m, 'error'); }}
           onBoundsChanged={setMapBounds}
           darkMap={darkMap}
-          onUserLocated={setUserPos}
+          onUserLocated={handleUserLocated}
         />}
         {/* Toast solo quando raggio attivo e nessun centro ancora */}
         {/* RadiusToast rimosso: il centro si sceglie solo da GPS o città nel pannello */}
       </div>
 
-      {/* ── BOTTONI MAPPA — colonna destra, auto-hide ── */}
-      <div style={{
-        position: 'fixed',
-        top: topOffset + 10,
-        right: 12,
-        display: 'flex', flexDirection: 'column', gap: 8,
-        zIndex: 12,
-        opacity:   showBtns ? 1 : 0,
-        transform: showBtns ? 'translateX(0)' : 'translateX(56px)',
-        pointerEvents: showBtns ? 'all' : 'none',
-        transition: 'opacity 0.22s ease, transform 0.22s ease',
-      }}>
-        <MapBtn
-          onClick={() => setLocateTrigger(n => n + 1)}
-          disabled={isLocating}
-          title={text('Mostrami sulla mappa', 'Show my location')}
-          active={false}
-          loading={isLocating}
-        >
-          <LocateGlyph />
-        </MapBtn>
-      </div>
-
-      {/* Bordo destro — tap per rivelare i bottoni quando sono nascosti */}
-      {autoHidden && !btnsRevealed && (
-        <button
-          type="button"
-          onClick={revealButtons}
-          aria-label={text('Mostra i comandi della mappa', 'Show map controls')}
-          style={{
-            position: 'fixed', top: topOffset + 10, right: 0,
-            width: 36, height: 44, zIndex: 12, padding: 0,
-            background: 'transparent', border: 0,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          }}
-        >
-          <span style={{
-            width: 28, height: 28,
-            background: 'rgba(10,10,10,0.85)',
-            border: '1px solid rgba(255,106,0,0.5)',
-            borderRadius: '8px 0 0 8px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" strokeWidth="2" strokeLinecap="round">
-              <path d="M15 18l-6-6 6-6"/>
-            </svg>
-          </span>
+      {/* The location action stays on the map; closing the sheet makes it available again. */}
+      {!autoHidden && <div style={{ position: 'fixed', top: topOffset + 10, right: 12, zIndex: 12 }}>
+        <button type="button" className="cm-map-locate" onClick={askNearMe} disabled={isLocating}>
+          <LocateGlyph />{isLocating ? text('Localizzazione…', 'Locating…') : text('Vicino a me', 'Near me')}
         </button>
-      )}
+      </div>}
 
       {/* ── OVERLAY LISTA — galleggia sulla mappa, altezza regolabile ── */}
       <div className="map-panel-wrap" style={{
@@ -769,37 +708,30 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
         transition: 'none',
       }}>
         <div className="cm-panel-surface">
-          <div className="cm-panel-heading">
-            <div className="cm-grip" onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} aria-hidden="true"><span /></div>
-            <div><h1>{userPos ? text('Più vicini a te', 'Nearest to you') : text('Spot sulla mappa', 'Spots on the map')}</h1><p>{spotsLoading ? text('Caricamento…', 'Loading…') : spotsError ? text('Caricamento non riuscito', 'Loading failed') : `${panelSpots.length} spot${radiusMode && radiusCenter ? ` entro ${radiusKm} km` : ''}${filtersActive ? text(' · Filtri attivi', ' · Filters active') : ''}`}</p></div>
-            {!isDesktop && <div className="cm-panel-states" role="group" aria-label={text('Dimensione pannello', 'Panel size')}>
-              <button aria-pressed={panelHeight <= PANEL_MIN + 10} onClick={() => snapTo(PANEL_MIN)}>{text('Mappa', 'Map')}</button>
-              <button aria-pressed={panelHeight > PANEL_MIN + 10 && panelHeight < windowH - 210} onClick={() => snapTo(DEFAULT_PANEL_H())}>{text('Lista', 'List')}</button>
-              <button aria-pressed={panelHeight >= windowH - 210} onClick={() => snapTo(Math.max(200, windowH - 196))}>{text('Espandi', 'Expand')}</button>
-            </div>}
-          </div>
+          {isDesktop ? <div className="cm-panel-heading">
+            <div><h1>{radiusMode ? text('Spot vicino a te', 'Spots near you') : searchQuery ? text('Risultati di ricerca', 'Search results') : text('Spot in questa zona', 'Spots in this area')}</h1><p>{spotsLoading ? text('Caricamento…', 'Loading…') : spotsError ? text('Caricamento non riuscito', 'Loading failed') : `${panelSpots.length} spot${filtersActive ? text(' · Filtri attivi', ' · Filters active') : ''}`}</p></div>
+          </div> : <button
+            type="button" className="cm-sheet-toggle"
+            aria-expanded={panelHeight > PANEL_MIN + 10} aria-controls="cm-map-results"
+            aria-label={panelHeight > PANEL_MIN + 10 ? text('Chiudi il pannello e mostra la mappa', 'Close panel and show map') : expandedId ? text('Riapri lo spot selezionato', 'Reopen selected spot') : text('Mostra gli spot in questa zona', 'Show spots in this area')}
+            onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragCancel}
+            onClick={e => {
+              if (didDragRef.current && e.detail !== 0) { didDragRef.current = false; return; }
+              initialScrollRef.current = listScrollRef.current;
+              snapTo(panelHeight > PANEL_MIN + 10 ? PANEL_MIN : DEFAULT_PANEL_H());
+            }}
+          >
+            <span className="cm-sheet-grip" aria-hidden="true" />
+            <span className="cm-sheet-label"><strong>{expandedId && selectedPin ? selectedPin.name : radiusMode ? text('Spot vicino a te', 'Spots near you') : searchQuery ? text('Risultati di ricerca', 'Search results') : text('Spot in questa zona', 'Spots in this area')}</strong>
+              <span>{spotsLoading ? text('Caricamento…', 'Loading…') : spotsError ? text('Caricamento non riuscito. Apri per riprovare.', 'Loading failed. Open to retry.') : expandedId && selectedPin ? selectedPin.city : `${panelSpots.length} spot${filtersActive ? text(' · Filtri attivi', ' · Filters active') : ''}`}</span>
+            </span>
+            <svg className="cm-sheet-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+          </button>}
 
-          {/* ── VICINO A ME — la prima domanda del rider, prima della lista ── */}
-          {(isDesktop || panelHeight > 90) && !expandedId && sessionReady && !spotsLoading && !spotsError && (
-            <div className="cm-near" role="group" aria-label={text('Spot vicino a te', 'Spots near you')}>
-              {userPos
-                ? [null, 10, 25, 50].map(km => (
-                    <button key={km ?? 'all'} type="button"
-                      aria-pressed={km === null ? !radiusMode : radiusMode && radiusKm === km}
-                      onClick={() => setNearRadius(km)}>
-                      {km === null ? text('Tutti', 'All') : `${km} km`}
-                    </button>
-                  ))
-                : <button type="button" className="cm-near-locate" disabled={isLocating} onClick={askNearMe}>
-                    <LocateGlyph />{isLocating ? text('Cerco la tua posizione…', 'Finding your location…') : text('Vicino a me', 'Near me')}
-                  </button>}
-            </div>
-          )}
-
-          {favoriteError && <div role="alert" style={{padding:'10px 16px',fontSize:14,borderBottom:'1px solid var(--gray-700)'}}>{text('I preferiti non sono sincronizzati. Controlla la connessione.', 'Favorites are not synced. Check your connection.')} <button className="cm-text-button" onClick={reloadFavorites}>{text('Riprova','Try again')}</button></div>}
+          {favoriteError && (isDesktop || panelHeight > PANEL_MIN + 10) && <div role="alert" style={{padding:'10px 16px',fontSize:14,borderBottom:'1px solid var(--gray-700)'}}>{text('I preferiti non sono sincronizzati. Controlla la connessione.', 'Favorites are not synced. Check your connection.')} <button className="cm-text-button" onClick={reloadFavorites}>{text('Riprova','Try again')}</button></div>}
           {/* Pannello scroll */}
-          {(isDesktop || panelHeight > 90) && (
-            <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div id="cm-map-results" hidden={!isDesktop && panelHeight <= PANEL_MIN + 10} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} onKeyDown={e => { if (e.key === 'Escape' && !isDesktop) { initialScrollRef.current = listScrollRef.current; snapTo(PANEL_MIN); e.currentTarget.parentElement?.querySelector<HTMLButtonElement>('.cm-sheet-toggle')?.focus(); } }}>
+            {(isDesktop || panelHeight > PANEL_MIN + 10) && <>
               {!sessionReady || spotsLoading || spotsError ? (
                 <div role={spotsError ? 'alert' : 'status'} aria-live="polite" style={{
                   padding: '24px 20px', minHeight: 160, overflowY: 'auto', height: '100%',
@@ -840,15 +772,15 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
                 }}
                 isDesktop={isDesktop}
                 scrollInstantRef={scrollInstantRef}
-                onReset={() => { setSearchQuery(''); setFilterType(null); setFilterRegion(null); setFilterCondition(null); setFilterDifficulty(null); setFilterOstacolo(null); }}
+                onReset={() => { setSearchQuery(''); setFilterType(null); setFilterRegion(null); setFilterCondition(null); setFilterDifficulty(null); setFilterOstacolo(null); setNearRadius(null); }}
                 isFav={isFav}
                 onToggleFav={(e, id) => {
                   e.stopPropagation();
                   if (favoritesLoaded) toggleFavHook(id);
                 }}
               />}
+            </>}
             </div>
-          )}
         </div>
       </div>
 
@@ -963,39 +895,5 @@ function LocateGlyph() {
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
       <circle cx="12" cy="12" r="9" strokeDasharray="2 3" strokeWidth="1.2"/>
     </svg>
-  );
-}
-
-function MapBtn({
-  children, onClick, title, active = false, disabled = false, loading = false,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  title?: string;
-  active?: boolean;
-  disabled?: boolean;
-  loading?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-label={title}
-      style={{
-        width: 44, height: 44,
-        background: active ? 'var(--orange)' : 'var(--gray-800)',
-        border: `1px solid ${active ? 'var(--orange)' : 'var(--gray-600)'}`,
-        borderRadius: 6,
-        color: active ? '#000' : loading ? 'var(--orange)' : 'var(--bone)',
-        fontSize: 18, cursor: disabled ? 'default' : 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: 'none',
-        animation: loading ? 'spin-slow 1s linear infinite' : 'none',
-        flexShrink: 0,
-      } as React.CSSProperties}
-    >
-      {children}
-    </button>
   );
 }

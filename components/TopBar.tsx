@@ -13,7 +13,16 @@ import MapIcon from './MapIcon';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { useLanguage } from '@/components/LanguageProvider';
 
+interface MapProximityControls {
+  activeRadius: number | null;
+  hasLocation: boolean;
+  isLocating: boolean;
+  onRadiusChange: (km: number | null) => void;
+  onLocate: () => void;
+}
+
 interface TopBarProps {
+  proximity?: MapProximityControls;
   onSearch:          (query: string) => void;
   onFilterType:      (type: SpotType | null) => void;
   onFilterRegion:    (region: string | null) => void;
@@ -39,7 +48,7 @@ interface TopBarProps {
 export default function TopBar({
   onSearch, onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onFilterOstacolo, onAddSpot,
   activeSearch = '', activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo,
-  spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth,
+  spots, filteredCount, onCitySelect, onSpotSelect, onOpenAuth, proximity,
 }: TopBarProps) {
   const { text } = useLanguage();
   const [menuOpen,        setMenuOpen]        = useState(false);
@@ -123,7 +132,7 @@ export default function TopBar({
     onFilterType(activeType === type ? null : type);
   }, [activeType, onFilterType]);
 
-  const anyFilter = !!(activeType || activeRegion || activeCondition || activeDifficulty || activeOstacolo);
+  const anyFilter = !!(activeType || activeRegion || activeCondition || activeDifficulty || activeOstacolo || proximity?.activeRadius);
 
   const openSearch = () => {
     setQuery(activeSearch);
@@ -186,7 +195,7 @@ export default function TopBar({
         <a href="/" className="cm-wordmark" aria-label="Chrispy Maps"><strong>Chrispy</strong><span>Maps</span></a>
         <span className="cm-brand-context">BMX / Skate / Scooter</span>
         <button onClick={openSearch} className="cm-search-trigger" aria-label={text('Cerca città o spot', 'Search cities or spots')}><MapIcon name="search" /><span>{activeSearch || text('Cerca città o spot', 'Search cities or spots')}</span></button>
-        <button onClick={() => setFilterSheetOpen(true)} className="cm-filter-trigger" aria-pressed={anyFilter}><MapIcon name="filter" /><span>{text('Filtri', 'Filters')}{anyFilter ? ` · ${[activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo].filter(Boolean).length}` : ''}</span></button>
+        <button onClick={() => setFilterSheetOpen(true)} className="cm-filter-trigger" aria-pressed={anyFilter}><MapIcon name="filter" /><span>{text('Filtri', 'Filters')}{anyFilter ? ` · ${[activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo, proximity?.activeRadius].filter(Boolean).length}` : ''}</span></button>
         <div className="topbar-mobile-actions">{sessionToken && <NotificationBell token={sessionToken} />}</div>
         <button onClick={onAddSpot} className="btn-primary topbar-add-btn cm-add-spot"><MapIcon name="plus" />{text('Aggiungi spot', 'Add spot')}</button>
       </header>
@@ -206,7 +215,7 @@ export default function TopBar({
       }} className="map-filter-bar">
 
         <div className="cm-quick-filters" aria-label={text('Categorie spot', 'Spot categories')}>
-          <button onClick={() => { onSearch(''); onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); onFilterOstacolo(null); }} aria-pressed={!anyFilter && !activeSearch}>{text('Tutti gli spot', 'All spots')}</button>
+          <button onClick={() => { onSearch(''); onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); onFilterOstacolo(null); proximity?.onRadiusChange(null); }} aria-pressed={!anyFilter && !activeSearch}>{text('Tutti gli spot', 'All spots')}</button>
           {(['street','park','rail','ledge','bowl','pumptrack'] as SpotType[]).map(type => <button key={type} onClick={() => handleTypeToggle(type)} aria-pressed={activeType === type}><MapIcon name={type} size={18} />{TIPI_SPOT[type].label}</button>)}
         </div>
         {/* Bottone FILTRI */}
@@ -243,7 +252,7 @@ export default function TopBar({
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 14, fontWeight: 700, lineHeight: 1, flexShrink: 0,
             }}>
-              {[activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo].filter(Boolean).length}
+              {[activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo, proximity?.activeRadius].filter(Boolean).length}
             </span>
           )}
         </button>
@@ -274,7 +283,7 @@ export default function TopBar({
         {/* Reset tutto */}
         {anyFilter && (
           <button
-            onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); onFilterOstacolo(null); }}
+            onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); onFilterOstacolo(null); proximity?.onRadiusChange(null); }}
             style={{
               fontFamily: 'var(--font-mono)', fontSize: 14,
               padding: '0 10px', height: 36,
@@ -340,6 +349,7 @@ export default function TopBar({
           onFilterOstacolo={onFilterOstacolo}
           onClose={() => setFilterSheetOpen(false)}
           filteredCount={filteredCount ?? spots.length}
+          proximity={proximity}
         />
       )}
 
@@ -760,8 +770,9 @@ function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }
 function FilterSheet({
   activeType, activeRegion, activeCondition, activeDifficulty, activeOstacolo,
   onFilterType, onFilterRegion, onFilterCondition, onFilterDifficulty, onFilterOstacolo,
-  onClose, filteredCount,
+  onClose, filteredCount, proximity,
 }: {
+  proximity?: MapProximityControls;
   activeType: SpotType | null;
   activeRegion: string | null;
   activeCondition: SpotCondition | null;
@@ -778,7 +789,7 @@ function FilterSheet({
   const { text } = useLanguage();
   const filterRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, filterRef, onClose);
-  const hasFilters = !!(activeType || activeRegion || activeCondition || activeDifficulty || activeOstacolo);
+  const hasFilters = !!(activeType || activeRegion || activeCondition || activeDifficulty || activeOstacolo || proximity?.activeRadius);
 
   return (
     <>
@@ -812,7 +823,7 @@ function FilterSheet({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {hasFilters && (
               <button
-                onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); onFilterOstacolo(null); }}
+                onClick={() => { onFilterType(null); onFilterRegion(null); onFilterCondition(null); onFilterDifficulty(null); onFilterOstacolo(null); proximity?.onRadiusChange(null); }}
                 style={{
                   fontFamily: 'var(--font-mono)', fontSize: 14,
                   padding: '6px 12px', border: '1px solid var(--gray-600)',
@@ -924,6 +935,17 @@ function FilterSheet({
               ))}
             </div>
           </div>
+
+          {proximity && <div className="cm-radius-filter">
+            <label htmlFor="cm-radius">{text('Distanza dalla tua posizione', 'Distance from your location')}</label>
+            <select id="cm-radius" value={proximity.activeRadius ?? ''} onChange={e => proximity.onRadiusChange(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">{text('Nessun limite', 'No limit')}</option>
+              {[10, 25, 50].map(km => <option key={km} value={km} disabled={!proximity.hasLocation}>{text(`Entro ${km} km`, `Within ${km} km`)}</option>)}
+            </select>
+            {proximity.hasLocation
+              ? <p>{text('Facoltativo. Distanza in linea d’aria.', 'Optional. Straight-line distance.')}</p>
+              : <button type="button" className="cm-text-button" disabled={proximity.isLocating} onClick={proximity.onLocate}>{proximity.isLocating ? text('Localizzazione…', 'Locating…') : text('Usa la mia posizione', 'Use my location')}</button>}
+          </div>}
 
           {/* REGIONE */}
           <div style={{ marginBottom: 24 }}>
