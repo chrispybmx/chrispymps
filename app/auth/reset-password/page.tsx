@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
@@ -11,20 +12,24 @@ export default function ResetPasswordPage() {
   const [loading,   setLoading]   = useState(false);
   const [done,      setDone]      = useState(false);
   const [error,     setError]     = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
   const [ready,     setReady]     = useState(false);
 
   // Supabase risolve automaticamente il token dall'URL (hash o query param)
   useEffect(() => {
     const sb = supabaseBrowser();
+    let active = true;
     // Ascolta il cambio di sessione — quando Supabase processa il link di reset
     const { data: { subscription } } = sb.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true);
+      if (active && event === 'PASSWORD_RECOVERY') { setReady(true); setChecked(true); }
     });
     // Controlla se c'è già una sessione recovery attiva
     sb.auth.getSession().then(({ data }) => {
+      if (!active) return;
       if (data.session) setReady(true);
-    });
-    return () => subscription.unsubscribe();
+      setChecked(true);
+    }).catch(() => { if (active) setChecked(true); });
+    return () => { active = false; subscription.unsubscribe(); };
   }, []);
 
   const handleReset = async () => {
@@ -73,7 +78,10 @@ export default function ResetPasswordPage() {
           </div>
         ) : !ready ? (
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', textAlign: 'center', padding: '20px 0' }}>
-            ⏳ Verifica link in corso…
+            {checked ? <div role="alert">
+              <p>Il link non è valido o è scaduto. Richiedi un nuovo link da “Ho dimenticato la password” nella schermata di accesso.</p>
+              <Link href="/map" style={{ display: 'inline-block', padding: '14px 0', color: 'var(--orange)' }}>Torna alla mappa</Link>
+            </div> : <span role="status">Verifica link in corso…</span>}
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 16 }}>

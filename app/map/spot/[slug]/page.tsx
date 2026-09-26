@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
+import { spotStructuredData } from '@/lib/seo';
 import { safeJsonLd } from '@/lib/json-ld';
 import { getFreshness } from '@/lib/freshness';
 import { citySlug, CITY_SLUG_RE } from '@/lib/slugify';
@@ -118,7 +119,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title, description: desc,
     alternates: { canonical: url },
     keywords: [`BMX spot ${place}`.trim(), `${tipo.label} ${place}`.trim(), spot.name],
-    openGraph: { title, description: desc, url, images: [{ url: cover ?? '/opengraph-image', width: 1200, height: 630 }], type: 'article' },
+    openGraph: { title, description: desc, url, images: cover ? [{ url: cover, alt: spot.name }] : [{ url: '/opengraph-image', width: 1200, height: 630 }], type: 'article' },
     twitter: { card: 'summary_large_image', title, description: desc, images: [cover ?? '/opengraph-image'] },
   };
 }
@@ -136,8 +137,6 @@ export default async function SpotPage({ params, searchParams }: Props) {
   const fresh  = getFreshness(spot.condition, spot.condition_updated_at, new Date(), language);
   const photos = spot.spot_photos ?? [];
   const cityPath = spot.city ? citySlug(spot.city) : '';
-  const country = spot.country_code && /^[a-z]{2}$/i.test(spot.country_code)
-    ? spot.country_code.toUpperCase() : spot.country || undefined;
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
 
   const isYouTube = spot.youtube_url && /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(spot.youtube_url);
@@ -202,7 +201,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
         </h1>
         {spot.city && (
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', marginBottom: 16 }}>
-            {spot.city}{spot.region ? `, ${spot.region}` : ''}
+            {CITY_SLUG_RE.test(cityPath) ? <Link href={`/map/${cityPath}`} style={{ color: 'inherit', textUnderlineOffset: '3px' }}>{spot.city}</Link> : spot.city}{spot.region ? `, ${spot.region}` : ''}
           </div>
         )}
       </div>
@@ -311,14 +310,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
       <SupportStrip />
 
       <script type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: safeJsonLd({
-          '@context': 'https://schema.org', '@type': ['SportsActivityLocation', 'Place'],
-          name: spot.name, description: spot.description ?? `${tipo.label}${spot.city ? ` · ${spot.city}` : ''}`,
-          url: `${APP_CONFIG.url}/map/spot/${spot.slug}`,
-          geo: { '@type': 'GeoCoordinates', latitude: spot.lat, longitude: spot.lon },
-          address: { '@type': 'PostalAddress', addressLocality: spot.city ?? '', addressCountry: country },
-          image: photos.map(p => p.url),
-        })}}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(spotStructuredData(spot)) }}
       />
       <script type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd({

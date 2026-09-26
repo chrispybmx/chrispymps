@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import MapClient from './MapClient';
 import { APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
 
 export const metadata: Metadata = {
-  title:       'Mappa Spot BMX, Skate & Scooter Italia',
-  description: 'Trova spot BMX, skatepark, park scooter e street spot in tutta Italia. Foto e informazioni condivise dai rider. Cerca per città, tipo e distanza.',
+  title:       'Spot BMX, skate e scooter: mappa della community',
+  description: 'Trova spot BMX, skatepark e street spot in Italia e in altri paesi. Foto e informazioni condivise dai rider. Cerca per città, tipo e distanza.',
   alternates: { canonical: APP_CONFIG.url },
   keywords: [
     'mappa spot BMX Italia', 'skatepark vicino a me', 'spot scooter Italia',
@@ -32,9 +33,9 @@ export const metadata: Metadata = {
 const mapJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'Chrispy Maps — Mappa Spot BMX Italia',
+  name: 'Chrispy Maps',
   url: APP_CONFIG.url,
-  description: 'Mappa interattiva community-driven per trovare spot BMX, skatepark, park scooter e street spot in tutta Italia.',
+  description: 'Mappa interattiva di spot BMX, skate e scooter condivisi dai rider.',
   applicationCategory: 'SportsApplication',
   operatingSystem: 'Web, iOS, Android',
   inLanguage: ['it-IT', 'en-GB'],
@@ -56,6 +57,14 @@ export default async function MapPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(mapJsonLd) }}
       />
+      <noscript>
+        <aside style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'var(--black)', color: 'var(--bone)', padding: '40px 24px', overflowY: 'auto' }}>
+          <h1>Chrispy Maps</h1>
+          <p>La mappa interattiva richiede JavaScript. Puoi consultare fotografie, località e schede degli spot nell’elenco.</p>
+          <p><Link href="/scopri">Scopri spot BMX, skate e scooter</Link></p>
+          <p><Link href="/map/about">Il progetto e la community</Link></p>
+        </aside>
+      </noscript>
       <MapClient initialSpots={[]} autoAdd={autoAdd} initialSpotSlug={typeof params.spot === 'string' ? params.spot : undefined} initialQuery={typeof params.q === 'string' ? params.q : undefined} />
     </>
   );

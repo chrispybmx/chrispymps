@@ -44,3 +44,5 @@
 .recoveryList input { width:20px; height:20px; accent-color:var(--orange); }
 @media(max-width:640px) { .header { padding:8px 16px; } .content { padding:24px 16px 48px; } .spotLink { gap:14px; padding-right:48px; } .photo { flex-basis:112px; aspect-ratio:1; } .info h3 { font-size:19px; } .category { font-size:13px; } .city { font-size:14px; } .credit { font-size:12px; } .spot { padding:18px 0; } .remove { top:18px; } .intro { margin-bottom:24px; } }
 @media(max-width:370px) { .photo { flex-basis:90px; } .spotLink { gap:12px; } .heading h1 { font-size:26px; } }
+
+@media(max-width:767px) { .content { padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); } }

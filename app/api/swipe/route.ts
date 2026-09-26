@@ -31,22 +31,26 @@ export async function GET(req: NextRequest) {
   const user = await utenteDaToken(req);
   if (!user) return NextResponse.json({ ok: false, error: 'Non autenticato' }, { status: 401 });
 
-  const lat = Number(req.nextUrl.searchParams.get('lat'));
-  const lon = Number(req.nextUrl.searchParams.get('lon'));
-  const conPosizione = Number.isFinite(lat) && Number.isFinite(lon);
+  const rawLat = req.nextUrl.searchParams.get('lat');
+  const rawLon = req.nextUrl.searchParams.get('lon');
+  const lat = Number(rawLat);
+  const lon = Number(rawLon);
+  const conPosizione = !!rawLat?.trim() && !!rawLon?.trim() &&
+    Number.isFinite(lat) && Math.abs(lat) <= 90 && Number.isFinite(lon) && Math.abs(lon) <= 180;
 
   const sb = supabaseAdmin();
 
   /* Le carte già viste non tornano più. */
-  const { data: visti } = await sb
+  const { data: visti, error: seenError } = await sb
     .from('spot_swipes')
     .select('spot_id')
     .eq('user_id', user.id);
+  if (seenError) return NextResponse.json({ ok: false, error: 'Lettura non riuscita' }, { status: 503 });
   const giaVisti = new Set((visti ?? []).map(v => v.spot_id as string));
 
   const { data: spots, error } = await sb
     .from('spots')
-    .select('id, slug, name, type, city, region, lat, lon, description, condition, submitted_by_username, spot_photos(url, position)')
+    .select('id, slug, name, type, city, region, lat, lon, description, condition, submitted_by_username, spot_photos(url, position, moderation_status)')
     .eq('status', 'approved');
 
   if (error) {
@@ -59,11 +63,12 @@ export async function GET(req: NextRequest) {
     city: string | null; region: string | null; lat: number; lon: number;
     description: string | null; condition: string;
     submitted_by_username: string | null;
-    spot_photos: { url: string; position: number }[] | null;
+    spot_photos: { url: string; position: number; moderation_status?: string | null }[] | null;
   };
 
   const carte = (spots as SpotRiga[] ?? [])
     .filter(s => !giaVisti.has(s.id))
+    .map(s => ({ ...s, spot_photos: s.spot_photos?.filter(p => p.moderation_status == null || p.moderation_status === 'approved') ?? [] }))
     /* Senza foto non è una carta: qui si vota guardando. */
     .filter(s => (s.spot_photos?.length ?? 0) > 0)
     .map(s => {
@@ -112,15 +117,6 @@ export async function POST(req: NextRequest) {
 
   const sb = supabaseAdmin();
 
-  const { error: swipeErr } = await sb
-    .from('spot_swipes')
-    .upsert({ user_id: user.id, spot_id: spotId, direction }, { onConflict: 'user_id,spot_id' });
-
-  if (swipeErr) {
-    console.error('[api/swipe] POST:', swipeErr.message);
-    return NextResponse.json({ ok: false, error: 'Salvataggio non riuscito' }, { status: 500 });
-  }
-
   /* Il like alimenta il contatore pubblico e la cartella personale.
      Insert semplice invece di upsert: così non dipendiamo dal nome esatto del
      vincolo di unicità delle due tabelle. Il doppione (23505) è l'esito
@@ -130,9 +126,22 @@ export async function POST(req: NextRequest) {
       const { error } = await sb.from(tabella).insert({ spot_id: spotId, user_id: user.id });
       if (error && error.code !== '23505') {
         console.error(`[api/swipe] ${tabella}:`, error.code, error.message);
+        return false;
       }
+      return true;
     };
-    await Promise.all([aggiungi('spot_likes'), aggiungi('spot_favorites')]);
+    const results = await Promise.all([aggiungi('spot_likes'), aggiungi('spot_favorites')]);
+    if (results.some(saved => !saved)) return NextResponse.json({ ok: false, error: 'Salvataggio non riuscito. Riprova.' }, { status: 503 });
+  }
+
+  // Mark as seen only after the requested saves succeed. Retrying inserts is idempotent.
+  const { error: swipeErr } = await sb
+    .from('spot_swipes')
+    .upsert({ user_id: user.id, spot_id: spotId, direction }, { onConflict: 'user_id,spot_id' });
+
+  if (swipeErr) {
+    console.error('[api/swipe] POST:', swipeErr.message);
+    return NextResponse.json({ ok: false, error: 'Salvataggio non riuscito' }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

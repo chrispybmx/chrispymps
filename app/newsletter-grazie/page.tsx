@@ -1,6 +1,8 @@
 import { Metadata } from 'next';
+import { PRIVATE_ROBOTS } from '@/lib/seo';
 
 export const metadata: Metadata = {
+  robots: PRIVATE_ROBOTS,
   title: 'Grazie per l\'iscrizione! | Newsletter ChrispyBMX',
   description: 'La tua iscrizione è confermata. Riceverai la newsletter ogni lunedì.',
 };

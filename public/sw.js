@@ -7,7 +7,7 @@
 // riceve header CSP e le fetch qui dentro non sono ristrette. Il CSP della
 // pagina governa solo la registrazione (worker-src), non il traffico interno.
 
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const STATIC_CACHE  = `chrispymaps-static-${CACHE_VERSION}`;
 const MAP_CACHE     = `chrispymaps-map-${CACHE_VERSION}`;
 const PAGE_CACHE    = `chrispymaps-pages-${CACHE_VERSION}`;
@@ -81,7 +81,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   // Private invitations and chats never enter an offline/shared cache.
   if (url.origin === self.location.origin &&
-      (url.pathname.startsWith('/messaggi') || url.pathname.startsWith('/api/session-invites'))) {
+      (url.pathname.startsWith('/messaggi') || url.pathname.startsWith('/auth/') ||
+       url.pathname.endsWith('/modifica') || url.pathname.startsWith('/api/session-invites'))) {
     event.respondWith(fetch(request, { cache: 'no-store' }).catch(() =>
       url.pathname.startsWith('/api/')
         ? new Response(JSON.stringify({ ok:false, error:'Connessione assente. Riprova quando sei online.' }), {status:503,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})

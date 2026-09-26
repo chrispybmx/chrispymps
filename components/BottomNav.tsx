@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import MapIcon from '@/components/MapIcon';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/components/LanguageProvider';
@@ -25,8 +26,8 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
   };
 
   const isMap       = (pathname === '/' || !!pathname?.startsWith('/map'));
-  const isSfoglia   = !!pathname?.startsWith('/sfoglia');
-  const isScopri    = !!pathname?.startsWith('/scopri');
+  const isSaved     = !!pathname?.startsWith('/preferiti');
+  const isScopri    = !!pathname?.startsWith('/scopri') || !!pathname?.startsWith('/sfoglia');
   const isProfile   = !!pathname?.startsWith('/u/');
 
   return (
@@ -104,7 +105,7 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
       <nav className="mobile-bnav" aria-label={text('Navigazione principale', 'Main navigation')}>
 
         {/* MAPPA */}
-        <Link href="/map" className={`mbn-link${isMap ? ' active' : ''}`} aria-label={text('Mappa', 'Map')}>
+        <Link href="/map" className={`mbn-link${isMap ? ' active' : ''}`} aria-current={isMap ? 'page' : undefined} aria-label={text('Mappa', 'Map')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
             <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/>
             <path d="M8 2v16M16 6v16"/>
@@ -112,14 +113,10 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
           {text('Mappa', 'Map')}
         </Link>
 
-        {/* SFOGLIA — scorri gli spot e salva quelli che ti piacciono */}
-        <Link href="/sfoglia" className={`mbn-link${isSfoglia ? ' active' : ''}`} aria-label={text('Sfoglia gli spot', 'Browse spots')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="6" y="3" width="12" height="16" rx="2"/>
-            <path d="M3 7v10a2 2 0 0 0 1.2 1.8M21 7v10a2 2 0 0 1-1.2 1.8"/>
-            <path d="M12 21v-1"/>
-          </svg>
-          {text('Sfoglia', 'Browse')}
+        {/* SALVATI */}
+        <Link href="/preferiti" className={`mbn-link${isSaved ? ' active' : ''}`} aria-current={isSaved ? 'page' : undefined} aria-label={text('Spot salvati', 'Saved spots')}>
+          <MapIcon name="heart" size={24} filled={isSaved} />
+          {text('Salvati', 'Saved')}
         </Link>
 
         {/* + SPOT — CTA centrale */}
@@ -133,7 +130,7 @@ export default function BottomNav({ onAddSpot, onOpenAuth }: BottomNavProps) {
         </div>
 
         {/* SCOPRI */}
-        <Link href="/scopri" className={`mbn-link${isScopri ? ' active' : ''}`} aria-label={text('Scopri spot', 'Discover spots')}>
+        <Link href="/scopri" className={`mbn-link${isScopri ? ' active' : ''}`} aria-current={isScopri ? 'page' : undefined} aria-label={text('Scopri spot', 'Discover spots')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <path d="M14.5 8.5L16 8l-.5 1.5-5 5L9 15l.5-1.5 5-5z"/>

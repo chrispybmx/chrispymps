@@ -90,6 +90,7 @@ export async function middleware(req: NextRequest) {
     // Clona i request headers per aggiungere x-nonce (letto da Next.js durante il rendering)
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set('x-nonce', nonce);
+    requestHeaders.set('Content-Security-Policy', csp);
 
     const response = NextResponse.next({
       request: { headers: requestHeaders },

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase-browser';
+import { useFavorites } from '@/hooks/useFavorites';
 import { TIPI_SPOT } from '@/lib/constants';
 import CommentiCarta from './CommentiCarta';
 import type { SpotType } from '@/lib/types';
@@ -28,8 +29,9 @@ const SOGLIA = 90;
 const TOLLERANZA_TOCCO = 10;
 
 export default function SfogliaClient() {
+  const { reload: reloadFavorites } = useFavorites();
   const [carte,    setCarte]    = useState<Carta[]>([]);
-  const [stato,    setStato]    = useState<'carico' | 'pronto' | 'anonimo' | 'finito'>('carico');
+  const [stato,    setStato]    = useState<'carico' | 'pronto' | 'anonimo' | 'finito' | 'errore'>('carico');
   const [piaciuti, setPiaciuti] = useState(0);
   const [token,    setToken]    = useState<string | null>(null);
   const [erroreSalvataggio, setErroreSalvataggio] = useState(false);
@@ -66,6 +68,7 @@ export default function SfogliaClient() {
 
   /* ── Mazzo ── */
   const caricaMazzo = useCallback(async (tk: string) => {
+    setStato('carico');
     const posizione = () => new Promise<string>(resolve => {
       if (!navigator.geolocation) return resolve('');
       navigator.geolocation.getCurrentPosition(
@@ -79,7 +82,7 @@ export default function SfogliaClient() {
       headers: { Authorization: `Bearer ${tk}` },
     }).then(r => r.json()).catch(() => null);
 
-    if (!j?.ok) { setStato('finito'); return; }
+    if (!j?.ok) { setStato('errore'); return; }
     setCarte(j.data ?? []);
     setStato((j.data ?? []).length ? 'pronto' : 'finito');
   }, []);
@@ -89,8 +92,8 @@ export default function SfogliaClient() {
       const tk = data.session?.access_token;
       if (!tk) { setStato('anonimo'); return; }
       setToken(tk);
-      caricaMazzo(tk);
-    });
+      void caricaMazzo(tk);
+    }).catch(() => setStato('errore'));
   }, [caricaMazzo]);
 
   /* ── Voto ── */
@@ -105,39 +108,41 @@ export default function SfogliaClient() {
       el.style.transition = 'transform 0.26s ease-out';
       el.style.transform  = `translateX(${direzione === 'like' ? 700 : -700}px) rotate(${direzione === 'like' ? 22 : -22}deg)`;
     }
-    if (direzione === 'like') setPiaciuti(n => n + 1);
-
-    /* Se il salvataggio fallisce la carta torna nel mazzo: farla sparire
-       lasciando credere di aver salvato è peggio che mostrare un errore. */
-    fetch('/api/swipe', {
+    setErroreSalvataggio(false);
+    // Keep the card until the request AND its exit animation finish. A fast
+    // rejection must not race a timer that removes the restored card again.
+    const animation = new Promise<void>(resolve => setTimeout(resolve, 260));
+    const save = fetch('/api/swipe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ spotId: carta.id, direction: direzione }),
-    })
-      .then(r => r.json().catch(() => null))
-      .then(j => { if (!j?.ok) throw new Error('salvataggio non riuscito'); })
-      .catch(() => {
-        if (direzione === 'like') setPiaciuti(n => Math.max(0, n - 1));
-        setErroreSalvataggio(true);
-        setCarte(prev => (prev.some(c => c.id === carta.id) ? prev : [carta, ...prev]));
-        setStato('pronto');
-      });
+    }).then(async response => {
+      const result = await response.json().catch(() => null);
+      return response.ok && result?.ok === true;
+    }).catch(() => false);
 
-    setTimeout(() => {
-      spostamento.current = { x: 0, y: 0 };
-      inUscita.current = false;
+    void Promise.all([save, animation]).then(([saved]) => {
+      if (!saved) {
+        setErroreSalvataggio(true);
+        riposiziona();
+        return;
+      }
+      if (direzione === 'like') {
+        setPiaciuti(n => n + 1);
+        void reloadFavorites();
+      }
       setIndiceFoto(0);
       setCommentiAperti(false);
       if (cartaRef.current) { cartaRef.current.style.transition = 'none'; cartaRef.current.style.transform = ''; }
       if (timbroSi.current) timbroSi.current.style.opacity = '0';
       if (timbroNo.current) timbroNo.current.style.opacity = '0';
-      setCarte(prev => {
-        const resto = prev.slice(1);
-        if (!resto.length) setStato('finito');
-        return resto;
-      });
-    }, 260);
-  }, [carte, token]);
+      setCarte(previous => previous.filter(item => item.id !== carta.id));
+      if (carte.length === 1) setStato('finito');
+    }).finally(() => {
+      spostamento.current = { x: 0, y: 0 };
+      inUscita.current = false;
+    });
+  }, [carte, token, reloadFavorites]);
 
   /* ── Gesto ── */
   const giu = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -191,6 +196,16 @@ export default function SfogliaClient() {
 
   /* ── Stati senza carte ── */
   if (stato === 'carico') return <Messaggio titolo="Preparo il mazzo…" />;
+
+  if (stato === 'errore') return (
+    <div role="alert">
+      <Messaggio titolo="Non riesco a caricare gli spot" testo="Controlla la connessione e riprova." />
+      <div style={{ textAlign: 'center' }}><button className="btn btn-primary" onClick={() => {
+        if (token) void caricaMazzo(token);
+        else window.location.reload();
+      }}>Riprova</button></div>
+    </div>
+  );
 
   if (stato === 'anonimo') return (
     <Messaggio

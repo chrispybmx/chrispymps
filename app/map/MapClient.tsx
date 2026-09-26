@@ -444,7 +444,9 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
 
   const [visibleCount, setVisibleCount] = useState(32);
   const areaKey = [searchQuery, filterType, filterRegion?.label, filterCondition, filterDifficulty, filterOstacolo, radiusMode, radiusKm, mapBounds?.south, mapBounds?.west, mapBounds?.north, mapBounds?.east].join('|');
-  useEffect(() => { if (!expandedId) setVisibleCount(Math.max(32, Math.ceil(initialScrollRef.current / 100) + 16)); }, [areaKey, expandedId]);
+  useEffect(() => {
+    if (sessionReady && !expandedId) setVisibleCount(Math.max(32, Math.ceil(initialScrollRef.current / 100) + 16));
+  }, [areaKey, expandedId, sessionReady]);
   const visibleSpots = useMemo(() => {
     const rows = panelSpots.slice(0, visibleCount);
     const selected = expandedId && panelSpots.find(spot => spot.id === expandedId);
@@ -553,6 +555,8 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
 
   const handleSpotClick = useCallback((pin: SpotMapPin, forceOpen = false) => {
     if (!forceOpen && expandedId === pin.id) {
+      // Render the saved portion before the child's layout effect restores scroll.
+      setVisibleCount(count => Math.max(count, Math.ceil(returnScrollRef.current / 100) + 16));
       setExpandedId(null);
       initialScrollRef.current = returnScrollRef.current;
       if (returnViewRef.current) setFlyTarget({...returnViewRef.current, exact:true});

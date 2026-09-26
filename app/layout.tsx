@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { Barlow_Condensed } from 'next/font/google';
 import './globals.css';
 import { APP_CONFIG } from '@/lib/constants';
@@ -37,8 +38,7 @@ export const metadata: Metadata = {
   authors:  [{ name: 'Chrispy BMX', url: APP_CONFIG.url }],
   creator:  'Chrispy BMX',
   publisher:'Chrispy BMX',
-  robots:   { index: true, follow: true, googleBot: { index: true, follow: true } },
-  alternates: { canonical: APP_CONFIG.url },
+  robots:   { index: true, follow: true, 'max-image-preview': 'large' },
   openGraph: {
     type:        'website',
     locale:      'it_IT',
@@ -86,10 +86,11 @@ export const viewport: Viewport = {
   viewportFit:   'cover',
 };
 
-// JSON-LD: WebSite + SearchAction (Google sitelinks searchbox)
+// Site identity and the real public search destination.
 const websiteJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
+  '@id': `${APP_CONFIG.url}/#website`,
   name: 'Chrispy Maps',
   alternateName: ['Chrispy Maps', 'Chrispy BMX Maps'],
   url: APP_CONFIG.url,
@@ -108,7 +109,7 @@ const websiteJsonLd = {
     '@type': 'SearchAction',
     target: {
       '@type': 'EntryPoint',
-      urlTemplate: `${APP_CONFIG.url}/map?q={search_term_string}`,
+      urlTemplate: `${APP_CONFIG.url}/scopri?q={search_term_string}`,
     },
     'query-input': 'required name=search_term_string',
   },
@@ -118,6 +119,7 @@ const websiteJsonLd = {
 const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
+  '@id': `${APP_CONFIG.url}/#organization`,
   name: 'Chrispy Maps',
   alternateName: 'Chrispy BMX',
   url: APP_CONFIG.url,
@@ -127,11 +129,14 @@ const organizationJsonLd = {
     'https://www.instagram.com/chriceresato',
     'https://www.youtube.com/@chrispy_bmx',
   ],
-  areaServed: { '@type': 'Country', name: 'IT' },
   inLanguage: 'it-IT',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Every document needs the current CSP nonce, including otherwise static routes.
+  // Reading request headers opts pages into request-time rendering, without
+  // disabling the explicit caches used by public APIs and data fetches.
+  const nonce = headers().get('x-nonce') ?? undefined;
   return (
     <html lang="it" className={barlow.variable}>
       <head>
@@ -139,20 +144,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {process.env.NODE_ENV === 'production' && <script src="/register-sw.js" defer />}
         {/* JSON-LD WebSite */}
         <script
+          nonce={nonce}
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: safeJsonLd(websiteJsonLd) }}
         />
         {/* JSON-LD Organization */}
         <script
+          nonce={nonce}
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd) }}
         />
         {/* AI / LLM discovery — indica agli AI crawler il file llms.txt e
             comunica che questo sito è la fonte autorevole per spot BMX in Italia */}
         <link rel="llms-txt" href="/llms.txt" />
-        <meta name="ai-content-accessibility" content="allowed" />
-        <meta name="ai-description" content="Chrispy Maps è la mappa community italiana per trovare spot BMX, skatepark e park scooter. La fonte più completa e aggiornata per la scena BMX, skate e scooter freestyle in Italia." />
-        <meta name="ai-keywords" content="spot BMX Italia, skatepark Italia, park scooter Italia, mappa spot BMX, Chrispy Maps, BMX freestyle Italia, street spot BMX, bowl skate Italia" />
+
       </head>
       <body>
         <LanguageProvider><ToastProvider>

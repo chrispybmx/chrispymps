@@ -87,12 +87,12 @@ LIMITE_RAGGIUNTO=no
 for cat in $CATEGORIE; do
   c=$(invio "{\"name\":\"verifica\",\"type\":\"$cat\",\"lat\":45.4,\"lon\":11.0,\"photo_urls\":[\"$FOTO_FINTA\"],\"access_token\":\"finto\"}")
   case "$c" in
-    401) ok "categoria «$cat» accettata dal server" ;;
-    422) ko "categoria «$cat» RESPINTA — un rider che la sceglie non riesce a inviare"
+    401) ok "categoria «${cat}» accettata dal server" ;;
+    422) ko "categoria «${cat}» RESPINTA — un rider che la sceglie non riesce a inviare"
          printf '        %s%s%s\n' "$GRIGIO" "$(cat /tmp/.verifica_risposta)" "$FINE" ;;
-    429) nota "limite di invii raggiunto sulla categoria «$cat» — riprova fra 5 minuti"
+    429) nota "limite di invii raggiunto sulla categoria «${cat}» — riprova fra 5 minuti"
          LIMITE_RAGGIUNTO=si; break ;;
-    *)   ko "categoria «$cat» ha risposto $c, atteso 401" ;;
+    *)   ko "categoria «${cat}» ha risposto $c, atteso 401" ;;
   esac
 done
 
@@ -158,6 +158,13 @@ controlla /regole 200
 controlla /privacy 200
 controlla /map/citta-inesistente-xyz 404
 controlla /news/non-esiste 404
+
+# The HTML must also be usable after a direct visit, not just return 200.
+if node scripts/check-page-scripts.mjs "$BASE"; then
+  ok "gli script delle pagine rispettano il nonce CSP"
+else
+  ko "una o più pagine bloccano gli script al caricamento diretto"
+fi
 
 # ═══════════════════════════════════════════════════════════════
 titolo "5. Le porte chiuse restano chiuse"

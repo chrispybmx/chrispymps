@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verifica": "./scripts/verifica.sh",
-    "verifica:prod": "./scripts/verifica.sh https://maps.chrispybmx.com"
+    "verifica:prod": "./scripts/verifica.sh https://maps.chrispybmx.com",
+    "verifica:seo": "node scripts/check-seo.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",

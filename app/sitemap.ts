@@ -2,68 +2,46 @@ import type { MetadataRoute } from 'next';
 import { supabaseServer } from '@/lib/supabase';
 import { APP_CONFIG } from '@/lib/constants';
 import { citySlug, CITY_SLUG_RE } from '@/lib/slugify';
-import { getApprovedCityNames } from '@/lib/spot-cities';
+import { seoDate } from '@/lib/seo';
 
 export const revalidate = 3600;
+const PAGE_SIZE = 1000;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = APP_CONFIG.url;
-
-  // Pagine statiche principali
-  // NOTA: la home è "/" (rewrite interno → /map), NON "/map" (che ora ridireziona a "/")
-  const staticPages: MetadataRoute.Sitemap = [
-    { url: `${base}`,              lastModified: new Date(), changeFrequency: 'daily',   priority: 1.0 },
-    { url: `${base}/scopri`,       lastModified: new Date(), changeFrequency: 'daily',   priority: 0.9 },
-    { url: `${base}/classifica`,   lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
-    { url: `${base}/events`,       lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
-    { url: `${base}/news`,         lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.7 },
-    { url: `${base}/newsletter`,   lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${base}/cerca-spot`,    lastModified: new Date(), changeFrequency: 'daily',   priority: 0.7 },
-    { url: `${base}/sessioni`,     lastModified: new Date(), changeFrequency: 'always',  priority: 0.6 },
-    { url: `${base}/skate-maps`,    lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${base}/map/about`,    lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${base}/map/support`,  lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${base}/regole`,       lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-  ];
-
-  const supabase = supabaseServer();
-
-  // Empty curated cities remain contribution pages, but are not indexed.
-  const citySlugs = new Set((await getApprovedCityNames()).map(citySlug).filter(slug => CITY_SLUG_RE.test(slug)));
-  const cityPages: MetadataRoute.Sitemap = Array.from(citySlugs).map((slug) => ({
-    url:             `${base}/map/${slug}`,
-    lastModified:    new Date(),
-    changeFrequency: 'weekly' as const,
-    priority:        0.85,
-  }));
-
-  // Pagine spot dinamiche
-  const { data: spots } = await supabase
-    .from('spots')
-    .select('slug, updated_at')
-    .eq('status', 'approved')
-    .order('updated_at', { ascending: false });
-
-  const spotPages: MetadataRoute.Sitemap = (spots ?? []).map((s) => ({
-    url:             `${base}/map/spot/${s.slug}`,
-    lastModified:    new Date(s.updated_at),
-    changeFrequency: 'weekly' as const,
-    priority:        0.75,
-  }));
-
-  // Pagine news dinamiche
-  const { data: newsItems } = await supabase
-    .from('news')
-    .select('slug, updated_at, published_at')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false });
-
-  const newsPages: MetadataRoute.Sitemap = (newsItems ?? []).map((n) => ({
-    url:             `${base}/news/${n.slug}`,
-    lastModified:    new Date(n.updated_at ?? n.published_at),
-    changeFrequency: 'monthly' as const,
-    priority:        0.65,
-  }));
-
-  return [...staticPages, ...cityPages, ...spotPages, ...newsPages];
+  // Personal pages and short-lived live sessions have no search destination.
+  // Static routes deliberately omit lastModified: request time is not an edit.
+  const paths = ['', '/scopri', '/classifica', '/events', '/news', '/newsletter', '/cerca-spot', '/skate-maps', '/map/about', '/map/support', '/regole', '/privacy'];
+  const pages: MetadataRoute.Sitemap = paths.map(path => ({ url: base + path }));
+  const cities = new Map<string, string | undefined>();
+  const sb = supabaseServer();
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await sb.from('spots').select('slug, city, updated_at')
+      .eq('status', 'approved').order('id').range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error('Cannot generate sitemap: spot query failed');
+    for (const spot of data ?? []) {
+      const modified = seoDate(spot.updated_at);
+      if (spot.slug) pages.push({ url: `${base}/map/spot/${encodeURIComponent(spot.slug)}`, ...(modified ? { lastModified: modified } : {}) });
+      if (spot.city) {
+        const slug = citySlug(spot.city);
+        if (CITY_SLUG_RE.test(slug) && !['spot', 'about', 'support'].includes(slug)) {
+          const previous = cities.get(slug);
+          cities.set(slug, modified && (!previous || modified > previous) ? modified : previous);
+        }
+      }
+    }
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  for (const [slug, lastModified] of cities) pages.push({ url: `${base}/map/${slug}`, ...(lastModified ? { lastModified } : {}) });
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await sb.from('news').select('slug, updated_at, published_at')
+      .eq('status', 'published').order('id').range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error('Cannot generate sitemap: news query failed');
+    for (const article of data ?? []) {
+      const modified = seoDate(article.updated_at) ?? seoDate(article.published_at);
+      if (article.slug) pages.push({ url: `${base}/news/${encodeURIComponent(article.slug)}`, ...(modified ? { lastModified: modified } : {}) });
+    }
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return [...new Map(pages.map(page => [page.url, page])).values()];
 }

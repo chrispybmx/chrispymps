@@ -6,6 +6,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { CITTA_ITALIANE, APP_CONFIG } from '@/lib/constants';
 import type { Spot } from '@/lib/types';
 import CityMapList from './CityMapList';
+import { cityCollectionData } from '@/lib/seo';
 import { safeJsonLd } from '@/lib/json-ld';
 import { citySlug, CITY_SLUG_RE } from '@/lib/slugify';
 import { getApprovedCityNames } from '@/lib/spot-cities';
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const cityLabel = getCityLabel(params.city, spots[0]?.city);
   const hasSpots = spots.length > 0;
-  const title = hasSpots ? `Spot BMX ${cityLabel} — Skatepark & Park Scooter` : `Segnala il primo spot a ${cityLabel}`;
+  const title = hasSpots ? `Spot BMX e skate a ${cityLabel}` : `Segnala il primo spot a ${cityLabel}`;
   const description = hasSpots
     ? `${spots.length} spot pubblicati a ${cityLabel}. Consulta foto, posizione e stato segnalato dalla community di BMX, skate e scooter.`
     : `Nessuno spot pubblicato a ${cityLabel}. Conosci un posto dove girare? Segnala il primo spot alla community.`;
@@ -98,12 +99,12 @@ const getCitySpots = cache(async (slug: string): Promise<Spot[]> => {
   // Resolve stored names first: accents and apostrophes cannot be reversed from a slug.
   const { data, error } = await supabase
     .from('spots')
-    .select('*, spot_photos(url, position)')
+    .select('*, spot_photos(url, position, moderation_status)')
     .eq('status', 'approved')
     .in('city', names)
     .order('approved_at', { ascending: false });
   if (error) throw new Error('Could not load city spots');
-  return (data ?? []) as Spot[];
+  return (data ?? []).map(spot => ({ ...spot, spot_photos: (spot.spot_photos ?? []).filter((photo: { moderation_status?: string | null }) => photo.moderation_status === 'approved' || photo.moderation_status === null) })) as Spot[];
 });
 
 export default async function CityPage({ params }: Props) {
@@ -138,14 +139,7 @@ export default async function CityPage({ params }: Props) {
     })),
   };
 
-  const collectionJsonLd = spots.length > 0 ? {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: `Spot BMX e Skatepark a ${cityLabel}`,
-    url,
-    description: `${spots.length} spot a ${cityLabel} pubblicati dalla community.`,
-    numberOfItems: spots.length,
-  } : null;
+  const collectionJsonLd = spots.length > 0 ? cityCollectionData(cityLabel, url, spots) : null;
 
   return (
     <main style={{

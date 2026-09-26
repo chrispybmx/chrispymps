@@ -43,6 +43,7 @@
 .results { min-height:0; flex:1; overflow-y:auto; overscroll-behavior:contain; padding:24px 24px 40px; }
 .resultsInner { max-width:1280px; margin:auto; }
 .resultHeading { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:0 0 20px; }
+.browseLink { font-size:14px; white-space:nowrap; }
 .resultHeading h2 { font-size:19px; font-weight:650; }
 .resultHeading span { color:var(--muted); font-size:13px; }
 .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:32px 24px; }

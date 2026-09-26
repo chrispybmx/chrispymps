@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import BottomNav from '@/components/BottomNav';
 import MapIcon from '@/components/MapIcon';
 import LanguageSwitch from '@/components/LanguageSwitch';
 import { useLanguage } from '@/components/LanguageProvider';
@@ -11,7 +13,10 @@ import { miniatura } from '@/lib/immagini';
 import { TIPI_SPOT } from '@/lib/constants';
 import styles from './favorites.module.css';
 
+const AuthModal = dynamic(() => import('@/components/AuthModal'), { ssr: false });
+
 export default function PreferiteClient() {
+  const [authOpen, setAuthOpen] = useState(false);
   const { language, text } = useLanguage();
   const { favIds, loaded, error, pendingIds, scope, setFav, reload, legacyIds, importLegacy } = useFavorites();
   const [details, setDetails] = useState<Map<string, FavoriteSpot>>(new Map());
@@ -92,7 +97,7 @@ export default function PreferiteClient() {
       </div>}
       {!loaded && <p className={styles.state} role="status">{text('Caricamento dei preferiti…', 'Loading saved spots…')}</p>}
       {loaded && !ids.length && !error && <section className={styles.empty}>
-        <MapIcon name="pin" size={36} /><h2>{text('Il prossimo giro parte da uno spot', 'Your next ride starts with a spot')}</h2>
+        <MapIcon name="pin" size={36} /><h2>{text('Nessuno spot salvato', 'No saved spots yet')}</h2>
         <p>{text('Salva con il cuore i posti che vuoi provare. Li ritrovi qui, pronti per la prossima uscita.', 'Tap the heart on places you want to ride. Find them here when you plan your next session.')}</p>
         <Link href="/" className={styles.primary}>{text('Cerca sulla mappa', 'Explore the map')} <MapIcon name="arrow" size={18} /></Link>
       </section>}
@@ -146,5 +151,7 @@ export default function PreferiteClient() {
         </>}
       </section>}
     </div>
+    <BottomNav onOpenAuth={() => setAuthOpen(true)} />
+    <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onSuccess={() => setAuthOpen(false)} />
   </main>;
 }

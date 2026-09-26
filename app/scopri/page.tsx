@@ -5,7 +5,7 @@ import { discoverCover, type DiscoverPhoto, type DiscoverSpot } from './discover
 import ScopriClient from './ScopriClient';
 import ScopriLoading from './loading';
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: 'Scopri spot BMX, skate e scooter',
   description: 'Trova spot della community con fotografie, località e caratteristiche. Cerca un posto o un rider e salva gli spot per la prossima uscita.',
   alternates: { canonical: 'https://maps.chrispybmx.com/scopri' },
@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   },
   twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Scopri spot — Chrispy Maps' },
 };
+
+export function generateMetadata({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }): Metadata {
+  const filtered = ['q', 'type', 'country', 'region', 'obstacle', 'difficulty', 'condition', 'sort'].some(key => Boolean(searchParams[key]));
+  return { ...baseMetadata, ...(filtered ? { robots: { index: false, follow: true } } : {}) };
+}
 
 export const revalidate = 300;
 
