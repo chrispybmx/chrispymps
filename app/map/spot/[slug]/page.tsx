@@ -1,3 +1,4 @@
+import SpotMetric from '@/components/SpotMetric';
 import SessionInviteLink from '@/components/SessionInviteLink';
 import type { Metadata } from 'next';
 import { cache } from 'react';
@@ -151,6 +152,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
       paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px))',
     }}>
 
+      <SpotMetric key={spot.id} />
       {/* ── HEADER STICKY ── */}
       <div className="cm-detail-header" style={{
         position: 'sticky', top: 0, zIndex: 20,
@@ -245,7 +247,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
         <BeforeYouRide spot={spot} language={language} />
 
         {/* ── PORTAMI QUI — grande, prominente ── */}
-        <a className="cm-directions" href={mapsUrl} target="_blank" rel="noopener noreferrer"
+        <a data-metric-directions="detail" className="cm-directions" href={mapsUrl} target="_blank" rel="noopener noreferrer"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             padding: '14px', borderRadius: 6, marginBottom: 16,

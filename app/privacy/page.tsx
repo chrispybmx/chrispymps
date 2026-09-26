@@ -186,9 +186,9 @@ const styles = {
 const dataRows = [
   {
     trattamento: 'Registrazione account',
-    dati: 'Email, username, password (hash bcrypt)',
+    dati: 'Email, username, credenziali gestite da Supabase Auth; dati facoltativi del profilo rider (data di nascita, regione, discipline, esperienza e setup)',
     base: 'Art. 6(1)(b) — esecuzione contratto',
-    durata: 'Durata account + 24 mesi di inattivita',
+    durata: 'Fino alla cancellazione dell’account, salvo conservazioni necessarie per obblighi di legge o tutela dei diritti',
   },
   {
     trattamento: 'Invio spot',
@@ -230,7 +230,7 @@ const dataRows = [
     trattamento: 'Cookie tecnici',
     dati: 'Dati di sessione',
     base: 'Art. 6(1)(f) — legittimo interesse',
-    durata: 'Durata della sessione',
+    durata: 'Secondo i tempi indicati nella sezione cookie',
   },
 ];
 
@@ -318,13 +318,28 @@ export default function PrivacyPage() {
         </section>
 
         {/* -------------------------------------------------------- */}
+        <section id="newsletter" style={styles.section}>
+          <h2 style={styles.h2}>Newsletter e comunicazioni di servizio</h2>
+          <p style={styles.p}>La newsletter BMX è facoltativa ed è riservata a chi ha almeno 16 anni, per scelta del progetto. Creare un account o aggiungere uno spot non equivale a iscriversi alla newsletter. Le email necessarie alla gestione dell’account e dei contributi hanno una finalità distinta.</p>
+          <p style={styles.p}>Puoi disiscriverti dal link presente nelle newsletter. MailerLite gestisce le liste e le automazioni. Le automazioni attualmente configurate su MailerLite rilevano le aperture delle email; questi dati sono distinti dai contatori di utilizzo della mappa. Puoi chiedere informazioni e revocare il consenso anche scrivendo al titolare.</p>
+          {process.env.NEWSLETTER_CONSENT_ENABLED === 'true' && <>
+            <p style={styles.p}>Le iscrizioni dai moduli pubblici richiedono una conferma via email entro 24 ore. La sola apertura del link non iscrive: occorre premere il pulsante di conferma. Dal profilo puoi gestire l’iscrizione associata al tuo indirizzo verificato.</p>
+            <p style={styles.p}>Conserviamo indirizzo email, scelta, momento, origine e versione del testo di consenso. Il trattamento per l’invio della newsletter si basa sul consenso (art. 6, par. 1, lett. a GDPR). La prova delle scelte è conservata durante l’iscrizione e fino a 24 mesi dalla revoca, per documentare e gestire correttamente il consenso e tutelare i diritti del titolare e dell’interessato (art. 6, par. 1, lett. f). Le richieste non confermate scadono dopo 24 ore e sono eliminate dalla pulizia programmata. I ritentativi tecnici di sincronizzazione restano aperti finché la scelta non è applicata; gli errori persistenti richiedono intervento.</p>
+            <p style={styles.p}>Se MailerLite non risponde, mostriamo che la modifica è in attesa. La revoca viene registrata subito e ritentata; eventuali email già in invio potrebbero ancora arrivare. Le email di conferma dell’iscrizione sono inviate tramite Resend.</p>
+          </>}
+        </section>
+        <section id="statistiche" style={styles.section}>
+          <h2 style={styles.h2}>Statistiche di utilizzo della mappa</h2>
+          {process.env.PRODUCT_METRICS_ENABLED === 'true' ? <p style={styles.p}>Contiamo ricerche confermate, aperture delle schede, clic sulle indicazioni e aperture e invii del modulo aggiungi spot. I contatori sono raggruppati per giorno e sezione, senza testo cercato, coordinate, email o identificatori dei rider. Non colleghiamo le azioni tra loro e non usiamo cookie analitici. I contatori sono conservati per 90 giorni per migliorare il servizio. Le normali richieste HTTP possono essere trattate nei log tecnici dei fornitori.</p> : <p style={styles.p}>La nuova raccolta dei contatori di utilizzo della mappa è disattivata. La precedente telemetria dei tentativi di registrazione è stata ritirata; l’eventuale storico e i log tecnici restano soggetti alle richieste di accesso e cancellazione e alla gestione della conservazione da parte del titolare.</p>}
+        </section>
+
         {/*  3. Destinatari e sub-responsabili                        */}
         {/* -------------------------------------------------------- */}
         <section style={styles.section}>
-          <h2 style={styles.h2}>3. DESTINATARI E SUB-RESPONSABILI</h2>
+          <h2 style={styles.h2}>3. DESTINATARI E FORNITORI</h2>
           <p style={styles.p}>
             I dati personali possono essere comunicati ai seguenti fornitori
-            terzi, in qualita di sub-responsabili del trattamento:
+            terzi coinvolti nel servizio. Il loro ruolo dipende dal trattamento e dagli accordi applicabili:
           </p>
           <ul style={styles.ul}>
             <li style={styles.li}>
@@ -497,7 +512,7 @@ export default function PrivacyPage() {
         {/* -------------------------------------------------------- */}
         {/*  8. Cookie e tecnologie locali                            */}
         {/* -------------------------------------------------------- */}
-        <section style={styles.section}>
+        <section id="cookie" style={styles.section}>
           <h2 style={styles.h2}>8. COOKIE E TECNOLOGIE LOCALI</h2>
           <p style={styles.p}>
             Chrispy Maps utilizza esclusivamente{' '}
@@ -523,8 +538,8 @@ export default function PrivacyPage() {
                     <span style={styles.code}>sb-*-auth-token</span>
                   </td>
                   <td style={styles.tdSecondary}>Necessario</td>
-                  <td style={styles.td}>Sessione di autenticazione utente (Supabase Auth)</td>
-                  <td style={styles.tdSecondary}>Sessione</td>
+                  <td style={styles.td}>Autenticazione utente (Supabase Auth)</td>
+                  <td style={styles.tdSecondary}>Fino a 400 giorni, rinnovabile; la sessione può terminare prima per logout, scadenza o revoca</td>
                 </tr>
                 <tr>
                   <td style={styles.td}>
@@ -532,7 +547,13 @@ export default function PrivacyPage() {
                   </td>
                   <td style={styles.tdSecondary}>Necessario</td>
                   <td style={styles.td}>Sessione di autenticazione amministratore</td>
-                  <td style={styles.tdSecondary}>Sessione</td>
+                  <td style={styles.tdSecondary}>7 giorni</td>
+                </tr>
+                <tr>
+                  <td style={styles.td}><span style={styles.code}>cm_language</span></td>
+                  <td style={styles.tdSecondary}>Preferenza</td>
+                  <td style={styles.td}>Lingua scelta per il sito</td>
+                  <td style={styles.tdSecondary}>1 anno</td>
                 </tr>
               </tbody>
             </table>
@@ -541,9 +562,12 @@ export default function PrivacyPage() {
           <h3 style={styles.h3}>localStorage</h3>
           <p style={styles.p}>
             Chrispy Maps utilizza il localStorage del browser per salvare
-            preferenze dell&apos;interfaccia utente (tema, filtri, impostazioni Spot
-            Radar). Questi dati restano esclusivamente sul dispositivo
-            dell&apos;utente e non vengono mai trasmessi al server.
+            preferenze dell&apos;interfaccia e l’avvenuta chiusura dell’avviso cookie.
+            I preferiti salvati senza account restano nel browser e possono essere
+            sincronizzati con l’account quando accedi. Lo stato di esplorazione
+            può essere conservato nella sessione del browser. Puoi cancellare
+            questi dati dalle impostazioni del browser; la cancellazione locale
+            non elimina automaticamente i dati già sincronizzati con l’account.
           </p>
         </section>
 

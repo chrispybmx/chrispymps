@@ -1,6 +1,6 @@
 // Read-only production smoke check: a 200 response is not enough if CSP blocks hydration.
 const base = process.argv[2] ?? 'http://127.0.0.1:3100';
-const routes = ['/', '/map', '/scopri', '/sfoglia', '/preferiti', '/sessioni', '/messaggi', '/events', '/news', '/classifica', '/privacy', '/regole', '/auth/reset-password', '/auth/setup-username', '/newsletter', '/newsletter-grazie', '/cerca-spot', '/skate-maps', '/map/about', '/map/support', '/admin/login', '/admin/conferma'];
+const routes = ['/', '/map', '/scopri', '/sfoglia', '/preferiti', '/sessioni', '/messaggi', '/events', '/news', '/classifica', '/privacy', '/regole', '/auth/reset-password', '/auth/setup-username', '/newsletter', '/newsletter-grazie', '/newsletter/conferma', '/cerca-spot', '/skate-maps', '/map/about', '/map/support', '/admin/login', '/admin/conferma'];
 let failures = 0;
 for (const route of routes) {
   try {

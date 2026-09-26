@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     csv = toCsv(
-      ['email', 'data_nascita', 'fascia_eta', 'regione', 'discipline', 'inizio_anno', 'anni_esperienza', 'setup', 'newsletter', 'iscritto_il'],
+      ['email', 'data_nascita', 'fascia_eta', 'regione', 'discipline', 'inizio_anno', 'anni_esperienza', 'setup', 'newsletter_storico_non_usare_per_invio', 'iscritto_il'],
       out,
     );
     nomeFile = `chrispymaps-ANAGRAFICA-${oggi}.csv`;

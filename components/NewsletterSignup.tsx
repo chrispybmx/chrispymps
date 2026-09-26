@@ -1,5 +1,6 @@
 'use client';
 
+import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from '@/lib/newsletter-consent';
 import { useState } from 'react';
 
 /**
@@ -9,11 +10,13 @@ import { useState } from 'react';
  */
 export default function NewsletterSignup() {
   const [email, setEmail] = useState('');
+  const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!consent) { setStatus('error'); setMessage('Conferma il consenso e di avere almeno 16 anni.'); return; }
     if (!email || !email.includes('@')) {
       setStatus('error');
       setMessage('Email non valida.');
@@ -27,13 +30,13 @@ export default function NewsletterSignup() {
       const res = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username: email.split('@')[0], source: 'newsletter' }),
+        body: JSON.stringify({ email, username: email.split('@')[0], source: 'newsletter', consent: true, over16: true, consentVersion: NEWSLETTER_CONSENT_VERSION }),
       });
       const data = await res.json();
 
       if (data.ok) {
         setStatus('success');
-        setMessage('Iscritto! Lunedì mattina ti arriva la prima newsletter.');
+        setMessage(data.message ?? 'Controlla la tua email e conferma l’iscrizione.');
         setEmail('');
       } else {
         setStatus('error');
@@ -116,8 +119,12 @@ export default function NewsletterSignup() {
             whiteSpace: 'nowrap',
           }}
         >
-          {status === 'loading' ? '...' : status === 'success' ? '✓ Iscritto' : 'Iscriviti'}
+          {status === 'loading' ? '...' : status === 'success' ? 'Controlla l’email' : 'Iscriviti'}
         </button>
+        <label style={{display:'flex',gap:10,width:'100%',fontSize:14,lineHeight:1.5,marginTop:12}}>
+          <input type="checkbox" required checked={consent} onChange={event=>setConsent(event.target.checked)} disabled={status==='loading'||status==='success'} />
+          <span>{NEWSLETTER_CONSENT_TEXT} <a href="/privacy#newsletter">Leggi l’informativa</a></span>
+        </label>
       </form>
 
       {message && (

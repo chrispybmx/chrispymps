@@ -1,15 +1,14 @@
 'use client';
 
+import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from '@/lib/newsletter-consent';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 /**
- * Newsletter landing form — GDPR compliant subscription.
+ * Newsletter form with versioned consent and email confirmation.
  * Source: 'newsletter' (all users → Newsletter BMX Settimanale group)
  * Requires explicit GDPR consent checkbox before submit.
  */
 export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string }) {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [consentGDPR, setConsentGDPR] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -32,15 +31,15 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
     setMessage('');
 
     try {
-      const res = await fetch('https://maps.chrispybmx.com/api/newsletter/subscribe', {
+      const res = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username: email.split('@')[0], source: 'newsletter' }),
+        body: JSON.stringify({ email, username: email.split('@')[0], source: 'newsletter', consent: true, over16: true, consentVersion: NEWSLETTER_CONSENT_VERSION }),
       });
       const data = await res.json();
 
       if (data.ok) {
-        setTimeout(() => router.push('/newsletter-grazie/'), 500);
+        setStatus('success'); setMessage(data.message ?? 'Controlla la tua email e conferma l’iscrizione.');
       } else {
         setStatus('error');
         setMessage(data.error || 'Qualcosa non ha funzionato. Riprova.');
@@ -81,14 +80,14 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
                 : 'bg-orange text-black shadow-vhs hover:shadow-vhs-lg active:scale-95'
             } ${busy ? 'cursor-wait opacity-80' : ''} ${!consentGDPR ? 'opacity-60' : ''}`}
           >
-            {busy ? '...' : done ? '✓ Iscritto' : 'Iscriviti'}
+            {busy ? '...' : done ? 'Controlla l’email' : 'Iscriviti'}
           </button>
         </div>
 
         <div className="text-vhs-xs text-gray-400 space-y-2">
           <p>
             Iscrivendoti accetti di ricevere la newsletter di ChrispyBMX. Useremo la tua email solo per inviarti aggiornamenti BMX. Puoi disiscriverti in qualsiasi momento tramite il link presente in ogni email. Leggi la{' '}
-            <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" className="text-orange hover:underline">
+            <a href="/privacy#newsletter" target="_blank" rel="noopener" className="text-orange hover:underline">
               Privacy Policy
             </a>
             .
@@ -103,7 +102,7 @@ export default function NewsletterLandingForm({ id = 'nl-email' }: { id?: string
             disabled={busy || done}
             className="w-4 h-4 mt-0.5 rounded border-gray-500 bg-gray-800 cursor-pointer accent-orange disabled:opacity-60 flex-shrink-0"
           />
-          <span>Acconsento a ricevere la newsletter di ChrispyBMX secondo la Privacy Policy.</span>
+          <span>{NEWSLETTER_CONSENT_TEXT}</span>
         </label>
       </form>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { trackMetric } from '@/lib/product-metrics';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { TIPI_SPOT, OSTACOLI, CITTA_ITALIANE, CITTA_COORDS, REGIONI_ITALIA, CONDIZIONI, DIFFICOLTA, APP_CONFIG, DEBOUNCE_SEARCH_MS } from '@/lib/constants';
 import type { Ostacolo, SpotType, SpotCondition, SpotMapPin } from '@/lib/types';
@@ -140,6 +141,7 @@ export default function TopBar({
     const citySpots = spots.filter(s => s.city?.toLowerCase() === cityValue.toLowerCase());
     const coords = CITTA_COORDS[cityValue.toLowerCase()] ?? (citySpots.length ? [citySpots.reduce((sum, s) => sum + s.lat, 0) / citySpots.length, citySpots.reduce((sum, s) => sum + s.lon, 0) / citySpots.length] : null);
     if (coords) {
+    trackMetric('search_used', 'map');
       onCitySelect(cityValue, coords[0], coords[1]);
       setSearchOpen(false);
       setQuery('');
@@ -147,6 +149,7 @@ export default function TopBar({
   };
 
   const pickPlace = (p: GeoPlace) => {
+    trackMetric('search_used', 'map');
     onCitySelect(p.name, p.lat, p.lon);
     setQuery('');
     setSearchOpen(false);
@@ -155,6 +158,7 @@ export default function TopBar({
   const pickSpot = (pin: SpotMapPin) => {
     setSearchOpen(false);
     setQuery(pin.name);
+    trackMetric('search_used', 'map');
     onSpotSelect(pin);
   };
 

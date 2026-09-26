@@ -3,8 +3,8 @@ import { PRIVATE_ROBOTS } from '@/lib/seo';
 
 export const metadata: Metadata = {
   robots: PRIVATE_ROBOTS,
-  title: 'Grazie per l\'iscrizione! | Newsletter ChrispyBMX',
-  description: 'La tua iscrizione è confermata. Riceverai la newsletter ogni lunedì.',
+  title: 'Newsletter Chrispy Maps',
+  description: 'Informazioni sulla newsletter BMX e sulla conferma dell’iscrizione.',
 };
 
 export default function NewsletterThankYouPage() {
@@ -33,12 +33,12 @@ export default function NewsletterThankYouPage() {
 
           {/* Main heading */}
           <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight font-mono">
-            Iscritto!
+            Newsletter BMX
           </h1>
 
           {/* Subheading */}
           <p className="text-xl text-zinc-300 mb-6 leading-relaxed">
-            La tua iscrizione a <span className="text-orange-400 font-bold">Cinque cose dal mondo BMX</span> è confermata.
+            Se hai richiesto <span className="text-orange-400 font-bold">Cinque cose dal mondo BMX</span>, controlla l’email e completa la conferma.
           </p>
 
           {/* Info box */}
@@ -46,7 +46,7 @@ export default function NewsletterThankYouPage() {
             <div>
               <h2 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-2">📧 Quando arriva</h2>
               <p className="text-zinc-300">
-                La prima newsletter ti arriverà <strong>lunedì mattina</strong>. Non ne perderai una più.
+                La newsletter esce il lunedì. Per riceverla devi aver completato l’iscrizione.
               </p>
             </div>
             <div>
@@ -58,7 +58,7 @@ export default function NewsletterThankYouPage() {
             <div>
               <h2 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-2">🔒 I tuoi dati</h2>
               <p className="text-zinc-300">
-                La tua email è protetta. Leggi la nostra <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" className="text-orange-400 hover:underline">Privacy Policy</a> per i dettagli.
+                La tua email è protetta. Leggi la nostra <a href="/privacy#newsletter" target="_blank" rel="noopener" className="text-orange-400 hover:underline">Privacy Policy</a> per i dettagli.
               </p>
             </div>
           </div>
@@ -84,9 +84,9 @@ export default function NewsletterThankYouPage() {
       {/* Footer links */}
       <footer className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950 to-transparent p-4 text-center text-xs text-zinc-500 space-y-2">
         <div className="flex flex-wrap gap-4 justify-center">
-          <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" className="hover:text-orange-400">Privacy Policy</a>
+          <a href="/privacy#newsletter" target="_blank" rel="noopener" className="hover:text-orange-400">Privacy Policy</a>
           <span>•</span>
-          <a href="https://chrispybmx.com/cookie-policy/" target="_blank" rel="noopener" className="hover:text-orange-400">Cookie Policy</a>
+          <a href="/privacy#cookie" target="_blank" rel="noopener" className="hover:text-orange-400">Cookie Policy</a>
           <span>•</span>
           <a href="mailto:christian.ceresato@gmail.com" className="hover:text-orange-400">Contatti</a>
         </div>

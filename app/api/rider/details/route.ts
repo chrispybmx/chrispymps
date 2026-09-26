@@ -1,26 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { subscribeToNewsletter } from '@/lib/newsletter';
 import {
-  puoRicevereMarketing,
   normalizzaDiscipline,
   normalizzaAnnoInizio,
-  ETA_MINIMA_MARKETING,
 } from '@/lib/rider-profile';
 
-/**
- * POST /api/rider/details
- * Salva i dati del rider e decide se può ricevere la newsletter.
- *
- * Perché passa dal server e non scrive il client: la regola sull'età deve
- * valere davvero. Dal browser chiunque può omettere la data di nascita o
- * dichiararne una falsa; qui la data viene letta dal corpo della richiesta ma
- * l'iscrizione a MailerLite parte solo se il calcolo lo consente, e il calcolo
- * lo fa il server. La scrittura usa il service role, così funziona anche prima
- * che la sessione sia del tutto propagata.
- *
- * Richiede Bearer token: si scrive solo sul proprio profilo.
- */
+/** Saves only supplied rider fields. Newsletter consent uses its dedicated API. */
 
 export const dynamic = 'force-dynamic';
 
@@ -57,29 +42,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Sessione scaduta' }, { status: 401 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as Corpo;
+  const raw = await req.json().catch(() => null);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return NextResponse.json({ ok:false, error:'Dati non validi.' }, { status:400 });
+  const body = raw as Corpo;
 
   const birthDate   = dataValida(body.birthDate);
   const region      = typeof body.region === 'string' && body.region.trim() ? body.region.trim().slice(0, 60) : null;
   const disciplines = normalizzaDiscipline(body.disciplines);
   const ridingSinceYear = normalizzaAnnoInizio(body.ridingSinceYear);
   const setupBrand  = typeof body.setupBrand === 'string' && body.setupBrand.trim() ? body.setupBrand.trim().slice(0, 80) : null;
-  const vuoleNewsletter = body.newsletter === true;
-
-  /* La regola sui minorenni si applica qui, dove il client non arriva. */
-  const puoEssereIscritto = vuoleNewsletter && puoRicevereMarketing(birthDate);
-
   const { error: upsertErr } = await sb
     .from('rider_details')
     .upsert({
       user_id:              user.id,
-      birth_date:           birthDate,
-      region,
-      disciplines,
-      riding_since_year:    ridingSinceYear,
-      setup_brand:          setupBrand,
-      newsletter_opt_in:    puoEssereIscritto,
-      newsletter_opt_in_at: puoEssereIscritto ? new Date().toISOString() : null,
+      ...('birthDate' in body ? { birth_date: birthDate } : {}),
+      ...('region' in body ? { region } : {}),
+      ...('disciplines' in body ? { disciplines } : {}),
+      ...('ridingSinceYear' in body ? { riding_since_year: ridingSinceYear } : {}),
+      ...('setupBrand' in body ? { setup_brand: setupBrand } : {}),
       updated_at:           new Date().toISOString(),
     }, { onConflict: 'user_id' });
 
@@ -88,20 +68,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Salvataggio non riuscito' }, { status: 500 });
   }
 
-  /* Il provider newsletter riceve solo indirizzo e lista: l'anagrafica resta da noi. */
-  if (puoEssereIscritto && user.email) {
-    const nome = body.username || user.user_metadata?.username || '';
-    await subscribeToNewsletter(user.email, nome, {
-      source: 'newsletter',
-    }).catch((e) => console.error('[api/rider/details] newsletter:', e));
-  }
-
-  return NextResponse.json({
-    ok: true,
-    /* Utile al client per non promettere una newsletter che non partirà. */
-    newsletterAttiva: puoEssereIscritto,
-    motivo: vuoleNewsletter && !puoEssereIscritto
-      ? `Sotto i ${ETA_MINIMA_MARKETING} anni non inviamo comunicazioni`
-      : undefined,
-  });
+  // Consent lives exclusively in /api/newsletter/preferences. Profile changes must
+  // never subscribe, withdraw, reset consent dates or overwrite omitted fields.
+  return NextResponse.json({ ok: true, ...(body.newsletter === true ? {
+    newsletterAttiva: false, motivo: 'Conferma la newsletter dalle preferenze del profilo.',
+  } : {}) });
 }

@@ -1,66 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { subscribeToNewsletter } from '@/lib/newsletter';
 import { z } from 'zod';
-
-const Schema = z.object({
-  email:           z.string().email().max(254),
-  username:        z.string().max(50).optional(),
-  source:          z.enum(['newsletter', 'signup', 'submit-spot']).optional(),
-  alsoNewsletter:  z.boolean().optional(),
-});
-
-// Origini autorizzate a chiamare l'endpoint cross-origin (landing statica su chrispybmx.com).
-// Same-origin (maps.chrispybmx.com) non passa da CORS, quindi non serve elencarlo.
-const ALLOWED_ORIGINS = new Set([
-  'https://chrispybmx.com',
-  'https://www.chrispybmx.com',
-]);
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
-    return {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-      'Vary': 'Origin',
-    };
-  }
-  return {};
+import { newsletterBody, allowedNewsletterOrigin, newsletterOrigins, newsletterUser } from '@/lib/newsletter-http';
+import { newsletterPreferencesEnabled, requestNewsletterConfirmation } from '@/lib/newsletter-preferences';
+import { NEWSLETTER_CONSENT_VERSION } from '@/lib/newsletter-consent';
+import { subscribeToNewsletter } from '@/lib/newsletter';
+const Schema = z.object({ email:z.string().trim().email().max(254), username:z.string().max(50).optional(), source:z.literal('newsletter'), consent:z.literal(true), over16:z.literal(true), consentVersion:z.literal(NEWSLETTER_CONSENT_VERSION) }).strict();
+function headers(req: NextRequest): Record<string,string> {
+  const origin=req.headers.get('origin');
+  return { 'Cache-Control':'no-store', ...(origin && newsletterOrigins.has(origin) ? { 'Access-Control-Allow-Origin':origin, Vary:'Origin' } : {}) };
 }
-
-/** Preflight CORS per i client cross-origin (es. chrispybmx.com/newsletter). */
 export async function OPTIONS(req: NextRequest) {
-  return new NextResponse(null, { status: 204, headers: corsHeaders(req.headers.get('origin')) });
+  return new NextResponse(null,{status:204,headers:{...headers(req),'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization'}});
 }
-
-/**
- * POST /api/newsletter/subscribe
- * Iscrive un utente a MailerLite.
- * Default: sempre 'submit-spot' (ChrispyMPS — Spot Submission).
- * Se alsoNewsletter=true: iscrive ANCHE a 'newsletter' (Newsletter BMX Settimanale).
- * Risposta sempre 200 per non bloccare il flusso UX.
- */
 export async function POST(req: NextRequest) {
-  const cors = corsHeaders(req.headers.get('origin'));
-  const body = await req.json().catch(() => ({}));
-  const result = Schema.safeParse(body);
-  if (!result.success) {
-    return NextResponse.json(
-      { ok: false, error: 'Email non valida' },
-      { status: 422, headers: cors },
-    );
+  const h=headers(req);
+  if(!allowedNewsletterOrigin(req)) return NextResponse.json({ok:false},{status:403,headers:h});
+  let body; try {body=await newsletterBody(req);}catch{return NextResponse.json({ok:false,error:'Richiesta non valida.'},{status:400,headers:h});}
+  // Existing welcome callers are bound to the authenticated account, never a supplied email.
+  if(body?.source==='submit-spot' || body?.source==='signup') {
+    const user=await newsletterUser(req);
+    if(!user) return NextResponse.json({ok:false,error:'Accedi con un account confermato.'},{status:401,headers:h});
+    const result=await subscribeToNewsletter(user.email!,String(user.user_metadata?.username??'').slice(0,50),{source:'submit-spot'});
+    return NextResponse.json({ok:result.ok},{status:result.ok?200:503,headers:h});
   }
-
-  const { email, username, source, alsoNewsletter } = result.data;
-  const name = username ?? email.split('@')[0];
-  const mainSource = source ?? 'submit-spot';
-
-  const { ok, error, subscriberId } = await subscribeToNewsletter(email, name, { source: mainSource });
-
-  if (alsoNewsletter && ok) {
-    await subscribeToNewsletter(email, name, { source: 'newsletter' });
-  }
-
-  return NextResponse.json({ ok, error, subscriberId }, { headers: cors });
+  const parsed=Schema.safeParse(body);
+  if(!parsed.success) return NextResponse.json({ok:false,error:'Conferma il consenso alla newsletter e di avere almeno 16 anni.'},{status:422,headers:h});
+  if(!newsletterPreferencesEnabled()) return NextResponse.json({ok:false,error:'Iscrizioni temporaneamente non disponibili. Riprova più tardi.'},{status:503,headers:h});
+  try {
+    await requestNewsletterConfirmation(parsed.data.email);
+    return NextResponse.json({ok:true,pendingConfirmation:true,message:'Controlla la tua email e conferma l’iscrizione entro 24 ore.'},{status:202,headers:h});
+  } catch {return NextResponse.json({ok:false,error:'Non riesco a inviare la conferma. Riprova più tardi.'},{status:503,headers:h});}
 }

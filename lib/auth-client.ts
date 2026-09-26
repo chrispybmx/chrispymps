@@ -1,3 +1,5 @@
+import { NEWSLETTER_CONSENT_VERSION } from './newsletter-consent';
+import { puoRicevereMarketing } from './rider-profile';
 import { supabaseBrowser } from './supabase-browser';
 
 export interface UserSession {
@@ -19,7 +21,7 @@ export async function signUp(
   email: string,
   password: string,
   username: string,
-  opts?: { newsletter?: boolean; birthDate?: string; region?: string },
+  opts?: { newsletter?: boolean; birthDate?: string; region?: string; over16?: boolean; onNewsletterResult?: (message: string) => void },
 ): Promise<'ok' | 'confirm_email'> {
   const sb = supabaseBrowser();
 
@@ -33,10 +35,10 @@ export async function signUp(
   if (!data.user) throw new Error('Errore nella registrazione. Riprova.');
 
   // 3. Crea profilo
-  const { error: profileErr } = await sb
-    .from('profiles')
-    .insert({ id: data.user.id, username });
-  if (profileErr) throw new Error(profileErr.message);
+  if (data.session) {
+    const { error: profileErr } = await sb.from('profiles').insert({ id:data.user.id, username });
+    if (profileErr) throw new Error(profileErr.message);
+  }
 
   /* 4. Dati del rider + newsletter — passano dal server.
         La regola sui minorenni non può stare qui: dal browser si aggira. Il
@@ -51,7 +53,6 @@ export async function signUp(
       body: JSON.stringify({
         birthDate:  opts?.birthDate ?? null,
         region:     opts?.region ?? null,
-        newsletter: !!opts?.newsletter,
         username,
       }),
     }).catch(() => { /* non blocca la registrazione */ });
@@ -59,11 +60,25 @@ export async function signUp(
 
   /* Gruppo "Spot Submission": email di benvenuto e regolamento della mappa.
      Resta legato all'account, non alla newsletter. */
-  fetch('/api/newsletter/subscribe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, username, source: 'submit-spot' }),
-  }).catch(() => {});
+  if (data.session?.access_token) {
+    fetch('/api/newsletter/subscribe', {
+      method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`},
+      body:JSON.stringify({source:'submit-spot'}),
+    }).catch(() => {});
+  }
+  if (opts?.newsletter && (puoRicevereMarketing(opts.birthDate) || (!opts.birthDate && opts.over16 === true))) {
+    // Confirmation email proves ownership before any marketing group is changed.
+    try {
+      const response = await fetch('/api/newsletter/subscribe', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,source:'newsletter',consent:true,over16:true,consentVersion:NEWSLETTER_CONSENT_VERSION}),
+      });
+      const result = await response.json();
+      opts.onNewsletterResult?.(response.ok && result.ok ? 'Newsletter: controlla l’email e conferma l’iscrizione.' : 'Account creato. La newsletter non è stata attivata: riprova dal profilo.');
+    } catch { opts.onNewsletterResult?.('Account creato. La newsletter non è stata attivata: riprova dal profilo.'); }
+  } else if (opts?.newsletter) {
+    opts.onNewsletterResult?.('Newsletter non attivata: è riservata a chi ha almeno 16 anni.');
+  }
 
   // Se l'email è già confermata (email confirmation disabled in Supabase) → ok
   // Altrimenti → conferma email necessaria
@@ -116,8 +131,8 @@ export async function setupGoogleUsername(userId: string, username: string, acce
   if (user?.email) {
     fetch('/api/newsletter/subscribe', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: user.email, username, source: 'submit-spot' }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ source: 'submit-spot' }),
     }).catch(() => {});
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import NewsletterPreferences from '@/components/NewsletterPreferences';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
@@ -268,6 +269,8 @@ export default function EditProfileClient({ profile }: Props) {
       >
         {saving ? 'Salvataggio…' : '💾 SALVA'}
       </button>
+
+      {token && <NewsletterPreferences token={token} />}
 
       {/* ══ Zona pericolosa — in fondo, silenziosa ══ */}
       <div style={{ marginTop: 72, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.05)' }}>

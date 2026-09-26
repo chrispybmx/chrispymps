@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import AdminProductMetrics from '@/components/AdminProductMetrics';
 import AdminCard from '@/components/AdminCard';
 import { compressImage } from '@/lib/compress-image';
 import AdminImportKML from '@/components/AdminImportKML';
@@ -647,6 +648,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
       {/* ── TAB: NUMERI ── */}
       {tab === 'numeri' && (
         <div style={{ padding: '16px 20px 40px', display: 'grid', gap: 18 }}>
+          <AdminProductMetrics />
           {!numeri && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-500)' }}>carico…</div>}
 
           {numeri && <>
@@ -679,7 +681,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
               )}
             </Riquadro>
 
-            <Riquadro titolo="Registrazione (ultimi 30 giorni)" nota="Dove si fermano e quanto ci mettono. Nessun dato personale.">
+            <Riquadro titolo="Registrazione — storico degli ultimi 30 giorni" nota="Raccolta disattivata. Questi dati precedono i nuovi contatori aggregati.">
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                 <Numero etichetta="tentativi" valore={numeri.registrazione.tentativi} />
                 <Numero etichetta="completati" valore={numeri.registrazione.riusciti} />

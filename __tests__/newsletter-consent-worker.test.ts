@@ -1,0 +1,21 @@
+import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
+const m=vi.hoisted(()=>({rpc:vi.fn(),from:vi.fn(),membership:vi.fn(),set:vi.fn(),send:vi.fn()}));
+vi.mock('@/lib/supabase',()=>({supabaseAdmin:()=>({rpc:m.rpc,from:m.from})}));
+vi.mock('@/lib/mailerlite-preferences',()=>({newsletterMembership:m.membership,setNewsletterMembership:m.set}));
+vi.mock('resend',()=>({Resend:class{emails={send:m.send};}}));
+import {chooseNewsletter,syncNewsletter,requestNewsletterConfirmation,confirmNewsletter} from '@/lib/newsletter-preferences';
+const job={email:'rider@example.com',enabled:false,revision:'revision'};
+beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('NEWSLETTER_SITE_URL','https://staging.example.com');const q:any={select:()=>q,eq:()=>q,delete:()=>q,maybeSingle:async()=>({data:{sync_pending:false,last_error:null},error:null}),then:(resolve:any)=>Promise.resolve({error:null}).then(resolve)};m.from.mockReturnValue(q);m.set.mockResolvedValue(undefined);m.send.mockResolvedValue({error:null});});
+afterEach(()=>vi.unstubAllEnvs());
+describe('consent persistence before side effects',()=>{
+ it('never touches provider when the consent record cannot be saved',async()=>{m.rpc.mockResolvedValue({error:{message:'missing migration'}});await expect(chooseNewsletter('rider@example.com',true,'profile')).rejects.toThrow();expect(m.set).not.toHaveBeenCalled();});
+ it('normalizes email and records a withdrawal snapshot',async()=>{m.rpc.mockResolvedValueOnce({error:null}).mockResolvedValueOnce({data:[],error:null});await chooseNewsletter(' Rider@Example.com ',false,'profile');expect(m.rpc.mock.calls[0][1]).toMatchObject({p_email:'rider@example.com',p_enabled:false,p_source:'profile'});expect(m.rpc.mock.calls[0][1].p_text).toContain('Revoco');});
+ it('acknowledges exactly the leased revision',async()=>{m.rpc.mockResolvedValueOnce({data:[job],error:null}).mockResolvedValueOnce({error:null}).mockResolvedValueOnce({data:[],error:null});expect(await syncNewsletter(job.email)).toBe(true);expect(m.set).toHaveBeenCalledWith(job.email,false);expect(m.rpc.mock.calls[1][1]).toMatchObject({p_email:job.email,p_revision:job.revision,p_error:null});expect(m.rpc.mock.calls[1][1].p_lease).toBe(m.rpc.mock.calls[0][1].p_lease);});
+ it('keeps provider failures pending with a fixed, non-personal error code',async()=>{m.rpc.mockResolvedValueOnce({data:[job],error:null}).mockResolvedValueOnce({error:null});m.set.mockRejectedValue(new Error('sensitive provider detail'));expect(await syncNewsletter(job.email)).toBe(false);expect(m.rpc.mock.calls[1][1].p_error).toBe('provider_unavailable');});
+ it('cannot claim success if acknowledgement fails',async()=>{m.rpc.mockResolvedValueOnce({data:[job],error:null}).mockResolvedValueOnce({error:{message:'db error'}});expect(await syncNewsletter(job.email)).toBe(false);});
+ it('does not send confirmations before their token has been saved',async()=>{m.rpc.mockResolvedValue({error:{message:'db unavailable'}});await expect(requestNewsletterConfirmation(job.email)).rejects.toThrow();expect(m.send).not.toHaveBeenCalled();});
+ it('does not resend within the per-address cooldown',async()=>{m.rpc.mockResolvedValue({data:false,error:null});await requestNewsletterConfirmation(job.email);expect(m.send).not.toHaveBeenCalled();});
+ it('stores only a token hash; sends the token in a fragment on the configured staging domain',async()=>{m.rpc.mockResolvedValue({data:true,error:null});await requestNewsletterConfirmation(job.email);const params=m.rpc.mock.calls[0][1];expect(params.p_hash).toMatch(/^[a-f0-9]{64}$/);const message=m.send.mock.calls[0][0];expect(message.text).toContain('https://staging.example.com/newsletter/conferma#');expect(message.text).not.toContain(params.p_hash);expect(message.text).not.toContain('maps.chrispybmx.com/newsletter/conferma');});
+ it('does not claim delivery if Resend rejects',async()=>{m.rpc.mockResolvedValue({data:true,error:null});m.send.mockResolvedValue({error:{message:'rejected'}});await expect(requestNewsletterConfirmation(job.email)).rejects.toThrow('Non riesco');expect(m.from).toHaveBeenCalledWith('cm_newsletter_confirmations');});
+ it('an unknown token cannot trigger provider synchronization',async()=>{m.rpc.mockResolvedValue({data:null,error:null});expect(await confirmNewsletter('a'.repeat(64))).toBeNull();expect(m.set).not.toHaveBeenCalled();});
+});

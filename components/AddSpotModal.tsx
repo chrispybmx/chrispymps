@@ -1,5 +1,7 @@
 'use client';
 
+import { NEWSLETTER_CONSENT_TEXT } from '@/lib/newsletter-consent';
+import { trackMetric } from '@/lib/product-metrics';
 import { useLanguage } from '@/components/LanguageProvider';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -240,6 +242,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     return () => batch.invalidate();
   }, [open]);
 
+  const metricOpen = useRef(false);
+  useEffect(() => {
+    if (open && !metricOpen.current) trackMetric('contribution_open', 'add');
+    metricOpen.current = open;
+  }, [open]);
+
   /* Compress image client-side before upload (5MB → ~300KB) */
   const compressImage = useCallback(async (file: File): Promise<Blob> => {
     const MAX_DIM = 1920;
@@ -326,6 +334,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [resetSent,     setResetSent]     = useState(false);
   const [resetLoading,  setResetLoading]  = useState(false);
   const [ageConfirmed2, setAgeConfirmed2] = useState(false);
+  const [newsletterMessage, setNewsletterMessage] = useState('');
   const [newsletterOptIn2, setNewsletterOptIn2] = useState(false);
 
   /* Nearby spots — duplicate detection */
@@ -537,6 +546,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? text("Errore durante l'invio.", "Could not submit the spot."));
       navigator.vibrate?.([30, 60, 30]);
+      trackMetric('contribution_sent', 'add');
       setStep('successo');
     } catch (err) {
       setError(err instanceof Error ? err.message : text("Errore sconosciuto. Riprova.", "Something went wrong. Try again."));
@@ -563,7 +573,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     if (regPassword.length < 6) { setAuthError(text("Password min 6 caratteri.", "Your password must be at least 6 characters.")); return; }
     if (!ageConfirmed2) { setAuthError(text("Devi confermare di avere almeno 14 anni.", "Confirm that you are at least 14 years old.")); return; }
     setAuthLoading(true); setAuthError(null);
-    try { const result = await signUp(regEmail, regPassword, regUsername, { newsletter: newsletterOptIn2 }); setAuthDone(result); }
+    try { const result = await signUp(regEmail, regPassword, regUsername, { newsletter: newsletterOptIn2, over16: newsletterOptIn2, onNewsletterResult: setNewsletterMessage }); setAuthDone(result); }
     catch (e) { setAuthError(e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.")); }
     finally { setAuthLoading(false); }
   };
@@ -620,6 +630,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
         <div style={{ padding: '20px' }}>
 
+          {newsletterMessage && <p role="status">{newsletterMessage}</p>}
           {/* Loading */}
           {isLoading && (
             <div style={{ textAlign: 'center', padding: '48px 0', fontFamily: 'var(--font-mono)', color: 'var(--gray-400)' }}>
@@ -730,7 +741,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                         <input type="checkbox" checked={newsletterOptIn2} onChange={e => setNewsletterOptIn2(e.target.checked)}
                           style={{ marginTop: 1, accentColor: 'var(--orange)', width: 18, height: 18, flexShrink: 0 }} />
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--bone)', lineHeight: 1.5 }}>
-                          {text("Ricevi la newsletter weekly Chrispy BMX", "Get the weekly Chrispy BMX newsletter")} <span style={{ fontSize: 14, color: 'var(--gray-400)' }}>{text("(facoltativo, disiscrizione con un click)", "(optional, unsubscribe with one click)")}</span>
+                          {NEWSLETTER_CONSENT_TEXT} <span style={{ fontSize: 14, color: 'var(--gray-400)' }}>{text("(facoltativo, disiscrizione con un click)", "(optional, unsubscribe with one click)")}</span>
                         </span>
                       </label>
                     </div>

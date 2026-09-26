@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { chooseNewsletter, newsletterPreferencesEnabled } from '@/lib/newsletter-preferences';
 import { supabaseAdmin, supabaseServer } from '@/lib/supabase';
 
 /**
@@ -10,7 +11,7 @@ import { supabaseAdmin, supabaseServer } from '@/lib/supabase';
  * 1. Anonimizza spot approvati (restano sulla mappa come "Chrispy Maps")
  * 2. Cancella spot pending/rejected
  * 3. Anonimizza/elimina tutti i dati personali
- * 4. Rimuovi da MailerLite (best-effort)
+ * 4. Rimuovi da MailerLite prima delle modifiche ai dati
  * 5. Solo se tutti gli step precedenti OK → elimina Auth user
  *
  * Ogni step critico controlla { error }. Se uno fallisce, l'utente Auth
@@ -46,6 +47,19 @@ export async function DELETE(req: NextRequest) {
         throw new StepError(label, error.message);
       }
       return data;
+    }
+
+    // Withdraw before deleting any account data: pending signup jobs and older
+    // confirmation links must never recreate a mailing subscription afterwards.
+    if (email && newsletterPreferencesEnabled()) {
+      const synced = await chooseNewsletter(email, false, 'account_delete');
+      if (!synced) return NextResponse.json({ok:false,error:'La revoca newsletter è salvata ma ancora in attesa. Riprova la cancellazione tra qualche minuto.'},{status:503});
+    }
+    if (email && process.env.MAILERLITE_API_KEY) {
+      const removal = await fetch(`https://connect.mailerlite.com/api/subscribers/${encodeURIComponent(email)}`, {
+        method:'DELETE',headers:{Authorization:`Bearer ${process.env.MAILERLITE_API_KEY}`},signal:AbortSignal.timeout(5000),
+      });
+      if (!removal.ok && removal.status !== 404) return NextResponse.json({ok:false,error:'Non riesco a completare la rimozione da MailerLite. L’account non è stato eliminato; riprova.'},{status:503});
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -150,30 +164,6 @@ export async function DELETE(req: NextRequest) {
     );
 
     /* ═══════════════════════════════════════════════════════
-       FASE 3 — MailerLite (best-effort, non blocca)
-       ═══════════════════════════════════════════════════════ */
-
-    if (email) {
-      try {
-        const mlKey = process.env.MAILERLITE_API_KEY;
-        if (mlKey) {
-          await fetch(
-            `https://connect.mailerlite.com/api/subscribers/${encodeURIComponent(email)}`,
-            {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${mlKey}`,
-              },
-            },
-          );
-        }
-      } catch (mlErr) {
-        console.warn('[user/delete] MailerLite removal failed (non-blocking):', mlErr);
-      }
-    }
-
-    /* ═══════════════════════════════════════════════════════
        FASE 4 — Elimina Auth user (solo se tutto OK sopra)
        ═══════════════════════════════════════════════════════ */
 
@@ -189,7 +179,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     if (err instanceof StepError) {
-      // Step critico fallito → Auth user NON eliminato → dati integri
+      // Auth user remains; previous successful steps may already have changed data.
       return NextResponse.json(
         { ok: false, error: 'Errore durante l\'eliminazione. Riprova o contattaci.' },
         { status: 500 },

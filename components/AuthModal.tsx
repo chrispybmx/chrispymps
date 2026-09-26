@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
 import DateWheels from '@/components/DateWheels';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
+import { NEWSLETTER_CONSENT_TEXT } from '@/lib/newsletter-consent';
 import { TracciaFunnel } from '@/lib/funnel';
 import PersonalizzaMappa from '@/components/PersonalizzaMappa';
 import { REGIONI_ITALIA } from '@/lib/constants';
@@ -35,13 +36,14 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [regPassword,  setRegPassword] = useState('');
   const [usernameOk,   setUsernameOk]  = useState<boolean | null>(null);
   const [checkingUn,   setCheckingUn]  = useState(false);
+  const [newsletterMessage, setNewsletterMessage] = useState('');
   const [newsletter, setNewsletter] = useState(false);
   const [birthDate,  setBirthDate]  = useState('');
   const [region,     setRegion]     = useState('');
   const [rilevando,  setRilevando]  = useState(false);
 
   /* Traccia del percorso di registrazione: quanto ci mette, dove si ferma.
-     Anonima — vedi lib/funnel.ts. */
+     Disattivata — interfaccia legacy, vedi lib/funnel.ts. */
   const traccia = useRef<TracciaFunnel | null>(null);
 
   // Accedi
@@ -55,7 +57,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const unDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetAll = () => {
-    setError(null); setDone(null); setLoading(false);
+    setError(null); setDone(null); setNewsletterMessage(''); setLoading(false);
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
     setUsernameOk(null); setResetSent(false); setResetting(false);
@@ -116,10 +118,10 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setLoading(true); setError(null);
     traccia.current?.inviato();
     try {
-      const result = await signUp(regEmail, regPassword, regUsername, { newsletter, birthDate, region });
+      const result = await signUp(regEmail, regPassword, regUsername, { newsletter, birthDate, region, onNewsletterResult: setNewsletterMessage });
       traccia.current?.riuscito();
       setDone(result);
-      if (result === 'ok' && onSuccess) onSuccess();
+      if (result === 'ok' && onSuccess && !newsletter) onSuccess();
     } catch (e) {
       const msg = e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.");
       traccia.current?.errore(msg);
@@ -178,6 +180,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
         </div>
 
         {/* Done: email confirmation needed */}
+        {newsletterMessage && <p role="status" style={{padding:'12px 20px',lineHeight:1.5}}>{newsletterMessage}</p>}
         {done === 'confirm_email' && (
           <div style={{ padding: '40px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
@@ -354,7 +357,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                     <input type="checkbox" checked={newsletter} onChange={e => setNewsletter(e.target.checked)}
                       style={{ marginTop: 2, accentColor: 'var(--orange)', width: 16, height: 16, flexShrink: 0 }} />
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.5 }}>
-                      {text("Voglio ricevere la newsletter BMX di Chrispy Maps", "I want to receive the Chrispy Maps BMX newsletter")}
+                      {NEWSLETTER_CONSENT_TEXT}
                     </span>
                   </label>
                 )}

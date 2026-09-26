@@ -203,7 +203,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // ── 10. Rate limit newsletter subscribe: 3 / 10 minuti per IP ──
-  if (pathname === '/api/newsletter/subscribe' && req.method === 'POST') {
+  if (['/api/newsletter/subscribe','/api/newsletter/confirm'].includes(pathname) && req.method === 'POST') {
     const { allowed } = await checkRateLimit(`newsletter:${ip}`, 3, 10 * 60 * 1000);
     if (!allowed) {
       return NextResponse.json({ ok: false, error: 'Troppe richieste. Riprova tra qualche minuto.' }, { status: 429 });

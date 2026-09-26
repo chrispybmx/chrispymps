@@ -1,5 +1,6 @@
 'use client';
 
+import { trackMetric } from '@/lib/product-metrics';
 import { useState, useMemo, useEffect, useRef, useTransition, type FormEvent } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -131,7 +132,7 @@ export default function ScopriClient({ spots, loadError = false }: Props) {
   }, [user, visibleIds]); // state from this response must not trigger a second request
 
   function change<K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) { setFilters(previous => ({ ...previous, [key]: value, ...(key === 'country' ? { region: '' } : {}) })); }
-  function search(event: FormEvent) { event.preventDefault(); input.current?.blur(); heading.current?.focus({ preventScroll: true }); }
+  function search(event: FormEvent) { event.preventDefault(); if (filters.query.trim()) trackMetric('search_used', 'discover'); input.current?.blur(); heading.current?.focus({ preventScroll: true }); }
   function reset() { setFilters({ ...EMPTY_DISCOVER_FILTERS }); input.current?.focus(); }
   function loadMore() {
     const first = filtered[visibleCount]?.id;
