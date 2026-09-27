@@ -1,0 +1,23 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
+const mocks = vi.hoisted(() => ({ exchange: vi.fn(), verify: vi.fn(), complete: vi.fn(), insert: vi.fn() }));
+vi.mock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: { exchangeCodeForSession: mocks.exchange, verifyOtp: mocks.verify } }) }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: vi.fn(), set: vi.fn() }) }));
+vi.mock('@/lib/supabase', () => ({ supabaseAdmin: () => ({ from: () => ({ insert: mocks.insert }) }) }));
+vi.mock('@/lib/auth-onboarding', () => ({ completeAccount: mocks.complete }));
+import { GET, POST } from '@/app/auth/callback/route';
+const response = { data: { session: { user: { id: 'rider' } } }, error: null };
+beforeEach(() => { vi.clearAllMocks(); mocks.exchange.mockResolvedValue(response); mocks.verify.mockResolvedValue(response); mocks.complete.mockResolvedValue({ profileReady: true, pending: false }); });
+const call = (query: string) => query.includes('token_hash=') ? POST(new NextRequest('https://maps.chrispybmx.com/auth/callback', {method:'POST', body:new URLSearchParams(query)})) : GET(new NextRequest('https://maps.chrispybmx.com/auth/callback?' + query));
+describe('email and OAuth callback', () => {
+  it('does not consume a token when an email scanner opens the link', async () => { const r=await GET(new NextRequest('https://maps.chrispybmx.com/auth/callback?token_hash=token&type=email')); expect(r.headers.get('location')).toContain('/auth/confirm?'); expect(mocks.verify).not.toHaveBeenCalled(); });
+  it('exchanges a code and returns to the original spot', async () => { const r = await call('code=valid&next=%2Fmap%2Fspot%2Froma'); expect(r.headers.get('location')).toBe('https://maps.chrispybmx.com/map/spot/roma'); expect(mocks.exchange).toHaveBeenCalledWith('valid'); });
+  it('verifies a signup token without requiring a PKCE cookie', async () => { await call('token_hash=token&type=email'); expect(mocks.verify).toHaveBeenCalledWith({ token_hash: 'token', type: 'email' }); expect(mocks.exchange).not.toHaveBeenCalled(); });
+  it('routes recovery to password reset without sending welcome email', async () => { const r = await call('token_hash=token&type=recovery'); expect(r.headers.get('location')).toContain('/auth/reset-password'); expect(mocks.complete).not.toHaveBeenCalled(); });
+  it('also routes PKCE recovery links', async () => { const r = await call('code=valid&flow=recovery'); expect(r.headers.get('location')).toContain('/auth/reset-password'); });
+  it('rejects external return destinations', async () => { const r = await call('code=valid&next=https://evil.example'); expect(r.headers.get('location')).toBe('https://maps.chrispybmx.com/map'); });
+  it('does not complete an expired confirmation', async () => { mocks.verify.mockResolvedValue({ data: { session: null }, error: { code: 'otp_expired', message: 'expired' } }); const r = await call('token_hash=old&type=email'); expect(r.headers.get('location')).toContain('/auth/problem'); expect(mocks.complete).not.toHaveBeenCalled(); });
+  it('rejects unsupported token types', async () => { const r = await call('token_hash=token&type=admin'); expect(r.headers.get('location')).toContain('/auth/problem'); expect(mocks.verify).not.toHaveBeenCalled(); });
+  it('preserves the destination when a username is still required', async () => { mocks.complete.mockResolvedValue({ profileReady: false, pending: false }); const r = await call('code=valid&next=%2Fmap%3Fadd%3D1'); expect(r.headers.get('location')).toContain('/auth/setup-username?next=%2Fmap%3Fadd%3D1'); });
+  it('does not silently hide incomplete optional setup', async () => { mocks.complete.mockResolvedValue({ profileReady: true, pending: true }); const r = await call('code=valid'); expect(r.headers.get('location')).toContain('account_pending=1'); });
+});

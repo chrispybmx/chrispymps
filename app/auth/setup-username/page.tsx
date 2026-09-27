@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { checkUsername, setupGoogleUsername } from '@/lib/auth-client';
+import { safeAuthNext } from '@/lib/auth-navigation';
 import { AUTH_ERROR_PARAM } from '@/lib/auth-errors';
 
 interface SessionInfo {
@@ -35,7 +36,7 @@ export default function SetupUsernamePage() {
       const { data: profile } = await sb
         .from('profiles').select('username').eq('id', s.user.id).maybeSingle();
       if (profile?.username) {
-        router.replace('/map');
+        router.replace(safeAuthNext(new URLSearchParams(window.location.search).get('next')));
       } else {
         setSession({ id: s.user.id, email: s.user.email ?? '', accessToken: s.access_token });
       }
@@ -45,7 +46,7 @@ export default function SetupUsernamePage() {
     sb.auth.getSession().then(({ data }) => resolve(data.session));
 
     // 2. Ascolta i cambiamenti (SIGNED_IN arriva dopo l'OAuth callback)
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_, s) => resolve(s));
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_, s) => { queueMicrotask(() => { void resolve(s); }); });
 
     // 3. Timeout: se dopo 6 secondi non c'è sessione → non loggato → /map
     const timeout = setTimeout(() => {
@@ -64,18 +65,21 @@ export default function SetupUsernamePage() {
     if (session === null) router.replace(`/map?${AUTH_ERROR_PARAM}=no_session`);
   }, [session, router]);
 
-  let unDebounce: ReturnType<typeof setTimeout>;
+  const unDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkedName = useRef('');
+  useEffect(() => () => { if (unDebounce.current) clearTimeout(unDebounce.current); }, []);
   const onUsernameChange = (val: string) => {
     const clean = val.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
     setUsername(clean);
     setUsernameOk(null);
-    clearTimeout(unDebounce);
+    checkedName.current = clean;
+    if (unDebounce.current) clearTimeout(unDebounce.current);
     if (clean.length < 3) return;
     setCheckingUn(true);
-    unDebounce = setTimeout(async () => {
-      const free = await checkUsername(clean);
-      setUsernameOk(free);
-      setCheckingUn(false);
+    unDebounce.current = setTimeout(async () => {
+      try { const free = await checkUsername(clean); if (checkedName.current === clean) setUsernameOk(free); }
+      catch { if (checkedName.current === clean) setError('Verifica username non disponibile. Riprova.'); }
+      finally { if (checkedName.current === clean) setCheckingUn(false); }
     }, 600);
   };
 
@@ -87,7 +91,7 @@ export default function SetupUsernamePage() {
     setError(null);
     try {
       await setupGoogleUsername(session.id, username, session.accessToken);
-      router.replace('/map');
+      router.replace(safeAuthNext(new URLSearchParams(window.location.search).get('next')));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore sconosciuto');
       setLoading(false);

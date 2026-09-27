@@ -1,3 +1,4 @@
+import { authReturnUrl } from './auth-navigation';
 import { NEWSLETTER_CONSENT_VERSION } from './newsletter-consent';
 import { puoRicevereMarketing } from './rider-profile';
 import { supabaseBrowser } from './supabase-browser';
@@ -12,7 +13,8 @@ export interface UserSession {
 /** Controlla se uno username è disponibile */
 export async function checkUsername(username: string): Promise<boolean> {
   const sb = supabaseBrowser();
-  const { data } = await sb.from('profiles').select('id').eq('username', username).maybeSingle();
+  const { data, error } = await sb.from('profiles').select('id').ilike('username', username).maybeSingle();
+  if (error) throw new Error('Verifica username non disponibile. Riprova.');
   return !data; // true = libero
 }
 
@@ -21,7 +23,7 @@ export async function signUp(
   email: string,
   password: string,
   username: string,
-  opts?: { newsletter?: boolean; birthDate?: string; region?: string; over16?: boolean; onNewsletterResult?: (message: string) => void },
+  opts?: { returnTo?: string; newsletter?: boolean; birthDate?: string; region?: string; over16?: boolean; onNewsletterResult?: (message: string) => void },
 ): Promise<'ok' | 'confirm_email'> {
   const sb = supabaseBrowser();
 
@@ -30,42 +32,12 @@ export async function signUp(
   if (!free) throw new Error('Username già in uso. Scegline un altro.');
 
   // 2. Crea account Supabase (username salvato anche in user_metadata per accesso rapido)
-  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username } } });
+  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: authReturnUrl(opts?.returnTo), data: { username, onboarding_pending: true, initial_rider_details: { birthDate: opts?.birthDate ?? null, region: opts?.region ?? null } } } });
   if (error) throw new Error(translateAuthError(error.message));
   if (!data.user) throw new Error('Errore nella registrazione. Riprova.');
 
-  // 3. Crea profilo
-  if (data.session) {
-    const { error: profileErr } = await sb.from('profiles').insert({ id:data.user.id, username });
-    if (profileErr) throw new Error(profileErr.message);
-  }
-
-  /* 4. Dati del rider + newsletter — passano dal server.
-        La regola sui minorenni non può stare qui: dal browser si aggira. Il
-        server salva su rider_details e decide se l'iscrizione parte davvero. */
-  if (data.session?.access_token) {
-    fetch('/api/rider/details', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${data.session.access_token}`,
-      },
-      body: JSON.stringify({
-        birthDate:  opts?.birthDate ?? null,
-        region:     opts?.region ?? null,
-        username,
-      }),
-    }).catch(() => { /* non blocca la registrazione */ });
-  }
-
-  /* Gruppo "Spot Submission": email di benvenuto e regolamento della mappa.
-     Resta legato all'account, non alla newsletter. */
-  if (data.session?.access_token) {
-    fetch('/api/newsletter/subscribe', {
-      method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`},
-      body:JSON.stringify({source:'submit-spot'}),
-    }).catch(() => {});
-  }
+  // Account confirmation and marketing confirmation are independent.
+  if (data.session) await completeSignedInAccount(data.session.access_token);
   if (opts?.newsletter && (puoRicevereMarketing(opts.birthDate) || (!opts.birthDate && opts.over16 === true))) {
     // Confirmation email proves ownership before any marketing group is changed.
     try {
@@ -88,8 +60,9 @@ export async function signUp(
 /** Login */
 export async function signIn(email: string, password: string): Promise<void> {
   const sb = supabaseBrowser();
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw new Error(translateAuthError(error.message));
+  if (data.session) await completeSignedInAccount(data.session.access_token);
 }
 
 /** Login con Google (OAuth) */
@@ -98,7 +71,7 @@ export async function signInWithGoogle(): Promise<void> {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: authReturnUrl().replace('flow=email', 'flow=oauth'),
       queryParams: { access_type: 'offline', prompt: 'select_account' },
     },
   });
@@ -140,7 +113,7 @@ export async function setupGoogleUsername(userId: string, username: string, acce
 /** Reset password — invia email con link (scade in 1 ora) */
 export async function resetPassword(email: string): Promise<void> {
   const sb = supabaseBrowser();
-  const redirectTo = `${window.location.origin}/auth/reset-password`;
+  const redirectTo = `${window.location.origin}/auth/callback?flow=recovery`;
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) throw new Error(translateAuthError(error.message));
 }
@@ -185,4 +158,17 @@ function translateAuthError(msg: string): string {
   if (msg.includes('User already registered'))   return 'Questa email è già registrata. Prova ad accedere.';
   if (msg.includes('Password should be'))        return 'La password deve essere di almeno 6 caratteri.';
   return msg;
+}
+
+async function completeSignedInAccount(token: string): Promise<void> {
+  try {
+    const response = await fetch('/api/auth/complete', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(12000) });
+    const result = await response.json();
+    if (response.ok && result.profileReady === false) window.location.assign(`/auth/setup-username?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+    else if (!response.ok || result.pending) window.dispatchEvent(new Event('chrispy:account-incomplete'));
+  } catch { window.dispatchEvent(new Event('chrispy:account-incomplete')); }
+}
+export async function resendConfirmation(email: string, next?: string): Promise<void> {
+  const { error } = await supabaseBrowser().auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: authReturnUrl(next) } });
+  if (error) throw new Error(translateAuthError(error.message));
 }

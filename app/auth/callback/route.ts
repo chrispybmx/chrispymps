@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { safeAuthNext } from '@/lib/auth-navigation';
+import { completeAccount } from '@/lib/auth-onboarding';
 import { supabaseAdmin } from '@/lib/supabase';
 
 const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -9,6 +11,7 @@ const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /** Registra il fallimento su auth_failure_log. Non deve mai far cadere il flusso. */
 async function logAuthFailure(params: {
+  provider?: 'email' | 'google';
   errorCode: string | null;
   errorDetail: string | null;
   stage: 'provider_redirect' | 'code_exchange';
@@ -16,7 +19,7 @@ async function logAuthFailure(params: {
 }) {
   try {
     await supabaseAdmin().from('auth_failure_log').insert({
-      provider:     'google',
+      provider:     params.provider ?? 'google',
       error_code:   params.errorCode,
       error_detail: params.errorDetail,
       stage:        params.stage,
@@ -28,9 +31,35 @@ async function logAuthFailure(params: {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  if (request.nextUrl.searchParams.has('token_hash')) {
+    const destination = new URL('/auth/confirm', request.url);
+    for (const key of ['token_hash', 'type', 'next', 'flow']) {
+      const value = request.nextUrl.searchParams.get(key); if (value) destination.searchParams.set(key, value);
+    }
+    return NextResponse.redirect(destination);
+  }
+  return handleCallback(request, request.nextUrl.searchParams);
+}
+export async function POST(request: NextRequest) {
+  const params = new URLSearchParams();
+  try {
+    const form = await request.formData();
+    for (const key of ['token_hash', 'type', 'next', 'flow']) {
+      const value = form.get(key); if (typeof value === 'string' && value.length <= 2048) params.set(key, value);
+    }
+  } catch { return NextResponse.redirect(new URL('/auth/problem', request.url), 303); }
+  return handleCallback(request, params);
+}
+async function handleCallback(request: NextRequest, searchParams: URLSearchParams) {
+  const { origin } = new URL(request.url);
+  const redirect = (destination: string | URL) => NextResponse.redirect(destination, request.method === 'POST' ? 303 : 307);
   const code  = searchParams.get('code');
   const error = searchParams.get('error');
+  const tokenHash = searchParams.get('token_hash');
+  const type = searchParams.get('type');
+  const next = safeAuthNext(searchParams.get('next'));
+  const recovery = type === 'recovery' || searchParams.get('flow') === 'recovery';
+  const emailFlow = !!tokenHash || recovery || searchParams.get('flow') === 'email';
 
   if (error) {
     /* Supabase e Google mandano ANCHE error_description / error_code con il
@@ -41,6 +70,7 @@ export async function GET(request: NextRequest) {
     const errorCode   = searchParams.get('error_code');
     console.error('[auth/callback] provider error:', { error, errorCode, description });
     await logAuthFailure({
+      provider: emailFlow ? 'email' : 'google',
       errorCode:   errorCode ?? error,
       errorDetail: description,
       stage:       'provider_redirect',
@@ -50,12 +80,11 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams({ auth_error: error });
     if (description) params.set('auth_error_detail', description);
     if (errorCode)   params.set('auth_error_code', errorCode);
-    return NextResponse.redirect(`${origin}/map?${params.toString()}`);
+    return redirect(emailFlow ? `${origin}/auth/problem` : `${origin}/map?${params.toString()}`);
   }
 
-  if (!code) {
-    return NextResponse.redirect(`${origin}/map?auth_error=no_code`);
-  }
+  if (!code && !tokenHash) return redirect(`${origin}/auth/problem`);
+  if (tokenHash && !['email', 'signup', 'recovery', 'email_change'].includes(type ?? '')) return redirect(`${origin}/auth/problem`);
 
   const cookieStore = cookies();
 
@@ -73,35 +102,28 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error: exchangeError } = await (tokenHash ? supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as 'email' | 'signup' | 'recovery' | 'email_change' }) : supabase.auth.exchangeCodeForSession(code!));
 
   if (exchangeError || !data.session) {
     /* Logghiamo il messaggio esatto: è l'unico modo per sapere se salta lo
        scambio PKCE, il cookie o la rete. Vedi lib/auth-errors.ts. */
     console.error('[auth/callback] exchangeCodeForSession error:', exchangeError?.message, exchangeError);
     await logAuthFailure({
+      provider: emailFlow ? 'email' : 'google',
       errorCode:   exchangeError?.code ?? 'exchange_failed',
       errorDetail: exchangeError?.message ?? 'nessun messaggio',
       stage:       'code_exchange',
       userAgent:   request.headers.get('user-agent'),
     });
-    return NextResponse.redirect(`${origin}/map?auth_error=oauth_failed`);
+    return redirect(`${origin}/auth/problem`);
   }
 
-  const userId = data.session.user.id;
-
-  // Controlla se il profilo esiste già
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (profile?.username) {
-    // Utente esistente — vai alla mappa
-    return NextResponse.redirect(`${origin}/map`);
-  }
-
-  // Nuovo utente Google — deve scegliere username
-  return NextResponse.redirect(`${origin}/auth/setup-username`);
+  if (recovery) return redirect(`${origin}/auth/reset-password`);
+  try {
+    const result = await completeAccount(data.session.user);
+    if (!result.profileReady) return redirect(`${origin}/auth/setup-username?next=${encodeURIComponent(next)}`);
+    const destination = new URL(next, origin);
+    if (result.pending) destination.searchParams.set('account_pending', '1');
+    return redirect(destination);
+  } catch { return redirect(`${origin}/auth/problem?stage=profile`); }
 }
