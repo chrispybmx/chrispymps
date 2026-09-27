@@ -6,6 +6,7 @@ import { APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
 import { ToastProvider } from '@/components/Toast';
 import MetricClicks from '@/components/MetricClicks';
+import Statistiche from '@/components/Statistiche';
 import CookieBanner from '@/components/CookieBanner';
 import { LanguageProvider } from '@/components/LanguageProvider';
 
@@ -165,6 +166,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <CookieBanner />
           <MetricClicks />
+          <Statistiche />
         </ToastProvider></LanguageProvider>
       </body>
     </html>

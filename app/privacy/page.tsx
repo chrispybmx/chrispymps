@@ -330,6 +330,7 @@ export default function PrivacyPage() {
         </section>
         <section id="statistiche" style={styles.section}>
           <h2 style={styles.h2}>Statistiche di utilizzo della mappa</h2>
+          <p style={styles.p}>Visite al sito: usiamo Vercel Web Analytics per contare in forma aggregata le pagine visitate, il sito di provenienza, il Paese, il tipo di dispositivo, il sistema operativo e il browser. Non usa cookie e non conserva l’indirizzo IP: per distinguere le visite usa un identificativo calcolato dalla richiesta, che viene scartato dopo 24 ore. Non conteggiamo le pagine di accesso, recupero password e conferma newsletter, e togliamo dagli indirizzi i parametri che potrebbero contenere codici personali. I dati sono trattati da Vercel Inc. per il nostro legittimo interesse a capire come viene usato il sito (art. 6, par. 1, lett. f GDPR) e restano consultabili per 30 giorni.</p>
           {process.env.PRODUCT_METRICS_ENABLED === 'true' ? <p style={styles.p}>Contiamo ricerche confermate, aperture delle schede, clic sulle indicazioni e aperture e invii del modulo aggiungi spot. I contatori sono raggruppati per giorno e sezione, senza testo cercato, coordinate, email o identificatori dei rider. Non colleghiamo le azioni tra loro e non usiamo cookie analitici. I contatori sono conservati per 90 giorni per migliorare il servizio. Le normali richieste HTTP possono essere trattate nei log tecnici dei fornitori.</p> : <p style={styles.p}>La nuova raccolta dei contatori di utilizzo della mappa è disattivata. La precedente telemetria dei tentativi di registrazione è stata ritirata; l’eventuale storico e i log tecnici restano soggetti alle richieste di accesso e cancellazione e alla gestione della conservazione da parte del titolare.</p>}
         </section>
 
@@ -347,7 +348,7 @@ export default function PrivacyPage() {
               storage
             </li>
             <li style={styles.li}>
-              <strong>Vercel Inc.</strong> (USA) — hosting e CDN
+              <strong>Vercel Inc.</strong> (USA) — hosting, CDN e statistiche aggregate delle visite (Web Analytics, senza cookie)
             </li>
             <li style={styles.li}>
               <strong>Resend Inc.</strong> (USA) — invio email transazionali
@@ -518,7 +519,8 @@ export default function PrivacyPage() {
             Chrispy Maps utilizza esclusivamente{' '}
             <strong>cookie tecnici e necessari</strong> per il funzionamento del
             servizio. Non vengono utilizzati cookie di profilazione, tracciamento
-            o di terze parti a fini pubblicitari.
+            o di terze parti a fini pubblicitari. Le statistiche delle visite
+            (Vercel Web Analytics) non usano cookie né memoria locale del browser.
           </p>
 
           <h3 style={styles.h3}>Cookie utilizzati</h3>
