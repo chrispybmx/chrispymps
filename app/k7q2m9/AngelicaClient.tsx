@@ -7,13 +7,14 @@ import styles from './angelica.module.css';
    Le altre scappano. Per cambiare le domande basta toccare questo elenco. */
 const QUIZ = [
   { q: 'Il sabato sera perfetto?', a: ['Discoteca fino all’alba', 'Divano, copertina e a letto alle 23'], ok: 1 },
+  { q: 'Chi comanda davvero in casa?', a: ['Io', 'Il Bimby', 'Lilli'], ok: 2 },
   { q: 'Cosa fa rumore quando ti alzi dal divano?', a: ['Le ginocchia', 'Niente, sono una piuma'], ok: 0 },
-  { q: 'Prima di comprare un vestito controlli…', a: ['Se va di moda', 'Se si lava in lavatrice'], ok: 1 },
-  { q: 'Dopo una serata fuori ti riprendi in…', a: ['Una notte di sonno', 'Mezza giornata', 'Tre giorni lavorativi'], ok: 2 },
+  { q: 'Il Bimby per te è…', a: ['Solo un elettrodomestico', 'Un membro della famiglia'], ok: 1 },
+  { q: 'Hai appena comprato casa. La frase che dici di più?', a: ['“Togliti le scarpe”', '“Fate come a casa vostra”'], ok: 0 },
   { q: 'Il drink della serata?', a: ['Tisana zenzero e limone', 'Shottini di tequila'], ok: 0 },
+  { q: 'Lilli ti sveglia alle 5 di mattina. Tu…', a: ['Continui a dormire tranquilla', 'Ti alzi e le dai da mangiare'], ok: 1 },
+  { q: 'Tra qualche anno sulla tua porta ci sarà scritto…', a: ['Stagista', 'Torno subito', 'Direttrice'], ok: 2 },
   { q: 'A che ora è “tardi”?', a: ['Le 4 di notte', 'Mezzanotte', 'Le 22:30'], ok: 2 },
-  { q: 'Il regalo che ti emoziona di più?', a: ['Una friggitrice ad aria', 'Un biglietto per un rave'], ok: 0 },
-  { q: 'Ti fa male la schiena perché…', a: ['Hai dormito storta', 'Hai fatto parkour'], ok: 0 },
   { q: 'Ultima domanda: quanti anni compi?', a: ['29, di nuovo', '30', '18 dentro'], ok: 1 },
 ];
 
