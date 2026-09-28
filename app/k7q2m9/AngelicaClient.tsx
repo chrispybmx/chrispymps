@@ -13,7 +13,7 @@ const QUIZ = [
   { q: 'Hai appena comprato casa. E adesso?', a: ['Ora compro una macchina e guardo un’altra casa', 'Adesso risparmio'], ok: 0 },
   { q: 'Il drink della serata?', a: ['Tisana zenzero e limone', 'Shottini di tequila'], ok: 0 },
   { q: 'Iscriversi in palestra?', a: ['No', 'Sì, se posso andarci in macchina: 5 minuti in bici sono troppo faticosi'], ok: 1 },
-  { q: 'Lilli ha appena mangiato gli snackini. Cosa vuole adesso?', a: ['Coccole', 'Bacini'], ok: 1 },
+  { q: 'Lilli ha appena mangiato gli snackini. Cosa vuole adesso?', a: ['Coccole', 'Altri snackini', 'Bacini'], ok: 1 },
   { q: 'Tra qualche anno sulla tua porta ci sarà scritto…', a: ['Stagista', 'Torno subito', 'Direttrice'], ok: 2 },
   { q: 'A che ora è “tardi”?', a: ['Le 4 di notte', 'Mezzanotte', 'Le 22:30'], ok: 2 },
   { q: 'Ultima domanda: quanti anni compi?', a: ['29, di nuovo', '30', '18 dentro'], ok: 1 },
