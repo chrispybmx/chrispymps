@@ -246,6 +246,27 @@ export default function RegolePage() {
           </p>
         </section>
 
+        {/* -------------------------------------------------------- */}
+        {/*  Segnalazione contenuti altrui (Digital Services Act)     */}
+        {/* -------------------------------------------------------- */}
+        <section style={styles.section}>
+          <h2 style={styles.h2}>SE UNA FOTO È TUA E NON L’HAI CARICATA TU</h2>
+          <p style={styles.p}>
+            Se trovi sulla mappa una tua foto, o un contenuto che viola i tuoi
+            diritti o la legge,{' '}
+            <a href="mailto:christian.ceresato@gmail.com?subject=Segnalazione%20contenuto" style={styles.link}>
+              scrivimi
+            </a>{' '}
+            con il link dello spot, cosa va tolto e perché, e come contattarti.
+          </p>
+          <p style={styles.p}>
+            Guardo ogni segnalazione entro pochi giorni. Se è fondata tolgo il
+            contenuto e avviso chi l’ha caricato; se non lo tolgo, ti spiego il
+            motivo. Chi ha caricato il contenuto può rispondermi allo stesso
+            indirizzo.
+          </p>
+        </section>
+
         <div style={{ textAlign: 'center', margin: '32px 0 16px' }}>
           <a href="/map?add=1" style={styles.cta}>
             🏴 AGGIUNGI UNO SPOT
