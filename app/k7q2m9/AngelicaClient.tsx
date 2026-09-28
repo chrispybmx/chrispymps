@@ -3,25 +3,49 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import styles from './angelica.module.css';
 
-type Step = 'start' | 'ask' | 'yes' | 'no';
+type Step = 'start' | 'ask' | 'no' | 'quiz' | 'final';
 
-const TASK_LABEL: Record<Exclude<Step, 'yes'>, string> = { start: 'Messaggio', ask: 'Conferma', no: 'Errore' };
+const TASK_LABEL: Record<Exclude<Step, 'final'>, string> = { start: 'Messaggio', ask: 'Conferma', no: 'Errore', quiz: 'Quiz' };
+
+/* Il quiz: `ok` e' l'indice della risposta giusta, l'unica cliccabile.
+   Le altre scappano. Per cambiare le domande basta toccare questo elenco. */
+const QUIZ = [
+  { q: 'Il sabato sera perfetto?', a: ['Discoteca fino all’alba', 'Divano, copertina e a letto alle 23'], ok: 1 },
+  { q: 'Cosa fa rumore quando ti alzi dal divano?', a: ['Le ginocchia', 'Niente, sono una piuma'], ok: 0 },
+  { q: 'Dopo una serata fuori ti riprendi in…', a: ['Una notte di sonno', 'Mezza giornata', 'Tre giorni lavorativi'], ok: 2 },
+  { q: 'Il regalo che ti emoziona di più?', a: ['Una friggitrice ad aria', 'Un biglietto per un rave'], ok: 0 },
+  { q: 'Ultima domanda: quanti anni compi?', a: ['29, di nuovo', '30', '18 dentro'], ok: 1 },
+];
 
 export default function AngelicaClient({ fontClass }: { fontClass: string }) {
   const [step, setStep] = useState<Step>('start');
+  const [qi, setQi] = useState(0);
 
-  if (step === 'yes') {
+  if (step === 'final') {
     return (
       <main className={`${fontClass} ${styles.desktop} ${styles.night}`}>
         <Fireworks />
-        <section className={`${styles.window} ${styles.party}`} aria-labelledby="auguri-title">
-          <div className={styles.titleBar}><span>auguri.exe</span></div>
-          <h1 id="auguri-title" className={styles.auguri}>Tanti auguri Angelica!</h1>
-          <p className={styles.statusBar}>Tocca lo schermo per altri fuochi</p>
-        </section>
+        <div className={styles.flash} aria-hidden="true" />
+        <div className={styles.finale}>
+          <p className={styles.intro}>Ange, mia sorella,</p>
+          <p className={styles.level}>il livello 3</p>
+          <LevelThree />
+          <section className={`${styles.window} ${styles.late}`} aria-labelledby="auguri-title">
+            <div className={styles.titleBar}><span>auguri.exe</span></div>
+            <div className={styles.message}>
+              <p>Sei forte. Questo è solo l’inizio: hai creato le basi per avere vero successo.</p>
+              <p>Ora è il momento di lavorare davvero, ma per le cose importanti, quelle che non puoi comprare.</p>
+            </div>
+            <h1 id="auguri-title" className={styles.auguri}>Buon compleanno Angelica!</h1>
+            <p className={styles.statusBar}>Tocca lo schermo per altri fuochi</p>
+          </section>
+        </div>
       </main>
     );
   }
+
+  const question = QUIZ[qi];
+  const next = () => (qi + 1 < QUIZ.length ? setQi(qi + 1) : setStep('final'));
 
   return (
     <main className={`${fontClass} ${styles.desktop}`}>
@@ -34,7 +58,7 @@ export default function AngelicaClient({ fontClass }: { fontClass: string }) {
       {step === 'ask' && (
         <Dialog title="Conferma" icon="question" onClose={() => setStep('start')}
           actions={<>
-            <button type="button" className={styles.button} autoFocus onClick={() => setStep('yes')}>Sì</button>
+            <button type="button" className={styles.button} autoFocus onClick={() => setStep('quiz')}>Sì</button>
             <button type="button" className={styles.button} onClick={() => setStep('no')}>No</button>
           </>}>
           Confermi di essere Angelica?
@@ -47,6 +71,21 @@ export default function AngelicaClient({ fontClass }: { fontClass: string }) {
           <strong className={styles.errorCode}>Errore 404</strong>
           Pagina non trovata.
         </Dialog>
+      )}
+
+      {step === 'quiz' && (
+        <section key={qi} className={`${styles.window} ${styles.quiz}`} aria-labelledby="quiz-q">
+          <div className={styles.titleBar}><span>quiz_30_anni.exe · {qi + 1} di {QUIZ.length}</span></div>
+          <p id="quiz-q" className={styles.question}>{question.q}</p>
+          <div className={styles.answers}>
+            {question.a.map((answer, i) => i === question.ok
+              ? <button key={answer} type="button" className={`${styles.button} ${styles.answer}`} onClick={next}>{answer}</button>
+              : <Runaway key={answer}>{answer}</Runaway>)}
+          </div>
+          <div className={styles.progress} aria-hidden="true">
+            {QUIZ.map((_, i) => <span key={i} className={i < qi ? styles.progressDone : undefined} />)}
+          </div>
+        </section>
       )}
 
       <Taskbar label={TASK_LABEL[step]} />
@@ -73,6 +112,90 @@ function Dialog({ title, icon, onClose, actions, children }: {
       </div>
       <div className={styles.actions}>{actions}</div>
     </section>
+  );
+}
+
+/* Risposta sbagliata: appena il puntatore ci arriva sopra (o il dito la tocca)
+   salta in un punto a caso dello schermo. Il click non la seleziona mai. */
+function Runaway({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const flee = () => {
+    const button = ref.current;
+    if (!button) return;
+    const { width, height } = button.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - Math.min(width, window.innerWidth - 16) - 8);
+    const maxTop = Math.max(8, window.innerHeight - height - 56);
+    setPos({ left: 8 + Math.random() * (maxLeft - 8), top: 8 + Math.random() * (maxTop - 8) });
+  };
+  return (
+    <button ref={ref} type="button" className={`${styles.button} ${styles.answer} ${pos ? styles.fled : ''}`}
+      style={pos ?? undefined} onPointerEnter={flee} onPointerDown={flee} onClick={flee}>
+      {children}
+    </button>
+  );
+}
+
+/* Super Saiyan 3 a pixel, disegnato a meta': la riga completa e' la meta'
+   sinistra piu' il suo specchio. */
+const SPRITE_HALF = [
+  '...........K.......',
+  '..........KYK.....K',
+  '..........KYYK...KY',
+  '......K...KYYYK.KYY',
+  '......KYK.KYYYYKYYY',
+  '......KYYKKYYYYYYYY',
+  '.......KYYYYYYYYYYY',
+  '......KYYYYYYYYYYYY',
+  '.....KYYYYYYyYYYYYY',
+  '....KYYYYYYYyYYYYYY',
+  '...K.KYYYYYyYYYYYYY',
+  '..KY.KYYYYYyKKKKKYY',
+  '.KYYKYYYYYYyKSSSKYY',
+  'KYYY.KYYYYYyKSSSSKY',
+  '.KYY.KYYYYYyKSSSSSK',
+  '..KYKYYYYYYyKsKKKSS',
+  '..KY.KYYYYYyKSWGSSS',
+  '.KYY.KYYYYYyKSSSSSs',
+  'KYYYKYYYYYYyKsSSSSS',
+  'KYYy.KYYYYYyKsSSSKK',
+  '.KYy.KYYYYYYKsSSSSS',
+  '..KYKYYYYYYYyKsSSSS',
+  '..KY.KYYYYYYyyKKKKK',
+  '.KYY.KYYYYYYyyyyKsS',
+  'KYYYKYYYYYYyyyyyKsS',
+  'KYYy.KYYYYyKKKKKKsS',
+  '.KYy.KYYYKOOOOOOKBB',
+  '.KYYKYYYKOOOOOOOKBB',
+  'KYYYKYYKOOOOOOOOKBB',
+  'KYYy.KYKOOOOoOOOOKB',
+  'KYyKKYYKOOOOoOOOOKB',
+  '.KK..KYKOOOOoOOOOOK',
+  '....KYKOOOOOoOOOOOO',
+  '.....KKOOOOOoOOOOOO',
+  '....KOOOOOOOoOOOOOO',
+  '....KKKKKKKKKKKKKKK',
+];
+const SPRITE_COLORS: Record<string, string> = {
+  K: '#1a1008', Y: '#ffe13a', y: '#e8a200', S: '#ffcf9e', s: '#e89a6a',
+  W: '#ffffff', G: '#19b39b', O: '#ff7b00', o: '#c95500', B: '#2447c9',
+};
+
+function LevelThree() {
+  const rows = SPRITE_HALF.map(half => half + [...half].reverse().join(''));
+  const rects: ReactNode[] = [];
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length;) {
+      let end = x + 1;
+      while (end < row.length && row[end] === row[x]) end++;
+      if (row[x] !== '.') rects.push(<rect key={`${x}-${y}`} x={x} y={y} width={end - x} height={1} fill={SPRITE_COLORS[row[x]]} />);
+      x = end;
+    }
+  });
+  return (
+    <svg className={styles.sprite} viewBox={`0 0 ${rows[0].length} ${rows.length}`} shapeRendering="crispEdges" aria-hidden="true">
+      {rects}
+    </svg>
   );
 }
 

@@ -16,7 +16,11 @@
   user-select: none;
 }
 
+/* Finale: flex con margin auto sul figlio, cosi' se il contenuto e' piu' alto
+   dello schermo si scorre invece di tagliare la parte alta. */
 .night {
+  display: flex;
+  overflow-y: auto;
   padding-bottom: 16px;
   background: #000;
 }
@@ -192,23 +196,154 @@
   box-shadow: inset -1px -1px #fff, inset 1px 1px #808080;
 }
 
+/* ── Quiz ── */
+
+.quiz {
+  width: min(420px, 100%);
+}
+
+.question {
+  padding: 18px 16px 8px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.answers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 16px;
+}
+
+.answer {
+  width: 100%;
+  text-align: left;
+}
+
+.fled {
+  position: fixed;
+  z-index: 5;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+}
+
+.progress {
+  display: flex;
+  gap: 2px;
+  height: 22px;
+  margin: 0 16px 14px;
+  padding: 3px;
+  box-shadow: inset -1px -1px #fff, inset 1px 1px #808080;
+}
+
+.progress span {
+  flex: 1;
+}
+
+.progress .progressDone {
+  background: #000080;
+}
+
+/* ── Finale: "il livello 3", lampo, Goku, poi il messaggio ── */
+
 .fireworks {
-  position: absolute;
+  position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
   touch-action: manipulation;
+  animation: appear 1s 2.8s both;
 }
 
-.party {
+.finale {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   width: min(460px, 100%);
+  margin: auto;
+  animation: shake 0.5s steps(6) 1.2s;
+}
+
+.intro {
+  color: #fff;
+  font-size: clamp(22px, 6vw, 30px);
+  text-align: center;
+  animation: appear 0.4s both;
+}
+
+.level {
+  color: #ffe13a;
+  font-size: clamp(40px, 12vw, 64px);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 3px 3px 0 #b85c00, 0 0 18px #ffb000;
+  animation: appear 0.01s 1.2s both;
+}
+
+.sprite {
+  width: 190px;
+  height: auto;
+  margin: 8px 0 4px;
+  animation: appear 0.01s 1.2s both, aura 1.4s ease-in-out 1.2s infinite;
+}
+
+.flash {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  background: #fff;
+  pointer-events: none;
+  animation: flash 0.7s ease-out 1.2s both;
+}
+
+.late {
+  animation: appear 0.3s 2.8s both;
+}
+
+.message {
+  display: grid;
+  gap: 10px;
+  padding: 18px 16px 4px;
+  font-size: 17px;
+}
+
+@keyframes appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes flash {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: none; }
+  20% { transform: translate(-6px, 3px); }
+  40% { transform: translate(5px, -4px); }
+  60% { transform: translate(-4px, -2px); }
+  80% { transform: translate(3px, 4px); }
+}
+
+@keyframes aura {
+  0%, 100% { filter: drop-shadow(0 0 6px #ffd000) drop-shadow(0 0 14px #ffb000); }
+  50% { filter: drop-shadow(0 0 12px #fff27a) drop-shadow(0 0 30px #ffb000); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finale { animation: none; }
+  .flash { display: none; }
+  .sprite { animation: appear 0.01s 1.2s both; filter: drop-shadow(0 0 10px #ffd000); }
 }
 
 .auguri {
-  padding: 28px 20px;
-  font-size: clamp(30px, 9vw, 46px);
+  padding: 16px 20px 24px;
+  font-size: clamp(28px, 8vw, 40px);
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
