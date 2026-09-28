@@ -1,27 +1,27 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import styles from './angelica.module.css';
-
-type Step = 'start' | 'ask' | 'no' | 'quiz' | 'final';
-
-const TASK_LABEL: Record<Exclude<Step, 'final'>, string> = { start: 'Messaggio', ask: 'Conferma', no: 'Errore', quiz: 'Quiz' };
 
 /* Il quiz: `ok` e' l'indice della risposta giusta, l'unica cliccabile.
    Le altre scappano. Per cambiare le domande basta toccare questo elenco. */
 const QUIZ = [
   { q: 'Il sabato sera perfetto?', a: ['Discoteca fino all’alba', 'Divano, copertina e a letto alle 23'], ok: 1 },
   { q: 'Cosa fa rumore quando ti alzi dal divano?', a: ['Le ginocchia', 'Niente, sono una piuma'], ok: 0 },
+  { q: 'Prima di comprare un vestito controlli…', a: ['Se va di moda', 'Se si lava in lavatrice'], ok: 1 },
   { q: 'Dopo una serata fuori ti riprendi in…', a: ['Una notte di sonno', 'Mezza giornata', 'Tre giorni lavorativi'], ok: 2 },
+  { q: 'Il drink della serata?', a: ['Tisana zenzero e limone', 'Shottini di tequila'], ok: 0 },
+  { q: 'A che ora è “tardi”?', a: ['Le 4 di notte', 'Mezzanotte', 'Le 22:30'], ok: 2 },
   { q: 'Il regalo che ti emoziona di più?', a: ['Una friggitrice ad aria', 'Un biglietto per un rave'], ok: 0 },
+  { q: 'Ti fa male la schiena perché…', a: ['Hai dormito storta', 'Hai fatto parkour'], ok: 0 },
   { q: 'Ultima domanda: quanti anni compi?', a: ['29, di nuovo', '30', '18 dentro'], ok: 1 },
 ];
 
 export default function AngelicaClient({ fontClass }: { fontClass: string }) {
-  const [step, setStep] = useState<Step>('start');
   const [qi, setQi] = useState(0);
+  const [done, setDone] = useState(false);
 
-  if (step === 'final') {
+  if (done) {
     return (
       <main className={`${fontClass} ${styles.desktop} ${styles.night}`}>
         <Fireworks />
@@ -45,78 +45,31 @@ export default function AngelicaClient({ fontClass }: { fontClass: string }) {
   }
 
   const question = QUIZ[qi];
-  const next = () => (qi + 1 < QUIZ.length ? setQi(qi + 1) : setStep('final'));
+  const next = () => (qi + 1 < QUIZ.length ? setQi(qi + 1) : setDone(true));
 
   return (
     <main className={`${fontClass} ${styles.desktop}`}>
-      {step === 'start' && (
-        <button type="button" className={`${styles.button} ${styles.bigButton}`} onClick={() => setStep('ask')}>
-          Sei Angelica?
-        </button>
-      )}
+      <section key={qi} className={`${styles.window} ${styles.quiz}`} aria-labelledby="quiz-q">
+        <div className={styles.titleBar}><span>quiz_30_anni.exe · {qi + 1} di {QUIZ.length}</span></div>
+        <p id="quiz-q" className={styles.question}>{question.q}</p>
+        <div className={styles.answers}>
+          {question.a.map((answer, i) => i === question.ok
+            ? <button key={answer} type="button" className={`${styles.button} ${styles.answer}`} onClick={next}>{answer}</button>
+            : <Runaway key={answer}>{answer}</Runaway>)}
+        </div>
+        <div className={styles.progress} aria-hidden="true">
+          {QUIZ.map((_, i) => <span key={i} className={i < qi ? styles.progressDone : undefined} />)}
+        </div>
+      </section>
 
-      {step === 'ask' && (
-        <Dialog title="Conferma" icon="question" onClose={() => setStep('start')}
-          actions={<>
-            <button type="button" className={styles.button} autoFocus onClick={() => setStep('quiz')}>Sì</button>
-            <button type="button" className={styles.button} onClick={() => setStep('no')}>No</button>
-          </>}>
-          Confermi di essere Angelica?
-        </Dialog>
-      )}
-
-      {step === 'no' && (
-        <Dialog title="Errore" icon="error" onClose={() => setStep('start')}
-          actions={<button type="button" className={styles.button} autoFocus onClick={() => setStep('start')}>OK</button>}>
-          <strong className={styles.errorCode}>Errore 404</strong>
-          Pagina non trovata.
-        </Dialog>
-      )}
-
-      {step === 'quiz' && (
-        <section key={qi} className={`${styles.window} ${styles.quiz}`} aria-labelledby="quiz-q">
-          <div className={styles.titleBar}><span>quiz_30_anni.exe · {qi + 1} di {QUIZ.length}</span></div>
-          <p id="quiz-q" className={styles.question}>{question.q}</p>
-          <div className={styles.answers}>
-            {question.a.map((answer, i) => i === question.ok
-              ? <button key={answer} type="button" className={`${styles.button} ${styles.answer}`} onClick={next}>{answer}</button>
-              : <Runaway key={answer}>{answer}</Runaway>)}
-          </div>
-          <div className={styles.progress} aria-hidden="true">
-            {QUIZ.map((_, i) => <span key={i} className={i < qi ? styles.progressDone : undefined} />)}
-          </div>
-        </section>
-      )}
-
-      <Taskbar label={TASK_LABEL[step]} />
+      <Taskbar label="Quiz" />
     </main>
   );
 }
 
-function Dialog({ title, icon, onClose, actions, children }: {
-  title: string; icon: 'question' | 'error'; onClose: () => void; actions: ReactNode; children: ReactNode;
-}) {
-  const id = useId();
-  return (
-    <section className={styles.window} role={icon === 'error' ? 'alertdialog' : 'dialog'} aria-modal="true"
-      aria-labelledby={`${id}-title`} aria-describedby={`${id}-text`}>
-      <div className={styles.titleBar}>
-        <span id={`${id}-title`}>{title}</span>
-        <button type="button" className={styles.titleClose} aria-label="Chiudi" onClick={onClose}>×</button>
-      </div>
-      <div className={styles.body}>
-        <span className={icon === 'error' ? styles.iconError : styles.iconQuestion} aria-hidden="true">
-          {icon === 'error' ? '×' : '?'}
-        </span>
-        <p id={`${id}-text`}>{children}</p>
-      </div>
-      <div className={styles.actions}>{actions}</div>
-    </section>
-  );
-}
-
-/* Risposta sbagliata: appena il puntatore ci arriva sopra (o il dito la tocca)
-   salta in un punto a caso dello schermo. Il click non la seleziona mai. */
+/* Risposta sbagliata: resta ferma finche' non la premi, poi salta in un punto
+   a caso dello schermo. Non si seleziona mai. Il click con detail 0 arriva
+   solo dalla tastiera: col mouse o col dito ci pensa gia' pointerdown. */
 function Runaway({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -130,7 +83,7 @@ function Runaway({ children }: { children: ReactNode }) {
   };
   return (
     <button ref={ref} type="button" className={`${styles.button} ${styles.answer} ${pos ? styles.fled : ''}`}
-      style={pos ?? undefined} onPointerEnter={flee} onPointerDown={flee} onClick={flee}>
+      style={pos ?? undefined} onPointerDown={flee} onClick={e => { if (e.detail === 0) flee(); }}>
       {children}
     </button>
   );
