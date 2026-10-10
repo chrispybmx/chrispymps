@@ -1,5 +1,26 @@
 # Registrazione e verifica email: preparazione locale
 
+## Decisione finale (10 ottobre, branch `unifica-produzione`)
+
+Il proprietario vuole che ci si registri senza intoppi e si carichi subito uno
+spot; la verifica email serve per MailerLite, dove la newsletter ha già il suo
+doppio opt-in. Quindi, rispetto alla preparazione descritta sotto:
+
+- **Signup immediato**: Confirm Email resta spento (`mailer_autoconfirm=true`),
+  niente preflight `/api/auth/registration-check` (rimosso), niente hook
+  Before User Created (la migrazione non crea più `cm_before_user_created`),
+  nuove iscrizioni Google consentite. Con la sessione immediata il client chiama
+  subito `/api/auth/complete`, che salva i dati privati e il gruppo di servizio.
+- **Campi**: data di nascita chiesta nel modulo principale (se data, almeno 14
+  anni); Paese, sport e regione facoltativi. Il modulo dentro Aggiungi spot non
+  chiede nulla in più di prima.
+- **Migrazione `20261010120000_registration_policy.sql`**: idempotente, aggiunge
+  `country_code` e i vincoli, tocca la vista `rider_stats_aggregate` solo se
+  esiste (in produzione non c'è). Provata su PGlite con e senza la vista.
+- I punti 3, 5 e la parte "OAuth bloccata" della sezione Modifiche sotto sono
+  superati. Restano validi export, preferenze privacy, prova email esplicita
+  dal profilo (`EMAIL_VERIFICATION_ENABLED`, ancora spenta).
+
 ## Stato
 
 Implementazione locale nella cartella `crock-lab`. Nessun deploy, modifica Auth,

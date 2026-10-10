@@ -187,7 +187,7 @@ const styles = {
 const dataRows = [
   {
     trattamento: 'Registrazione account',
-    dati: 'Email, username, credenziali gestite da Supabase Auth, data di nascita dichiarata e Paese di residenza; dati facoltativi del profilo rider (regione, discipline, esperienza e setup)',
+    dati: 'Email, username, credenziali gestite da Supabase Auth, data di nascita dichiarata; dati facoltativi del profilo rider (Paese di residenza, regione, discipline, esperienza e setup)',
     base: 'Art. 6(1)(b) — esecuzione contratto',
     durata: 'Fino alla cancellazione dell’account, salvo conservazioni necessarie per obblighi di legge o tutela dei diritti',
   },
@@ -333,7 +333,7 @@ export default function PrivacyPage() {
         {/* -------------------------------------------------------- */}
         <section id="account" style={styles.section}>
           <h2 style={styles.h2}>Account e preferenze del rider</h2>
-          <p style={styles.p}>La registrazione richiede data di nascita dichiarata e Paese di residenza. La data serve ad applicare le soglie previste dal servizio; non costituisce una verifica documentale dell’età. Il Paese indica il contesto territoriale dell’account, non la posizione GPS. Sport praticati e regione sono facoltativi. Questi dati sono conservati separatamente dal profilo pubblico; puoi modificare o rimuovere sport e Paese dalle impostazioni.</p>
+          <p style={styles.p}>Il modulo di registrazione chiede la data di nascita dichiarata; Paese di residenza, sport praticati e regione sono facoltativi. La data serve ad applicare le soglie previste dal servizio; non costituisce una verifica documentale dell’età. Il Paese indica il contesto territoriale dell’account, non la posizione GPS. Questi dati sono conservati separatamente dal profilo pubblico; puoi modificare o rimuovere sport e Paese dalle impostazioni.</p>
           <p style={styles.p}>La conferma email dimostra l’accesso alla casella, non l’identità o l’età della persona. Registriamo l’indirizzo confermato e il momento della verifica. Creare un account o indicare gli sport non autorizza automaticamente newsletter, pubblicità, cessione dei dati o presenza Community.</p>
         </section>
 
