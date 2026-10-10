@@ -12,13 +12,12 @@ try {
   // Production CSP deliberately excludes the fake local Supabase origin.
   // Only this isolated test context bypasses it; application headers stay intact.
   const page=await browser.newPage({viewport:{width,height:900},locale:'it-IT',bypassCSP:true});
-  const errors=[];let submissions=0;let payload;let preflight=0;
+  const errors=[];let submissions=0;let payload;
   page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(()=>{localStorage.setItem('cmaps_cookie_notice','1');localStorage.setItem('cmaps_language','it');});
   await page.route('**/*',async route=>{
    const url=new URL(route.request().url());
    if(!['localhost','127.0.0.1'].includes(url.hostname))return route.abort();
-   if(url.pathname==='/api/auth/registration-check'){preflight++;return route.fulfill({json:{ok:true}});}
    if(url.pathname==='/auth/v1/signup'){
     submissions++;payload=route.request().postDataJSON();
     await new Promise(resolve=>setTimeout(resolve,200));
@@ -40,7 +39,7 @@ try {
   await page.locator('#signup-country').selectOption('IT');
   await page.getByRole('button',{name:'Crea account',exact:true}).click();
   await page.getByText('Per registrarti devi avere almeno 14 anni.',{exact:false}).waitFor();
-  assert.equal(preflight,0);assert.equal(submissions,0);
+  assert.equal(submissions,0);
   await page.getByLabel('Anno',{exact:true}).selectOption('2000');
   await page.getByRole('checkbox',{name:'BMX',exact:true}).check();
   await page.getByRole('checkbox',{name:'MTB',exact:true}).check();
@@ -50,8 +49,8 @@ try {
   await page.screenshot({path:`/private/tmp/crock-registration-${engine}-${width}.png`});
   await page.getByRole('button',{name:'Crea account',exact:true}).evaluate(button=>{button.click();button.click();});
   try { await page.getByText('CONTROLLA LA TUA EMAIL',{exact:true}).waitFor(); }
-  catch(error) { console.log({preflight,submissions,dialog:(await dialog.innerText()).slice(-1200)}); throw error; }
-  assert.equal(submissions,1);assert.equal(preflight,1);
+  catch(error) { console.log({submissions,dialog:(await dialog.innerText()).slice(-1200)}); throw error; }
+  assert.equal(submissions,1);
   assert.deepEqual(payload.data.initial_rider_details.disciplines,['bmx','mtb']);
   assert.equal(payload.data.initial_rider_details.countryCode,'IT');
   assert.equal(payload.data.registration_version,2);

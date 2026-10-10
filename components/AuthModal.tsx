@@ -347,9 +347,9 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                 </div>
 
                 <div>
-                  <label htmlFor="signup-country" style={lbl}>{text('Paese di residenza *','Country of residence *')}</label>
+                  <label htmlFor="signup-country" style={lbl}>{text('Paese di residenza (facoltativo)','Country of residence (optional)')}</label>
                   <select id="signup-country" autoComplete="country" value={country} onChange={e=>{setCountry(e.target.value);setRegion('');}} style={inp}>
-                    <option value="">{text('Seleziona','Select')}</option>
+                    <option value="">{text('Non specificato','Not specified')}</option>
                     {countries.map(c=><option key={c.code} value={c.code}>{c.label}</option>)}
                   </select>
                 </div>

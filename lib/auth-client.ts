@@ -28,11 +28,8 @@ export async function signUp(
 ): Promise<'ok' | 'confirm_email'> {
   const sb = supabaseBrowser();
 
-  const parsed=registrationDetails().safeParse({birthDate:opts?.birthDate,countryCode:opts?.countryCode,disciplines:opts?.disciplines??[],region:opts?.region??''});
+  const parsed=registrationDetails().safeParse({birthDate:opts?.birthDate||undefined,countryCode:opts?.countryCode,disciplines:opts?.disciplines??[],region:opts?.region??''});
   if(!parsed.success)throw new Error(parsed.error.issues[0].message);
-  const preflight=await fetch('/api/auth/registration-check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(parsed.data),signal:AbortSignal.timeout(10000)});
-  const ready=await preflight.json();
-  if(!preflight.ok||!ready.ok)throw new Error(ready.error||'Registrazione non disponibile. Riprova.');
 
   // 1. Username disponibile?
   const free = await checkUsername(username);
@@ -43,11 +40,10 @@ export async function signUp(
   if (error) throw new Error(translateAuthError(error.message));
   if (!data.user) throw new Error('Errore nella registrazione. Riprova.');
 
-  // Account confirmation and marketing confirmation are independent.
-  if (data.session) {
-    await sb.auth.signOut();
-    throw new Error('Conferma email non disponibile. Non abbiamo completato l’accesso. Contatta l’assistenza.');
-  }
+  // Account confirmation and marketing confirmation are independent. With automatic
+  // confirmation the rider is in right away and can add a spot; with Confirm Email on,
+  // the server completes the profile after the link (see /auth/callback).
+  if (data.session) await completeSignedInAccount(data.session.access_token);
   if (opts?.newsletter && (puoRicevereMarketing(opts.birthDate) || (!opts.birthDate && opts.over16 === true))) {
     // Confirmation email proves ownership before any marketing group is changed.
     try {
@@ -62,8 +58,7 @@ export async function signUp(
     opts.onNewsletterResult?.('Newsletter non attivata: è riservata a chi ha almeno 16 anni.');
   }
 
-  // Signup never grants access before email confirmation.
-  return 'confirm_email';
+  return data.session ? 'ok' : 'confirm_email';
 }
 
 /** Login */

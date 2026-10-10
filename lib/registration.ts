@@ -18,11 +18,13 @@ export function registrationAge(value: unknown, now = new Date()): number | null
  const today=now.toISOString().slice(0,10);
  return Number(today.slice(0,4))-Number(value.slice(0,4))-(today.slice(5)<value.slice(5)?1:0);
 }
+/** Nothing here may slow down signup: every field is optional. A declared birth
+ *  date must still mean at least 14 years; an empty country means "not given". */
 export function registrationDetails(now = new Date()) {
  return z.object({
   birthDate:z.string().refine(value=>validBirthDate(value,now),'Data di nascita non valida.')
-   .refine(value=>(registrationAge(value,now)??-1)>=MINIMUM_ACCOUNT_AGE,`Per registrarti devi avere almeno ${MINIMUM_ACCOUNT_AGE} anni.`),
-  countryCode,
+   .refine(value=>(registrationAge(value,now)??-1)>=MINIMUM_ACCOUNT_AGE,`Per registrarti devi avere almeno ${MINIMUM_ACCOUNT_AGE} anni.`).optional(),
+  countryCode:z.preprocess(value=>value===''?undefined:value,countryCode.optional()),
   disciplines:z.array(z.enum(disciplineChoices)).max(5).default([]).transform(values=>[...new Set(values)]),
   region:z.string().trim().max(60).default(''),
  }).strict();
