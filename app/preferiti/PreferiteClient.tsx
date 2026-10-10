@@ -10,6 +10,7 @@ import { useLanguage } from '@/components/LanguageProvider';
 import { useFavorites } from '@/hooks/useFavorites';
 import { loadFavoriteSpots, type FavoriteSpot } from '@/lib/favorite-spots';
 import { miniatura } from '@/lib/immagini';
+import { sharedSpotsPath, SHARED_SPOTS_MAX } from '@/lib/shared-spots';
 import { TIPI_SPOT } from '@/lib/constants';
 import styles from './favorites.module.css';
 
@@ -17,6 +18,17 @@ const AuthModal = dynamic(() => import('@/components/AuthModal'), { ssr: false }
 
 export default function PreferiteClient() {
   const [authOpen, setAuthOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareSelection, setShareSelection] = useState<Set<string>>(new Set());
+  const [shareMessage, setShareMessage] = useState('');
+  async function shareRide() {
+    if (!shareSelection.size) return;
+    const url = window.location.origin + sharedSpotsPath([...shareSelection]);
+    try {
+      if (navigator.share) await navigator.share({ title: 'Spot da girare · Chrispy Maps', url });
+      else { await navigator.clipboard.writeText(url); setShareMessage(text('Link copiato.', 'Link copied.')); }
+    } catch (error) { if (!(error instanceof Error && error.name === 'AbortError')) setShareMessage(text('Non riesco a condividere il link. Riprova.', 'Could not share the link. Try again.')); }
+  }
   const { language, text } = useLanguage();
   const { favIds, loaded, error, pendingIds, scope, setFav, reload, legacyIds, importLegacy } = useFavorites();
   const [details, setDetails] = useState<Map<string, FavoriteSpot>>(new Map());
@@ -36,7 +48,7 @@ export default function PreferiteClient() {
   const identity = ids.join(',');
 
   useEffect(() => { setLegacy(legacyIds()); }, [legacyIds]);
-  useEffect(() => { setRemoved(null); setReview(false); setSelected(new Set()); setImported(false); }, [scope]);
+  useEffect(() => { setRemoved(null); setReview(false); setSelected(new Set()); setImported(false); setSharing(false); setShareSelection(new Set()); }, [scope]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -103,11 +115,18 @@ export default function PreferiteClient() {
       </section>}
 
       {loaded && ids.length > 0 && <>
-        <div className={styles.listHeading}><h2>{text('Da ritrovare', 'Ready for another visit')}</h2><span>{spots.length}{loading ? '…' : ''}</span></div>
+        <div className={styles.listHeading}><h2>{text('Da girare', 'Places to ride')}</h2><span>{spots.length}{loading ? '…' : ''}</span></div>
+        <button type="button" className="btn-ghost" aria-expanded={sharing} onClick={() => { setSharing(value => !value); setShareMessage(''); }}>{text('Prepara una selezione da condividere', 'Choose spots to share')}</button>
+        {sharing && <section aria-label={text('Condividi spot', 'Share spots')}>
+          <p>{text('Scegli fino a 24 spot. Il link contiene solo i posti scelti, senza il tuo account, e chi lo riceve può inoltrarlo.', 'Choose up to 24 spots. The link contains only selected places, without your account, and recipients can forward it.')}</p>
+          <button type="button" className="btn-primary" disabled={!shareSelection.size} onClick={() => void shareRide()}>{text(`Condividi ${shareSelection.size} spot`, `Share ${shareSelection.size} spots`)}</button>
+          {shareMessage && <p role="status">{shareMessage}</p>}
+        </section>}
         <div className={styles.list}>
           {spots.map(spot => {
             const cover = spot.spot_photos?.[0];
             return <article key={spot.id} className={styles.spot}>
+              {sharing && <label style={{ display: 'flex', alignItems: 'center', minWidth: 44, padding: 8 }}><input type="checkbox" aria-label={text(`Condividi ${spot.name}`, `Share ${spot.name}`)} checked={shareSelection.has(spot.id)} disabled={!shareSelection.has(spot.id) && shareSelection.size >= SHARED_SPOTS_MAX} onChange={event => setShareSelection(previous => { const next = new Set(previous); if (event.target.checked) next.add(spot.id); else next.delete(spot.id); return next; })} /></label>}
               <Link href={`/map/spot/${encodeURIComponent(spot.slug)}`} className={styles.spotLink}>
                 <div className={styles.photo}>
                   {cover ? <img src={miniatura(cover.url, 480)} alt="" loading="lazy" /> : <MapIcon name="photo" size={28} />}
@@ -152,6 +171,6 @@ export default function PreferiteClient() {
       </section>}
     </div>
     <BottomNav onOpenAuth={() => setAuthOpen(true)} />
-    <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onSuccess={() => setAuthOpen(false)} />
+    {authOpen && <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onSuccess={() => setAuthOpen(false)} />}
   </main>;
 }

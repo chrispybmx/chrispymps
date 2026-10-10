@@ -31,3 +31,5 @@ tmp/
 # TypeScript
 *.tsbuildinfo
 .env*.local
+.preview-data/
+.env*

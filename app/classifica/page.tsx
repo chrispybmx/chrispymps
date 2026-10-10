@@ -43,7 +43,7 @@ function getLevelForXP(xp: number) {
 }
 
 async function getData(): Promise<{ topSpots: SpotRow[]; topRiders: RiderRow[] }> {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
 
   /* TOP SPOT — sorted by likes (most voted) */
   const { data: spotsRaw } = await supabase

@@ -9,7 +9,7 @@ import { UUID_RE } from '@/lib/validation';
  * Returns all pending user-submitted photos with spot + user info.
  */
 export async function GET(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
  * Body: { photo_id, action: 'approve' | 'reject' }
  */
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

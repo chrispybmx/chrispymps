@@ -25,7 +25,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Non autenticato' }, { status: 401 });
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabaseServer().auth.getUser(token);
+    const { data: { user } } = await (await supabaseServer()).auth.getUser(token);
     if (!user)
       return NextResponse.json({ ok: false, error: 'Sessione scaduta' }, { status: 401 });
 

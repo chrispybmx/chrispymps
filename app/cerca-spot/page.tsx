@@ -35,7 +35,7 @@ interface RequestItem {
 }
 
 async function getRequests(): Promise<RequestItem[]> {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from('news')
     .select('id, slug, title, excerpt, request_city, request_resolved, published_at, created_at, submitted_by_username, tags')

@@ -14,7 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const paths = ['', '/scopri', '/classifica', '/events', '/news', '/newsletter', '/cerca-spot', '/skate-maps', '/map/about', '/map/support', '/regole', '/privacy'];
   const pages: MetadataRoute.Sitemap = paths.map(path => ({ url: base + path }));
   const cities = new Map<string, string | undefined>();
-  const sb = supabaseServer();
+  const sb = await supabaseServer();
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await sb.from('spots').select('slug, city, updated_at')
       .eq('status', 'approved').order('id').range(offset, offset + PAGE_SIZE - 1);

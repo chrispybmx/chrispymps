@@ -47,7 +47,7 @@ CREATE TRIGGER trg_comment_likes_count
 `;
 
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

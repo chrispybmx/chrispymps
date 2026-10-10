@@ -6,10 +6,11 @@ import type { Spot } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export default async function AdminEditPage({ params }: Props) {
-  if (!isAdminAuthenticated()) redirect('/admin/login');
+export default async function AdminEditPage(props: Props) {
+  const params = await props.params;
+  if (!(await isAdminAuthenticated())) redirect('/admin/login');
 
   const supabase = supabaseAdmin();
   const { data } = await supabase

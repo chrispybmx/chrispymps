@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 const source = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
 describe('private pages bypass the service worker cache', () => {
-  it.each(['/auth/callback?code=test-code', '/auth/reset-password', '/auth/setup-username', '/u/test/modifica', '/messaggi', '/api/session-invites'])('never caches %s', async path => {
+  it.each(['/auth/callback?code=test-code', '/auth/reset-password', '/auth/setup-username', '/u/test/modifica', '/messaggi', '/api/session-invites', '/impostazioni/privacy', '/api/user/export'])('never caches %s', async path => {
     const handlers: Record<string, Function> = {};
     const fetch = vi.fn().mockResolvedValue(new Response('private response'));
     const caches = { open: vi.fn(), match: vi.fn() };

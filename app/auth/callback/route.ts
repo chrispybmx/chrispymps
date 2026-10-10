@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { safeAuthNext } from '@/lib/auth-navigation';
+import { safeAuthErrorCode } from '@/lib/auth-errors';
 import { completeAccount } from '@/lib/auth-onboarding';
 import { supabaseAdmin } from '@/lib/supabase';
+import { recordEmailProof } from '@/lib/email-verification';
 
 const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -13,20 +15,18 @@ const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 async function logAuthFailure(params: {
   provider?: 'email' | 'google';
   errorCode: string | null;
-  errorDetail: string | null;
   stage: 'provider_redirect' | 'code_exchange';
-  userAgent: string | null;
 }) {
   try {
     await supabaseAdmin().from('auth_failure_log').insert({
       provider:     params.provider ?? 'google',
-      error_code:   params.errorCode,
-      error_detail: params.errorDetail,
+      error_code:   safeAuthErrorCode(params.errorCode),
+      error_detail: null,
       stage:        params.stage,
-      user_agent:   params.userAgent,
+      user_agent:   null,
     });
-  } catch (e) {
-    console.error('[auth/callback] impossibile registrare il fallimento:', e);
+  } catch {
+    console.error('[auth/callback] impossibile registrare il fallimento');
   }
 }
 
@@ -62,31 +62,23 @@ async function handleCallback(request: NextRequest, searchParams: URLSearchParam
   const emailFlow = !!tokenHash || recovery || searchParams.get('flow') === 'email';
 
   if (error) {
-    /* Supabase e Google mandano ANCHE error_description / error_code con il
-       motivo letterale ("Unable to exchange external code", "Database error
-       saving new user", ...). Leggere solo `error` lascia il codice generico
-       `server_error`, che dice che è rotto ma non dice dove. */
-    const description = searchParams.get('error_description');
+    // Do not persist free-form provider descriptions or forward them in URLs.
     const errorCode   = searchParams.get('error_code');
-    console.error('[auth/callback] provider error:', { error, errorCode, description });
+    console.error('[auth/callback] provider error:', safeAuthErrorCode(errorCode ?? error));
     await logAuthFailure({
       provider: emailFlow ? 'email' : 'google',
       errorCode:   errorCode ?? error,
-      errorDetail: description,
       stage:       'provider_redirect',
-      userAgent:   request.headers.get('user-agent'),
     });
 
-    const params = new URLSearchParams({ auth_error: error });
-    if (description) params.set('auth_error_detail', description);
-    if (errorCode)   params.set('auth_error_code', errorCode);
+    const params = new URLSearchParams({ auth_error: safeAuthErrorCode(errorCode ?? error) });
     return redirect(emailFlow ? `${origin}/auth/problem` : `${origin}/map?${params.toString()}`);
   }
 
   if (!code && !tokenHash) return redirect(`${origin}/auth/problem`);
   if (tokenHash && !['email', 'signup', 'recovery', 'email_change'].includes(type ?? '')) return redirect(`${origin}/auth/problem`);
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON, {
     cookies: {
@@ -105,21 +97,19 @@ async function handleCallback(request: NextRequest, searchParams: URLSearchParam
   const { data, error: exchangeError } = await (tokenHash ? supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as 'email' | 'signup' | 'recovery' | 'email_change' }) : supabase.auth.exchangeCodeForSession(code!));
 
   if (exchangeError || !data.session) {
-    /* Logghiamo il messaggio esatto: è l'unico modo per sapere se salta lo
-       scambio PKCE, il cookie o la rete. Vedi lib/auth-errors.ts. */
-    console.error('[auth/callback] exchangeCodeForSession error:', exchangeError?.message, exchangeError);
+    // Provider messages can contain identifiers or credentials: keep known codes only.
+    console.error('[auth/callback] code exchange failed:', safeAuthErrorCode(exchangeError?.code));
     await logAuthFailure({
       provider: emailFlow ? 'email' : 'google',
       errorCode:   exchangeError?.code ?? 'exchange_failed',
-      errorDetail: exchangeError?.message ?? 'nessun messaggio',
       stage:       'code_exchange',
-      userAgent:   request.headers.get('user-agent'),
     });
     return redirect(`${origin}/auth/problem`);
   }
 
   if (recovery) return redirect(`${origin}/auth/reset-password`);
   try {
+    if(tokenHash && ['email','signup','email_change'].includes(type??''))await recordEmailProof(data.session.user);
     const result = await completeAccount(data.session.user);
     if (!result.profileReady) return redirect(`${origin}/auth/setup-username?next=${encodeURIComponent(next)}`);
     const destination = new URL(next, origin);

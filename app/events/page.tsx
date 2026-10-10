@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 async function getEvents(): Promise<CalendarEvent[]> {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
 
   let result = await supabase
     .from('events')

@@ -10,7 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase';
  */
 export async function POST(req: NextRequest) {
   // Auth admin via cookie HMAC (stesso sistema degli altri endpoint admin)
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
   }
 

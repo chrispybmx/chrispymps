@@ -336,7 +336,7 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
     if (json.ok) {
       setAllSpots(s => s.filter(x => x.id !== id));
       setPending(s => s.filter(x => x.id !== id));
-      showMsg('🗑️ Spot eliminato.');
+      showMsg(json.warning || 'Spot eliminato.');
     } else { showMsg('❌ ' + json.error); }
     setLoading(null);
   }, []);

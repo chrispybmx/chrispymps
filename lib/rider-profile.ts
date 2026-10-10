@@ -14,6 +14,7 @@ export const DISCIPLINE = [
   { key: 'bmx',     label: 'BMX',     emoji: '🚲' },
   { key: 'skate',   label: 'Skate',   emoji: '🛹' },
   { key: 'scooter', label: 'Scooter', emoji: '🛴' },
+  { key: 'mtb',     label: 'MTB',     emoji: '🚲' },
   { key: 'altro',   label: 'Altro',   emoji: '✨' },
 ] as const;
 

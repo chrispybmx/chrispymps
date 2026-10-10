@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { COOKIE_KEY, COOKIE_DISMISSED_EVENT } from '@/components/CookieBanner';
+import { hasAnalyticsChoice } from '@/lib/analytics-consent';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 
 const STORAGE_KEY = 'cmaps_onboarding_v2';
 
@@ -45,12 +47,13 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
   const user = useUser();
   const [visible, setVisible]     = useState(false);
   const [cookieDone, setCookieDone] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(visible, dialogRef, () => dismiss());
 
   /* Attende la chiusura dell'informativa cookie (o la sua assenza). */
   useEffect(() => {
-    try {
-      if (localStorage.getItem(COOKIE_KEY)) { setCookieDone(true); return; }
-    } catch { setCookieDone(true); return; }
+    if (hasAnalyticsChoice()) { setCookieDone(true); return; }
+    try { if (localStorage.getItem(COOKIE_KEY)) { setCookieDone(true); return; } } catch {}
 
     const onDismissed = () => setCookieDone(true);
     window.addEventListener(COOKIE_DISMISSED_EVENT, onDismissed);
@@ -61,14 +64,14 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
     if (!cookieDone) return;
     if (user === undefined) return;          // sessione ancora in caricamento
     if (user) {                              // già dentro → mai mostrare
-      try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+      setVisible(false);
       return;
     }
     if (totalSpots === 0) return;            // aspetta di avere un numero da mostrare
 
     try {
       if (localStorage.getItem(STORAGE_KEY)) return;
-    } catch { return; }
+    } catch { /* Still allow the welcome screen without persistent storage. */ }
 
     /* Ritardo breve: la mappa ha già disegnato, la card non copre uno schermo vuoto. */
     const t = setTimeout(() => setVisible(true), 900);
@@ -95,7 +98,7 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
         }}
       />
 
-      <div style={{
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Benvenuto su Chrispy Maps" style={{
         position: 'fixed',
         bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
         left: '50%',
@@ -105,7 +108,8 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
         maxWidth: 340,
         background: 'var(--gray-800)',
         border: '2px solid var(--orange)',
-        borderRadius: 12,
+        borderRadius: 8,
+        maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto',
         padding: '22px 20px 20px',
         animation: 'slideUp 0.3s ease-out',
         boxShadow: '0 8px 40px rgba(255,106,0,0.15)',
@@ -122,7 +126,7 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
         <div style={{
           fontFamily: 'var(--font-mono)', fontSize: 12,
           color: 'var(--gray-400)', textAlign: 'center',
-          marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.08em',
+          marginTop: 4, textTransform: 'uppercase', letterSpacing: 0,
         }}>
           spot mappati dai rider
         </div>

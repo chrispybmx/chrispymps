@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 /**
  * GET /api/user-stats?username=X
- * Public: returns user XP, level, badges, recent contributions.
+ * Public: aggregate XP and badges only, never location/activity history.
  */
 export async function GET(req: NextRequest) {
   const username = req.nextUrl.searchParams.get('username');
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   // Get user_stats
   const { data: stats } = await sb
     .from('user_stats')
-    .select('*')
+    .select('lifetime_xp,monthly_xp,current_level,trust_score,approved_spots_count,approved_photos_count,status_confirmations_count,current_streak_weeks')
     .eq('user_id', profile.id)
     .maybeSingle();
 
@@ -37,14 +37,6 @@ export async function GET(req: NextRequest) {
     .select('badge_key, awarded_at, badges(name, description, emoji, category)')
     .eq('user_id', profile.id)
     .order('awarded_at', { ascending: false });
-
-  // Get recent XP events (last 20)
-  const { data: recentXP } = await sb
-    .from('point_events')
-    .select('event_type, xp_amount, reason, created_at, spot_id, spots(name, slug)')
-    .eq('user_id', profile.id)
-    .order('created_at', { ascending: false })
-    .limit(20);
 
   // Default stats if no record yet
   const defaultStats = {
@@ -63,11 +55,11 @@ export async function GET(req: NextRequest) {
     data: {
       stats: stats || defaultStats,
       badges: userBadges ?? [],
-      recentXP: recentXP ?? [],
+      recentXP: [], // Keep the response shape without publishing detailed activity.
     },
   }, {
     headers: {
-      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      'Cache-Control': 'private, no-store, max-age=0',
     },
   });
 }

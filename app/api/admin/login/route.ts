@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loginAdmin, adminSessionCookieHeader } from '@/lib/auth';
+import { isCrossOriginBrowserRequest } from '@/lib/request-origin';
 
-/* ── Rate limiter in-memory ──────────────────────────────────────────
-   5 tentativi per IP ogni 15 minuti. Dopodichè blocco di 30 minuti.
-   Per un sito personale è più che sufficiente contro brute-force automatici.
-   (Resetta al restart della serverless function — accettabile per questo use case)
-──────────────────────────────────────────────────────────────────── */
+// Local defence only: serverless instances do not share counters.
+// A persistent edge/database limiter is still required for distributed attempts.
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS    = 15 * 60 * 1000; // 15 minuti
 const BLOCK_MS     = 30 * 60 * 1000; // 30 minuti di blocco dopo troppi tentativi
@@ -55,6 +53,9 @@ function clearAttempts(ip: string) { ipStore.delete(ip); }
 
 /* ── Route handler ─────────────────────────────────────────────────── */
 export async function POST(req: NextRequest) {
+  if (isCrossOriginBrowserRequest(req)) {
+    return NextResponse.json({ ok: false, error: 'Origine non consentita' }, { status: 403 });
+  }
   const ip = getIp(req);
   const { allowed, retryAfterSec } = checkRateLimit(ip);
 
@@ -73,13 +74,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let password = '';
-  if (isFormPost) {
-    const formData = await req.formData();
-    password = (formData.get('password') as string) ?? '';
-  } else {
-    const json = await req.json().catch(() => ({ password: '' }));
-    password = json.password ?? '';
+  // Bound actual streamed bytes, not only a client-supplied Content-Length.
+  const reader = req.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    if (Number(req.headers.get('content-length')) > 4096) throw new Error('large');
+    if (reader) for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 4096) { await reader.cancel(); throw new Error('large'); }
+      chunks.push(value);
+    }
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Richiesta non valida' }, { status: 413 });
+  } finally { reader?.releaseLock(); }
+  const raw = Buffer.concat(chunks).toString('utf8');
+  let password: unknown;
+  try { password = isFormPost ? new URLSearchParams(raw).get('password') : JSON.parse(raw)?.password; }
+  catch { password = null; }
+  if (typeof password !== 'string' || password.length > 1024) {
+    return NextResponse.json({ ok: false, error: 'Richiesta non valida' }, { status: 400 });
   }
 
   if (!password) {

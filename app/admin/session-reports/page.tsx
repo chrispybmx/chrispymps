@@ -28,7 +28,7 @@ const snapshotSchema = z.object({
 });
 type Snapshot = z.infer<typeof snapshotSchema>;
 interface Report { id: string; reporter_id: string; reported_id: string; reason: string; created_at: string; snapshot: unknown }
-interface PageProps { searchParams?: { before?: string | string[] } }
+interface PageProps { searchParams?: Promise<{ before?: string | string[] }> }
 
 function dateLabel(value: string, timeZone = 'Europe/Rome'): string {
   try {
@@ -89,9 +89,10 @@ function ReportItem({ report }: { report: Report }) {
   );
 }
 
-export default async function SessionReportsPage({ searchParams }: PageProps) {
+export default async function SessionReportsPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   // Authenticate before constructing the service client or reading any report.
-  if (!isAdminAuthenticated()) redirect('/admin/login');
+  if (!(await isAdminAuthenticated())) redirect('/admin/login');
   noStore();
   let reports: Report[] = [];
   let errorMessage = '';

@@ -1,0 +1,15 @@
+.env*
+.git
+.next
+node_modules
+.preview-data
+.claude
+.agents
+.impeccable
+supabase/.temp
+docs
+tasks
+ChatGPT Image*.png
+*.log
+*.bak
+*.tsbuildinfo

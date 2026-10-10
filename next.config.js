@@ -21,6 +21,8 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
+  serverExternalPackages: ['@electric-sql/pglite'],
   typescript: { ignoreBuildErrors: false },
   eslint: { ignoreDuringBuilds: false },
   images: {

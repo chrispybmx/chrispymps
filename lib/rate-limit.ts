@@ -34,6 +34,7 @@ async function redisPipeline(commands: (string | number)[][]): Promise<UpstashRe
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(commands),
+    signal: AbortSignal.timeout(3000),
   });
   if (!res.ok) throw new Error(`upstash ${res.status}`);
   return res.json() as Promise<UpstashResult[]>;

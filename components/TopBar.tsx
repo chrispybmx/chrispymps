@@ -62,9 +62,19 @@ export default function TopBar({
   const profileUsername = user?.username ?? null;
   const sessionToken    = user?.accessToken ?? null;
 
-  /* ── Nominatim live geocoding ── */
+  /* External geography is queried only on explicit submission. */
   const [places,        setPlaces]        = useState<GeoPlace[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesError, setPlacesError] = useState('');
+  const geoRequest = useRef<AbortController | null>(null);
+  async function searchPlace() {
+    if (query.trim().length < 2 || query.trim().startsWith('@')) return;
+    geoRequest.current?.abort(); const controller = new AbortController(); geoRequest.current = controller;
+    setPlacesLoading(true); setPlacesError('');
+    try { const data = await geocodeForward(query.trim(), { limit: 5, signal: controller.signal }); if (!controller.signal.aborted) { setPlaces(data); if (!data.length) setPlacesError(text('Nessun luogo trovato. Prova un nome più preciso.', 'No place found. Try a more precise name.')); } }
+    catch (error) { if (!controller.signal.aborted) setPlacesError(error instanceof Error ? error.message : text('Ricerca non disponibile. Riprova.', 'Search unavailable. Try again.')); }
+    finally { if (!controller.signal.aborted) setPlacesLoading(false); }
+  }
 
   /* ── Ricerca utenti via API (include utenti senza spot) ── */
   interface ApiUser { username: string; bio?: string | null; spotCount: number }
@@ -75,21 +85,18 @@ export default function TopBar({
     let active = true;
     const term = query.trim();
     const isUser = term.startsWith('@');
+    geoRequest.current?.abort(); setPlacesLoading(false); setPlacesError('');
     setPlaces([]); setApiUsers([]);
     if (!searchOpen || term.length < 2) { setPlacesLoading(false); setUsersLoading(false); return; }
-    setPlacesLoading(!isUser); setUsersLoading(true);
+    setUsersLoading(true);
     const controller = new AbortController();
     const t = setTimeout(() => {
-      if (!isUser) geocodeForward(term, { limit: 5 })
-        .then(data => { if (active) setPlaces(data); })
-        .catch(() => { if (active) setPlaces([]); })
-        .finally(() => { if (active) setPlacesLoading(false); });
       fetch(`/api/users?q=${encodeURIComponent(term.replace(/^@/, ''))}`, { signal: controller.signal })
         .then(res => res.json()).then(j => { if (active && j.ok) setApiUsers(j.data ?? []); })
         .catch(() => { if (active) setApiUsers([]); })
         .finally(() => { if (active) setUsersLoading(false); });
     }, DEBOUNCE_SEARCH_MS);
-    return () => { active = false; clearTimeout(t); controller.abort(); };
+    return () => { active = false; clearTimeout(t); controller.abort(); geoRequest.current?.abort(); };
   }, [query, searchOpen]);
 
   /* ── Query normalizzata ── */
@@ -391,7 +398,7 @@ export default function TopBar({
               ref={inputRef}
               type="text"
               placeholder={text('Cerca città o spot', 'Search cities or spots')} aria-label={text('Cerca città o spot', 'Search cities or spots')}
-              value={query}
+              value={query} maxLength={200} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void searchPlace(); } }}
               onChange={e => setQuery(e.target.value)}
               style={{
                 flex: 1, border: 'none', background: 'transparent',
@@ -525,6 +532,12 @@ export default function TopBar({
                 )}
               </>
             )}
+
+            {query.trim().length >= 2 && !isAtSearch && <div style={{ padding: '12px 0' }}>
+              <button type="button" className="btn-primary" disabled={placesLoading} onClick={() => void searchPlace()}>{placesLoading ? text('Ricerca luogo…', 'Searching places…') : text(`Cerca luogo: ${query.trim()}`, `Search place: ${query.trim()}`)}</button>
+              {placesError && <p role="status">{placesError}</p>}
+              <small style={{ display: 'block', marginTop: 8 }}>© OpenStreetMap contributors</small>
+            </div>}
 
             {/* ── Empty state ── */}
             {query.trim().length === 0 && (

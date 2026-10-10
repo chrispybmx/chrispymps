@@ -53,7 +53,7 @@ export async function GET(req: Request) {
   today.setHours(0, 0, 0, 0);
   const horizon = new Date(today.getTime() + HORIZON_DAYS * 86_400_000);
 
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from('events')
     .select('id, slug, title, city, event_date, cover_url, link_url, lat, lng')

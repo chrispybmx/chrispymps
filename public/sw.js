@@ -1,13 +1,13 @@
 // Chrispy Maps Service Worker
 //
-// Strategie: cache-first per gli asset, stale-while-revalidate per pagine e
+// Strategie: cache-first per gli asset, rete con ripiego offline per pagine e
 // dati della mappa, network-only per tutto il resto delle API.
 //
 // NB: /sw.js e' escluso dal matcher del middleware, quindi questo file NON
 // riceve header CSP e le fetch qui dentro non sono ristrette. Il CSP della
 // pagina governa solo la registrazione (worker-src), non il traffico interno.
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v8';
 const STATIC_CACHE  = `chrispymaps-static-${CACHE_VERSION}`;
 const MAP_CACHE     = `chrispymaps-map-${CACHE_VERSION}`;
 const PAGE_CACHE    = `chrispymaps-pages-${CACHE_VERSION}`;
@@ -82,7 +82,10 @@ self.addEventListener('fetch', (event) => {
   // Private invitations and chats never enter an offline/shared cache.
   if (url.origin === self.location.origin &&
       (url.pathname.startsWith('/messaggi') || url.pathname.startsWith('/auth/') ||
-       url.pathname.endsWith('/modifica') || url.pathname.startsWith('/api/session-invites'))) {
+       url.pathname.endsWith('/modifica') || url.pathname.startsWith('/api/session-invites') ||
+       url.pathname.startsWith('/api/rider-sessions') || url.pathname.startsWith('/sessioni') ||
+       url.pathname.startsWith('/anteprima-sessioni') || url.pathname.startsWith('/impostazioni/') ||
+       url.pathname.startsWith('/api/user/'))) {
     event.respondWith(fetch(request, { cache: 'no-store' }).catch(() =>
       url.pathname.startsWith('/api/')
         ? new Response(JSON.stringify({ ok:false, error:'Connessione assente. Riprova quando sei online.' }), {status:503,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
@@ -135,9 +138,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Pagine mappa e spot → stale-while-revalidate
+  // Una pagina vecchia puo' richiamare menu o chunk di un deployment precedente.
   if (url.pathname.startsWith('/map') && !url.pathname.includes('.')) {
-    event.respondWith(staleWhileRevalidate(request, PAGE_CACHE));
+    event.respondWith(networkFirstPage(request, PAGE_CACHE));
     return;
   }
 
@@ -297,38 +300,23 @@ async function reteConRipiego(request, cacheName, msTimeout) {
   );
 }
 
-/** Serve subito la copia in cache e intanto aggiorna.
- *
- *  La versione precedente finiva con `cached || fetchPromise || paginaOffline()`:
- *  una Promise e' sempre vera, quindi paginaOffline() era irraggiungibile, e se
- *  la rete cadeva la funzione restituiva null. Un respondWith(null) non e' una
- *  risposta: il browser mostrava il proprio errore di rete al posto della
- *  pagina offline scritta apposta. */
-async function staleWhileRevalidate(request, cacheName) {
-  const cache  = await caches.open(cacheName);
-  const cached = await cache.match(request);
-
-  const inArrivo = fetch(request)
-    .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => null);
-
-  if (cached) {
-    /* Aggiorna in sottofondo senza far aspettare nessuno. */
-    inArrivo.catch(() => {});
-    return cached;
+/** Online usa subito il deployment corrente; offline conserva la mappa salvata. */
+async function networkFirstPage(request, cacheName) {
+  let response;
+  try {
+    response = await fetch(request, { cache: 'no-cache' });
+  } catch {
+    try { return (await caches.match(request)) || paginaOffline(); }
+    catch { return paginaOffline(); }
   }
-
-  const dallaRete = await inArrivo;
-  if (dallaRete) return dallaRete;
-
-  /* Ultima spiaggia prima della pagina offline: la copia messa da parte
-     all'installazione vive in STATIC_CACHE, non in questa. Senza questo
-     passaggio, aprire /map senza rete alla prima visita mostrerebbe la pagina
-     offline pur avendo la mappa gia' salvata. */
-  return (await caches.match(request)) || paginaOffline();
+  if (response.ok) {
+    try {
+      const cache = await caches.open(cacheName);
+      await cache.put(request, response.clone());
+    } catch { /* La cache piena non deve impedire di aprire la pagina online. */ }
+  }
+  // Anche un 404 deve restare un 404, senza ripiegare su un vecchio 200.
+  return response;
 }
 
 function paginaOffline() {

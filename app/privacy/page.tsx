@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import AnalyticsPreferences from '@/components/AnalyticsPreferences';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
@@ -186,7 +187,7 @@ const styles = {
 const dataRows = [
   {
     trattamento: 'Registrazione account',
-    dati: 'Email, username, credenziali gestite da Supabase Auth; dati facoltativi del profilo rider (data di nascita, regione, discipline, esperienza e setup)',
+    dati: 'Email, username, credenziali gestite da Supabase Auth, data di nascita dichiarata e Paese di residenza; dati facoltativi del profilo rider (regione, discipline, esperienza e setup)',
     base: 'Art. 6(1)(b) — esecuzione contratto',
     durata: 'Fino alla cancellazione dell’account, salvo conservazioni necessarie per obblighi di legge o tutela dei diritti',
   },
@@ -231,6 +232,18 @@ const dataRows = [
     dati: 'Dati di sessione',
     base: 'Art. 6(1)(f) — legittimo interesse',
     durata: 'Secondo i tempi indicati nella sezione cookie',
+  },
+  {
+    trattamento: 'Sessioni personali',
+    dati: 'Account, spot scelto, inizio, fine, stato, fonte manuale e valutazione facoltativa della sessione',
+    base: 'Art. 6(1)(b) — servizio richiesto dall’utente',
+    durata: 'Fino alla cancellazione della sessione o dell’account; identificativi tecnici anti-duplicazione fino alla cancellazione dell’account',
+  },
+  {
+    trattamento: 'Presenza condivisa allo spot',
+    dati: 'Associazione temporanea tra sessione e spot, scelta di visibilità e scadenza',
+    base: 'Art. 6(1)(a) — consenso facoltativo',
+    durata: 'Visibilità per due ore, salvo rinnovo esplicito; revocabile subito',
   },
 ];
 
@@ -318,6 +331,20 @@ export default function PrivacyPage() {
         </section>
 
         {/* -------------------------------------------------------- */}
+        <section id="account" style={styles.section}>
+          <h2 style={styles.h2}>Account e preferenze del rider</h2>
+          <p style={styles.p}>La registrazione richiede data di nascita dichiarata e Paese di residenza. La data serve ad applicare le soglie previste dal servizio; non costituisce una verifica documentale dell’età. Il Paese indica il contesto territoriale dell’account, non la posizione GPS. Sport praticati e regione sono facoltativi. Questi dati sono conservati separatamente dal profilo pubblico; puoi modificare o rimuovere sport e Paese dalle impostazioni.</p>
+          <p style={styles.p}>La conferma email dimostra l’accesso alla casella, non l’identità o l’età della persona. Registriamo l’indirizzo confermato e il momento della verifica. Creare un account o indicare gli sport non autorizza automaticamente newsletter, pubblicità, cessione dei dati o presenza Community.</p>
+        </section>
+
+        <section id="sessioni" style={styles.section}>
+          <h2 style={styles.h2}>Sessioni e presenza negli spot</h2>
+          <p style={styles.p}>Avviare una sessione registra il tempo trascorso presso lo spot scelto, non il movimento effettivo. Non misuriamo distanza, calorie o tempo di riding. Lo storico e la valutazione facoltativa con le faccine restano privati. I totali sono privati inizialmente: dal tuo profilo puoi scegliere separatamente di mostrare tempo complessivo e numero di sessioni concluse, anche a chi non ha un account. Non vengono condivisi spot, date, singole durate o sessioni in corso. Disattivando la scelta i totali non sono più restituiti dal server; una pagina già aperta li aggiorna al prossimo controllo. La scelta è indipendente dalla presenza Community.</p>
+          <p style={styles.p}>La scelta iniziale è “Solo io”. Dove disponibile, “Community” richiede una scelta separata e contribuisce al conteggio delle presenze segnalate nello spot. Nella fase attuale la condivisione e la lettura dei conteggi sono limitate agli account autorizzati al test. Non è una presenza GPS verificata: non pubblichiamo coordinate personali, tragitti o cronologia degli spostamenti.</p>
+          <p style={styles.p}>La presenza condivisa scade dopo due ore, salvo rinnovo esplicito. Puoi nasconderla subito senza cancellare la sessione. Alla scadenza il timer si ferma e propone la fine da confermare: le sessioni da confermare non entrano nei totali. Puoi correggere la fine o eliminare la sessione dallo storico personale.</p>
+          <p style={styles.p}>I dati sono gestiti tramite Supabase e Vercel per fornire questa funzione, non per pubblicità o addestramento AI. La cancellazione di uno spot interrompe le sessioni aperte e conserva nello storico personale il tempo registrato con la dicitura “Spot eliminato”. Gli identificativi tecnici usati per evitare duplicazioni non ripubblicano le sessioni eliminate e vengono rimossi con l’account.</p>
+        </section>
+
         <section id="newsletter" style={styles.section}>
           <h2 style={styles.h2}>Newsletter e comunicazioni di servizio</h2>
           <p style={styles.p}>La newsletter BMX è facoltativa ed è riservata a chi ha almeno 16 anni, per scelta del progetto. Creare un account o aggiungere uno spot non equivale a iscriversi alla newsletter. Le email necessarie alla gestione dell’account e dei contributi hanno una finalità distinta.</p>
@@ -330,7 +357,9 @@ export default function PrivacyPage() {
         </section>
         <section id="statistiche" style={styles.section}>
           <h2 style={styles.h2}>Statistiche di utilizzo della mappa</h2>
-          <p style={styles.p}>Visite al sito: usiamo Vercel Web Analytics per contare in forma aggregata le pagine visitate, il sito di provenienza, il Paese, il tipo di dispositivo, il sistema operativo e il browser. Non usa cookie e non conserva l’indirizzo IP: per distinguere le visite usa un identificativo calcolato dalla richiesta, che viene scartato dopo 24 ore. Non conteggiamo le pagine di accesso, recupero password e conferma newsletter, e togliamo dagli indirizzi i parametri che potrebbero contenere codici personali. I dati sono trattati da Vercel Inc. per il nostro legittimo interesse a capire come viene usato il sito (art. 6, par. 1, lett. f GDPR) e restano consultabili per 30 giorni.</p>
+          <p style={styles.p}>Le statistiche facoltative sono disattivate per impostazione iniziale. Se abilitate dal gestore, Vercel Web Analytics e i contatori di utilizzo partono soltanto dopo la tua scelta su questo dispositivo. Puoi revocarla qui; la pagina si ricarica per interrompere anche lo script gia avviato. La scelta e conservata localmente per un massimo di 180 giorni. Rispettiamo anche Do Not Track e Global Privacy Control.</p>
+          <p style={styles.p}>Escludiamo dalle statistiche delle visite profili, messaggi, preferiti, pagine di autenticazione, amministrazione e sessioni. Rimuoviamo tutti i parametri e i frammenti degli indirizzi, anche UTM. Non usiamo session replay. Il consenso alle statistiche non autorizza pubblicita o uso delle sessioni per addestrare AI. I normali log tecnici dell&apos;hosting restano distinti da queste statistiche.</p>
+          <AnalyticsPreferences />
           {process.env.PRODUCT_METRICS_ENABLED === 'true' ? <p style={styles.p}>Contiamo ricerche confermate, aperture delle schede, clic sulle indicazioni e aperture e invii del modulo aggiungi spot. I contatori sono raggruppati per giorno e sezione, senza testo cercato, coordinate, email o identificatori dei rider. Non colleghiamo le azioni tra loro e non usiamo cookie analitici. I contatori sono conservati per 90 giorni per migliorare il servizio. Le normali richieste HTTP possono essere trattate nei log tecnici dei fornitori.</p> : <p style={styles.p}>La nuova raccolta dei contatori di utilizzo della mappa è disattivata. La precedente telemetria dei tentativi di registrazione è stata ritirata; l’eventuale storico e i log tecnici restano soggetti alle richieste di accesso e cancellazione e alla gestione della conservazione da parte del titolare.</p>}
         </section>
 
@@ -374,9 +403,13 @@ export default function PrivacyPage() {
               inquadrata. Nessun dato del tuo account viene trasmesso.
             </li>
             <li style={styles.li}>
-              <strong>unpkg</strong> (rete di distribuzione servita da Cloudflare,
-              Inc., USA) — icone dei segnaposto della mappa. Riceve
-              l&apos;indirizzo IP al caricamento delle immagini.
+              <strong>Brevo</strong> — fornitore email alternativo previsto dal codice,
+              utilizzato solo se configurato dal gestore. La configurazione puo
+              prevedere anche una copia verso questo fornitore.
+            </li>
+            <li style={styles.li}>
+              <strong>Upstash</strong> — limiti tecnici delle richieste, quando
+              configurato; non e un sistema di session replay.
             </li>
             <li style={styles.li}>
               <strong>YouTube</strong> (Google Ireland Limited, Irlanda) — video
@@ -452,10 +485,19 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p style={styles.p}>
-            Per esercitare i tuoi diritti, scrivi a:{' '}
+            In <a href="/impostazioni/privacy" style={styles.link}>Privacy e dati</a> puoi gestire le preferenze
+            e scaricare account, profilo, preferenze rider, sessioni e spot salvati.
+            Il download non comprende tutti i dati trattati: per foto, commenti, messaggi,
+            newsletter, log o altre richieste, scrivi a:{' '}
             <a href="mailto:christian.ceresato@gmail.com" style={styles.link}>
               christian.ceresato@gmail.com
             </a>
+          </p>
+          <p style={styles.p}>
+            La cancellazione dell’account scollega i contributi pubblici ma non rimuove
+            automaticamente foto e testi già pubblicati. Togliere il nome dell’autore
+            non rende anonimi eventuali volti o informazioni personali nel contenuto.
+            Puoi richiederne la rimozione al contatto sopra, anche dopo la cancellazione.
           </p>
           <p style={styles.label}>
             Il titolare risponde entro 30 giorni dalla ricezione della richiesta,
@@ -561,7 +603,7 @@ export default function PrivacyPage() {
             </table>
           </div>
 
-          <h3 style={styles.h3}>localStorage</h3>
+          <h3 style={styles.h3}>Archiviazione sul dispositivo</h3>
           <p style={styles.p}>
             Chrispy Maps utilizza il localStorage del browser per salvare
             preferenze dell&apos;interfaccia e l’avvenuta chiusura dell’avviso cookie.
@@ -571,6 +613,7 @@ export default function PrivacyPage() {
             questi dati dalle impostazioni del browser; la cancellazione locale
             non elimina automaticamente i dati già sincronizzati con l’account.
           </p>
+          <p style={styles.p}>Le bozze degli spot, comprese le fotografie selezionate, sono conservate in IndexedDB sul dispositivo e separate per account. Sono recuperabili per sette giorni; una bozza scaduta viene eliminata alla successiva apertura. Puoi eliminarle dal modulo “Aggiungi spot” o dalle impostazioni del browser. Il link di una selezione “Da girare” contiene gli identificativi degli spot scelti, senza il nome del tuo account: chi lo riceve può inoltrarlo.</p>
         </section>
 
         {/* -------------------------------------------------------- */}
@@ -580,7 +623,7 @@ export default function PrivacyPage() {
           <h2 style={styles.h2}>9. ULTIMO AGGIORNAMENTO</h2>
           <p style={styles.p}>
             La presente informativa e stata aggiornata l&apos;ultima volta a{' '}
-            <strong>settembre 2026</strong>.
+            <strong>2 ottobre 2026</strong>.
           </p>
           <p style={styles.p}>
             Il titolare si riserva il diritto di modificare la presente

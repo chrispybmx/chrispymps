@@ -1,4 +1,11 @@
 import type { NextRequest } from 'next/server';
+
+/** SameSite cookies alone do not stop requests from sibling subdomains. */
+export function isCrossOriginBrowserRequest(req: NextRequest): boolean {
+  if (req.headers.has('origin')) return !requestHasSameOrigin(req);
+  const site = req.headers.get('sec-fetch-site');
+  return site === 'cross-site' || site === 'same-site';
+}
 /** Next's internal URL may use localhost behind a proxy; Host is the browser target. */
 export function requestHasSameOrigin(req: NextRequest): boolean {
   const origin = req.headers.get('origin');

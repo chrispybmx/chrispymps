@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyApproveToken, verifyRejectToken, verifyEventActionToken } from '@/lib/auth';
@@ -14,7 +15,7 @@ export const metadata = {
 };
 
 interface Props {
-  searchParams: { token?: string; rifiuta?: string; evento?: string; azione?: string };
+  searchParams: Promise<{ token?: string; rifiuta?: string; evento?: string; azione?: string }>;
 }
 
 /**
@@ -33,7 +34,8 @@ interface Props {
  * Non serve il login: il token È la credenziale, ed è quello il senso del
  * link — poter moderare dal telefono senza entrare nella dashboard.
  */
-export default async function ConfermaPage({ searchParams }: Props) {
+export default async function ConfermaPage(props: Props) {
+  const searchParams = await props.searchParams;
   /* Gli eventi passano di qui con un token diverso: stesso difetto, stesso
      rimedio. Vedi app/api/admin/events/moderate. */
   if (searchParams.evento) {
@@ -101,13 +103,13 @@ function Scaduto() {
           I link di moderazione valgono 72 ore. Questo è scaduto, oppure è già
           stato usato.
         </p>
-        <a href="/admin" style={{
+        <Link href="/admin" style={{
           display: 'inline-block', background: 'var(--orange)', color: '#000',
           padding: '11px 22px', borderRadius: 8, textDecoration: 'none',
           fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
-        }}>
+        }} prefetch={false}>
           APRI LA DASHBOARD
-        </a>
+        </Link>
       </div>
     </main>
   );

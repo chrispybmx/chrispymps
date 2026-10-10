@@ -249,7 +249,7 @@ export default function RegolePage() {
         {/* -------------------------------------------------------- */}
         {/*  Segnalazione contenuti altrui (Digital Services Act)     */}
         {/* -------------------------------------------------------- */}
-        <section style={styles.section}>
+        <section id="segnalazioni" style={styles.section}>
           <h2 style={styles.h2}>SE UNA FOTO È TUA E NON L’HAI CARICATA TU</h2>
           <p style={styles.p}>
             Se trovi sulla mappa una tua foto, o un contenuto che viola i tuoi
@@ -265,12 +265,18 @@ export default function RegolePage() {
             motivo. Chi ha caricato il contenuto può rispondermi allo stesso
             indirizzo.
           </p>
+          <p style={styles.p}>
+            Indica il contenuto originale, il link del contenuto contestato e se
+            sei il titolare dei diritti o una persona autorizzata a rappresentarlo.
+            Le segnalazioni vengono valutate caso per caso: in presenza di
+            violazioni ripetute, l&apos;account puo essere sospeso o chiuso.
+          </p>
         </section>
 
         <div style={{ textAlign: 'center', margin: '32px 0 16px' }}>
-          <a href="/map?add=1" style={styles.cta}>
+          <Link href="/map?add=1" style={styles.cta} prefetch={false}>
             🏴 AGGIUNGI UNO SPOT
-          </a>
+          </Link>
         </div>
       </div>
     </main>

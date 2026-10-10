@@ -5,9 +5,14 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { TIPI_SPOT, APP_CONFIG } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import ProfileClient from './ProfileClient';
+import { RiderHistory } from '@/components/RiderSessions';
+import { RiderPublicStats } from '@/components/RiderProfileStats';
 import FavoritesSection from './FavoritesSection';
 import ProfileGamification from '@/components/ProfileGamification';
 import BottomNav from '@/components/BottomNav';
+import { headers } from 'next/headers';
+import { localSessionPreview } from '@/lib/rider-preview-server';
+import { PREVIEW_ACTOR } from '@/lib/rider-preview';
 
 interface Profile {
   id:               string;
@@ -38,65 +43,24 @@ async function getData(username: string) {
     .maybeSingle();
   if (!profile) return null;
 
-  const [{ data: spots }, { data: riddenRaw }, { count: photosCount }, { count: statusCount }, { data: userStats }] = await Promise.all([
-    sb
+  const { data: spots } = await sb
       .from('spots')
       .select('id, slug, name, type, city, condition, approved_at, spot_photos(url, position)')
       .eq('submitted_by_username', username)
       .eq('status', 'approved')
-      .order('approved_at', { ascending: false, nullsFirst: false }),
-    /* Spot girati: join spot_riders → spots */
-    sb
-      .from('spot_riders')
-      .select('spots(id, slug, name, type, city, condition, spot_photos(url, position))')
-      .eq('user_id', profile.id)
-      .limit(50),
-    /* Foto caricate dall'utente (approvate) */
-    sb
-      .from('spot_photos')
-      .select('id', { count: 'exact', head: true })
-      .eq('uploaded_by', profile.id)
-      .eq('moderation_status', 'approved'),
-    /* Conferme stato */
-    sb
-      .from('spot_status_updates')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', profile.id),
-    /* Streak from user_stats */
-    sb
-      .from('user_stats')
-      .select('current_streak_weeks')
-      .eq('user_id', profile.id)
-      .maybeSingle(),
-  ]);
-
-  /* Estrae i dati annidati da spot_riders → spots (Supabase returns array) */
-  type RiddenRow = { spots: SpotCard[] | null };
-  const ridden: SpotCard[] = (riddenRaw ?? [])
-    .flatMap((r: RiddenRow) => r.spots ?? [])
-    .filter((s): s is SpotCard => !!s);
-
-  /* Città uniche visitate (da spot girati + pubblicati) */
-  const allCities = [
-    ...ridden.map(s => s.city),
-    ...(spots ?? []).map(s => s.city),
-  ].filter((c): c is string => !!c);
-  const citiesCount = new Set(allCities).size;
+      .order('approved_at', { ascending: false, nullsFirst: false });
 
   return {
     profile:  profile as Profile,
     spots:    (spots ?? []) as SpotCard[],
-    ridden,
-    citiesCount,
-    photosCount: photosCount ?? 0,
-    statusCount: statusCount ?? 0,
-    streakWeeks: userStats?.current_streak_weeks ?? 0,
   };
 }
 
 export const revalidate = 300;
 
-export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const params = await props.params;
+  if(params.username==='rider_demo'&&localSessionPreview((await headers()).get('host')))return {title:'Il tuo profilo · demo locale',robots:{index:false,follow:false},alternates:{canonical:null}};
   const sb = supabaseAdmin();
   const { data: profile } = await sb
     .from('profiles')
@@ -152,10 +116,27 @@ export async function generateMetadata({ params }: { params: { username: string 
   };
 }
 
-export default async function UserProfilePage({ params }: { params: { username: string } }) {
+export default async function UserProfilePage(
+  props: { params: Promise<{ username: string }>; searchParams?: Promise<{ view?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
+  if(params.username==='rider_demo'&&localSessionPreview((await headers()).get('host')))return <>
+    <main style={{maxWidth:720,margin:'0 auto',padding:'24px 20px 80px',minHeight:'100dvh',boxSizing:'border-box'}}>
+      <Link href="/" style={{color:'var(--gray-400)'}}>Torna alla mappa</Link>
+      <header style={{padding:'28px 0 20px',borderBottom:'1px solid var(--gray-700)'}}>
+        <h1 style={{fontSize:28,margin:'0 0 8px'}}>{searchParams?.view==='public'?'Profilo rider':'Il tuo profilo'}</h1>
+        <p style={{margin:0,color:'var(--gray-400)'}}>@rider_demo · Account di prova locale</p>
+      </header>
+      {searchParams?.view==='public'?<RiderPublicStats ownerId={PREVIEW_ACTOR} endpoint="/api/rider-stats-preview"/>:<>
+       <Link href="/?session=1" className="btn-primary" style={{display:'inline-flex',marginTop:20}}>Vai in sessione</Link>
+       <RiderHistory ownerId={PREVIEW_ACTOR} compact/>
+      </>}
+    </main><BottomNav/>
+  </>;
   const data = await getData(params.username);
   if (!data) notFound();
-  const { profile, spots, ridden, citiesCount, photosCount, statusCount, streakWeeks } = data;
+  const { profile, spots } = data;
   const joinDate = new Date(profile.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   return (
@@ -181,51 +162,16 @@ export default async function UserProfilePage({ params }: { params: { username: 
           <ProfileGamification username={profile.username} />
         </div>
 
-        {/* Minimal stats — inline text, not pill boxes */}
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 12,
-          color: 'var(--gray-500)', marginBottom: 24,
-          display: 'flex', flexWrap: 'wrap', gap: 12,
-        }}>
-          <span><strong style={{ color: 'var(--bone)' }}>{spots.length}</strong> spot</span>
-          {photosCount > 0 && <span><strong style={{ color: 'var(--bone)' }}>{photosCount}</strong> foto</span>}
-          {ridden.length > 0 && <span><strong style={{ color: 'var(--bone)' }}>{ridden.length}</strong> girati</span>}
-          {citiesCount > 0 && <span><strong style={{ color: 'var(--bone)' }}>{citiesCount}</strong> città</span>}
-          {streakWeeks > 0 && <span><strong style={{ color: streakWeeks >= 12 ? 'var(--orange)' : streakWeeks >= 4 ? '#f5c542' : 'var(--bone)' }}>🔥 {streakWeeks}w</strong> streak</span>}
-        </div>
-
+        <RiderHistory ownerId={profile.id} compact />
+        <RiderPublicStats ownerId={profile.id} />
         {/* Spot pubblicati */}
-        {spots.length === 0 ? (
-          <div style={{ textAlign: 'center', paddingTop: 48 }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🏴</div>
-            <p style={{ fontFamily: 'var(--font-mono)', color: 'var(--gray-400)', fontSize: 15 }}>Nessuno spot ancora.</p>
-          </div>
-        ) : (
-          <>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
-              📍 SPOT DI @{profile.username.toUpperCase()}
-            </div>
+        {spots.length > 0 && (
+          <details style={{borderTop:'1px solid var(--gray-700)',padding:'16px 0'}}>
+            <summary style={{minHeight:44,cursor:'pointer'}}>Spot pubblicati ({spots.length})</summary>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {spots.map(spot => <SpotTile key={spot.id} spot={spot} username={profile.username} />)}
             </div>
-          </>
-        )}
-
-        {/* Spot girati — visibili a tutti, sezione pubblica */}
-        {ridden.length > 0 && (
-          <div style={{ marginTop: 32 }}>
-            <div style={{
-              fontFamily: 'var(--font-mono)', fontSize: 12,
-              color: 'var(--gray-400)', textTransform: 'uppercase',
-              letterSpacing: '0.08em', marginBottom: 14,
-              borderTop: '1px solid var(--gray-700)', paddingTop: 24,
-            }}>
-              🛹 SPOT GIRATI ({ridden.length})
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {ridden.map(spot => <SpotTile key={spot.id} spot={spot} username={profile.username} />)}
-            </div>
-          </div>
+          </details>
         )}
 
         {/* Preferiti — visibili solo al proprietario del profilo */}

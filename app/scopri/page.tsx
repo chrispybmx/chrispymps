@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { supabaseServer } from '@/lib/supabase';
-import { discoverCover, type DiscoverPhoto, type DiscoverSpot } from './discover';
+import { getDiscoverPage } from '@/lib/discover-server';
+import { parseDiscoverFilters, discoverSearchParams } from './discover';
 import ScopriClient from './ScopriClient';
 import ScopriLoading from './loading';
 
@@ -18,38 +18,25 @@ const baseMetadata: Metadata = {
   twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Scopri spot — Chrispy Maps' },
 };
 
-export function generateMetadata({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }): Metadata {
+export async function generateMetadata(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+): Promise<Metadata> {
+  const searchParams = await props.searchParams;
   const filtered = ['q', 'type', 'country', 'region', 'obstacle', 'difficulty', 'condition', 'sort'].some(key => Boolean(searchParams[key]));
   return { ...baseMetadata, ...(filtered ? { robots: { index: false, follow: true } } : {}) };
 }
 
 export const revalidate = 300;
 
-async function getSpots(): Promise<{ spots: DiscoverSpot[]; loadError: boolean }> {
-  try {
-    const supabase = supabaseServer();
-    const result = await supabase.from('spots')
-      .select('id, slug, name, type, lat, lon, city, region, country, country_code, condition, condition_updated_at, difficulty, ostacoli, submitted_by_username, likes_count, approved_at, created_at, spot_photos(url, position, source, moderation_status)')
-      .eq('status', 'approved').order('approved_at', { ascending: false, nullsFirst: false }).order('id');
-    let data = result.data as unknown as Record<string, unknown>[] | null;
-    let error = result.error;
-    if (error && /ostacoli/i.test(error.message)) {
-      const fallback = await supabase.from('spots')
-        .select('id, slug, name, type, lat, lon, city, region, country, country_code, condition, condition_updated_at, difficulty, submitted_by_username, likes_count, approved_at, created_at, spot_photos(url, position, source, moderation_status)')
-        .eq('status', 'approved').order('approved_at', { ascending: false, nullsFirst: false }).order('id');
-      data = fallback.data as unknown as Record<string, unknown>[] | null; error = fallback.error;
-    }
-    if (error) return { spots: [], loadError: true };
-    const spots = (data ?? []).map(row => {
-      const cover = discoverCover(row.spot_photos as DiscoverPhoto[] | null);
-      const { spot_photos: _photos, ...spot } = row;
-      return { ...spot, cover_url: cover?.url, cover_source: cover?.source ?? undefined } as unknown as DiscoverSpot;
-    });
-    return { spots, loadError: false };
-  } catch { return { spots: [], loadError: true }; }
-}
-
-export default async function ScopriPage() {
-  const result = await getSpots();
-  return <Suspense fallback={<ScopriLoading />}><ScopriClient {...result} /></Suspense>;
+export default async function ScopriPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) if (typeof value === 'string') params.set(key, value);
+  const filters = parseDiscoverFilters(params);
+  let result;
+  try { result = { ...(await getDiscoverPage(filters)), loadError: false }; }
+  catch { result = { spots: [], total: 0, nextOffset: null, countries: [], loadError: true }; }
+  return <Suspense fallback={<ScopriLoading />}><ScopriClient {...result} initialKey={discoverSearchParams(filters)} /></Suspense>;
 }

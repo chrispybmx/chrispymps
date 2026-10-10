@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { safeAuthNext } from '@/lib/auth-navigation';
-export default function ConfirmEmail({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ConfirmEmail(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const token = typeof searchParams.token_hash === 'string' && searchParams.token_hash.length <= 512 ? searchParams.token_hash : '';
   const type = typeof searchParams.type === 'string' && ['email','signup','recovery','email_change'].includes(searchParams.type) ? searchParams.type : '';
   const next = safeAuthNext(typeof searchParams.next === 'string' ? searchParams.next : null);

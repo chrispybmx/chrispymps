@@ -1,0 +1,21 @@
+title = "Chrispy Maps secret scanning"
+[extend]
+useDefault = true
+[[allowlists]]
+description = "Public IndexNow ownership token, intentionally served as a public file"
+condition = "AND"
+paths = ['''(?:^|/)(?:lib/indexnow\.ts|scripts/indexnow-submit-all\.mjs)$''']
+regexTarget = "secret"
+regexes = ['^d2707434d81d4231f08b2a5813182e7a$']
+[[allowlists]]
+description = "Local storage identifier, not a credential"
+condition = "AND"
+paths = ['''(?:^|/)lib/explore-state\.ts$''']
+regexTarget = "secret"
+regexes = ['^cmaps_explore_v1$']
+[[allowlists]]
+description = "Unit test fixture only"
+condition = "AND"
+paths = ['''(?:^|/)__tests__/auth\.test\.ts$''']
+regexTarget = "secret"
+regexes = ['^test-secret-at-least-32-characters-long-000$']

@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { requestSignIn } from '@/lib/auth-navigation';
 import { useUser } from '@/hooks/useUser';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from './Toast';
 import MapIcon from './MapIcon';
 import { useLanguage } from './LanguageProvider';
+import { SpotSession } from './RiderSessions';
 
 interface Props {
   spotId: string;
@@ -37,7 +39,7 @@ export default function SpotPageActions({ spotId, initialLikes }: Props) {
   }, [spotId, user]);
 
   const handleLike = async () => {
-    if (!user || likeLoading) { if (!user) toast(text('Accedi per votare', 'Sign in to vote'), 'info'); return; }
+    if (!user || likeLoading) { if (!user) requestSignIn(); return; }
     setLikeLoading(true);
     ++likeVersion.current;
     const actor = user.id;
@@ -60,6 +62,7 @@ export default function SpotPageActions({ spotId, initialLikes }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {favoriteError && <p role="alert" style={{fontSize:14}}>{text('Preferiti non sincronizzati. Riprova dalla pagina Preferiti.', 'Favorites are not synced. Try again from Favorites.')}</p>}
+      <SpotSession spotId={spotId} />
       {/* Top row: 🔥 + ❤️ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button aria-label={text("Mi piace","Like")} disabled={likeLoading} aria-pressed={liked} onClick={handleLike}
@@ -99,28 +102,39 @@ export function SpotStarRating({ spotId }: { spotId: string }) {
   const [count, setCount] = useState(0);
   const [hover, setHover] = useState(0);
 
+  const [saving, setSaving] = useState(false);
+  const busy = useRef(false);
+  const version = useRef(0);
+  const identity = useRef(user?.id); identity.current = user?.id;
   useEffect(() => {
+    const controller = new AbortController();
+    const generation = ++version.current;
+    setMyRating(0);
     const headers: Record<string, string> = {};
     if (user) headers.Authorization = `Bearer ${user.accessToken}`;
-    fetch(`/api/spot-ratings?spot_id=${spotId}`, { headers })
+    fetch(`/api/spot-ratings?spot_id=${spotId}`, { headers, signal: controller.signal })
       .then(r => r.json())
-      .then(j => { if (j.ok) { setMyRating(j.myRating); setAvgRating(j.avg); setCount(j.count); } })
+      .then(j => { if (j.ok && !controller.signal.aborted && version.current === generation) { setMyRating(j.myRating); setAvgRating(j.avg); setCount(j.count); } })
       .catch(() => {});
-  }, [spotId, user?.id]); // eslint-disable-line
+    return () => controller.abort();
+  }, [spotId, user]);
 
   const handleStar = async (star: number) => {
-    if (!user) { toast(text('Accedi per votare', 'Sign in to vote'), 'info'); return; }
-    const newR = star === myRating ? 0 : star;
-    setMyRating(newR);
+    if (!user) { requestSignIn(); return; }
+    if (busy.current) return;
+    busy.current = true; setSaving(true); ++version.current;
+    const actor = user.id;
     try {
       const res = await fetch('/api/spot-ratings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.accessToken}` },
-        body: JSON.stringify({ spot_id: spotId, rating: newR }),
+        body: JSON.stringify({ spot_id: spotId, rating: star === myRating ? 0 : star }),
       });
       const j = await res.json();
-      if (j.ok) { setMyRating(j.myRating); setAvgRating(j.avg); setCount(j.count); }
-    } catch {}
+      if (!res.ok || !j.ok) throw new Error();
+      if (identity.current === actor) { setMyRating(j.myRating); setAvgRating(j.avg); setCount(j.count); }
+    } catch { if (identity.current === actor) toast(text('Voto non salvato. Riprova.', 'Vote not saved. Try again.'), 'error'); }
+    finally { busy.current = false; setSaving(false); setHover(0); }
   };
 
   const display = hover || myRating;
@@ -134,7 +148,7 @@ export function SpotStarRating({ spotId }: { spotId: string }) {
     }}>
       <div style={{ display: 'flex', gap: 2 }}>
         {[1, 2, 3, 4, 5].map(star => (
-          <button key={star} aria-label={text(`Vota ${star} ${star === 1 ? 'stella' : 'stelle'}`, `Rate ${star} ${star === 1 ? 'star' : 'stars'}`)} aria-pressed={myRating === star}
+          <button key={star} disabled={saving || user === undefined} aria-busy={saving} aria-label={text(`Vota ${star} ${star === 1 ? 'stella' : 'stelle'}`, `Rate ${star} ${star === 1 ? 'star' : 'stars'}`)} aria-pressed={myRating === star}
             onClick={() => handleStar(star)}
             onMouseEnter={() => setHover(star)}
             onMouseLeave={() => setHover(0)}

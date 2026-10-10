@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     if (!spotId) {
       return NextResponse.json({ ok: false, error: 'Link scaduto o non valido. Approva dalla dashboard.' }, { status: 401 });
     }
-  } else if (isAdminAuthenticated()) {
+  } else if (await isAdminAuthenticated()) {
     if (!spot_id) {
       return NextResponse.json({ ok: false, error: 'spot_id mancante' }, { status: 400 });
     }

@@ -1,5 +1,6 @@
 'use client';
 
+import type { DiscoverPage } from '@/lib/discover-server';
 import { trackMetric } from '@/lib/product-metrics';
 import { useState, useMemo, useEffect, useRef, useTransition, type FormEvent } from 'react';
 import Link from 'next/link';
@@ -18,7 +19,7 @@ import { countryLabel, discoverCountries, discoverSearchParams, DISCOVER_PAGE_SI
 import styles from './scopri.module.css';
 
 const AuthModal = dynamic(() => import('@/components/AuthModal'), { ssr: false });
-interface Props { spots: DiscoverSpot[]; loadError?: boolean }
+interface Props extends DiscoverPage { loadError?: boolean; initialKey: string }
 interface RiderResult { username: string; spotCount: number }
 interface LikeState { count: number; hasLiked: boolean }
 const obstacleEnglish: Partial<Record<Ostacolo, string>> = { stairs: 'Stairs', curb: 'Curb' };
@@ -31,14 +32,24 @@ function SpotCover({ spot, index, missing, streetview }: { spot: DiscoverSpot; i
   return <div className={styles.photo}>{url && !failed ? <img src={original ? url : miniatura(url, 640)} srcSet={original ? undefined : `${miniatura(url, 400)} 400w, ${miniatura(url, 640)} 640w`} sizes="(min-width:1440px) 300px, (min-width:960px) 32vw, (min-width:600px) 48vw, 100vw" alt={spot.name} loading={index < 3 ? 'eager' : 'lazy'} decoding="async" onError={() => { if (!original && miniatura(url, 640) !== url) setOriginal(true); else setFailed(true); }} /> : <div className={styles.noPhoto}><MapIcon name={spot.type} size={32} /><span>{missing}</span></div>}{spot.cover_source === 'streetview' && url && !failed && <span className={styles.source}>{streetview}</span>}</div>;
 }
 
-export default function ScopriClient({ spots, loadError = false }: Props) {
+export default function ScopriClient({ spots: initialSpots, loadError: initialError = false, total: initialTotal, nextOffset: initialOffset, countries: initialCountries, initialKey }: Props) {
   const { language, locale, text } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const paramsString = searchParams.toString();
   const [filters, setFilters] = useState<DiscoverFilters>(() => parseDiscoverFilters(searchParams));
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(DISCOVER_PAGE_SIZE);
+  const [spots, setSpots] = useState(initialSpots);
+  const [total, setTotal] = useState(initialTotal);
+  const [nextOffset, setNextOffset] = useState(initialOffset);
+  const [countrySources, setCountrySources] = useState(initialCountries);
+  const [loadError, setLoadError] = useState(initialError);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [moreError, setMoreError] = useState(false);
+  const [pageRetry, setPageRetry] = useState(0);
+  const pageRequest = useRef<AbortController | null>(null);
+  const firstPage = useRef(true);
+  const loadingMore = useRef(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [refreshing, startRefresh] = useTransition();
   const [userResults, setUserResults] = useState<RiderResult[]>([]);
@@ -68,7 +79,6 @@ export default function ScopriClient({ spots, loadError = false }: Props) {
   }, [paramsString]);
 
   useEffect(() => {
-    setVisibleCount(DISCOVER_PAGE_SIZE);
     if (scroller.current) scroller.current.scrollTop = 0;
     const timer = window.setTimeout(() => {
       const current = new URLSearchParams(window.location.search);
@@ -99,9 +109,25 @@ export default function ScopriClient({ spots, loadError = false }: Props) {
     return () => { controller.abort(); window.clearTimeout(timer); };
   }, [filters.query, userRetry]);
 
-  const filtered = useMemo(() => filterDiscoverSpots(spots, filters), [spots, filters]);
-  const visible = filtered.slice(0, visibleCount);
-  const countries = useMemo(() => discoverCountries(spots, language), [spots, language]);
+  const filterKey = discoverSearchParams(filters);
+  useEffect(() => {
+    if (firstPage.current) { firstPage.current = false; if (filterKey === initialKey) return; }
+    pageRequest.current?.abort(); loadingMore.current = false;
+    const controller = new AbortController(); pageRequest.current = controller;
+    setPageLoading(true); setLoadError(false); setMoreError(false);
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/discover?${filterKey}`, { signal: controller.signal });
+        const result = await response.json(); if (!response.ok || !result.ok) throw new Error();
+        if (!controller.signal.aborted) { setSpots(result.spots); setTotal(result.total); setNextOffset(result.nextOffset); setCountrySources(result.countries); }
+      } catch { if (!controller.signal.aborted) setLoadError(true); }
+      finally { if (!controller.signal.aborted) setPageLoading(false); }
+    }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [filterKey, pageRetry, initialKey]);
+  useEffect(() => () => pageRequest.current?.abort(), []);
+  const visible = spots;
+  const countries = useMemo(() => discoverCountries(countrySources, language), [countrySources, language]);
   const advancedCount = [filters.difficulty, filters.country, filters.region, filters.obstacle, filters.condition].filter(Boolean).length;
   const anyFilter = !!(filters.query || filters.type || advancedCount);
   const canFilterRegion = !filters.country || ['code:IT', 'name:italia', 'name:italy'].includes(filters.country);
@@ -134,10 +160,20 @@ export default function ScopriClient({ spots, loadError = false }: Props) {
   function change<K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) { setFilters(previous => ({ ...previous, [key]: value, ...(key === 'country' ? { region: '' } : {}) })); }
   function search(event: FormEvent) { event.preventDefault(); if (filters.query.trim()) trackMetric('search_used', 'discover'); input.current?.blur(); heading.current?.focus({ preventScroll: true }); }
   function reset() { setFilters({ ...EMPTY_DISCOVER_FILTERS }); input.current?.focus(); }
-  function loadMore() {
-    const first = filtered[visibleCount]?.id;
-    setVisibleCount(count => count + DISCOVER_PAGE_SIZE);
-    requestAnimationFrame(() => { if (first) { titleRefs.current[first]?.focus({ preventScroll: true }); titleRefs.current[first]?.scrollIntoView({ block: 'nearest' }); } });
+  async function loadMore() {
+    if (loadingMore.current || pageLoading || nextOffset === null) return;
+    loadingMore.current = true; setMoreError(false);
+    const controller = new AbortController(); pageRequest.current = controller;
+    setPageLoading(true);
+    try {
+      const response = await fetch(`/api/discover?${filterKey}&offset=${nextOffset}`, { signal: controller.signal });
+      const result = await response.json(); if (!response.ok || !result.ok) throw new Error();
+      if (!controller.signal.aborted) {
+        setSpots(previous => [...previous, ...result.spots.filter((spot: DiscoverSpot) => !previous.some(old => old.id === spot.id))]);
+        setTotal(result.total); setNextOffset(result.nextOffset);
+      }
+    } catch { if (!controller.signal.aborted) setMoreError(true); }
+    finally { if (!controller.signal.aborted) { loadingMore.current = false; setPageLoading(false); } }
   }
   async function likeSpot(id: string) {
     if (!user) { setAuthOpen(true); return; }
@@ -168,7 +204,7 @@ export default function ScopriClient({ spots, loadError = false }: Props) {
         <label>{text('Difficoltà', 'Difficulty')}<select value={filters.difficulty} onChange={event => change('difficulty', event.target.value)}><option value="">{text('Tutti i livelli', 'All levels')}</option>{DIFFICOLTA.map(item => <option key={item.value} value={item.value}>{item.value === 'beginner' ? text('Principiante', 'Beginner') : item.value === 'intermediate' ? text('Intermedio', 'Intermediate') : 'Pro'}</option>)}</select></label>
         <label>{text('Condizione', 'Condition')}<select value={filters.condition} onChange={event => change('condition', event.target.value as SpotCondition | '')}><option value="">{text('Tutte le condizioni', 'All conditions')}</option>{(['alive', 'bustato', 'demolito'] as const).map(value => <option key={value} value={value}>{conditionLabel(value)}</option>)}</select></label>
         {canFilterRegion && <label>{text('Regione italiana', 'Italian region')}<select value={filters.region} onChange={event => change('region', event.target.value)}><option value="">{text('Tutte le regioni', 'All regions')}</option>{REGIONI_ITALIA.map(region => <option key={region.label} value={region.label}>{region.label}</option>)}</select></label>}
-        <button className={`${styles.button} ${styles.doneFilters}`} onClick={() => { setFiltersOpen(false); heading.current?.focus({ preventScroll: true }); }}>{text('Mostra', 'Show')} {filtered.length} {text('spot', filtered.length === 1 ? 'spot' : 'spots')}</button>
+        <button className={`${styles.button} ${styles.doneFilters}`} onClick={() => { setFiltersOpen(false); heading.current?.focus({ preventScroll: true }); }}>{text('Mostra', 'Show')} {total} {text('spot', total === 1 ? 'spot' : 'spots')}</button>
       </div>}
     </header>
 
@@ -176,12 +212,12 @@ export default function ScopriClient({ spots, loadError = false }: Props) {
       <div className={styles.resultsInner}>
         {(usersLoading || usersError || userResults.length > 0) && <section className={styles.riders} aria-label={text('Rider trovati', 'Riders found')}><h2>{text('Rider', 'Riders')}</h2>{usersLoading ? <p role="status">{text('Ricerca rider…', 'Searching riders…')}</p> : usersError ? <p>{text('Ricerca rider non disponibile.', 'Rider search is unavailable.')} <button onClick={() => setUserRetry(value => value + 1)}>{text('Riprova', 'Retry')}</button></p> : <ul>{userResults.map(rider => <li key={rider.username}><Link href={`/u/${encodeURIComponent(rider.username)}`}><MapIcon name="user" /><span><strong>@{rider.username}</strong><small>{rider.spotCount} {text('spot', rider.spotCount === 1 ? 'spot' : 'spots')}</small></span><MapIcon name="arrow" size={18} /></Link></li>)}</ul>}</section>}
         <div className={styles.resultHeading}>
-          <div><h2 tabIndex={-1} ref={heading}>{loadError ? text('Spot non disponibili', 'Spots unavailable') : `${filtered.length} ${text('spot', filtered.length === 1 ? 'spot' : 'spots')}`}</h2>{!loadError && <span>{filters.sort === 'newest' ? text('In ordine di aggiunta', 'Ordered by date added') : text('In ordine alfabetico', 'Alphabetical order')}</span>}</div>
+          <div><h2 tabIndex={-1} ref={heading}>{loadError ? text('Spot non disponibili', 'Spots unavailable') : `${total} ${text('spot', total === 1 ? 'spot' : 'spots')}`}</h2>{!loadError && <span>{filters.sort === 'newest' ? text('In ordine di aggiunta', 'Ordered by date added') : text('In ordine alfabetico', 'Alphabetical order')}</span>}</div>
           <Link href="/sfoglia" className={`${styles.textLink} ${styles.browseLink}`}>{text('Uno spot alla volta', 'One spot at a time')} <MapIcon name="arrow" size={18} /></Link>
         </div>
         {favorites.error && <div className={styles.feedback} role="alert">{favorites.error === 'load' ? text('Non riesco a caricare i tuoi spot salvati.', 'Your saved spots could not be loaded.') : text('La modifica ai salvati non è riuscita.', 'The change to your saved spots could not be saved.')} <button onClick={() => favorites.reload()}>{text('Riprova', 'Retry')}</button></div>}
         {likeError && <p className={styles.feedback} role="alert">{likeError}</p>}
-        {loadError ? <section className={styles.empty}><MapIcon name="pin" size={30} /><h2>{text('Non riesco a caricare gli spot.', 'Spots could not be loaded.')}</h2><p>{text('Controlla la connessione e riprova.', 'Check your connection and try again.')}</p><button className={styles.button} disabled={refreshing} onClick={() => startRefresh(() => router.refresh())}>{refreshing ? text('Caricamento…', 'Loading…') : text('Riprova', 'Retry')}</button></section> : !filtered.length ? <section className={styles.empty}><MapIcon name="search" size={30} /><h2>{text('Nessuno spot con questi filtri.', 'No spots match these filters.')}</h2><p>{text('Prova un altro nome, una città o una categoria.', 'Try a different name, city or category.')}</p>{anyFilter && <button className={styles.button} onClick={reset}>{text('Azzera i filtri', 'Clear filters')}</button>}<Link href="/" className={styles.textLink}>{text('Cerca sulla mappa', 'Search on the map')} <MapIcon name="arrow" size={18} /></Link></section> : <>
+        {pageLoading && !loadingMore.current ? <p role="status">{text('Ricerca spot…', 'Searching spots…')}</p> : loadError ? <section className={styles.empty}><MapIcon name="pin" size={30} /><h2>{text('Non riesco a caricare gli spot.', 'Spots could not be loaded.')}</h2><p>{text('Controlla la connessione e riprova.', 'Check your connection and try again.')}</p><button className={styles.button} disabled={refreshing} onClick={() => setPageRetry(value => value + 1)}>{refreshing ? text('Caricamento…', 'Loading…') : text('Riprova', 'Retry')}</button></section> : !total ? <section className={styles.empty}><MapIcon name="search" size={30} /><h2>{text('Nessuno spot con questi filtri.', 'No spots match these filters.')}</h2><p>{text('Prova un altro nome, una città o una categoria.', 'Try a different name, city or category.')}</p>{anyFilter && <button className={styles.button} onClick={reset}>{text('Azzera i filtri', 'Clear filters')}</button>}<Link href="/" className={styles.textLink}>{text('Cerca sulla mappa', 'Search on the map')} <MapIcon name="arrow" size={18} /></Link></section> : <>
           <div className={styles.grid}>{visible.map((spot, index) => {
             const saved = favorites.isFav(spot.id);
             const like = likes[spot.id];
@@ -195,11 +231,11 @@ export default function ScopriClient({ spots, loadError = false }: Props) {
               <div className={styles.cardActions}><button aria-pressed={saved} disabled={!favorites.loaded || favorites.pendingIds.has(spot.id)} onClick={() => favorites.toggleFav(spot.id)} className={saved ? styles.saved : ''} aria-label={`${saved ? text('Rimuovi dai salvati', 'Remove from saved') : text('Salva', 'Save')} ${spot.name}`}><MapIcon name="heart" size={19} filled={saved} /><span>{saved ? text('Salvato', 'Saved') : text('Salva', 'Save')}</span></button><button aria-pressed={like ? like.hasLiked : undefined} disabled={likeBusy.has(spot.id) || user === undefined} onClick={() => void likeSpot(spot.id)} className={like?.hasLiked ? styles.saved : ''} aria-label={`${like?.hasLiked ? text('Rimuovi il voto a', 'Unlike') : text('Mi piace', 'Like')} ${spot.name}`}><MapIcon name="like" size={19} /><span>{count > 0 ? count : text('Mi piace', 'Like')}</span></button><Link href={`/map?spot=${encodeURIComponent(spot.slug)}`} aria-label={`${text('Mostra sulla mappa', 'Show on map')}: ${spot.name}`}><MapIcon name="pin" size={19} /><span>{text('Mappa', 'Map')}</span></Link></div>
             </article>;
           })}</div>
-          <div className={styles.pagination}><p>{text('Mostrati', 'Showing')} {Math.min(visibleCount, filtered.length)} {text('di', 'of')} {filtered.length} {text('spot', filtered.length === 1 ? 'spot' : 'spots')}</p>{visibleCount < filtered.length && <button className={styles.button} onClick={loadMore}>{text('Carica altri spot', 'Load more spots')} <MapIcon name="plus" size={18} /></button>}</div>
+          {moreError && <p role="alert">{text('Caricamento non riuscito. Riprova con “Carica altri spot”.', 'Could not load more spots. Please try again.')}</p>}<div className={styles.pagination}><p>{text('Mostrati', 'Showing')} {spots.length} {text('di', 'of')} {total} {text('spot', total === 1 ? 'spot' : 'spots')}</p>{nextOffset !== null && <button className={styles.button} disabled={pageLoading} onClick={() => void loadMore()}>{text('Carica altri spot', 'Load more spots')} <MapIcon name="plus" size={18} /></button>}</div>
         </>}
       </div>
     </div>
     <BottomNav onOpenAuth={() => setAuthOpen(true)} />
-    <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onSuccess={() => setAuthOpen(false)} />
+    {authOpen && <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onSuccess={() => setAuthOpen(false)} />}
   </main>;
 }

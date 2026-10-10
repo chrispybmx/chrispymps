@@ -22,6 +22,8 @@ const CLUSTER_ZOOM = 12;
 const GEO_CONCESSA_KEY = 'cmaps_geo_concessa';
 
 interface SpotMapProps {
+  liveMode?: boolean;
+  liveCounts?: Record<string,number>;
   spots:             SpotMapPin[];
   filterType:        SpotType | null;
   filterRegionBbox?: [number, number, number, number] | null;
@@ -55,17 +57,19 @@ interface SpotMapProps {
 }
 
 /* ── SVG pin individuale ── */
-function pinSvg(type: SpotType, condition: string, isSelected = false, updatedAt?: string | null): string {
-  const fill = isSelected ? '#ff6a00' : '#181715';
+function pinSvg(type: SpotType, condition: string, isSelected = false, updatedAt?: string | null, liveMode=false, liveCount=0): string {
+  const fill = isSelected ? '#ff6a00' : liveMode ? '#14613b' : '#181715';
   const ink = isSelected ? '#181715' : '#f6f3ee';
   const status = condition !== 'alive' ? '<path d="M27 7l8 8m0-8-8 8" stroke="#ff6a00" stroke-width="3"/>' : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 40 50"><path d="M20 47 5 29A19 19 0 1 1 35 29Z" fill="${fill}" stroke="#f6f3ee" stroke-width="2.5"/><g transform="translate(8 7)" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${spotSymbol(type)}"/></g>${status}</svg>`;
+  const badge=liveMode&&liveCount>0?`<span class="cm-live-pin-count">${Math.floor(liveCount)}</span>`:'';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 40 50"><path d="M20 47 5 29A19 19 0 1 1 35 29Z" fill="${fill}" stroke="#f6f3ee" stroke-width="2.5"/><g transform="translate(8 7)" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${spotSymbol(type)}"/></g>${status}</svg>${badge}`;
 }
 
 /* ── Clustering geografico a griglia adattiva allo zoom ──
    Celle più piccole = cluster più granulari e precisi. */
 
 export default function SpotMap({
+  liveMode=false,liveCounts,
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
   initialView, onViewChanged, selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
   locateTrigger, onLocatingChange, onLocateError, onBoundsChanged, darkMap: darkMapProp, onUserLocated,
@@ -171,7 +175,7 @@ export default function SpotMap({
           : { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, noWrap: true, className: 'osm-tiles' }
       ).addTo(map);
 
-      zoomControlRef.current = L.control.zoom({ position: 'bottomleft', zoomInTitle: textRef.current('Ingrandisci', 'Zoom in'), zoomOutTitle: textRef.current('Riduci', 'Zoom out') }).addTo(map);
+      zoomControlRef.current = L.control.zoom({ position: 'topleft', zoomInTitle: textRef.current('Ingrandisci', 'Zoom in'), zoomOutTitle: textRef.current('Riduci', 'Zoom out') }).addTo(map);
       markersRef.current  = L.layerGroup().addTo(map);
       mapInstance.current = map;
       setMapReady(true);
@@ -306,7 +310,7 @@ export default function SpotMap({
   useEffect(() => {
     if (!mapReady || !mapInstance.current || !L) return;
     zoomControlRef.current?.remove();
-    zoomControlRef.current = L.control.zoom({ position: 'bottomleft', zoomInTitle: text('Ingrandisci', 'Zoom in'), zoomOutTitle: text('Riduci', 'Zoom out') }).addTo(mapInstance.current);
+    zoomControlRef.current = L.control.zoom({ position: 'topleft', zoomInTitle: text('Ingrandisci', 'Zoom in'), zoomOutTitle: text('Riduci', 'Zoom out') }).addTo(mapInstance.current);
     userMarkerRef.current?.setTooltipContent(text('Sei qui', 'You are here'));
   }, [mapReady, text]);
 
@@ -325,11 +329,12 @@ export default function SpotMap({
 
         /* Pallino arancione uniforme — sempre, anche per singoli spot */
         const radius = Math.min(14 + Math.sqrt(c.count), 21);
-        const label = c.count === 1 ? `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${spotSymbol(c.spots[0].type)}"/></svg>` : String(c.count);
+        const riderCount=liveMode?c.spots.reduce((sum,spot)=>sum+(liveCounts?.[spot.id]??0),0):0;
+        const label = liveMode ? String(riderCount) : c.count === 1 ? `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${spotSymbol(c.spots[0].type)}"/></svg>` : String(c.count);
         const fontSize = 14;
         const html = `<div style="
           width:${radius * 2}px; height:${radius * 2}px;
-          background: #181715;
+          background: ${liveMode ? '#14613b' : '#181715'};
           border: 2px solid #f6f3ee;
           border-radius: 50%;
           display:flex; align-items:center; justify-content:center;
@@ -347,13 +352,14 @@ export default function SpotMap({
           iconAnchor:[radius, radius],
         });
 
-        const marker = L!.marker([c.lat, c.lon], { icon, title: text(`${c.count} spot`, `${c.count} ${c.count === 1 ? 'spot' : 'spots'}`), alt: text(`${c.count} spot, ingrandisci la zona`, `${c.count} ${c.count === 1 ? 'spot' : 'spots'}, zoom into this area`) });
+        const liveLabel=text(`${riderCount} rider segnalati in ${c.count} spot`,`${riderCount} riders reported at ${c.count} spots`);
+        const marker = L!.marker([c.lat, c.lon], { icon, title: liveMode?liveLabel:text(`${c.count} spot`, `${c.count} ${c.count === 1 ? 'spot' : 'spots'}`), alt: liveMode?liveLabel:text(`${c.count} spot, ingrandisci la zona`, `${c.count} ${c.count === 1 ? 'spot' : 'spots'}, zoom into this area`) });
         const cityName = c.city
           ? c.city.charAt(0).toUpperCase() + c.city.slice(1)
           : text('Zona', 'Area');
 
         marker.bindTooltip(
-          `<span style="font-family:monospace;font-size:12px"><b>${escapeMapLabel(cityName)}</b> · ${c.count} ${text('spot', c.count === 1 ? 'spot' : 'spots')}</span>`,
+          `<span style="font-family:monospace;font-size:12px"><b>${escapeMapLabel(cityName)}</b> · ${liveMode?escapeMapLabel(liveLabel):`${c.count} ${text('spot', c.count === 1 ? 'spot' : 'spots')}`}</span>`,
           { permanent: false, direction: 'top', offset: [0, -radius - 2] }
         );
 
@@ -391,7 +397,7 @@ export default function SpotMap({
 
         // Usa selPinRef (sempre aggiornato) per rendere l'icona corretta
         const isSel = selPinRef.current?.id === pin.id;
-        const svg   = pinSvg(pin.type, pin.condition, isSel, pin.condition_updated_at);
+        const svg   = pinSvg(pin.type, pin.condition, isSel, pin.condition_updated_at, liveMode, liveCounts?.[pin.id]);
         const pw    = isSel ? 48 : 38;
         const ph    = isSel ? 60 : 48;
         const icon  = L!.divIcon({
@@ -402,7 +408,8 @@ export default function SpotMap({
           popupAnchor: [0, -(ph + 2)],
         });
 
-        const marker = L!.marker([pin.lat, pin.lon], { icon, title: pin.name, alt: `${pin.name}, ${TIPI_SPOT[pin.type].label}` });
+        const pinLabel=liveMode?`${pin.name}, ${liveCounts?.[pin.id]??0} ${text('rider segnalati','riders reported')}`:`${pin.name}, ${TIPI_SPOT[pin.type].label}`;
+        const marker = L!.marker([pin.lat, pin.lon], { icon, title: liveMode?pinLabel:pin.name, alt: pinLabel });
         // Un unico percorso per marker e lista: seleziona l’anteprima esistente.
         marker.on('click', () => onSpotClickRef.current(pin));
 
@@ -427,7 +434,7 @@ export default function SpotMap({
       hasInitialFit.current = true;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, clusters, zoom, mapReady, text]); // selectedPin gestito in Effect 2
+  }, [filtered, clusters, zoom, mapReady, text, liveMode, liveCounts]); // selectedPin gestito in Effect 2
 
   /* ── Effect 2: aggiorna SOLO l'icona del pin selezionato/deselezionato ── */
   /* Evita di ricreare tutti i marker ad ogni click: O(1) invece di O(n) */
@@ -443,7 +450,7 @@ export default function SpotMap({
       if (marker) {
         const pin = filteredRef.current.find(s => s.id === prevSelId);
         if (pin) {
-          const svg  = pinSvg(pin.type, pin.condition, false, pin.condition_updated_at);
+          const svg  = pinSvg(pin.type, pin.condition, false, pin.condition_updated_at, liveMode, liveCounts?.[pin.id]);
           const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [38, 48], iconAnchor: [19, 48], popupAnchor: [0, -50] });
           marker.setIcon(icon);
         }
@@ -454,7 +461,7 @@ export default function SpotMap({
     if (selectedPin) {
       const marker = pinMarkersRef.current.get(selectedPin.id);
       if (marker) {
-        const svg  = pinSvg(selectedPin.type, selectedPin.condition, true, selectedPin.condition_updated_at);
+        const svg  = pinSvg(selectedPin.type, selectedPin.condition, true, selectedPin.condition_updated_at, liveMode, liveCounts?.[selectedPin.id]);
         const icon = L!.divIcon({ html: svg, className: 'spot-pin', iconSize: [48, 60], iconAnchor: [24, 60], popupAnchor: [0, -62] });
         marker.setIcon(icon);
       }
@@ -462,7 +469,7 @@ export default function SpotMap({
 
     prevSelIdRef.current = newSelId;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPin, zoom]);
+  }, [selectedPin, zoom, liveMode, liveCounts]);
 
   /* ── Fly-to: centrato nello spazio visibile sopra il pannello ── */
   useEffect(() => {

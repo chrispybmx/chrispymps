@@ -55,7 +55,7 @@ const WELCOME_HTML = `<table width="100%" cellpadding="0" cellspacing="0" border
 </table>`;
 
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

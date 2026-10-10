@@ -8,14 +8,14 @@ function slugify(str: string) {
 }
 
 export async function GET() {
-  if (!isAdminAuthenticated()) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   const { data, error } = await supabaseAdmin().from('news').select('*, news_photos(id, url, position, caption)').order('created_at', { ascending: false });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, data: data ?? [] });
 }
 
 export async function POST(req: Request) {
-  if (!isAdminAuthenticated()) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   const body = await req.json().catch(() => ({}));
 
   // Validazione e sanitizzazione input
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  if (!isAdminAuthenticated()) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   const { id } = await req.json().catch(() => ({}));
   if (!id || !UUID_RE.test(String(id))) return NextResponse.json({ ok: false, error: 'ID non valido' }, { status: 400 });
   const { error } = await supabaseAdmin().from('news').delete().eq('id', id);

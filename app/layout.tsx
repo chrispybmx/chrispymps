@@ -1,16 +1,23 @@
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
-import { Barlow_Condensed } from 'next/font/google';
+import { Barlow, Barlow_Condensed } from 'next/font/google';
 import './globals.css';
 import { APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
 import { ToastProvider } from '@/components/Toast';
 import MetricClicks from '@/components/MetricClicks';
 import Statistiche from '@/components/Statistiche';
+import ContextualAuth from '@/components/ContextualAuth';
+import SiteConnectionStatus from '@/components/SiteConnectionStatus';
 import CookieBanner from '@/components/CookieBanner';
 import { LanguageProvider } from '@/components/LanguageProvider';
+import { RiderSessionsRoot } from '@/components/RiderSessions';
+import PreviewSessionsRoot from '@/components/PreviewSessionsRoot';
+import { localSessionPreview } from '@/lib/rider-preview-server';
 
-const barlow = Barlow_Condensed({ weight: ['400', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--font-brand' });
+const barlow = Barlow_Condensed({ weight: ['600', '700', '800'], subsets: ['latin'], display: 'swap', variable: '--font-brand' });
+
+const barlowText = Barlow({ weight: ['400', '500', '600', '700'], subsets: ['latin'], display: 'swap', variable: '--font-text' });
 
 export const metadata: Metadata = {
   title: {
@@ -134,13 +141,14 @@ const organizationJsonLd = {
   inLanguage: 'it-IT',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Every document needs the current CSP nonce, including otherwise static routes.
   // Reading request headers opts pages into request-time rendering, without
   // disabling the explicit caches used by public APIs and data fetches.
-  const nonce = headers().get('x-nonce') ?? undefined;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+  const preview=localSessionPreview((await headers()).get('host'));
   return (
-    <html lang="it" className={barlow.variable}>
+    <html lang="it" className={`${barlow.variable} ${barlowText.variable}`}>
       <head>
         {/* Service Worker — external file per CSP (no unsafe-inline) */}
         {process.env.NODE_ENV === 'production' && <script src="/register-sw.js" defer />}
@@ -163,10 +171,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <LanguageProvider><ToastProvider>
-          {children}
+          {preview?<PreviewSessionsRoot>{children}</PreviewSessionsRoot>:<RiderSessionsRoot>{children}</RiderSessionsRoot>}
           <CookieBanner />
-          <MetricClicks />
-          <Statistiche />
+          <MetricClicks /><ContextualAuth /><SiteConnectionStatus /><Statistiche />
         </ToastProvider></LanguageProvider>
       </body>
     </html>

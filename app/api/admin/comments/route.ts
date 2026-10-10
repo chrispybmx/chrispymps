@@ -5,7 +5,7 @@ import { UUID_RE } from '@/lib/validation';
 
 /* ── GET: lista tutti i commenti con info spot ── */
 export async function GET(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
 /* ── DELETE: elimina un commento per id ── */
 export async function DELETE(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

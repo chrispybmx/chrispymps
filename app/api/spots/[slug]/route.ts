@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { supabaseServer, supabaseAdmin } from '@/lib/supabase';
+import { supabasePublic, supabaseAdmin } from '@/lib/supabase';
+import { PUBLIC_SPOT_COLUMNS, publicSpotPayload } from '@/lib/public-spot';
 import { UUID_RE } from '@/lib/validation';
 import { TIPI_SPOT_TUTTI, OSTACOLI_TUTTI } from '@/lib/constants';
 import { citySlug } from '@/lib/slugify';
@@ -37,17 +38,12 @@ function revalidateSpot(slug?: string | null, city?: string | null) {
  * combaciare con spots.submitted_by_user_id. Nessun altro puo toccare lo spot.
  */
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { slug: string } }
-) {
-  const supabase = supabaseServer();
+export async function GET(_req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
+  const supabase = supabasePublic();
   const { data, error } = await supabase
     .from('spots')
-    .select(`
-      *,
-      spot_photos (id, url, position, credit_name)
-    `)
+    .select(`${PUBLIC_SPOT_COLUMNS},spot_photos(id,url,position,credit_name,moderation_status)`)
     .eq('slug', params.slug)
     .eq('status', 'approved')
     .single();
@@ -56,12 +52,7 @@ export async function GET(
     return NextResponse.json({ ok: false, error: 'Spot non trovato' }, { status: 404 });
   }
 
-  // Ordina foto per posizione
-  if (data.spot_photos) {
-    data.spot_photos.sort((a: { position: number }, b: { position: number }) => a.position - b.position);
-  }
-
-  return NextResponse.json({ ok: true, data }, {
+  return NextResponse.json({ ok: true, data: publicSpotPayload(data) }, {
     headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
   });
 }
@@ -98,7 +89,8 @@ async function authorizeOwner(spotId: string, token: string) {
   return { supabase, user, spot };
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const spotId = params.slug;
   if (!UUID_RE.test(spotId)) {
     return NextResponse.json({ ok: false, error: 'ID non valido' }, { status: 400 });
@@ -148,7 +140,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   return NextResponse.json({ ok: true, slug: updated?.slug });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const spotId = params.slug;
   if (!UUID_RE.test(spotId)) {
     return NextResponse.json({ ok: false, error: 'ID non valido' }, { status: 400 });

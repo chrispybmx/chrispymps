@@ -5,8 +5,19 @@
  * il reverse usa i nomi locali dei luoghi (consistenza slug città nel DB).
  */
 
-const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
-const HEADERS = { 'User-Agent': 'ChrispyMaps/1.0' };
+async function geoFetch(params: URLSearchParams, signal?: AbortSignal) {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (signal?.aborted) cancel();
+  signal?.addEventListener('abort', cancel, { once: true });
+  const timeout = setTimeout(cancel, 12000);
+  try {
+    const response = await fetch(`/api/geocoding?${params}`, { signal: controller.signal });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Ricerca non disponibile.');
+    return data;
+  } finally { clearTimeout(timeout); signal?.removeEventListener('abort', cancel); }
+}
 
 /** Lingua dell'utente per i risultati di ricerca (client-side); 'en' su server. */
 function userLanguage(): string {
@@ -31,19 +42,19 @@ export interface ReverseGeo {
 /** Forward geocoding: testo → luoghi (mondo intero) */
 export async function geocodeForward(
   query: string,
-  options: { limit?: number; featureType?: string } = {},
+  options: { limit?: number; featureType?: string; signal?: AbortSignal } = {},
 ): Promise<GeoPlace[]> {
   const { limit = 5, featureType } = options;
   const params = new URLSearchParams({
     q:               query,
     format:          'json',
     limit:           String(limit),
-    'accept-language': userLanguage(),
+    language: userLanguage(),
+    mode: 'search',
   });
-  if (featureType) params.set('featuretype', featureType);
+  if (featureType) params.set('featureType', featureType);
 
-  const res  = await fetch(`${NOMINATIM_BASE}/search?${params}`, { headers: HEADERS });
-  const data = await res.json() as Array<{ name: string; lat: string; lon: string; type: string; display_name: string }>;
+  const data = await geoFetch(params, options.signal) as Array<{ name: string; lat: string; lon: string; type: string; display_name: string }>;
 
   return data.map(r => {
     // Contesto: primo livello amministrativo + paese (ultima parte del display_name)
@@ -66,15 +77,14 @@ export async function geocodeForward(
  *  Nessun accept-language: Nominatim risponde col nome locale del luogo,
  *  così la stessa città produce sempre lo stesso valore nel DB
  *  (es. "Roma" e non "Rome"/"Rom" a seconda dell'utente). */
-export async function reverseGeocode(lat: number, lon: number): Promise<ReverseGeo> {
+export async function reverseGeocode(lat: number, lon: number, signal?: AbortSignal): Promise<ReverseGeo> {
   const params = new URLSearchParams({
     lat:            String(lat),
     lon:            String(lon),
     format:         'json',
-    addressdetails: '1',
+    addressdetails: '1', mode: 'reverse',
   });
-  const res  = await fetch(`${NOMINATIM_BASE}/reverse?${params}`, { headers: HEADERS });
-  const data = await res.json();
+  const data = await geoFetch(params, signal);
   const city =
     data.address?.city ??
     data.address?.town ??

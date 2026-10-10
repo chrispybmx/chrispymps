@@ -16,7 +16,7 @@ const Schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const language = getSiteLanguage();
+  const language = await getSiteLanguage();
   const text = (it: string, en: string) => language === 'en' ? en : it;
   const failure = () => NextResponse.json({ ok: false, error: text('Non siamo riusciti a salvare la segnalazione. Riprova.', 'We could not save your report. Please try again.') }, { status: 503 });
   const parsed = Schema.safeParse(await req.json().catch(() => null));

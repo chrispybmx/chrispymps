@@ -80,6 +80,7 @@ describe('restricted reports and cleanup', () => {
 describe('client minimization', () => {
   it('sends no identifiers, referrer or cookies', async () => {
     vi.stubEnv('NEXT_PUBLIC_PRODUCT_METRICS_ENABLED', 'true'); vi.stubGlobal('window', {}); vi.stubGlobal('navigator', {});
+    vi.stubGlobal('window', {localStorage:{getItem:()=>JSON.stringify({accepted:true,at:Date.now()})}});
     const fetch = vi.fn().mockResolvedValue({}); vi.stubGlobal('fetch', fetch);
     trackMetric('search_used', 'map');
     expect(fetch).toHaveBeenCalledWith('/api/product-metrics', expect.objectContaining({ credentials: 'omit', referrerPolicy: 'no-referrer', body: JSON.stringify(payload) }));

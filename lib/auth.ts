@@ -58,9 +58,9 @@ function verifyToken(token: string): boolean {
  * Controlla se la richiesta corrente ha una sessione admin valida.
  * Da usare nelle Server Components e Route Handlers.
  */
-export function isAdminAuthenticated(): boolean {
+export async function isAdminAuthenticated(): Promise<boolean> {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE)?.value;
     if (!token) return false;
     return verifyToken(token);

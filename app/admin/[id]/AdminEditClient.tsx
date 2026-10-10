@@ -116,7 +116,10 @@ export default function AdminEditClient({ spot: initial }: Props) {
     try {
       const res  = await fetch('/api/admin/delete-spot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spot_id: spot.id }) });
       const json = await res.json();
-      if (json.ok) router.push('/admin');
+      if (json.ok) {
+        if (json.warning) window.alert(json.warning);
+        router.push('/admin');
+      }
       else         showMsg('❌ ' + json.error);
     } catch { showMsg('❌ Errore'); }
     finally { setSaving(false); }

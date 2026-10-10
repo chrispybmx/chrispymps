@@ -3,9 +3,10 @@ import { supabaseServer } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(_: Request, { params }: { params: { slug: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   try {
-    const supabase = supabaseServer();
+    const supabase = await supabaseServer();
     const { data, error } = await supabase
       .from('news')
       .select('*')

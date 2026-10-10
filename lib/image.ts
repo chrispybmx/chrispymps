@@ -25,14 +25,17 @@ export async function optimizeImage(
 ): Promise<OptimizeResult> {
   const { maxDim = 1600, quality = 85 } = opts;
 
+  // Bound decoded memory too: a small compressed upload can contain huge pixels.
+  const decodeOptions = { limitInputPixels: 40_000_000, animated: false };
+
   // hasAlpha: decide il formato di uscita. Se i metadati non sono leggibili si
   // assume opaco (JPEG), come per qualunque foto.
   let hasAlpha = false;
   try {
-    hasAlpha = (await sharp(input).metadata()).hasAlpha === true;
+    hasAlpha = (await sharp(input, decodeOptions).metadata()).hasAlpha === true;
   } catch { /* formato illeggibile: ci penserà la pipeline sotto */ }
 
-  const pipeline = sharp(input)
+  const pipeline = sharp(input, decodeOptions)
     .rotate() // applica l'orientamento EXIF, poi i metadati vengono scartati
     .resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true });
 

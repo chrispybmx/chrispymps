@@ -42,11 +42,12 @@ const mapJsonLd = {
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
 };
 
-export default async function MapPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+export default async function MapPage(
+  props: {
+    searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const params: { [key: string]: string | string[] | undefined } = searchParams ? await searchParams : {};
   const autoAdd = params['add'] === '1';
 
@@ -65,7 +66,7 @@ export default async function MapPage({
           <p><Link href="/map/about">Il progetto e la community</Link></p>
         </aside>
       </noscript>
-      <MapClient initialSpots={[]} autoAdd={autoAdd} initialSpotSlug={typeof params.spot === 'string' ? params.spot : undefined} initialQuery={typeof params.q === 'string' ? params.q : undefined} />
+      <MapClient initialSpots={[]} autoAdd={autoAdd} chooseSession={params.session === '1'} initialSpotSlug={typeof params.spot === 'string' ? params.spot : undefined} initialQuery={typeof params.q === 'string' ? params.q : undefined} />
     </>
   );
 }

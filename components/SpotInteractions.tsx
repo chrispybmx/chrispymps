@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { requestSignIn } from '@/lib/auth-navigation';
+import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/components/LanguageProvider';
 
 interface Comment {
@@ -33,18 +35,11 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const user = useUser();
   useEffect(() => {
-    import('@/lib/supabase-browser').then(({ supabaseBrowser }) => {
-      supabaseBrowser().auth.getSession().then(({ data }) => {
-        const t = data.session?.access_token ?? null;
-        setToken(t);
-        setUsername(
-          data.session?.user?.user_metadata?.username ??
-          data.session?.user?.email?.split('@')[0] ?? null
-        );
-      });
-    }).catch(() => {});
-  }, []);
+    setToken(user?.accessToken ?? null);
+    setUsername(user?.username ?? null);
+  }, [user]);
 
   /* Carica commenti — passa il token per avere i propri like */
   useEffect(() => {
@@ -300,13 +295,13 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
           <p style={{ color: 'var(--gray-400)', fontSize: 14, marginBottom: 12 }}>
             {t('Accedi per commentare o mettere like', 'Sign in to comment or like')}
           </p>
-          <a href="/" style={{
+          <button type="button" onClick={requestSignIn} style={{
             display: 'inline-block', background: 'var(--orange)', color: '#000',
             fontFamily: 'var(--font-mono)', fontSize: 12, padding: '8px 20px',
             borderRadius: 6, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.04em',
           }}>
             {t('Accedi / Registrati', 'Sign in / Register')} →
-          </a>
+          </button>
         </div>
       )}
     </div>

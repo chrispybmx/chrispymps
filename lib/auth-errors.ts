@@ -46,6 +46,10 @@ const MESSAGGI: Record<string, string> = {
 };
 
 /** Messaggio leggibile per un codice di errore; `null` se non c'è errore. */
+export function safeAuthErrorCode(code: string | null | undefined): string {
+  return code && Object.hasOwn(MESSAGGI, code) ? code : 'oauth_failed';
+}
+
 export function authErrorMessage(code: string | null | undefined): string | null {
   if (!code) return null;
   const noto = MESSAGGI[code];

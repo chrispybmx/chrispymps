@@ -48,6 +48,9 @@ export default function PhotoCarousel({ photos, language = 'it' }: { photos: Pho
 
   return (
     <>
+      <a href="/regole#segnalazioni" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px', color: 'var(--gray-400)', fontSize: 13 }}>
+        {text('Segnala una violazione dei diritti', 'Report a rights violation')}
+      </a>
       {lightbox && (
         <Lightbox
           photos={photos}

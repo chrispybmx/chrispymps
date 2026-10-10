@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import NewsletterPreferences from '@/components/NewsletterPreferences';
+import Link from 'next/link';
+import EmailVerification from '@/components/EmailVerification';
+import RiderPreferences from '@/components/RiderPreferences';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
@@ -52,12 +54,11 @@ export default function EditProfileClient({ profile }: Props) {
       const u = data.session?.user;
       setToken(data.session?.access_token ?? null);
       if (u) {
-        const uname = u.user_metadata?.username ?? u.email?.split('@')[0];
-        setIsOwn(uname === profile.username);
+        setIsOwn(u.id === profile.id);
       }
       setChecking(false);
     });
-  }, [profile.username]);
+  }, [profile.id]);
 
   const handleAvatarUpload = async (file: File) => {
     if (!token || file.size > 5 * 1024 * 1024) return;
@@ -270,21 +271,21 @@ export default function EditProfileClient({ profile }: Props) {
         {saving ? 'Salvataggio…' : '💾 SALVA'}
       </button>
 
-      {token && <NewsletterPreferences token={token} />}
+      {token && <EmailVerification token={token} />}
+      {token && <RiderPreferences token={token} />}
+      <Link href="/impostazioni/privacy" style={{display:'flex',alignItems:'center',minHeight:44,marginTop:24,color:'var(--orange)'}}>Privacy e dati</Link>
 
       {/* ══ Zona pericolosa — in fondo, silenziosa ══ */}
-      <div style={{ marginTop: 72, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <div id="elimina-account" style={{ marginTop: 32, paddingTop: 18, scrollMarginTop:80, borderTop: '1px solid var(--gray-600)' }}>
         {!zonaAperta ? (
           <button
             onClick={() => setZonaAperta(true)}
             style={{
-              fontFamily: 'var(--font-mono)', fontSize: 10,
-              color: 'var(--gray-700)', background: 'none',
-              border: 'none', padding: 0, cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 14,
+              color: 'var(--bone)', background: 'none',
+              border: 'none', padding: '8px 0', minHeight:44, cursor: 'pointer',
               transition: 'color 0.15s',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-500)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gray-700)'; }}
           >
             Elimina account
           </button>
@@ -294,9 +295,10 @@ export default function EditProfileClient({ profile }: Props) {
               fontFamily: 'var(--font-mono)', fontSize: 12,
               color: 'var(--gray-400)', lineHeight: 1.7,
             }}>
-              Cancelliamo il tuo profilo e i tuoi dati personali.
-              Gli spot che hai pubblicato restano sulla mappa come contributi
-              anonimi della community, così chi ci gira non li perde.
+              Eliminiamo l’account e il profilo. Spot approvati, foto, commenti e altri
+              contributi pubblicati possono restare, scollegati dall’account.
+              Questo non rimuove volti, nomi o informazioni personali presenti nei contenuti.
+              Per questi casi puoi <a href="mailto:christian.ceresato@gmail.com?subject=Rimozione%20dati%20nei%20contributi" style={{color:'var(--orange)'}}>richiedere la rimozione</a>, anche dopo la cancellazione.
               <br />
               <span style={{ color: '#ff6b6b' }}>Non si torna indietro.</span>
             </div>

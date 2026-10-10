@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 
 const endpoints = [
-  { name: 'marker index', run: () => mapIndex() },
+  { name: 'marker index', run: () => mapIndex(new NextRequest('http://localhost/api/spots/index')) },
   { name: 'photo results', run: () => spots(req()) },
 ];
 
@@ -50,7 +50,7 @@ describe('public map route boundaries', () => {
   it('loads a complete small marker index across the Supabase 1000-row boundary', async () => {
     const first = Array.from({ length: 1000 }, (_, n) => spot(n + 1));
     mock.responses = [response(first), response([spot(1001), spot(1002)])];
-    const result = await mapIndex(); const body = await result.json();
+    const result = await mapIndex(new NextRequest('http://localhost/api/spots/index')); const body = await result.json();
     expect(body.data).toHaveLength(1002); expect(new Set(body.data.map((s: { id: string }) => s.id)).size).toBe(1002);
     expect(mock.queries[0].range).toHaveBeenCalledWith(0, 999); expect(mock.queries[1].range).toHaveBeenCalledWith(1000, 1999);
     for (const query of mock.queries) {
@@ -162,7 +162,7 @@ describe('schema compatibility and generic failures', () => {
   }
   it('keeps the index fallback across later pages rather than repeating failing schema requests', async () => {
     mock.responses = [{ data: null, error: { code: '42703', message: 'ostacoli does not exist' } }, response(Array.from({ length: 1000 }, (_, n) => spot(n))), response([spot(1000)])];
-    const result = await mapIndex(); expect((await result.json()).data).toHaveLength(1001); expect(mock.queries).toHaveLength(3);
+    const result = await mapIndex(new NextRequest('http://localhost/api/spots/index')); expect((await result.json()).data).toHaveLength(1001); expect(mock.queries).toHaveLength(3);
     expect(mock.queries[2].select.mock.calls[0][0]).not.toContain('ostacoli'); expect(mock.queries[2].range).toHaveBeenCalledWith(1000, 1999);
   });
 });

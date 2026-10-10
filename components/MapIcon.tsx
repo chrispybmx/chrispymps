@@ -1,5 +1,8 @@
 import { spotSymbol } from '@/lib/spot-symbols';
 const paths: Record<string, string> = {
+ 'face-sad':'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM8 9h.01M16 9h.01M8 17s1.5-3 4-3 4 3 4 3',
+ 'face-neutral':'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM8 9h.01M16 9h.01M8 15h8',
+ 'face-happy':'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM8 9h.01M16 9h.01M8 14s1.5 3 4 3 4-3 4-3',
  message: 'M4 4h16v12H9l-5 4V4Z',
  bell: 'M6 8a6 6 0 0 1 12 0v6l2 3H4l2-3V8ZM10 21h4',
  like: 'M7 10v11H3V10h4ZM7 10l5-8 2 1v6h6l1 2-3 10H7',

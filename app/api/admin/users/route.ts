@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 /* GET /api/admin/users — list all profiles with spot + comment counts */
 export async function GET() {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
@@ -58,7 +58,7 @@ export async function GET() {
    action=suspend          → delete comments + set spots to pending
 */
 export async function DELETE(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

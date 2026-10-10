@@ -1,8 +1,10 @@
 import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from './supabase';
 import { subscribeToNewsletter } from './newsletter';
+import { registrationDetails, validBirthDate } from './registration';
 /** Runs only for a verified identity. Optional delivery never authorizes access. */
 export async function completeAccount(user: User): Promise<{ profileReady: boolean; pending: boolean }> {
+  if(!user.email_confirmed_at)return {profileReady:false,pending:true};
   const sb = supabaseAdmin();
   const { data: profile, error: readError } = await sb.from('profiles').select('username').eq('id', user.id).maybeSingle();
   if (readError) throw new Error('profile_read');
@@ -17,8 +19,12 @@ export async function completeAccount(user: User): Promise<{ profileReady: boole
   let pending = false;
   const initial = metadata.initial_rider_details;
   if (initial && typeof initial === 'object') {
-    const birth = typeof initial.birthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(initial.birthDate) ? initial.birthDate : null;
-    const { error } = await sb.from('rider_details').upsert({ user_id: user.id, birth_date: birth, region: typeof initial.region === 'string' ? initial.region.slice(0, 60) : null }, { onConflict: 'user_id', ignoreDuplicates: true });
+    const details=metadata.registration_version===2?registrationDetails().safeParse(initial):null;
+    if(details&&!details.success)return {profileReady:true,pending:true};
+    const birth = validBirthDate(initial.birthDate) ? initial.birthDate : null;
+    const { error } = await sb.from('rider_details').upsert({ user_id: user.id, birth_date: birth, region: typeof initial.region === 'string' ? initial.region.slice(0, 60) : null,
+      ...(details?.success?{country_code:details.data.countryCode,disciplines:details.data.disciplines.length?details.data.disciplines:null}:{})
+    }, { onConflict: 'user_id', ignoreDuplicates: true });
     if (error) pending = true;
   }
   // The operational welcome group is separate from marketing consent.

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase';
 import type { SpotMapPin } from '@/lib/types';
-import { readSpotQuery } from '@/lib/spot-query';
+import { readSpotQuery, pointInBounds } from '@/lib/spot-query';
+import { localSessionPreview } from '@/lib/rider-preview-server';
+import { previewSpots } from '@/lib/preview-spots';
 
 /** Una foto e' pubblicabile se e' stata approvata (o e' precedente alla
  *  moderazione, quando la colonna era ancora NULL).
@@ -21,7 +23,14 @@ export async function GET(req: NextRequest) {
   let query: ReturnType<typeof readSpotQuery>;
   try { query = readSpotQuery(req.nextUrl.searchParams); }
   catch { return NextResponse.json({ok:false,error:'Parametri di ricerca non validi.'},{status:400}); }
-  const supabase = supabaseServer();
+  if(localSessionPreview(req.headers.get('host'))) {
+    let rows=(await previewSpots()).filter(s=>(!query.ids||query.ids.includes(s.id))&&(!query.bounds||pointInBounds(s,query.bounds)));
+    const hasMore=!!query.bounds&&rows.length>query.offset+200;
+    if(query.bounds)rows=rows.slice(query.offset,query.offset+200);
+    if(query.coverOnly)rows=rows.map(s=>({...s,photo_urls:s.photo_urls?.slice(0,1),photo_sources:s.photo_sources?.slice(0,1)}));
+    return NextResponse.json({ok:true,data:rows,...(query.bounds?{hasMore,nextOffset:hasMore?query.offset+200:null}:{})},{headers:{'Cache-Control':'no-store'}});
+  }
+  const supabase = await supabaseServer();
 
   /* `ostacoli` arriva con 20260824_ostacoli.sql. Finche' la migration non e'
      stata eseguita la colonna non esiste, e Postgrest non ignora il campo

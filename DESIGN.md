@@ -1,12 +1,34 @@
 # Chrispy Maps · Direzione di prodotto
 
+## Tipografia piu leggibile: 10 ottobre 2026
+
+Il marchio Chrispy Maps resta invariato. Il testo dell'interfaccia usa Barlow
+Medium 500, con campi allo stesso peso ed etichette e comandi Semibold 600.
+I nomi degli spot in lista e la maniglia del pannello usano Condensed Bold 700.
+Le categorie e gli autori in lista salgono a 13 px; le categorie hanno piu
+contrasto. Navigazione mobile a 12 px e peso 600, dentro gli stessi pulsanti.
+Il peso 500 e caricato realmente da next/font, senza simulazioni del browser.
+Questa indicazione aggiorna i pesi della sezione tipografica precedente;
+non cambia logo, font family, cartografia, dimensioni del + o funzionalita.
+
+## Aggiornamento Crock Lab: Aggiungi spot
+
+Su richiesta del proprietario, nella copia Crock Lab viene rimossa la trama
+interlacciata da Aggiungi spot, sia su desktop sia su mobile. Il comando mobile
+e' circolare, 58 px, con bordo del colore della barra e ombra leggera: emerge
+dal bordo superiore mantenendo il callback originale. Il desktop conserva
+il pulsante con testo, ora a superficie piena. Questa decisione sostituisce
+le precedenti indicazioni sull'interlacciato riportate sotto.
+Il collegamento flottante Sessioni/account demo e' rimosso: Sessioni resta
+raggiungibile dal menu e dalla barra della sessione attiva.
+
 ## Cosa abbiamo osservato
 
 La mappa è già il centro del prodotto. Il sito usa nero/arancione e fotografie pubblicate dai rider. Ricerca, categorie, ostacoli, difficoltà, regioni, raggio e posizione sono già disponibili. Le schede collegano fotografie, autore, accesso, indicazioni, contributi, commenti e valutazioni. L'interfaccia precedente sovrapponeva effetti VHS e testi piccoli a questi contenuti; su desktop la lista occupava il fondo della mappa.
 
 ## Una direzione: costruito da chi gira
 
-Conserviamo nome, nero/arancione, cartografia chiara, fotografie e attribuzione alla community. Il marchio tipografico usa Barlow Condensed in grassetto, con Chrispy chiaro e Maps arancione. È compatto e leggibile nella testata mobile. Non introduce graffiti, adesivi o immagini artificiali.
+Conserviamo nome, nero/arancione, cartografia chiara, fotografie e attribuzione alla community. Il marchio tipografico usa Barlow Condensed ExtraBold, con Chrispy chiaro e Maps arancione. È compatto e leggibile nella testata mobile. Non introduce graffiti, adesivi o immagini artificiali.
 
 La personalità deriva dai posti reali, dai nomi dei rider e da simboli che rappresentano rail, ledge, bank e altri elementi. Le superfici sono piene; separatori e spazio sostituiscono schede annidate e ombre diffuse.
 
@@ -25,7 +47,7 @@ Desktop a due colonne: foto a sinistra, caratteristiche e azioni a destra. Mobil
 ## Regole del sistema
 
 - Colori: antracite caldo per le superfici, bianco caldo per il testo; arancione Chrispy #ff6a00 per azioni principali, selezione e focus. Cartografia chiara con tono caldo ispirato al VHS originale: seppia 32%, saturazione 1,45 e contrasto 1,12. La correzione riguarda solo le tessere, mai marker, controlli o foto, e non si applica alla mappa scura. Nessuna scanline, sfocatura o animazione decorativa. Colori di stato solo quando indicano dati reali.
-- Tipografia: Barlow Condensed per il marchio; sans di sistema per l'interfaccia. Informazioni principali 14–16 px, nomi 16–26 px, titolo scheda 28–32 px. Etichette secondarie compatte 12 px; niente font decorativi nei comandi.
+- Tipografia: famiglia Barlow per dare continuità al prodotto. Barlow Condensed 800 per Chrispy e 700 per Maps; Condensed 600 per i nomi degli spot e 700 per i titoli. Barlow normale 400/600/700 per comandi, località, descrizioni e moduli. Nomi in lista 1,25 rem, in Scopri 1,75 rem; titolo scheda 2,125 rem su telefono e 2,5 rem su desktop. Il condensato rimane nei nomi e nei titoli, mai in dati e campi piccoli. Maiuscole originali dei contenuti; nessuna trasformazione in slogan. Font serviti dal sito tramite next/font, con fallback corretto nelle metriche e font-display swap.
 - Icone: contorno coerente, 18–24 px; simboli distinti per categoria e ostacolo, con etichetta testuale nei controlli. I marker non dipendono solo dal colore.
 - Spazi: passi di 4/8 px, margini principali 16/20/24 px. Raggi generalmente 4–8 px; separatori sottili. Nessuna ombra sistematica.
 - Interazioni: obiettivi principali di almeno 44 px, focus visibile, dialoghi ricerca/filtri/menu/accesso gestibili da tastiera. Animazioni brevi e solo funzionali; rispetto della preferenza di movimento ridotto.

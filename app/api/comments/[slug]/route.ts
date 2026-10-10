@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
 
-interface Props { params: { slug: string } }
+interface Props { params: Promise<{ slug: string }> }
 
 /* ── GET: leggi commenti per uno spot o una news ── */
-export async function GET(req: NextRequest, { params }: Props) {
+export async function GET(req: NextRequest, props: Props) {
+  const params = await props.params;
   const admin = supabaseAdmin();
   const isNews = req.nextUrl.searchParams.get('type') === 'news';
 
@@ -73,7 +74,8 @@ export async function GET(req: NextRequest, { params }: Props) {
 }
 
 /* ── POST: aggiungi commento / risposta (richiede auth) ── */
-export async function POST(req: NextRequest, { params }: Props) {
+export async function POST(req: NextRequest, props: Props) {
+  const params = await props.params;
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
@@ -156,7 +158,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   // Inserisci commento / risposta
-  const insertData = newsId
+  const insertData: { news_id?: string; spot_id?: string; user_id: string; username: string; text: string; parent_id: string | null } = newsId
     ? { news_id: newsId, user_id: user.id, username, text, parent_id: parent_id || null }
     : { spot_id: spot!.id, user_id: user.id, username, text, parent_id: parent_id || null };
 

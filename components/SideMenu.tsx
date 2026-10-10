@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { SESSION_INVITES_PUBLIC } from '@/lib/session-invites';
 import MapIcon from './MapIcon';
 import { useLanguage } from './LanguageProvider';
@@ -30,7 +31,7 @@ const MENU_ITEMS = [
   { href: '/news',       label: 'News', labelEn: 'News',       emoji: '📰' },
   { href: '/classifica', label: 'Classifica', labelEn: 'Leaderboard', emoji: '🏆' },
   { href: '/cerca-spot', label: 'Cerca Spot', labelEn: 'Find spots', emoji: '📍' },
-  { href: '/sessioni',  label: 'Sessioni', labelEn: 'Sessions',   emoji: '🔴', liveOnly: true },
+  { href: '/sessioni',  label: 'Sessioni', labelEn: 'Sessions',   emoji: '🔴', liveOnly: false },
   { divider: true },
   { href: LINKS.youtube,   label: 'Tutorial', labelEn: 'Tutorials',    emoji: '▶️', external: true },
   { href: '/map/support',  label: 'Supporta', labelEn: 'Support',    emoji: '☕' },
@@ -204,7 +205,7 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
           <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <a href="/regole" style={{ color: 'var(--orange)', textDecoration: 'none' }}>{text('Regole', 'Community rules')}</a>
             <a href="/privacy" style={{ color: 'var(--orange)', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="/map/about" style={{ color: 'var(--gray-500)', textDecoration: 'none' }}>{text('Contatti', 'Contact')}</a>
+            <Link href="/map/about" style={{ color: 'var(--gray-500)', textDecoration: 'none' }} prefetch={false}>{text('Contatti', 'Contact')}</Link>
           </div>
         </div>
       </nav>

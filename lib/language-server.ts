@@ -1,3 +1,3 @@
 import { cookies } from 'next/headers';
 import { parseLanguage } from './language';
-export function getSiteLanguage() { return parseLanguage(cookies().get('cm_language')?.value); }
+export async function getSiteLanguage() { return parseLanguage((await cookies()).get('cm_language')?.value); }

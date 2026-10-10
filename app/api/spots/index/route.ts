@@ -1,11 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { localSessionPreview } from '@/lib/rider-preview-server';
+import { previewSpots } from '@/lib/preview-spots';
 import { supabaseServer } from '@/lib/supabase';
 export const revalidate = 60;
 
 /** Small public index for markers/search. Photos are requested for the visible results. */
-export async function GET() {
+export async function GET(req:NextRequest) {
   try {
-  const sb = supabaseServer();
+  if(localSessionPreview(req?.headers.get('host')??null))return NextResponse.json({ok:true,data:await previewSpots(true)},{headers:{'Cache-Control':'no-store'}});
+  const sb = await supabaseServer();
   const result: unknown[] = [];
   let withObstacles = true;
   const pageSize = 1000;

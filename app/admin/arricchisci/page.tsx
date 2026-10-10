@@ -37,7 +37,7 @@ async function getSpots(): Promise<SpotRow[]> {
 }
 
 export default async function ArricchisciPage() {
-  if (!isAdminAuthenticated()) redirect('/admin/login');
+  if (!(await isAdminAuthenticated())) redirect('/admin/login');
   const spots = await getSpots();
   return <ArricchisciClient initialSpots={spots} />;
 }

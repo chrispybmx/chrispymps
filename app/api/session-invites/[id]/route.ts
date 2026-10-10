@@ -4,9 +4,10 @@ import { SessionMessage, SessionThread } from '@/lib/session-invites';
 import { actionSchema, messageCursor, messageSchema, privateJson, sessionBody, sessionEndpoint, sessionIdSchema, sessionRpc } from '@/lib/session-invites-server';
 
 export const dynamic = 'force-dynamic';
-type Context = { params: { id: string } };
+type Context = { params: Promise<{ id: string }> };
 
-export async function GET(req: NextRequest, { params }: Context) {
+export async function GET(req: NextRequest, props: Context) {
+  const params = await props.params;
   return sessionEndpoint(req, async ({ admin, actor }) => {
     const invitation = sessionIdSchema.parse(params.id);
     const data = await sessionRpc<SessionThread>(admin, 'cm_session_thread', { actor, invitation, ...messageCursor(req.nextUrl.searchParams) });
@@ -14,7 +15,8 @@ export async function GET(req: NextRequest, { params }: Context) {
   });
 }
 
-export async function POST(req: NextRequest, { params }: Context) {
+export async function POST(req: NextRequest, props: Context) {
+  const params = await props.params;
   return sessionEndpoint(req, async ({ admin, actor }) => {
     const invitation = sessionIdSchema.parse(params.id);
     const input = messageSchema.parse(await sessionBody(req));
@@ -26,7 +28,8 @@ export async function POST(req: NextRequest, { params }: Context) {
   });
 }
 
-export async function PATCH(req: NextRequest, { params }: Context) {
+export async function PATCH(req: NextRequest, props: Context) {
+  const params = await props.params;
   return sessionEndpoint(req, async ({ admin, actor }) => {
     const invitation = sessionIdSchema.parse(params.id);
     const input = actionSchema.parse(await sessionBody(req));

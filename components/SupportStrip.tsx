@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 
 import { useLanguage } from '@/components/LanguageProvider';
 
@@ -12,12 +13,12 @@ export default function SupportStrip() {
     <div className="support-strip">
       <span aria-hidden="true">🏴</span>
       <span>{text('Questo progetto è gratuito.', 'This project is free to use.')}</span>
-      <a
+      <Link
         href="/map/support"
         aria-label={text('Supporta Chrispy Maps', 'Support Chrispy Maps')}
-      >
+       prefetch={false}>
         {text('Supportalo', 'Support it')} →
-      </a>
+      </Link>
     </div>
   );
 }

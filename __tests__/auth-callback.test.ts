@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
-const mocks = vi.hoisted(() => ({ exchange: vi.fn(), verify: vi.fn(), complete: vi.fn(), insert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ exchange: vi.fn(), verify: vi.fn(), complete: vi.fn(), insert: vi.fn(), proof: vi.fn() }));
+vi.mock('@/lib/email-verification', () => ({ recordEmailProof: mocks.proof }));
 vi.mock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: { exchangeCodeForSession: mocks.exchange, verifyOtp: mocks.verify } }) }));
 vi.mock('next/headers', () => ({ cookies: () => ({ get: vi.fn(), set: vi.fn() }) }));
 vi.mock('@/lib/supabase', () => ({ supabaseAdmin: () => ({ from: () => ({ insert: mocks.insert }) }) }));
@@ -10,6 +11,15 @@ const response = { data: { session: { user: { id: 'rider' } } }, error: null };
 beforeEach(() => { vi.clearAllMocks(); mocks.exchange.mockResolvedValue(response); mocks.verify.mockResolvedValue(response); mocks.complete.mockResolvedValue({ profileReady: true, pending: false }); });
 const call = (query: string) => query.includes('token_hash=') ? POST(new NextRequest('https://maps.chrispybmx.com/auth/callback', {method:'POST', body:new URLSearchParams(query)})) : GET(new NextRequest('https://maps.chrispybmx.com/auth/callback?' + query));
 describe('email and OAuth callback', () => {
+  it('records proof only after a successful email OTP', async () => { await call('token_hash=token&type=email'); expect(mocks.proof).toHaveBeenCalledWith(response.data.session.user); });
+  it('does not infer proof from a PKCE redirect or a client flow parameter', async () => { await call('code=valid&flow=email'); expect(mocks.proof).not.toHaveBeenCalled(); });
+  it('does not record proof from recovery or expired tokens', async () => { await call('token_hash=token&type=recovery'); expect(mocks.proof).not.toHaveBeenCalled(); mocks.verify.mockResolvedValue({data:{session:null},error:{code:'otp_expired'}}); await call('token_hash=old&type=email'); expect(mocks.proof).not.toHaveBeenCalled(); });
+  it('does not persist or redirect raw provider error details', async () => {
+    const r=await call('error=unknown-secret&error_code=person%40example.com&error_description=token-secret');
+    expect(r.headers.get('location')).toBe('https://maps.chrispybmx.com/map?auth_error=oauth_failed');
+    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({error_code:'oauth_failed',error_detail:null,user_agent:null}));
+    expect(JSON.stringify(mocks.insert.mock.calls)).not.toContain('token-secret');
+  });
   it('does not consume a token when an email scanner opens the link', async () => { const r=await GET(new NextRequest('https://maps.chrispybmx.com/auth/callback?token_hash=token&type=email')); expect(r.headers.get('location')).toContain('/auth/confirm?'); expect(mocks.verify).not.toHaveBeenCalled(); });
   it('exchanges a code and returns to the original spot', async () => { const r = await call('code=valid&next=%2Fmap%2Fspot%2Froma'); expect(r.headers.get('location')).toBe('https://maps.chrispybmx.com/map/spot/roma'); expect(mocks.exchange).toHaveBeenCalledWith('valid'); });
   it('verifies a signup token without requiring a PKCE cookie', async () => { await call('token_hash=token&type=email'); expect(mocks.verify).toHaveBeenCalledWith({ token_hash: 'token', type: 'email' }); expect(mocks.exchange).not.toHaveBeenCalled(); });

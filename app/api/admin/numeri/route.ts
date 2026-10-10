@@ -17,7 +17,7 @@ import { getFreshness } from '@/lib/freshness';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

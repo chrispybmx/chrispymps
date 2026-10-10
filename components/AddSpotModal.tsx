@@ -1,6 +1,8 @@
 'use client';
 
 import { NEWSLETTER_CONSENT_TEXT } from '@/lib/newsletter-consent';
+import { readSpotDraft, saveSpotDraft, deleteSpotDraft } from '@/lib/spot-draft';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { trackMetric } from '@/lib/product-metrics';
 import { useLanguage } from '@/components/LanguageProvider';
 
@@ -19,6 +21,7 @@ interface AddSpotModalProps {
   onClose:     () => void;
   initialLat?: number;
   initialLon?: number;
+  onSubmitted?: (spot:import('@/lib/types').SpotMapPin)=>void;
 }
 
 type Step    = 'posizione' | 'foto' | 'dettagli' | 'successo';
@@ -37,7 +40,7 @@ const inp: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
   background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
   borderRadius: 4, color: 'var(--bone)', fontFamily: 'var(--font-mono)',
-  fontSize: 15, padding: '10px 12px', outline: 'none',
+  fontSize: 16, padding: '10px 12px', outline: 'none',
 };
 const lbl: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)',
@@ -204,7 +207,7 @@ function LocationMapPicker({
 /* ══════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════ */
-export default function AddSpotModal({ open, onClose, initialLat, initialLon }: AddSpotModalProps) {
+export default function AddSpotModal({ open, onClose, initialLat, initialLon, onSubmitted }: AddSpotModalProps) {
   const { text } = useLanguage();
   const user      = useUser();
   const isLoading = user === undefined;
@@ -342,19 +345,25 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const [nearbySpots, setNearbySpots] = useState<NearbySpot[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyDismissed, setNearbyDismissed] = useState(false);
+  const [nearbyError, setNearbyError] = useState(false);
+  const [needsAuth, setNeedsAuth] = useState(false);
 
   /* Reverse geocode → auto-popola città + paese */
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
   const [countryCode, setCountryCode] = useState('');
+  const geoRequest = useRef<AbortController | null>(null);
   const fetchCity = useCallback(async (eLat: number, eLon: number) => {
+    geoRequest.current?.abort();
+    const controller = new AbortController(); geoRequest.current = controller;
+    setCity(''); setCountry(''); setCountryCode('');
     try {
-      const geo = await reverseGeocode(eLat, eLon);
-      if (geo.city) setCity(geo.city);
-      setCountry(geo.country ?? '');
-      setCountryCode(geo.countryCode ?? '');
-    } catch { /* silent */ }
+      const geo = await reverseGeocode(eLat, eLon, controller.signal);
+      if (controller.signal.aborted) return;
+      setCity(geo.city ?? ''); setCountry(geo.country ?? ''); setCountryCode(geo.countryCode ?? '');
+    } catch { /* Coordinates remain usable without a locality. */ }
   }, []);
+  useEffect(() => () => geoRequest.current?.abort(), []);
 
   /* Sync initialLat/Lon */
   useEffect(() => {
@@ -364,23 +373,58 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     }
   }, [initialLat, initialLon, fetchCity]);
 
-  /* Fetch nearby spots when coords are set */
+  /* Never display a duplicate check from an older position. */
   useEffect(() => {
-    if (lat == null || lon == null) { setNearbySpots([]); setNearbyDismissed(false); return; }
+    const controller = new AbortController();
+    setNearbySpots([]); setNearbyDismissed(false); setNearbyError(false);
+    if (!open || lat == null || lon == null) { setNearbyLoading(false); return; }
     setNearbyLoading(true);
-    setNearbyDismissed(false);
-    fetch(`/api/spots/nearby?lat=${lat}&lon=${lon}&radius=150`)
-      .then(r => r.json())
-      .then(j => { if (j.ok) setNearbySpots(j.data ?? []); })
-      .catch(() => {})
-      .finally(() => setNearbyLoading(false));
-  }, [lat, lon]);
+    fetch(`/api/spots/nearby?lat=${lat}&lon=${lon}&radius=150`, { signal: controller.signal })
+      .then(async r => { const j = await r.json(); if (!r.ok || !j.ok) throw new Error(); if (!controller.signal.aborted) setNearbySpots(j.data ?? []); })
+      .catch(() => { if (!controller.signal.aborted) setNearbyError(true); })
+      .finally(() => { if (!controller.signal.aborted) setNearbyLoading(false); });
+    return () => controller.abort();
+  }, [lat, lon, open]);
+
+  const [draftOwner, setDraftOwner] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState<'saved' | 'saving' | 'error' | ''>('');
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const draftGeneration = useRef(0);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true; const owner = user.id;
+    setDraftOwner(null);
+    readSpotDraft(owner).then(draft => {
+      if (!active) return;
+      setStep(draft?.step ?? 'posizione'); setLat(draft?.lat ?? initialLat ?? null); setLon(draft?.lon ?? initialLon ?? null);
+      setCity(draft?.city ?? ''); setCountry(draft?.country ?? ''); setCountryCode(draft?.countryCode ?? '');
+      setName(draft?.name ?? ''); setType(draft?.type ?? ''); setOstacoli(draft?.ostacoli ?? []);
+      setDescription(draft?.description ?? ''); setNotes(draft?.notes ?? ''); setDifficulty(draft?.difficulty ?? '');
+      setPhotos(draft?.photos ?? []); setDraftOwner(owner);
+      if (draft) { setGpsState(draft.lat != null ? 'ok' : 'idle'); setDraftStatus('saved'); }
+    }).catch(() => { if (active) { setDraftOwner(owner); setDraftStatus('error'); } });
+    return () => { active = false; };
+  // The draft belongs to an account, never to a login token refresh.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+  useEffect(() => {
+    if (!draftOwner || draftOwner !== user?.id || step === 'successo') return;
+    if (lat == null && lon == null && !name && !photos.length && !description && !notes && !type) return;
+    const generation = ++draftGeneration.current;
+    setDraftStatus('saving');
+    saveSpotDraft(draftOwner, { updatedAt: Date.now(), step, lat, lon, city, country, countryCode, name, type, ostacoli, description, notes, difficulty, photos })
+      .then(() => { if (generation === draftGeneration.current) setDraftStatus('saved'); })
+      .catch(() => { if (generation === draftGeneration.current) setDraftStatus('error'); });
+  }, [draftOwner, user?.id, step, lat, lon, city, country, countryCode, name, type, ostacoli, description, notes, difficulty, photos]);
 
   /* Reset */
-  const handleClose = useCallback(() => {
+  const discardDraft = useCallback(() => {
     photoUploadBatch.current.invalidate();
+    ++draftGeneration.current;
+    if (user?.id) void deleteSpotDraft(user.id).catch(() => setDraftStatus('error'));
+    setDraftStatus(''); setDiscardOpen(false); setDifficulty('');
     setStep('posizione');
-    setLat(initialLat ?? null); setLon(initialLon ?? null); setCity(''); setCountry(''); setCountryCode('');
+    setLat(null); setLon(null); setCity(''); setCountry(''); setCountryCode('');
     /* 'gps' e non null: il selettore di metodo non esiste più, quindi null
        lascerebbe il passo posizione completamente vuoto alla riapertura. */
     setLocMode('gps');
@@ -396,7 +440,14 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     setRegUsername(''); setRegEmail(''); setRegPassword('');
     setLoginEmail(''); setLoginPassword('');
     onClose();
-  }, [initialLat, initialLon, onClose]);
+  }, [onClose, user?.id]);
+  const handleClose = () => {
+    if (submitting) return;
+    if (step === 'successo') { discardDraft(); return; }
+    setDiscardOpen(false); onClose();
+  };
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(open, dialogRef, handleClose);
 
   /* Parse input (URL o coordinate) — supporta anche link corti maps.app.goo.gl */
   const handleConfirmCoords = async () => {
@@ -465,14 +516,14 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
   /* Permesso già dato → posizione presa da sola, zero tap. */
   useEffect(() => {
-    if (!open) return;
+    if (!open || draftOwner !== user?.id) return;
     if (geoPreGranted !== true) return;
     if (locMode !== 'gps') return;
     if (lat != null || lon != null) return;
     if (gpsState !== 'idle') return;
     getGPS();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, geoPreGranted, locMode, lat, lon, gpsState]);
+  }, [open, geoPreGranted, locMode, lat, lon, gpsState, draftOwner, user?.id]);
 
   /* GPS */
   const getGPS = () => {
@@ -496,12 +547,13 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
   /* Submit */
   const handleSubmit = async () => {
-    if (!user || !name.trim() || !type || lat == null || lon == null) return;
+    if (submitting || !user || !name.trim() || !type || lat == null || lon == null) return;
     setSubmitting(true); setError(null);
     try {
       const { data: { session } } = await supabaseBrowser().auth.getSession();
       if (!session?.access_token) {
-        setError(text("Sessione scaduta. Chiudi il modal, ricarica la pagina e riprova.", "Your sign-in expired. Close this window, reload the page and try again."));
+        setNeedsAuth(true);
+        setAuthError(text("Accedi di nuovo. La bozza è conservata.", "Sign in again. Your draft is preserved."));
         return;
       }
       // Only a complete upload of this exact selection can replace its files.
@@ -547,23 +599,30 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
       if (!json.ok) throw new Error(json.error ?? text("Errore durante l'invio.", "Could not submit the spot."));
       navigator.vibrate?.([30, 60, 30]);
       trackMetric('contribution_sent', 'add');
+      ++draftGeneration.current;
+      if (user?.id) await deleteSpotDraft(user.id).catch(() => {});
       setStep('successo');
+      if(json.data?.id&&json.data?.slug&&lat!==null&&lon!==null)onSubmitted?.({id:json.data.id,slug:json.data.slug,name,lat,lon,type,condition:'alive'});
     } catch (err) {
       setError(err instanceof Error ? err.message : text("Errore sconosciuto. Riprova.", "Something went wrong. Try again."));
     } finally { setSubmitting(false); }
   };
 
   /* Auth handlers */
-  let unDebounce: ReturnType<typeof setTimeout>;
+  const unDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkedName = useRef('');
+  useEffect(() => () => { if (unDebounce.current) clearTimeout(unDebounce.current); }, []);
   const onUsernameChange = (val: string) => {
     const clean = val.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
     setRegUsername(clean); setUsernameOk(null);
-    clearTimeout(unDebounce);
+    checkedName.current = clean;
+    if (unDebounce.current) clearTimeout(unDebounce.current);
     if (clean.length < 3) return;
     setCheckingUn(true);
-    unDebounce = setTimeout(async () => {
-      const free = await checkUsername(clean);
-      setUsernameOk(free); setCheckingUn(false);
+    unDebounce.current = setTimeout(async () => {
+      try { const free = await checkUsername(clean); if (checkedName.current === clean) setUsernameOk(free); }
+      catch { if (checkedName.current === clean) setAuthError(text('Verifica username non disponibile. Riprova.', 'Username check unavailable. Try again.')); }
+      finally { if (checkedName.current === clean) setCheckingUn(false); }
     }, DEBOUNCE_USERNAME_MS);
   };
 
@@ -573,7 +632,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
     if (regPassword.length < 6) { setAuthError(text("Password min 6 caratteri.", "Your password must be at least 6 characters.")); return; }
     if (!ageConfirmed2) { setAuthError(text("Devi confermare di avere almeno 14 anni.", "Confirm that you are at least 14 years old.")); return; }
     setAuthLoading(true); setAuthError(null);
-    try { const result = await signUp(regEmail, regPassword, regUsername, { newsletter: newsletterOptIn2, over16: newsletterOptIn2, onNewsletterResult: setNewsletterMessage }); setAuthDone(result); }
+    try { const result = await signUp(regEmail, regPassword, regUsername, { returnTo: "/map?add=1", newsletter: newsletterOptIn2, over16: newsletterOptIn2, onNewsletterResult: setNewsletterMessage }); setAuthDone(result); }
     catch (e) { setAuthError(e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.")); }
     finally { setAuthLoading(false); }
   };
@@ -581,7 +640,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
   const handleSignIn = async () => {
     if (!loginEmail || !loginPassword) { setAuthError(text("Inserisci email e password.", "Enter your email and password.")); return; }
     setAuthLoading(true); setAuthError(null);
-    try { await signIn(loginEmail, loginPassword); }
+    try { await signIn(loginEmail, loginPassword); setNeedsAuth(false); }
     catch (e) { setAuthError(e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.")); }
     finally { setAuthLoading(false); }
   };
@@ -598,7 +657,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 69, backdropFilter: 'none' }}
         aria-hidden />
 
-      <div role="dialog" aria-modal aria-label={text("Aggiungi spot BMX", "Add a BMX spot")} style={{
+      <div ref={dialogRef} role="dialog" aria-modal aria-label={text("Aggiungi spot BMX", "Add a BMX spot")} style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         background: 'var(--gray-800)', borderTop: '2px solid var(--orange)',
         borderRadius: '8px 8px 0 0', zIndex: 70,
@@ -612,7 +671,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 14px', borderBottom: '1px solid var(--gray-700)' }}>
           <div>
             <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--orange)', margin: 0 }}>{text("Aggiungi spot", "Add spot")}</h2>
-            {user && step !== 'successo' && (
+            {user && !needsAuth && step !== 'successo' && (
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', marginTop: 2 }}>
                 {text(STEP_LABEL[step], STEP_LABEL_EN[step])}
               </div>
@@ -621,8 +680,13 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           <button onClick={handleClose} className="btn-ghost" aria-label={text("Chiudi", "Close")} style={{ fontSize: 20 }}>✕</button>
         </div>
 
+        {user && step !== 'successo' && <div style={{ padding: '8px 20px', fontSize: 14 }}>
+          <p role="status">{draftStatus === 'saving' ? text('Salvataggio bozza…', 'Saving draft…') : draftStatus === 'error' ? text('Bozza conservata solo finché resti nella pagina: il dispositivo non permette il salvataggio.', 'Draft kept only while this page stays open: device storage is unavailable.') : draftStatus === 'saved' ? text('Bozza salvata su questo dispositivo per 7 giorni, comprese le foto.', 'Draft saved on this device for 7 days, including photos.') : text('Puoi chiudere e riprendere il contributo.', 'You can close and resume your contribution.')}</p>
+          {discardOpen ? <div><span>{text('Eliminare foto e dati della bozza?', 'Delete this draft and its photos?')}</span> <button type="button" className="btn-ghost" onClick={discardDraft}>{text('Elimina bozza', 'Delete draft')}</button><button type="button" className="btn-ghost" onClick={() => setDiscardOpen(false)}>{text('Continua a modificare', 'Keep editing')}</button></div> : <button type="button" className="cm-text-button" onClick={() => setDiscardOpen(true)}>{text('Elimina bozza', 'Delete draft')}</button>}
+        </div>}
+
         {/* Progress */}
-        {user && step !== 'successo' && (
+        {user && !needsAuth && step !== 'successo' && (
           <div style={{ height: 3, background: 'var(--gray-700)' }}>
             <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--orange)', transition: 'width 0.3s ease-out' }} />
           </div>
@@ -639,7 +703,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           )}
 
           {/* ══ AUTH GATE ══ */}
-          {!isLoading && !user && (
+          {!isLoading && (!user || needsAuth) && (
             authDone === 'confirm_email' ? (
               <div style={{ textAlign: 'center', padding: '32px 0 40px' }}>
                 <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
@@ -660,7 +724,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
                 <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--gray-700)' }}>
                   {(['accedi', 'registrati'] as AuthTab[]).map(t => (
-                    <button key={t} onClick={() => { setAuthTab(t); setAuthError(null); }} style={{
+                    <button key={t} aria-pressed={authTab === t} onClick={() => { setAuthTab(t); setAuthError(null); }} style={{
                       flex: 1, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '12px 0',
                       border: 'none', background: 'transparent',
                       color: authTab === t ? 'var(--orange)' : 'var(--gray-400)',
@@ -674,8 +738,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
 
                 {authTab === 'accedi' && (
                   <div style={{ display: 'grid', gap: 14 }}>
-                    <div><label style={lbl}>Email</label><input type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
-                    <div><label style={lbl}>Password</label><input type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
+                    <div><label htmlFor="add-field-1" style={lbl}>Email</label><input id="add-field-1" type="email" style={inp} value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
+                    <div><label htmlFor="add-field-2" style={lbl}>Password</label><input id="add-field-2" type="password" style={inp} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignIn()} /></div>
                     {authError && <ErrBox msg={authError} />}
                     {resetSent && (
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#00c851', background: 'rgba(0,200,81,0.08)', border: '1px solid rgba(0,200,81,0.2)', borderRadius: 6, padding: '10px 14px' }}>
@@ -712,7 +776,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 {authTab === 'registrati' && (
                   <div style={{ display: 'grid', gap: 14 }}>
                     <div>
-                      <label style={lbl}>Username *</label>
+                      <label htmlFor="add-username" style={lbl}>Username *</label>
                       <div style={{ position: 'relative' }}>
                         <input type="text"
                           style={{ ...inp, paddingLeft: 28, borderColor: usernameOk === false ? '#ff4444' : usernameOk === true ? '#00c851' : 'var(--gray-600)' }}
@@ -725,8 +789,8 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                       </div>
                       {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', marginTop: 2 }}>{text("Username già in uso", "Username already taken")}</div>}
                     </div>
-                    <div><label style={lbl}>Email *</label><input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} /></div>
-                    <div><label style={lbl}>{text("Password * (min 6 caratteri)", "Password * (at least 6 characters)")}</label><input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} /></div>
+                    <div><label htmlFor="add-field-3" style={lbl}>Email *</label><input id="add-field-3" type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} /></div>
+                    <div><label htmlFor="add-field-4" style={lbl}>{text("Password * (min 6 caratteri)", "Password * (at least 6 characters)")}</label><input id="add-field-4" type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} /></div>
                     <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
                       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
                         <input type="checkbox" checked={ageConfirmed2} onChange={e => setAgeConfirmed2(e.target.checked)}
@@ -760,7 +824,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           )}
 
           {/* ══ STEP 1 — POSIZIONE ══ */}
-          {!isLoading && user && step === 'posizione' && (
+          {!isLoading && user && !needsAuth && step === 'posizione' && (
             <div style={{ display: 'grid', gap: 16 }}>
 
               {/* Badge utente */}
@@ -859,9 +923,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
               {locMode === 'coords' && !hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div>
-                    <label style={lbl}>{text("Link Google Maps o coordinate", "Google Maps link or coordinates")}</label>
-                    <textarea
-                      style={{ ...inp, resize: 'none', fontSize: 14, lineHeight: 1.5 }}
+                    <label htmlFor="add-coordinates" style={lbl}>{text("Link Google Maps o coordinate", "Google Maps link or coordinates")}</label>
+                    <textarea id="add-coordinates"
+                      style={{ ...inp, resize: 'none', fontSize: 16, lineHeight: 1.5 }}
                       rows={3}
                       value={coordInput}
                       onChange={e => { setCoordInput(e.target.value); setCoordError(null); }}
@@ -915,6 +979,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                   </button>
 
                   {/* ── NEARBY SPOTS — duplicate detection ── */}
+                  {nearbyError && <p role="status">{text("Verifica spot vicini non disponibile. Controlla la mappa prima di inviare.", "Nearby spot check is unavailable. Check the map before submitting.")}</p>}
                   {nearbyLoading && (
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', textAlign: 'center', padding: '8px 0' }}>
                       {text("Controllo spot vicini...", "Checking nearby spots...")}
@@ -1010,7 +1075,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           )}
 
           {/* ══ STEP 2 — FOTO ══ */}
-          {!isLoading && user && step === 'foto' && (
+          {!isLoading && user && !needsAuth && step === 'foto' && (
             <div style={{ display: 'grid', gap: 20 }}>
               <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
                 {text("Carica almeno una foto dello spot. La prima sarà la cover.", "Upload at least one photo of the spot. The first becomes its cover.")}
@@ -1042,19 +1107,19 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
           )}
 
           {/* ══ STEP 3 — DETTAGLI ══ */}
-          {!isLoading && user && step === 'dettagli' && (
+          {!isLoading && user && !needsAuth && step === 'dettagli' && (
             <div style={{ display: 'grid', gap: 18 }}>
               <div>
-                <label style={lbl}>{text("Nome spot *", "Spot name *")}</label>
-                <input type="text" style={inp} value={name} onChange={e => setName(e.target.value)}
+                <label htmlFor="add-field-5" style={lbl}>{text("Nome spot *", "Spot name *")}</label>
+                <input id="add-field-5" type="text" style={inp} value={name} onChange={e => setName(e.target.value)}
                   placeholder={text("es. \"Gradoni Piazza Bra\"", "e.g. \"Piazza Bra steps\"")} maxLength={100} />
               </div>
               <div>
                 <label style={lbl}>{text("Tipo *", "Type *")}</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                   {TIPI_SPOT_SELEZIONABILI.map(([t, info]) => (
-                    <button key={t} onClick={() => setType(t)} style={{
-                      padding: '6px 12px',
+                    <button key={t} aria-pressed={type === t} onClick={() => setType(t)} style={{
+                      minHeight: 44, padding: '6px 12px',
                       border: `1px solid ${type === t ? info.color : 'var(--gray-600)'}`,
                       borderRadius: 2,
                       background: type === t ? info.color : 'transparent',
@@ -1076,7 +1141,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                     const scelto = ostacoli.includes(o);
                     return (
                       <button
-                        key={o}
+                        key={o} aria-pressed={ostacoli.includes(o)}
                         onClick={() => setOstacoli(prev =>
                           prev.includes(o) ? prev.filter(x => x !== o) : prev.length >= 8 ? prev : [...prev, o]
                         )}
@@ -1096,15 +1161,15 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 </div>
               </div>
               <div>
-                <label style={lbl}>{text("Descrizione (opzionale)", "Description (optional)")}</label>
-                <textarea style={{ ...inp, resize: 'vertical' }} rows={2}
+                <label htmlFor="add-field-6" style={lbl}>{text("Descrizione (opzionale)", "Description (optional)")}</label>
+                <textarea id="add-field-6" style={{ ...inp, resize: 'vertical' }} rows={2}
                   value={description} onChange={e => setDescription(e.target.value)}
                   placeholder={text("Es. \"Gradoni in marmo, fondo buono. Presente anche un ledge.\"", "e.g. \"Marble steps, good ground. There is also a ledge.\"")}
                   maxLength={500} />
               </div>
               <div>
-                <label style={lbl}>{text("Note accesso (opzionale)", "Access notes (optional)")}</label>
-                <input type="text" style={inp} value={notes} onChange={e => setNotes(e.target.value)}
+                <label htmlFor="add-field-7" style={lbl}>{text("Note accesso (opzionale)", "Access notes (optional)")}</label>
+                <input id="add-field-7" type="text" style={inp} value={notes} onChange={e => setNotes(e.target.value)}
                   placeholder={text("Es. \"Security alle 18\" / \"Sempre libero\"", "e.g. \"Security after 6 pm\" / \"Always open\"")} maxLength={200} />
               </div>
 
@@ -1113,7 +1178,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon }: 
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                   {DIFFICOLTA.map(d => (
                     <button
-                      key={d.value}
+                      key={d.value} aria-pressed={difficulty === d.value}
                       type="button"
                       onClick={() => setDifficulty(difficulty === d.value ? '' : d.value)}
                       style={{

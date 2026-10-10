@@ -13,7 +13,7 @@ import { getApprovedCityNames } from '@/lib/spot-cities';
 
 export const revalidate = 3600;
 
-interface Props { params: { city: string } }
+interface Props { params: Promise<{ city: string }> }
 
 /** Label leggibile: lista curata italiana, altrimenti de-slug Title Case
     (world-wide: le città estere arrivano dai dati, non da una lista). */
@@ -27,7 +27,8 @@ function getCityLabel(slug: string, storedName?: string): string {
     .join(' ');
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   // Check di esistenza QUI (oltre che nel componente) contro il soft-404: uno
   // slug inventato generava un <title> SEO dallo slug + canonical self-
   // referencing => doorway page indicizzabile su URL infinite. Con notFound()
@@ -95,7 +96,7 @@ export async function generateStaticParams() {
 const getCitySpots = cache(async (slug: string): Promise<Spot[]> => {
   const names = (await getApprovedCityNames()).filter(name => citySlug(name) === slug);
   if (names.length === 0) return [];
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   // Resolve stored names first: accents and apostrophes cannot be reversed from a slug.
   const { data, error } = await supabase
     .from('spots')
@@ -107,7 +108,8 @@ const getCitySpots = cache(async (slug: string): Promise<Spot[]> => {
   return (data ?? []).map(spot => ({ ...spot, spot_photos: (spot.spot_photos ?? []).filter((photo: { moderation_status?: string | null }) => photo.moderation_status === 'approved' || photo.moderation_status === null) })) as Spot[];
 });
 
-export default async function CityPage({ params }: Props) {
+export default async function CityPage(props: Props) {
+  const params = await props.params;
   if (!CITY_SLUG_RE.test(params.city)) notFound();
   const spots = await getCitySpots(params.city);
   const cityLabel = getCityLabel(params.city, spots[0]?.city);

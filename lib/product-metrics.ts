@@ -1,3 +1,4 @@
+import { analyticsAllowed } from './analytics-consent';
 /** Fixed vocabulary only: never add query text, URLs, rider IDs or coordinates. */
 export const METRIC_LABELS = {
   search_used: 'Ricerche confermate',
@@ -23,6 +24,7 @@ export function validMetric(body: unknown): body is { event: MetricEvent; source
 /** Best effort; no cookies, storage, identifiers, referrer or blocking navigation. */
 export function trackMetric(event: MetricEvent, source: MetricSource) {
   if (process.env.NEXT_PUBLIC_PRODUCT_METRICS_ENABLED !== 'true' || typeof window === 'undefined') return;
+  if (!analyticsAllowed()) return;
   if (navigator.doNotTrack === '1' || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl) return;
   try {
     void fetch('/api/product-metrics', {

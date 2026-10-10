@@ -1,0 +1,13 @@
+.page { max-width:680px; margin:0 auto; padding:24px 20px calc(112px + env(safe-area-inset-bottom, 0px)); color:var(--bone); }
+.page h1 { font-size:32px; margin:24px 0; }
+.section { padding:24px 0; border-top:1px solid var(--gray-600); overflow-wrap:anywhere; }
+.section h2 { font-size:22px; margin:0 0 12px; }
+.section p { line-height:1.6; margin:12px 0; }
+.section a { color:var(--orange); text-underline-offset:3px; }
+.section button, .link { min-height:44px; max-width:100%; white-space:normal; }
+.section input[type=checkbox] { width:20px; height:20px; flex-shrink:0; accent-color:var(--orange); }
+.section label { align-items:center; }
+.section button:focus-visible, .section a:focus-visible { outline:2px solid var(--orange); outline-offset:4px; }
+.actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.link { display:inline-flex; align-items:center; padding:8px 0; }
+.error { color:#ff8f8f; }

@@ -3,7 +3,7 @@ import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
-  if (!isAdminAuthenticated()) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   try {
     // Try with spot join (requires spot_id FK)
     let result = await supabaseAdmin()
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (!isAdminAuthenticated()) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   const body = await req.json();
   const supabase = supabaseAdmin();
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  if (!isAdminAuthenticated()) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   const { id } = await req.json();
   const { error } = await supabaseAdmin().from('events').delete().eq('id', id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

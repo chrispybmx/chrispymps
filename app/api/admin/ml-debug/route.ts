@@ -22,7 +22,7 @@ async function ml<T = unknown>(path: string, key: string): Promise<{ ok: boolean
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
   const key = process.env.MAILERLITE_API_KEY;

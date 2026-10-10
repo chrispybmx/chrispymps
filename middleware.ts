@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { isCrossOriginBrowserRequest } from '@/lib/request-origin';
 
 /**
  * Middleware centralizzato per:
@@ -77,6 +78,10 @@ function getClientIp(req: NextRequest): string {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  if (pathname.startsWith('/api/admin/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+      && isCrossOriginBrowserRequest(req)) {
+    return NextResponse.json({ ok: false, error: 'Origine non consentita' }, { status: 403 });
+  }
   const ip = getClientIp(req);
 
   // ── 0. CSP nonce-based per tutte le pagine ──

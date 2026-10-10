@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
-import SessioniClient from './SessioniClient';
+import Link from 'next/link';
+import { RiderHistory } from '@/components/RiderSessions';
 
 export const metadata: Metadata = {
-  title: 'Sessioni Live — Chi sta ridando ora',
-  description: 'Guarda chi sta ridando in questo momento sugli spot BMX in Italia. Unisciti alla session!',
-  alternates: { canonical: 'https://maps.chrispybmx.com/sessioni' },
-  robots: { index: false, follow: true },
+  title: 'Le tue sessioni',
+  description: 'Sessioni personali e gestione della presenza negli spot.',
+  alternates: { canonical: null },
+  robots: { index: false, follow: false },
 };
 
 export default function SessioniPage() {
-  return <SessioniClient />;
+  return <main style={{maxWidth:760,margin:'0 auto',padding:'24px 20px'}}><Link href="/">Torna alla mappa</Link><RiderHistory /></main>;
 }

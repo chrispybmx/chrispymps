@@ -17,7 +17,7 @@ const ALLOWED_MIME: Record<string, string> = {
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

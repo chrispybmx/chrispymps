@@ -3,7 +3,7 @@ import { supabaseServer } from './supabase';
 
 /** Pagination keeps cities visible after the first 1,000 published spots. */
 export const getApprovedCityNames = cache(async (): Promise<string[]> => {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const names = new Set<string>();
   const pageSize = 1000;
 

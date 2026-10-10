@@ -2,9 +2,12 @@ import SpotMetric from '@/components/SpotMetric';
 import SessionInviteLink from '@/components/SessionInviteLink';
 import type { Metadata } from 'next';
 import { cache } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound,redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import { localSessionPreview } from '@/lib/rider-preview-server';
 import Link from 'next/link';
-import { supabaseServer } from '@/lib/supabase';
+import { supabasePublic } from '@/lib/supabase';
+import { PUBLIC_SPOT_COLUMNS } from '@/lib/public-spot';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { spotStructuredData } from '@/lib/seo';
 import { safeJsonLd } from '@/lib/json-ld';
@@ -27,12 +30,12 @@ import { BeforeYouRide, SpotStatusHistory } from '@/components/SpotTrustInfo';
 
 export const revalidate = 300;
 
-interface Props { params: { slug: string }; searchParams: { from?: string } }
+interface Props { params: Promise<{ slug: string }>; searchParams: Promise<{ from?: string }> }
 
 /** cache(): la query gira una volta sola per richiesta, condivisa tra
     generateMetadata (dove sta il check di esistenza) e il componente. */
 const getSpot = cache(async (slug: string): Promise<Spot | null> => {
-  const supabase = supabaseServer();
+  const supabase = supabasePublic();
 
   /* `spot_photos.source` arriva con 20260819_spot_photos_source.sql. Finché la
      migration non è applicata in produzione la colonna non esiste e Postgrest
@@ -42,7 +45,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
      supabase-js legge la stringa letterale, non un template. */
   const withSource = await supabase
     .from('spots')
-    .select('*, likes_count, spot_photos(id, url, position, credit_name, source, created_at, moderation_status)')
+    .select(`${PUBLIC_SPOT_COLUMNS},spot_photos(id, url, position, credit_name, source, created_at, moderation_status)`)
     .eq('slug', slug)
     .eq('status', 'approved')
     .single();
@@ -52,7 +55,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
   if (withSource.error) {
     const legacy = await supabase
       .from('spots')
-      .select('*, likes_count, spot_photos(id, url, position, credit_name, created_at, moderation_status)')
+      .select(`${PUBLIC_SPOT_COLUMNS},spot_photos(id, url, position, credit_name, created_at, moderation_status)`)
       .eq('slug', slug)
       .eq('status', 'approved')
       .single();
@@ -79,7 +82,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
 
 /** Public history only: never read auth user metadata or contact details. */
 async function getSpotHistory(spotId: string): Promise<SpotStatusHistoryItem[]> {
-  const sb = supabaseServer();
+  const sb = supabasePublic();
   const { data, error } = await sb.from('spot_status_updates')
     .select('id, user_id, condition, note, created_at')
     .eq('spot_id', spotId).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(3);
@@ -96,7 +99,9 @@ async function getSpotHistory(spotId: string): Promise<SpotStatusHistoryItem[]> 
   }));
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
+  if(localSessionPreview((await headers()).get('host')))redirect(`/?spot=${encodeURIComponent(params.slug)}`);
   // notFound() QUI (oltre che nel componente) contro il soft-404: serve la 404
   // page con noindex/nofollow invece di metadata inventati su slug inesistenti.
   // NOTA VERIFICATA: lo status resta 200 finché esiste
@@ -104,7 +109,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // shell prima che notFound() possa impostare il 404 (misurato su Next 14.2.35).
   const spot = await getSpot(params.slug);
   if (!spot) notFound();
-  const language = getSiteLanguage();
+  const language = await getSiteLanguage();
   const text = (it: string, en: string) => language === 'en' ? en : it;
   const tipo  = TIPI_SPOT[spot.type];
   const cover = spot.spot_photos?.[0]?.url;
@@ -125,11 +130,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SpotPage({ params, searchParams }: Props) {
+export default async function SpotPage(props: Props) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
+  if(localSessionPreview((await headers()).get('host')))redirect(`/?spot=${encodeURIComponent(params.slug)}`);
   const spot = await getSpot(params.slug);
   if (!spot) notFound();
 
-  const language = getSiteLanguage();
+  const language = await getSiteLanguage();
   const text = (it: string, en: string) => language === 'en' ? en : it;
   const history = await getSpotHistory(spot.id);
   const tipo   = TIPI_SPOT[spot.type];
@@ -198,7 +206,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: tipo.color, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           <MapIcon name={spot.type} size={18} /> {tipo.label}
         </div>
-        <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 28, color: 'var(--orange)', margin: '0 0 8px', lineHeight: 1.15 }}>
+        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 28, color: 'var(--orange)', margin: '0 0 8px', lineHeight: 1.15 }}>
           {spot.name}
         </h1>
         {spot.city && (
@@ -206,6 +214,19 @@ export default async function SpotPage({ params, searchParams }: Props) {
             {CITY_SLUG_RE.test(cityPath) ? <Link href={`/map/${cityPath}`} style={{ color: 'inherit', textUnderlineOffset: '3px' }}>{spot.city}</Link> : spot.city}{spot.region ? `, ${spot.region}` : ''}
           </div>
         )}
+        {/* ── PORTAMI QUI — grande, prominente ── */}
+        <a data-metric-directions="detail" className="cm-directions" href={mapsUrl} target="_blank" rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '14px', borderRadius: 6, marginBottom: 16,
+            background: 'var(--orange)', color: '#000',
+            fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
+            textDecoration: 'none', letterSpacing: '0.04em',
+            boxShadow: 'none',
+          }}>
+          <MapIcon name="route" /> {text("Apri indicazioni", "Get directions")}
+        </a>
+
       </div>
 
       <div className="cm-detail-body" style={{ padding: '16px 20px 0' }}>
@@ -245,19 +266,6 @@ export default async function SpotPage({ params, searchParams }: Props) {
         )}
 
         <BeforeYouRide spot={spot} language={language} />
-
-        {/* ── PORTAMI QUI — grande, prominente ── */}
-        <a data-metric-directions="detail" className="cm-directions" href={mapsUrl} target="_blank" rel="noopener noreferrer"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '14px', borderRadius: 6, marginBottom: 16,
-            background: 'var(--orange)', color: '#000',
-            fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
-            textDecoration: 'none', letterSpacing: '0.04em',
-            boxShadow: 'none',
-          }}>
-          <MapIcon name="route" /> {text("Apri indicazioni", "Get directions")}
-        </a>
 
         {/* ── CONDIVIDI ── */}
         <div style={{ marginBottom: 20 }}>

@@ -66,14 +66,14 @@ describe('private session report admin review', () => {
   });
 
   it('never interpolates unvalidated cursor text into PostgREST', async () => {
-    const html = renderToStaticMarkup(await SessionReportsPage({ searchParams: { before: 'junk),or(id.neq.anything)' } }));
+    const html = renderToStaticMarkup(await SessionReportsPage({ searchParams: Promise.resolve({ before: 'junk),or(id.neq.anything)' }) }));
     expect(html).toContain('non è valido');
     expect(mock.from).not.toHaveBeenCalled();
     expect(mock.or).not.toHaveBeenCalled();
   });
 
   it('uses timestamp plus id to reach older reports with matching timestamps', async () => {
-    await SessionReportsPage({ searchParams: { before: `${TIME}|${id(30)}` } });
+    await SessionReportsPage({ searchParams: Promise.resolve({ before: `${TIME}|${id(30)}` }) });
     expect(mock.or).toHaveBeenCalledWith(`created_at.lt.${TIME},and(created_at.eq.${TIME},id.lt.${id(30)})`);
     expect(mock.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false });
     expect(mock.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false });

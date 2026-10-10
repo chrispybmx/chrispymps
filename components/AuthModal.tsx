@@ -3,16 +3,18 @@
 import { useLanguage } from '@/components/LanguageProvider';
 
 import { useState, useRef, useEffect } from 'react';
-import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
+import { signIn, signUp, checkUsername, resetPassword, resendConfirmation } from '@/lib/auth-client';
 import DateWheels from '@/components/DateWheels';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { NEWSLETTER_CONSENT_TEXT } from '@/lib/newsletter-consent';
 import { TracciaFunnel } from '@/lib/funnel';
 import PersonalizzaMappa from '@/components/PersonalizzaMappa';
 import { REGIONI_ITALIA } from '@/lib/constants';
-import { puoRicevereMarketing, ETA_MINIMA_MARKETING } from '@/lib/rider-profile';
+import { puoRicevereMarketing, ETA_MINIMA_MARKETING, DISCIPLINE, type DisciplinaKey } from '@/lib/rider-profile';
+import { COUNTRY_CODES, MINIMUM_ACCOUNT_AGE, registrationDetails } from '@/lib/registration';
 
 interface AuthModalProps {
+  returnTo?: string;
   open:          boolean;
   onClose:       () => void;
   defaultTab?:   'accedi' | 'registrati';
@@ -21,14 +23,27 @@ interface AuthModalProps {
 
 type Tab = 'accedi' | 'registrati';
 
-export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSuccess }: AuthModalProps) {
+export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSuccess, returnTo }: AuthModalProps) {
   const { text } = useLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(open, dialogRef, onClose);
   const [tab,     setTab]     = useState<Tab>(defaultTab);
   const [loading, setLoading] = useState(false);
+  const signupBusy=useRef(false);
   const [error,   setError]   = useState<string | null>(null);
   const [done,    setDone]    = useState<'ok' | 'confirm_email' | null>(null);
+
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendUntil, setResendUntil] = useState(0);
+  async function resend(email: string) {
+    if (resendBusy || Date.now() < resendUntil) return;
+    if (!email.trim()) { setError(text('Inserisci prima la tua email.', 'Enter your email first.')); return; }
+    setResendBusy(true); setResendMessage('');
+    try { await resendConfirmation(email, returnTo); setResendUntil(Date.now() + 60000); setResendMessage(text('Se l’account attende conferma, riceverai un nuovo link. Controlla anche lo spam. Attendi un minuto prima di riprovare.', 'If your account needs confirmation, you will receive a new link. Check spam too. Wait a minute before trying again.')); }
+    catch (e) { setResendMessage(e instanceof Error ? e.message : text('Invio non riuscito. Riprova.', 'Could not send. Try again.')); }
+    finally { setResendBusy(false); }
+  }
 
   // Registrazione
   const [regUsername,  setRegUsername]  = useState('');
@@ -40,6 +55,10 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [newsletter, setNewsletter] = useState(false);
   const [birthDate,  setBirthDate]  = useState('');
   const [region,     setRegion]     = useState('');
+  const [country,setCountry]=useState('');
+  const [sports,setSports]=useState<DisciplinaKey[]>([]);
+  const countryNames=new Intl.DisplayNames([text('it','en')],{type:'region'});
+  const countries=COUNTRY_CODES.map(code=>({code,label:countryNames.of(code)||code})).sort((a,b)=>a.label.localeCompare(b.label,text('it','en')));
   const [rilevando,  setRilevando]  = useState(false);
 
   /* Traccia del percorso di registrazione: quanto ci mette, dove si ferma.
@@ -54,6 +73,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
 
   // BUG-FIX: useRef per il timer debounce — una variabile locale viene ricreata
   // a ogni render e clearTimeout non annulla mai il timer precedente
+  const usernameVersion = useRef(0);
   const unDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetAll = () => {
@@ -62,6 +82,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setLoginEmail(''); setLoginPassword('');
     setUsernameOk(null); setResetSent(false); setResetting(false);
     setNewsletter(false);
+    setBirthDate('');setRegion('');setCountry('');setSports([]);
   };
 
   const handleClose = () => { resetAll(); onClose(); };
@@ -72,12 +93,13 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setRegUsername(clean);
     setUsernameOk(null);
     if (unDebounceRef.current) clearTimeout(unDebounceRef.current);
-    if (clean.length < 3) return;
+    const version = ++usernameVersion.current;
+    if (clean.length < 3) { setCheckingUn(false); return; }
     setCheckingUn(true);
     unDebounceRef.current = setTimeout(async () => {
-      const free = await checkUsername(clean);
-      setUsernameOk(free);
-      setCheckingUn(false);
+      try { const free = await checkUsername(clean); if (version === usernameVersion.current) setUsernameOk(free); }
+      catch { if (version === usernameVersion.current) setError(text('Verifica username non disponibile. Riprova.', 'Username check unavailable. Try again.')); }
+      finally { if (version === usernameVersion.current) setCheckingUn(false); }
     }, 600);
   };
 
@@ -111,14 +133,17 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   }, [open, tab]);
 
   const handleSignUp = async () => {
+    if(loading||signupBusy.current)return;
     if (!regUsername || !regEmail || !regPassword) { setError(text("Compila tutti i campi.", "Complete all fields.")); traccia.current?.errore('campi vuoti'); return; }
     if (regUsername.length < 3) { setError(text("Username troppo corto (min 3 caratteri).", "Your username must be at least 3 characters.")); traccia.current?.errore('username corto'); return; }
     if (regPassword.length < 6) { setError(text("Password troppo corta (min 6 caratteri).", "Your password must be at least 6 characters.")); traccia.current?.errore('password corta'); return; }
     if (!birthDate) { setError(text("Manca la data di nascita.", "Enter your date of birth.")); traccia.current?.errore('data mancante'); return; }
-    setLoading(true); setError(null);
+    const valid=registrationDetails().safeParse({birthDate,countryCode:country,disciplines:sports,region});
+    if(!valid.success){setError(valid.error.issues[0].message);return;}
+    signupBusy.current=true;setLoading(true); setError(null);
     traccia.current?.inviato();
     try {
-      const result = await signUp(regEmail, regPassword, regUsername, { newsletter, birthDate, region, onNewsletterResult: setNewsletterMessage });
+      const result = await signUp(regEmail, regPassword, regUsername, { returnTo, newsletter, birthDate, countryCode:country,disciplines:sports,region, onNewsletterResult: setNewsletterMessage });
       traccia.current?.riuscito();
       setDone(result);
       if (result === 'ok' && onSuccess && !newsletter) onSuccess();
@@ -126,7 +151,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
       const msg = e instanceof Error ? e.message : text("Errore sconosciuto", "Something went wrong.");
       traccia.current?.errore(msg);
       setError(msg);
-    } finally { setLoading(false); }
+    } finally { signupBusy.current=false;setLoading(false); }
   };
 
   const handleSignIn = async () => {
@@ -148,11 +173,11 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     width: '100%', boxSizing: 'border-box',
     background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
     borderRadius: 4, color: 'var(--bone)', fontFamily: 'var(--font-mono)',
-    fontSize: 15, padding: '10px 12px', outline: 'none',
+    fontSize: 16, padding: '10px 12px', outline: 'none',
   };
   const lbl: React.CSSProperties = {
     fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)',
-    textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5,
+    textTransform: 'uppercase', letterSpacing: 0, display: 'block', marginBottom: 5,
   };
 
   return (
@@ -179,6 +204,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
           <button onClick={handleClose} aria-label={text("Chiudi accesso", "Close sign-in")} className="btn-ghost" style={{ fontSize: 20 }}>✕</button>
         </div>
 
+        {resendMessage && <p role="status" style={{ padding: '12px 20px' }}>{resendMessage}</p>}
         {/* Done: email confirmation needed */}
         {newsletterMessage && <p role="status" style={{padding:'12px 20px',lineHeight:1.5}}>{newsletterMessage}</p>}
         {done === 'confirm_email' && (
@@ -194,6 +220,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
             <p style={{ color: 'var(--gray-400)', fontSize: 14 }}>
               {text("Dopo la conferma potrai accedere e aggiungere spot.", "Once confirmed, you can sign in and add spots.")}
             </p>
+            <button type="button" className="btn-ghost" disabled={resendBusy} onClick={() => void resend(regEmail)}>{resendBusy ? text('Invio…', 'Sending…') : text('Invia di nuovo la conferma', 'Resend confirmation')}</button>
             <button onClick={handleClose} className="btn-primary" style={{ marginTop: 24, width: '100%', justifyContent: 'center' }}>
               {text("OK, ho capito", "Got it")}
             </button>
@@ -207,6 +234,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
           <PersonalizzaMappa username={regUsername} onFinito={handleClose} />
         )}
 
+        {!done && tab === 'accedi' && <button type="button" className="btn-ghost" disabled={resendBusy} onClick={() => void resend(loginEmail)} style={{ margin: '12px 20px' }}>{text('Non hai ricevuto la conferma email?', 'Missing your confirmation email?')}</button>}
         {!done && (
           <div style={{ padding: '0 20px 20px' }}>
 
@@ -282,10 +310,11 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
             {tab === 'registrati' && (
               <div style={{ display: 'grid', gap: 16 }}>
                 <div>
-                  <label style={lbl}>Username *</label>
+                  <label htmlFor="signup-username" style={lbl}>Username *</label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type="text"
+                      id="signup-username" autoComplete="username"
                       style={{ ...inp, paddingLeft: 28, borderColor: usernameOk === false ? '#ff4444' : usernameOk === true ? '#00c851' : 'var(--gray-600)' }}
                       value={regUsername}
                       onChange={e => onUsernameChange(e.target.value)}
@@ -303,21 +332,39 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                   {usernameOk === false && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', marginTop: 2 }}>{text("Username già in uso", "Username already taken")}</div>}
                 </div>
                 <div>
-                  <label style={lbl}>Email *</label>
-                  <input type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} />
+                  <label htmlFor="signup-email" style={lbl}>Email *</label>
+                  <input id="signup-email" autoComplete="email" type="email" style={inp} value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder={text("la-tua@email.com", "you@email.com")} />
                 </div>
                 <div>
-                  <label style={lbl}>{text("Password * (min 6 caratteri)", "Password * (at least 6 characters)")}</label>
-                  <input type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
+                  <label htmlFor="signup-password" style={lbl}>{text("Password * (min 6 caratteri)", "Password * (at least 6 characters)")}</label>
+                  <input id="signup-password" autoComplete="new-password" type="password" style={inp} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleSignUp()} />
                 </div>
                 {/* Data di nascita — rondelle, niente tastiera */}
                 <div>
                   <label style={lbl}>{text("Data di nascita *", "Date of birth *")}</label>
-                  <DateWheels value={birthDate} onChange={setBirthDate} annoMin={1950} />
+                  <DateWheels value={birthDate} onChange={setBirthDate} annoMin={1920} />
+                  <small style={{color:'var(--gray-400)'}}>{text('Privata. Non viene mostrata nel profilo.','Private. Not shown on your profile.')}</small>
                 </div>
 
-                {/* Regione — un tap, o la si rileva */}
                 <div>
+                  <label htmlFor="signup-country" style={lbl}>{text('Paese di residenza *','Country of residence *')}</label>
+                  <select id="signup-country" autoComplete="country" value={country} onChange={e=>{setCountry(e.target.value);setRegion('');}} style={inp}>
+                    <option value="">{text('Seleziona','Select')}</option>
+                    {countries.map(c=><option key={c.code} value={c.code}>{c.label}</option>)}
+                  </select>
+                </div>
+                <fieldset style={{border:0,padding:0,margin:0}}>
+                  <legend style={lbl}>{text('Sport (facoltativo)','Sports (optional)')}</legend>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
+                    {DISCIPLINE.map(sport=><label key={sport.key} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,cursor:'pointer'}}>
+                      <input type="checkbox" checked={sports.includes(sport.key)} onChange={e=>setSports(current=>e.target.checked?[...current,sport.key]:current.filter(s=>s!==sport.key))} style={{accentColor:'var(--orange)',width:18,height:18}}/>
+                      {text(sport.label,sport.key==='altro'?'Other':sport.label)}
+                    </label>)}
+                  </div>
+                </fieldset>
+
+                {/* Regione — un tap, o la si rileva */}
+                {country==='IT'&&<div>
                   <label style={lbl}>{text("Dove giri di solito", "Where you usually ride")}</label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <select
@@ -349,7 +396,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', marginTop: 4, lineHeight: 1.5 }}>
                     {text("La regione dove giri di solito, non dove ti trovi adesso. Il 📍 la suggerisce, puoi cambiarla.", "The region where you usually ride, which may differ from your current location. Tap 📍 for a suggestion, then change it if needed.")}
                   </div>
-                </div>
+                </div>}
 
                 {/* Newsletter — sotto i 16 non compare: non si promette ciò che non parte */}
                 {(!birthDate || puoRicevereMarketing(birthDate)) && (
@@ -371,9 +418,10 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
                   {loading ? text("⏳ Registrazione...", "⏳ Creating account...") : text("Crea account", "Create account")}
                 </button>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-500)', textAlign: 'center', lineHeight: 1.6 }}>
-                  {text("Cliccando su \"Crea Account\" accetti la nostra", "By clicking \"Create account\", you accept our")}{' '}
-                  <a href="https://www.iubenda.com/privacy-policy/84160410" target="_blank" rel="noopener" style={{ color: 'var(--orange)', textDecoration: 'underline' }}>Privacy Policy</a>
-                  {' '}{text("e dichiari di avere almeno 14 anni.", "and confirm that you are at least 14 years old.")}
+                  {text('Creando l’account accetti le','By creating an account you accept the')}{' '}
+                  <a href="/regole" target="_blank" rel="noopener" style={{color:'var(--orange)'}}>{text('regole','rules')}</a>{' '}
+                  {text('e dichiari di avere almeno','and declare you are at least')} {MINIMUM_ACCOUNT_AGE} {text('anni. Leggi l’','years old. Read the ')}
+                  <a href="/privacy" target="_blank" rel="noopener" style={{color:'var(--orange)'}}>{text('informativa privacy','privacy notice')}</a>.
                 </p>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', textAlign: 'center' }}>
                   {text("Hai già un account?", "Already have an account?")}{' '}
@@ -392,7 +440,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
 
 function Err({ msg }: { msg: string }) {
   return (
-    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '8px 12px' }}>
+    <div role="alert" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#ff4444', background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 4, padding: '8px 12px' }}>
       ⚠ {msg}
     </div>
   );

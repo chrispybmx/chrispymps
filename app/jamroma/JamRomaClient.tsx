@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import 'leaflet/dist/leaflet.css';
@@ -470,9 +471,9 @@ export default function JamRomaClient() {
 
         {/* ── Back ── */}
         <div style={{ textAlign: 'center', paddingBottom: 20 }}>
-          <a href="/map" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: C.coral, textDecoration: 'none' }}>
+          <Link href="/map" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: C.coral, textDecoration: 'none' }} prefetch={false}>
             ← Torna alla mappa
-          </a>
+          </Link>
         </div>
       </div>
 

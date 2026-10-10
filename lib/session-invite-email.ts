@@ -29,18 +29,22 @@ export async function deliverSessionInviteEmail({ id }: { id: string; recipientI
     if (prefError || inviteError) throw new Error('Email eligibility unavailable');
     if (!pref?.email_enabled || !invite || invite.recipient_id !== job.recipient_id ||
         invite.status !== 'pending' || new Date(invite.starts_at).getTime() <= Date.now()) {
-      await sb.from('cm_session_email_outbox').delete().eq('invite_id',id).eq('locked_until',lease);
+      const { error: removeError } = await sb.from('cm_session_email_outbox').delete().eq('invite_id',id).eq('locked_until',lease);
+      if (removeError) throw new Error('Email cancellation unavailable');
       return 'skipped';
     }
     const {data, error} = await sb.auth.admin.getUserById(job.recipient_id);
     if (error || !data.user?.email) throw new Error('Recipient unavailable');
-    const link = APP_CONFIG.url + '/messaggi?invite=' + encodeURIComponent(id);
+    const site = new URL(process.env.SESSION_INVITES_SITE_URL || APP_CONFIG.url);
+    if (site.protocol !== 'https:' || site.username || site.password) throw new Error('Invalid session email origin');
+    const inbox = site.origin + '/messaggi';
+    const link = inbox + '?invite=' + encodeURIComponent(id);
     const result = await new Resend(process.env.RESEND_API_KEY).emails.send({
       from: 'Chrispy Maps <noreply@chrispybmx.com>',
       to: data.user.email,
       subject: 'Hai un invito a una session su Chrispy Maps',
       text: 'Un rider ti ha invitato a girare insieme. Apri Chrispy Maps per vedere la proposta e decidere se accettare.\n\n' +
-        link + '\n\nRicevi questa email perché hai attivato gli avvisi per gli inviti. Puoi disattivarli nelle preferenze della pagina Messaggi: ' + APP_CONFIG.url + '/messaggi',
+        link + '\n\nRicevi questa email perché hai attivato gli avvisi per gli inviti. Puoi disattivarli nelle preferenze della pagina Messaggi: ' + inbox,
     }, { idempotencyKey: 'session-invite/' + id });
     if (result.error) throw new Error('Email provider unavailable');
     const {error:doneError} = await sb.from('cm_session_email_outbox')
@@ -50,10 +54,11 @@ export async function deliverSessionInviteEmail({ id }: { id: string; recipientI
     return 'sent';
   } catch {
     // Do not persist provider responses, addresses or conversation content in errors.
-    await sb.from('cm_session_email_outbox').update({
+    const { error: retryError } = await sb.from('cm_session_email_outbox').update({
       attempts:job.attempts+1,locked_until:null,last_error:'Invio non completato, riprova pianificata.',
       next_attempt_at:new Date(Date.now()+Math.min(3_600_000,60_000*2**job.attempts)).toISOString(),
     }).eq('invite_id',id).eq('locked_until',lease);
+    if (retryError) throw new Error('Impossibile pianificare il nuovo tentativo email.');
     return 'retry';
   }
 }

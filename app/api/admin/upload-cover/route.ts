@@ -33,7 +33,7 @@ function isValidImageMagicBytes(buf: Buffer, mimeType: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

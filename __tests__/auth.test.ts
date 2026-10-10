@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 // next/headers importa 'server-only' → mockiamo cookies() per poter testare in node.
 const { cookieGet } = vi.hoisted(() => ({ cookieGet: vi.fn() }));
 vi.mock('next/headers', () => ({
-  cookies: () => ({ get: cookieGet }),
+  cookies: async () => ({ get: cookieGet }),
 }));
 
 import {
@@ -44,20 +44,20 @@ describe('loginAdmin', () => {
 });
 
 describe('isAdminAuthenticated', () => {
-  it('false se manca il cookie', () => {
+  it('false se manca il cookie', async () => {
     cookieGet.mockReturnValueOnce(undefined);
-    expect(isAdminAuthenticated()).toBe(false);
+    expect(await isAdminAuthenticated()).toBe(false);
   });
 
-  it('false se il cookie è spazzatura', () => {
+  it('false se il cookie è spazzatura', async () => {
     cookieGet.mockReturnValueOnce({ value: 'garbage.token' });
-    expect(isAdminAuthenticated()).toBe(false);
+    expect(await isAdminAuthenticated()).toBe(false);
   });
 
-  it('true con un token di sessione valido appena emesso', () => {
+  it('true con un token di sessione valido appena emesso', async () => {
     const { token } = loginAdmin(PASSWORD);
     cookieGet.mockReturnValueOnce({ value: token });
-    expect(isAdminAuthenticated()).toBe(true);
+    expect(await isAdminAuthenticated()).toBe(true);
   });
 });
 
@@ -169,18 +169,18 @@ describe('sessione admin — scadenza', () => {
     return `${timestamp}.${sig}`;
   };
 
-  it('una sessione con timestamp nel futuro non e\' valida', () => {
+  it('una sessione con timestamp nel futuro non e\' valida', async () => {
     cookieGet.mockReturnValue({ value: cuoci(String(Date.now() + 365 * 24 * 3600 * 1000)) });
-    expect(isAdminAuthenticated()).toBe(false);
+    expect(await isAdminAuthenticated()).toBe(false);
   });
 
-  it('una sessione con timestamp non numerico non e\' valida', () => {
+  it('una sessione con timestamp non numerico non e\' valida', async () => {
     cookieGet.mockReturnValue({ value: cuoci('domani') });
-    expect(isAdminAuthenticated()).toBe(false);
+    expect(await isAdminAuthenticated()).toBe(false);
   });
 
-  it('una sessione appena creata e\' valida', () => {
+  it('una sessione appena creata e\' valida', async () => {
     cookieGet.mockReturnValue({ value: cuoci(String(Date.now())) });
-    expect(isAdminAuthenticated()).toBe(true);
+    expect(await isAdminAuthenticated()).toBe(true);
   });
 });

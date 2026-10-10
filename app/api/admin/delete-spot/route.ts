@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
 
 export async function POST(req: Request) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 
@@ -16,10 +16,16 @@ export async function POST(req: Request) {
   const supabase = supabaseAdmin();
 
   // 1. Recupera le foto per eliminarle dallo storage
-  const { data: photos } = await supabase
+  const { data: photos, error: photosError } = await supabase
     .from('spot_photos')
     .select('url')
     .eq('spot_id', spot_id);
+
+  if (photosError) return NextResponse.json({ ok: false, error: 'Impossibile leggere le foto dello spot.' }, { status: 500 });
+
+  // Do not remove files while a database constraint can still reject deletion.
+  const { error } = await supabase.from('spots').delete().eq('id', spot_id);
+  if (error) return NextResponse.json({ ok: false, error: 'Impossibile eliminare lo spot.' }, { status: 500 });
 
   // 2. Elimina file dallo storage Supabase (se presenti)
   if (photos && photos.length > 0) {
@@ -38,13 +44,14 @@ export async function POST(req: Request) {
     }).filter(Boolean) as string[];
 
     if (paths.length > 0) {
-      await supabase.storage.from('spot-photos').remove(paths);
+      try {
+        const { error: storageError } = await supabase.storage.from('spot-photos').remove(paths);
+        if (storageError) throw new Error('STORAGE_CLEANUP_FAILED');
+      } catch {
+        return NextResponse.json({ ok: true, warning: 'Spot eliminato. Pulizia dei file fotografici da completare.', cleanupPending: true });
+      }
     }
   }
-
-  // 3. Elimina lo spot (cascade elimina foto e status_updates via FK)
-  const { error } = await supabase.from('spots').delete().eq('id', spot_id);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

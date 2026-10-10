@@ -15,6 +15,11 @@ describe('actual photo optimization', () => {
     expect(meta.orientation).toBeUndefined();
   });
 
+  it('rejects oversized decoded images before processing their pixels', async () => {
+    const input = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="8000" height="8000"><rect width="8000" height="8000" fill="red"/></svg>');
+    await expect(optimizeImage(input)).rejects.toThrow(/pixel limit/i);
+  });
+
   it('keeps transparent images transparent and does not enlarge them', async () => {
     const input = await sharp({ create: { width: 8, height: 12, channels: 4, background: '#00885580' } }).png().toBuffer();
     const result = await optimizeImage(input);

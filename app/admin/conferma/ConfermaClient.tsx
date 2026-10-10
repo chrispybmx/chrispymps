@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 
 import { useState } from 'react';
 import type { SpotStatus } from '@/lib/types';
@@ -176,9 +177,9 @@ export default function ConfermaClient(p: Props) {
           }}>
             {esito.testo}
             <div style={{ marginTop: 14 }}>
-              <a href="/admin" style={{ fontSize: 12, color: 'var(--orange)' }}>
+              <Link href="/admin" style={{ fontSize: 12, color: 'var(--orange)' }} prefetch={false}>
                 Vai alla dashboard →
-              </a>
+              </Link>
             </div>
           </div>
         ) : giaDeciso ? (

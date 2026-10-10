@@ -2,6 +2,7 @@ import { authReturnUrl } from './auth-navigation';
 import { NEWSLETTER_CONSENT_VERSION } from './newsletter-consent';
 import { puoRicevereMarketing } from './rider-profile';
 import { supabaseBrowser } from './supabase-browser';
+import { registrationDetails } from './registration';
 
 export interface UserSession {
   id:          string;
@@ -23,21 +24,30 @@ export async function signUp(
   email: string,
   password: string,
   username: string,
-  opts?: { returnTo?: string; newsletter?: boolean; birthDate?: string; region?: string; over16?: boolean; onNewsletterResult?: (message: string) => void },
+  opts?: { returnTo?: string; newsletter?: boolean; birthDate?: string; countryCode?: string; disciplines?: string[]; region?: string; over16?: boolean; onNewsletterResult?: (message: string) => void },
 ): Promise<'ok' | 'confirm_email'> {
   const sb = supabaseBrowser();
+
+  const parsed=registrationDetails().safeParse({birthDate:opts?.birthDate,countryCode:opts?.countryCode,disciplines:opts?.disciplines??[],region:opts?.region??''});
+  if(!parsed.success)throw new Error(parsed.error.issues[0].message);
+  const preflight=await fetch('/api/auth/registration-check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(parsed.data),signal:AbortSignal.timeout(10000)});
+  const ready=await preflight.json();
+  if(!preflight.ok||!ready.ok)throw new Error(ready.error||'Registrazione non disponibile. Riprova.');
 
   // 1. Username disponibile?
   const free = await checkUsername(username);
   if (!free) throw new Error('Username già in uso. Scegline un altro.');
 
   // 2. Crea account Supabase (username salvato anche in user_metadata per accesso rapido)
-  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: authReturnUrl(opts?.returnTo), data: { username, onboarding_pending: true, initial_rider_details: { birthDate: opts?.birthDate ?? null, region: opts?.region ?? null } } } });
+  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: authReturnUrl(opts?.returnTo), data: { username, onboarding_pending: true, registration_version:2, initial_rider_details: parsed.data } } });
   if (error) throw new Error(translateAuthError(error.message));
   if (!data.user) throw new Error('Errore nella registrazione. Riprova.');
 
   // Account confirmation and marketing confirmation are independent.
-  if (data.session) await completeSignedInAccount(data.session.access_token);
+  if (data.session) {
+    await sb.auth.signOut();
+    throw new Error('Conferma email non disponibile. Non abbiamo completato l’accesso. Contatta l’assistenza.');
+  }
   if (opts?.newsletter && (puoRicevereMarketing(opts.birthDate) || (!opts.birthDate && opts.over16 === true))) {
     // Confirmation email proves ownership before any marketing group is changed.
     try {
@@ -52,9 +62,8 @@ export async function signUp(
     opts.onNewsletterResult?.('Newsletter non attivata: è riservata a chi ha almeno 16 anni.');
   }
 
-  // Se l'email è già confermata (email confirmation disabled in Supabase) → ok
-  // Altrimenti → conferma email necessaria
-  return data.session ? 'ok' : 'confirm_email';
+  // Signup never grants access before email confirmation.
+  return 'confirm_email';
 }
 
 /** Login */

@@ -18,7 +18,7 @@ async function getPendingSpots(): Promise<Spot[]> {
 }
 
 export default async function AdminPage() {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     redirect('/admin/login');
   }
 

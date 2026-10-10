@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const supabase = supabaseServer();
+    const supabase = await supabaseServer();
 
     // Try with spot join first (requires spot_id FK to exist)
     let data: unknown[] | null = null;

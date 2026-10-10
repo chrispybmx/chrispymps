@@ -6,10 +6,13 @@ import Link from 'next/link';
 import type { SpotMapPin, SpotType, SpotCondition, Ostacolo } from '@/lib/types';
 import { REGIONI_ITALIA, TIPI_SPOT, OSTACOLI, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
-import AddSpotModal from '@/components/AddSpotModal';
-import AuthModal from '@/components/AuthModal';
+import { SpotSession, SessionDock, useRiderSessions } from '@/components/RiderSessions';
+import NearbySessionStart from '@/components/NearbySessionStart';
+const AddSpotModal = dynamic(() => import('@/components/AddSpotModal'), { ssr: false });
+const AuthModal = dynamic(() => import('@/components/AuthModal'), { ssr: false });
 import BottomNav from '@/components/BottomNav';
-import Lightbox from '@/components/Lightbox';
+import OnboardingHints from '@/components/OnboardingHints';
+const Lightbox = dynamic(() => import('@/components/Lightbox'), { ssr: false });
 import { useToast } from '@/components/Toast';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
@@ -22,6 +25,7 @@ import AuthErrorBanner from '@/components/AuthErrorBanner';
 import { findNearby } from '@/lib/nearby-radar';
 import { loadMapSpots } from '@/lib/map-spots';
 import { useMapPhotos } from '@/hooks/useMapPhotos';
+import { useLiveSpots } from '@/hooks/useLiveSpots';
 import { pointInBounds, normalizeMapBounds } from '@/lib/spot-query';
 import { useLanguage } from '@/components/LanguageProvider';
 import { EXPLORE_STATE_KEY, parseExploreState, type MapView, type ExploreState } from '@/lib/explore-state';
@@ -80,25 +84,33 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
   ),
 });
 
-interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean; initialSpotSlug?: string; initialQuery?: string }
+interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean; initialSpotSlug?: string; initialQuery?: string; chooseSession?:boolean }
 
 const topOffset_MOBILE  = 116;  // topbar only (filter bar hidden on mobile)
 const topOffset_DESKTOP = 120; // topbar + filter bar
 /** Raggio entro cui uno spot conta come "nella tua zona". */
 const NEARBY_KM       = 25;
 const PANEL_MIN       = 76;
-function DEFAULT_PANEL_H() {
+function MAX_PANEL_H() {
   return typeof window !== 'undefined'
     ? Math.max(200, window.innerHeight - 208)
     : 400;
 }
 
+function DEFAULT_PANEL_H() {
+  return typeof window !== 'undefined' ? Math.min(MAX_PANEL_H(), Math.max(240, Math.round(window.innerHeight * .46))) : 360;
+}
+
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, initialQuery }: MapClientProps) {
+export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, initialQuery, chooseSession }: MapClientProps) {
   const { text, language } = useLanguage();
   const [spots, setSpots]    = useState<SpotMapPin[]>(initialSpots);
+  const [liveMode,setLiveMode]=useState(false);
+  const live=useLiveSpots(liveMode);
+  const riderSessions=useRiderSessions();
+  const hasOpenSession=!!riderSessions?.snapshot?.sessions.some(s=>s.status==='active'||s.status==='needs_confirmation');
   const [spotsLoading, setSpotsLoading] = useState(initialSpots.length === 0);
   const [spotsError, setSpotsError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -145,6 +157,11 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
   const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [addOpen,            setAddOpen]            = useState(false);
+  const [sessionChoice,setSessionChoice]=useState(false);
+  const [sessionDraft,setSessionDraft]=useState<SpotMapPin|null>(null);
+  const addForSession=useRef(false);
+  const [addMounted, setAddMounted] = useState(false);
+  useEffect(() => { if (addOpen) setAddMounted(true); }, [addOpen]);
   const [addLat,             setAddLat]             = useState<number | undefined>();
   const [addLon,             setAddLon]             = useState<number | undefined>();
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number; exact?: boolean; bounds?: [number, number, number, number] } | null>(null);
@@ -175,7 +192,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
   const didDragRef = useRef(false);
 
   const snapTo = useCallback((h: number) => {
-    setPanelHeight(Math.max(PANEL_MIN, Math.min(h, DEFAULT_PANEL_H())));
+    setPanelHeight(Math.max(PANEL_MIN, Math.min(h, MAX_PANEL_H())));
   }, []);
 
   const onDragStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
@@ -199,8 +216,10 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     dragState.current = null;
     if (!didDragRef.current) return; // The native click handles taps and keyboard activation.
     const delta = startY - e.clientY;
-    const shouldOpen = Math.abs(delta) > 40 ? delta > 0 : startH + delta > (PANEL_MIN + DEFAULT_PANEL_H()) / 2;
-    snapTo(shouldOpen ? DEFAULT_PANEL_H() : PANEL_MIN);
+    const stops = [PANEL_MIN, DEFAULT_PANEL_H(), MAX_PANEL_H()];
+    const target = startH + delta;
+    const candidates = Math.abs(delta) > 40 ? stops.filter(h => delta > 0 ? h > startH + 10 : h < startH - 10) : stops;
+    snapTo((candidates.length ? candidates : stops).reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a));
   }, [snapTo]);
 
   const onDragCancel = useCallback(() => {
@@ -296,7 +315,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     const check = () => {
       setIsDesktop(window.innerWidth >= 768);
       setWindowH(window.innerHeight);
-      setPanelHeight(h => Math.max(PANEL_MIN, Math.min(h, DEFAULT_PANEL_H())));
+      setPanelHeight(h => Math.max(PANEL_MIN, Math.min(h, MAX_PANEL_H())));
     };
     check();
     window.addEventListener('resize', check);
@@ -357,6 +376,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
 
   const filtered = useMemo(() => {
     let result = spots.filter((s) => {
+      if (liveMode && !live.counts[s.id]) return false;
       if (filterType && s.type !== filterType) return false;
       if (filterRegion) {
         const [latMin, lonMin, latMax, lonMax] = filterRegion.bbox;
@@ -384,7 +404,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
         .sort((a, b) => (distanceMap.get(a.id) ?? 0) - (distanceMap.get(b.id) ?? 0));
     }
     return result;
-  }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, filterOstacolo, searchQuery, radiusMode, radiusCenter, radiusKm, distanceMap]);
+  }, [spots, filterType, filterRegion, filterCondition, filterDifficulty, filterOstacolo, searchQuery, radiusMode, radiusCenter, radiusKm, distanceMap, liveMode, live.counts]);
 
   /* Spot visibili nel pannello: filtrati per viewport della mappa + ordine casuale.
      Se l'utente è in radius mode o ha una ricerca attiva, non filtrare per viewport. */
@@ -429,7 +449,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     return selected && !rows.some(spot => spot.id === selected.id) ? [selected, ...rows] : rows;
   }, [panelSpots, visibleCount, expandedId]);
   const {photos: spotPhotos, error: photoError, retry: retryPhotos} = useMapPhotos(
-    mapBounds || searchQuery ? visibleSpots.map(spot => spot.id) : [], expandedId,
+    (isDesktop || panelHeight > PANEL_MIN + 10) && (mapBounds || searchQuery) ? visibleSpots.map(spot => spot.id) : [], expandedId,
   );
   const visibleWithPhotos = visibleSpots.map(spot => {
     const photos = spotPhotos[spot.id];
@@ -628,6 +648,17 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     setAddOpen(true);
   }, [user]);
 
+  const openSessionChoice=useCallback(()=>{
+    setSessionChoice(true);snapTo(hasOpenSession?Math.min(480,MAX_PANEL_H()):MAX_PANEL_H());
+  },[snapTo,hasOpenSession]);
+  useEffect(()=>{if(sessionChoice&&hasOpenSession)snapTo(Math.min(480,MAX_PANEL_H()));},[sessionChoice,hasOpenSession,snapTo]);
+  const sessionChoiceOpened=useRef(false);
+  useEffect(()=>{
+    if(chooseSession&&sessionReady&&!spotsLoading&&!sessionChoiceOpened.current){
+      sessionChoiceOpened.current=true;openSessionChoice();
+    }
+  },[chooseSession,sessionReady,spotsLoading,openSessionChoice]);
+
   /* Bottoni mappa: nascosti quando il pannello è alto (>62% vh) */
   const autoHidden = !isDesktop && panelHeight > windowH * 0.62;
 
@@ -666,6 +697,8 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
           initialView={initialView}
           onViewChanged={setCurrentView}
           spots={filtered}
+          liveMode={liveMode}
+          liveCounts={liveMode?live.counts:undefined}
           filterType={filterType}
           filterRegionBbox={filterRegion?.bbox ?? null}
           searchQuery={searchQuery}
@@ -691,7 +724,10 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
       </div>
 
       {/* The location action stays on the map; closing the sheet makes it available again. */}
-      {!autoHidden && <div style={{ position: 'fixed', top: topOffset + 10, right: 12, zIndex: 12 }}>
+      {!autoHidden && <div className="cm-map-controls" style={{ position: 'fixed', top: topOffset + 10, right: 12, zIndex: 12 }}>
+        <button type="button" className="cm-map-locate cm-live-toggle" aria-pressed={liveMode} title={text('Presenze condivise negli spot','Shared spot presence')} onClick={()=>{setLiveMode(value=>!value);setExpandedId(null);setActiveListId(null);setSessionChoice(false);}}>
+          <span className="cm-live-dot" aria-hidden="true"/>Live
+        </button>
         <button type="button" className="cm-map-locate" onClick={askNearMe} disabled={isLocating}>
           <LocateGlyph />{isLocating ? text('Localizzazione…', 'Locating…') : text('Vicino a me', 'Near me')}
         </button>
@@ -709,7 +745,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
       }}>
         <div className="cm-panel-surface">
           {isDesktop ? <div className="cm-panel-heading">
-            <div><h1>{radiusMode ? text('Spot vicino a te', 'Spots near you') : searchQuery ? text('Risultati di ricerca', 'Search results') : text('Spot in questa zona', 'Spots in this area')}</h1><p>{spotsLoading ? text('Caricamento…', 'Loading…') : spotsError ? text('Caricamento non riuscito', 'Loading failed') : `${panelSpots.length} spot${filtersActive ? text(' · Filtri attivi', ' · Filters active') : ''}`}</p></div>
+            <div><h1>{liveMode ? 'Live' : radiusMode ? text('Spot vicino a te', 'Spots near you') : searchQuery ? text('Risultati di ricerca', 'Search results') : text('Spot in questa zona', 'Spots in this area')}</h1><p>{spotsLoading ? text('Caricamento…', 'Loading…') : spotsError ? text('Caricamento non riuscito', 'Loading failed') : `${panelSpots.length} spot${filtersActive ? text(' · Filtri attivi', ' · Filters active') : ''}`}</p></div>
           </div> : <button
             type="button" className="cm-sheet-toggle"
             aria-expanded={panelHeight > PANEL_MIN + 10} aria-controls="cm-map-results"
@@ -722,17 +758,22 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
             }}
           >
             <span className="cm-sheet-grip" aria-hidden="true" />
-            <span className="cm-sheet-label"><strong>{expandedId && selectedPin ? selectedPin.name : radiusMode ? text('Spot vicino a te', 'Spots near you') : searchQuery ? text('Risultati di ricerca', 'Search results') : text('Spot in questa zona', 'Spots in this area')}</strong>
+            <span className="cm-sheet-label"><strong>{expandedId && selectedPin ? selectedPin.name : liveMode ? 'Live' : radiusMode ? text('Spot vicino a te', 'Spots near you') : searchQuery ? text('Risultati di ricerca', 'Search results') : text('Spot in questa zona', 'Spots in this area')}</strong>
               <span>{spotsLoading ? text('Caricamento…', 'Loading…') : spotsError ? text('Caricamento non riuscito. Apri per riprovare.', 'Loading failed. Open to retry.') : expandedId && selectedPin ? selectedPin.city : `${panelSpots.length} spot${filtersActive ? text(' · Filtri attivi', ' · Filters active') : ''}`}</span>
             </span>
             <svg className="cm-sheet-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
           </button>}
 
           {favoriteError && (isDesktop || panelHeight > PANEL_MIN + 10) && <div role="alert" style={{padding:'10px 16px',fontSize:14,borderBottom:'1px solid var(--gray-700)'}}>{text('I preferiti non sono sincronizzati. Controlla la connessione.', 'Favorites are not synced. Check your connection.')} <button className="cm-text-button" onClick={reloadFavorites}>{text('Riprova','Try again')}</button></div>}
+          {liveMode && (isDesktop || panelHeight > PANEL_MIN + 10) && <div className="cm-live-status" role="status">
+            {live.status==='loading'?text('Caricamento Live…','Loading Live…'):live.status==='signin'?text('Accedi per vedere Live.','Sign in to view Live.'):live.status==='restricted'?text('Live è disponibile per gli account autorizzati al pilot.','Live is available to authorized pilot accounts.'):live.status==='error'?text('Live non disponibile.','Live unavailable.'):panelSpots.length?text('Presenze segnalate dai rider','Presence reported by riders'):text('Nessuna presenza condivisa in questa zona.','No shared presence in this area.')}
+            {live.status==='signin'&&<button className="cm-text-button" onClick={()=>setAuthOpen(true)}>{text('Accedi','Sign in')}</button>}
+            {live.status==='error'&&<button className="cm-text-button" onClick={live.retry}>{text('Riprova','Try again')}</button>}
+          </div>}
           {/* Pannello scroll */}
           <div id="cm-map-results" hidden={!isDesktop && panelHeight <= PANEL_MIN + 10} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} onKeyDown={e => { if (e.key === 'Escape' && !isDesktop) { initialScrollRef.current = listScrollRef.current; snapTo(PANEL_MIN); e.currentTarget.parentElement?.querySelector<HTMLButtonElement>('.cm-sheet-toggle')?.focus(); } }}>
             {(isDesktop || panelHeight > PANEL_MIN + 10) && <>
-              {!sessionReady || spotsLoading || spotsError ? (
+              {sessionChoice?<NearbySessionStart spots={spots} addedSpot={sessionDraft} onClose={()=>setSessionChoice(false)} onStarted={spot=>{handleSpotClick(spot,true);snapTo(Math.min(480,MAX_PANEL_H()));}} onAddSpot={point=>{addForSession.current=true;setAddLat(point?.lat);setAddLon(point?.lon);openAddSpot();}}/>:!sessionReady || spotsLoading || spotsError ? (
                 <div role={spotsError ? 'alert' : 'status'} aria-live="polite" style={{
                   padding: '24px 20px', minHeight: 160, overflowY: 'auto', height: '100%',
                   fontFamily: 'var(--font-mono)', textAlign: 'center', color: 'var(--bone)',
@@ -745,7 +786,8 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
                     background: 'var(--orange)', color: 'var(--black)', font: 'inherit', cursor: 'pointer',
                   }}>{text('Riprova', 'Try again')}</button>}
                 </div>
-              ) : <SpotListPanel
+              ) : liveMode && !panelSpots.length ? <div className="cm-empty"><button className="cm-text-button" onClick={()=>setLiveMode(false)}>{text('Tutti gli spot','All spots')}</button></div> : <SpotListPanel
+                liveCounts={liveMode?live.counts:undefined}
                 spots={visibleWithPhotos}
                 total={panelSpots.length}
                 onLoadMore={() => setVisibleCount(count => count + 32)}
@@ -763,7 +805,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
                 onScrolled={() => setScrollToId(null)}
                 radiusCenter={radiusMode ? radiusCenter : null}
                 userPos={userPos}
-                nearestOverall={nearestOverall}
+                nearestOverall={liveMode?null:nearestOverall}
                 filtersActive={filtersActive}
                 onGoToNearest={() => {
                   if (!nearestOverall) return;
@@ -784,12 +826,13 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
         </div>
       </div>
 
-      <AddSpotModal
+      {(addOpen || addMounted) && <AddSpotModal
         open={addOpen}
-        onClose={() => { setAddOpen(false); setAddLat(undefined); setAddLon(undefined); }}
+        onClose={() => { setAddOpen(false); setAddLat(undefined); setAddLon(undefined); addForSession.current=false; }}
+        onSubmitted={spot=>{if(addForSession.current){addForSession.current=false;setSessionDraft(spot);setAddOpen(false);setSessionChoice(true);snapTo(MAX_PANEL_H());}}}
         initialLat={addLat} initialLon={addLon}
-      />
-      <AuthModal open={authOpen} onClose={() => { pendingAddRef.current = false; setAuthOpen(false); }} onSuccess={() => { if (pendingAddRef.current) { pendingAddRef.current = false; setAuthOpen(false); setAddOpen(true); } }} />
+      />}
+      {authOpen && <AuthModal returnTo={pendingAddRef.current ? "/map?add=1" : undefined} open={authOpen} onClose={() => { pendingAddRef.current = false; setAuthOpen(false); }} onSuccess={() => { if (pendingAddRef.current) { pendingAddRef.current = false; setAuthOpen(false); setAddOpen(true); } }} />}
 
       {/* ── ACCESSO SOCIAL FALLITO — prima tornava alla mappa in silenzio ── */}
       <AuthErrorBanner />
@@ -798,7 +841,9 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
       <NearbyEventBanner userPos={userPos} />
 
       {/* ── BOTTOM NAV — solo mobile, sostituisce il pulsante +SPOT della topbar ── */}
-      <BottomNav onAddSpot={openAddSpot} onOpenAuth={() => setAuthOpen(true)} />
+      <BottomNav onAddSpot={openAddSpot} onStartSession={openSessionChoice} onOpenAuth={() => setAuthOpen(true)} />
+      {!autoHidden&&(!sessionChoice||panelHeight<=PANEL_MIN+10)&&<SessionDock onMap/>}
+      {!chooseSession&&!autoAdd&&!initialSpotSlug&&!sessionChoice&&<OnboardingHints totalSpots={spots.length} nearbyCount={nearbyCount} nearest={nearestOverall?{name:nearestOverall.spot.name,km:nearestOverall.km}:null} onAttivaPosizione={askNearMe} onGoToNearest={()=>{if(nearestOverall){setFlyTarget({lat:nearestOverall.spot.lat,lon:nearestOverall.spot.lon,zoom:16});handleSpotClick(nearestOverall.spot);}}}/>}
 
     </div>
   );
@@ -809,9 +854,11 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
 ════════════════════════════════════════════════════════ */
 
 function SpotListPanel({
+  liveCounts,
   spots, total, onLoadMore, photoLoaded, photoError, onRetryPhotos, activeId, expandedId, onActivate, onSpotClick, scrollToId, onScrolled, radiusCenter,
   userPos, nearestOverall, filtersActive, onGoToNearest, onReset, isFav, onToggleFav, initialScrollRef, listScrollRef, onBeforeNavigate,
 }: {
+  liveCounts?:Record<string,number>;
   initialScrollRef: React.MutableRefObject<number>; listScrollRef: React.MutableRefObject<number>; onBeforeNavigate: () => void;
   total: number; onLoadMore: () => void; photoLoaded: (id: string) => boolean; photoError: boolean; onRetryPhotos: () => void;
   spots: SpotMapPin[]; activeId: string | null; expandedId: string | null;
@@ -860,6 +907,7 @@ function SpotListPanel({
           <span className="cm-category"><MapIcon name={selected.type} size={18} />{TIPI_SPOT[selected.type].label}</span>
           <h2><Link className="cm-spot-title-link" onClick={onBeforeNavigate} href={`/map/spot/${selected.slug}`}>{selected.name} <MapIcon name="arrow" size={20} /></Link></h2>
           <p className="cm-locality">{selected.city}{distance(selected) && ` · ${distance(selected)} ${text('in linea d’aria','straight-line distance')}`}</p>
+          <SpotSession spotId={selected.id} />
           <div className="cm-features">{(selected.ostacoli ?? []).filter(o => OSTACOLI[o]).map(o => <span key={o}><MapIcon name={o} size={16} />{OSTACOLI[o].label}</span>)}</div>
           {selected.difficulty && <p className="cm-meta">{text('Difficoltà','Difficulty')}: {{ beginner: text('Principiante','Beginner'), intermediate: text('Intermedio','Intermediate'), pro: 'Pro' }[selected.difficulty] ?? selected.difficulty}</p>}
           <p className="cm-meta">{getFreshness(selected.condition,selected.condition_updated_at,new Date(),language).label}</p>
@@ -874,7 +922,7 @@ function SpotListPanel({
           return <article key={spot.id} className={`cm-result${activeId === spot.id ? ' is-active' : ''}`} onMouseEnter={() => onActivate(spot.id)} onFocus={() => onActivate(spot.id)}>
             <button className="cm-result-select" onClick={() => onSpotClick(spot)} aria-label={text(`Mostra ${spot.name}${spot.city ? `, ${spot.city}` : ''} sulla mappa`, `Show ${spot.name}${spot.city ? `, ${spot.city}` : ''} on the map`)}>
               <span className="cm-result-image">{cover ? <img src={miniatura(cover,400)} alt="" loading="lazy" /> : <span className="cm-missing-photo"><MapIcon name="photo" /><small>{photoLoaded(spot.id) ? text('Foto assente','No photo') : text('Caricamento…','Loading…')}</small></span>}</span>
-              <span className="cm-result-copy"><span className="cm-category"><MapIcon name={spot.type} size={17} />{TIPI_SPOT[spot.type].label}</span><strong>{spot.name}</strong><span className="cm-locality">{spot.city}{distance(spot) && ` · ${distance(spot)}`}</span>{spot.submitted_by_username && <span className="cm-result-author">@{spot.submitted_by_username}</span>}{spot.cover_source === 'streetview' && <span className="cm-source-label">Street View</span>}</span>
+              <span className="cm-result-copy"><span className="cm-category"><MapIcon name={spot.type} size={17} />{TIPI_SPOT[spot.type].label}</span><strong>{spot.name}</strong><span className="cm-locality">{spot.city}{distance(spot) && ` · ${distance(spot)}`}</span>{liveCounts?.[spot.id] ? <span className="cm-live-count">{liveCounts[spot.id]} rider · {text('Presenza segnalata','Reported presence')}</span> : null}{spot.submitted_by_username && <span className="cm-result-author">@{spot.submitted_by_username}</span>}{spot.cover_source === 'streetview' && <span className="cm-source-label">Street View</span>}</span>
             </button>
             <button className="cm-result-fav" aria-label={text(`${isFav(spot.id)?'Rimuovi':'Salva'} ${spot.name} ${isFav(spot.id)?'dai':'nei'} preferiti`, `${isFav(spot.id)?'Remove':'Save'} ${spot.name} ${isFav(spot.id)?'from':'to'} favorites`)} aria-pressed={isFav(spot.id)} onClick={e => onToggleFav(e,spot.id)}><MapIcon name="heart" size={18} filled={isFav(spot.id)} /></button>
           </article>;

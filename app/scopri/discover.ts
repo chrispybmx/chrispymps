@@ -22,7 +22,7 @@ export function countryLabel(spot: Pick<DiscoverSpot, 'country' | 'country_code'
   }
   return spot.country?.trim() ?? '';
 }
-export function discoverCountries(spots: DiscoverSpot[], language: 'it' | 'en' = 'it') {
+export function discoverCountries(spots: Pick<DiscoverSpot, 'country' | 'country_code'>[], language: 'it' | 'en' = 'it') {
   const choices = new Map<string, string>();
   for (const spot of spots) { const key = countryKey(spot); if (key) choices.set(key, countryLabel(spot, language)); }
   return [...choices].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, language));

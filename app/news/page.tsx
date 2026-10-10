@@ -35,7 +35,7 @@ interface NewsItem {
 }
 
 async function getNews(): Promise<NewsItem[]> {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from('news')
     .select('id, slug, title, excerpt, cover_url, tags, published_at, created_at, submitted_by_username')

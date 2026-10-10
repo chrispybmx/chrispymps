@@ -23,7 +23,7 @@ function slugify(str: string): string {
 }
 
 export async function POST(req: Request) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, error: 'Non autorizzato' }, { status: 401 });
   }
 

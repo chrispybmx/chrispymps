@@ -14,9 +14,10 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-interface Props { params: { username: string } }
+interface Props { params: Promise<{ username: string }> }
 
-export default async function ModificaProfiloPage({ params }: Props) {
+export default async function ModificaProfiloPage(props: Props) {
+  const params = await props.params;
   const sb = supabaseAdmin();
   const { data: profile } = await sb
     .from('profiles')

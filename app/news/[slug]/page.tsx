@@ -34,7 +34,7 @@ interface NewsArticle {
 /** cache(): la query gira una volta sola per richiesta, condivisa tra
     generateMetadata (dove sta il check di esistenza) e il componente. */
 const getArticle = cache(async (slug: string): Promise<NewsArticle | null> => {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from('news')
     .select('id, slug, title, excerpt, body, cover_url, tags, published_at, created_at, post_type, request_city, request_resolved, news_photos(id, url, position, caption)')
@@ -53,7 +53,8 @@ const getArticle = cache(async (slug: string): Promise<NewsArticle | null> => {
   return data as NewsArticle | null;
 });
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   // notFound() QUI (oltre che nel componente) contro il soft-404: serve la 404
   // page con noindex/nofollow invece di metadata su articoli inesistenti.
   // NOTA VERIFICATA: lo status resta 200 finché esiste app/news/loading.tsx —
@@ -108,7 +109,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function ArticlePage({ params }: { params: { slug: string } }) {
+export default async function ArticlePage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const article = await getArticle(params.slug);
   if (!article) notFound();
 
