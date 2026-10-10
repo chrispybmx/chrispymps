@@ -1,4 +1,4 @@
-import { PGlite } from '@electric-sql/pglite';
+import type { PGlite } from '@electric-sql/pglite';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PREVIEW_ACTOR,PREVIEW_SPOT } from './rider-preview';
@@ -12,6 +12,8 @@ const globalDB=globalThis as typeof globalThis & {crockSessionPreview?:Promise<P
 export function previewDatabase() {
  if(!globalDB.crockSessionPreview)globalDB.crockSessionPreview=(async()=>{
   // In-memory PostgreSQL, survives page reloads, resets only on server restart.
+  // Loaded on demand: layout and public routes import this module in production too.
+  const { PGlite }=await import('@electric-sql/pglite');
   const db=new PGlite();
   await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
    create schema auth;create table auth.users(id uuid primary key);
