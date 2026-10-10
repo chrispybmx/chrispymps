@@ -30,6 +30,7 @@ export function previewDatabase() {
   await db.exec(await readFile(path.join(process.cwd(),'supabase/migrations/20261002_rider_sessions.sql'),'utf8'));
   await db.exec(await readFile(path.join(process.cwd(),'supabase/migrations/20261002190000_rider_profile_stats.sql'),'utf8'));
   await db.exec(await readFile(path.join(process.cwd(),'supabase/migrations/20261003120000_rider_live_map.sql'),'utf8'));
+  await db.exec(await readFile(path.join(process.cwd(),'supabase/migrations/20261010150000_rider_public_stats_daily.sql'),'utf8'));
   // Authorization exists only for this explicitly synthetic local fixture.
   await db.query("insert into cm_rider_pilot(user_id,authorization_note) values($1,'Synthetic local preview fixture; not age verification')",[PREVIEW_ACTOR]);
   await db.exec('update cm_rider_settings set sharing_enabled=true');

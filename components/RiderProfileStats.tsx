@@ -32,11 +32,11 @@ export function RiderPublicStats({ ownerId, endpoint = '/api/rider-stats' }: { o
     if (active && ticket === generation) setStored(response.ok && result.ok && result.data ? { owner: ownerId, viewer, data: result.data } : null);
    } catch { if (active && ticket === generation) setStored(null); }
   };
+  // Totals change at most once a day: reload on return to the page, no polling.
   void load();
-  const timer = setInterval(load, 30000);
   window.addEventListener('focus', load);
   document.addEventListener('visibilitychange', load);
-  return () => { active = false; controller.abort(); clearInterval(timer); window.removeEventListener('focus', load); document.removeEventListener('visibilitychange', load); };
+  return () => { active = false; controller.abort(); window.removeEventListener('focus', load); document.removeEventListener('visibilitychange', load); };
  }, [ownerId, token, ready, isOwner, viewer, endpoint]);
  if (!totals || isOwner || !ready) return null;
  return <section className={styles.publicStats} aria-label="Session del rider">

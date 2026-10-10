@@ -31,6 +31,7 @@ beforeAll(async()=>{
  await db.exec(await readFile(new URL('../supabase/migrations/20261002_rider_sessions.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20261002190000_rider_profile_stats.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20261003120000_rider_live_map.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261010150000_rider_public_stats_daily.sql',import.meta.url),'utf8'));
  bridge.getUser.mockImplementation(async(token:string)=>({data:{user:identities[token]?{id:identities[token]}:null},error:null}));
  bridge.rpc.mockImplementation(async(name:string,args:Record<string,unknown>)=>{
   if(!/^cm_rider_[a-z_]+$/.test(name)) throw new Error('Invalid function');
@@ -259,6 +260,7 @@ function statsRequest(who?:string,body?:unknown,target?:string) {
  });
 }
 async function publicStats(who?:string) {return (await (await getStats(statsRequest(who,undefined,a))).json()).data;}
+async function backdate(id:string,days:number) {await db.query('update cm_rider_sessions set started_at=started_at-make_interval(days=>$2),deadline_at=deadline_at-make_interval(days=>$2),ended_at=ended_at-make_interval(days=>$2) where id=$1',[id,days]);}
 
 it('keeps aggregate stats private by default even with Community presence',async()=>{
  const s=await start();await command({action:'stop',id:s.id});
@@ -273,17 +275,25 @@ it('shares only confirmed aggregate totals, updates edits/deletes, and revokes i
  const s=await start();await expire(s.id);await snapshot();
  const pending=(await snapshot()).sessions[0];
  await command({action:'confirm',id:s.id,version:pending.version,endedAt:pending.endedAt});
- const confirmed=(await snapshot()).sessions[0];
  await command({action:'mood',id:s.id,mood:'happy'});
  expect((await setStats(statsRequest('a',{shared:true}))).status).toBe(200);
  // Repeated preference writes are idempotent, with no duplicate consent rows.
  await setStats(statsRequest('a',{shared:true}));
+ // A session ended today stays out of the public totals until the next day.
+ expect(await publicStats()).toEqual({confirmedCount:0,confirmedSeconds:0});
+ await backdate(s.id,2);
+ const confirmed=(await snapshot()).sessions[0];
  expect(await publicStats()).toEqual({confirmedCount:1,confirmedSeconds:7200});
  expect(await publicStats('b')).toEqual(await publicStats());
  expect(Object.keys(await publicStats()).sort()).toEqual(['confirmedCount','confirmedSeconds']);
  expect((await snapshot('b')).sessions).toEqual([]);
  const current=(await snapshot()).sessions[0];
  await command({action:'edit',id:s.id,version:current.version,endedAt:new Date(Date.parse(confirmed.startedAt)+3600000).toISOString()});
+ expect((await publicStats()).confirmedSeconds).toBe(3600);
+ // Whole hours only: 89 minutes read as 1 hour.
+ const edited=(await snapshot()).sessions[0];
+ await command({action:'edit',id:s.id,version:edited.version,endedAt:new Date(Date.parse(confirmed.startedAt)+89*60000).toISOString()});
+ expect(Date.parse((await snapshot()).sessions[0].endedAt)).toBe(Date.parse(confirmed.startedAt)+89*60000);
  expect((await publicStats()).confirmedSeconds).toBe(3600);
  const next=await start();expect((await publicStats()).confirmedCount).toBe(1);
  await expire(next.id);expect((await publicStats()).confirmedCount).toBe(1);
@@ -390,14 +400,17 @@ it('preserves identity, expiry, idempotency and totals through 1000 seeded mixed
    expect((await setStats(statsRequest(who,{shared:sharing[who]}))).status).toBe(200);
   }
   const ids=new Set<string>();
+  // Public totals include only sessions ended before today's midnight in Rome, in whole hours.
+  const cut=Number((await db.query<{cut:number}>("select extract(epoch from date_trunc('day',now() at time zone 'Europe/Rome') at time zone 'Europe/Rome')*1000 as cut")).rows[0].cut);
   for(const owner of ['a','b']) {
    const current=await snapshot(owner);
    expect(current.sessions.filter((s:{status:string})=>s.status==='active').length).toBeLessThanOrEqual(1);
-   let count=0,seconds=0;
+   let count=0,seconds=0,publicCount=0,publicSeconds=0;
    for(const s of current.sessions) {
     expect(ids.has(s.id)).toBe(false);ids.add(s.id);
     expect(s.source).toBe('manual');
     if(s.status==='confirmed') {count++;seconds+=(Date.parse(s.endedAt)-Date.parse(s.startedAt))/1000;}
+    if(s.status==='confirmed'&&Date.parse(s.endedAt)<cut) {publicCount++;publicSeconds+=(Date.parse(s.endedAt)-Date.parse(s.startedAt))/1000;}
    }
    expect(current.confirmedCount).toBe(count);
    // JSON timestamps contain microseconds; JS Date truncates them to milliseconds.
@@ -406,7 +419,7 @@ it('preserves identity, expiry, idempotency and totals through 1000 seeded mixed
    expect(response.headers.get('cache-control')).toContain('no-store');
    const publicData=(await response.json()).data;
    if(!sharing[owner])expect(publicData).toBeNull();
-   else expect(publicData).toEqual({confirmedCount:current.confirmedCount,confirmedSeconds:current.confirmedSeconds});
+   else expect(publicData).toEqual({confirmedCount:publicCount,confirmedSeconds:Math.floor((publicSeconds+0.001*(publicCount+1))/3600)*3600});
   }
  }
  for(const name of ['startAndRetry','stop','closedAppExpiry','confirmOrEdit','delete','foreignMutationDenied','privateMood','forgedPayloadDenied','toggleStats'])expect(coverage[name]||0,`Missing scenario ${name}`).toBeGreaterThan(0);
