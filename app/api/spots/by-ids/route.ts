@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
+import { PUBLIC_SPOT_COLUMNS, publicSpotPayload } from '@/lib/public-spot';
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -22,17 +23,14 @@ export async function POST(req: NextRequest) {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase
     .from('spots')
-    .select('*, spot_photos(id, url, position, credit_name)')
+    .select(`${PUBLIC_SPOT_COLUMNS},spot_photos(id, url, position, credit_name, moderation_status)`)
     .in('id', validIds)
     .eq('status', 'approved');
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  // Sort foto per position
-  const spots = (data ?? []).map(s => ({
-    ...s,
-    spot_photos: (s.spot_photos ?? []).sort((a: { position: number }, b: { position: number }) => a.position - b.position),
-  }));
+  // Allowlist pubblica: niente note di moderazione né colonne future; foto ordinate per position
+  const spots = (data ?? []).map(s => publicSpotPayload(s));
 
   return NextResponse.json({ ok: true, data: spots });
 }

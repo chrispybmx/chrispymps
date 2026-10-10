@@ -10,6 +10,7 @@ import { cityCollectionData } from '@/lib/seo';
 import { safeJsonLd } from '@/lib/json-ld';
 import { citySlug, CITY_SLUG_RE } from '@/lib/slugify';
 import { getApprovedCityNames } from '@/lib/spot-cities';
+import { PUBLIC_SPOT_COLUMNS } from '@/lib/public-spot';
 
 export const revalidate = 3600;
 
@@ -100,7 +101,7 @@ const getCitySpots = cache(async (slug: string): Promise<Spot[]> => {
   // Resolve stored names first: accents and apostrophes cannot be reversed from a slug.
   const { data, error } = await supabase
     .from('spots')
-    .select('*, spot_photos(url, position, moderation_status)')
+    .select(`${PUBLIC_SPOT_COLUMNS},spot_photos(url, position, moderation_status)`)
     .eq('status', 'approved')
     .in('city', names)
     .order('approved_at', { ascending: false });
