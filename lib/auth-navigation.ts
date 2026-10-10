@@ -3,7 +3,8 @@ export function safeAuthNext(value: string | null | undefined): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || /[\\\r\n]/.test(value)) return '/map';
   try {
     const url = new URL(value, 'https://maps.chrispybmx.com');
-    if (url.origin !== 'https://maps.chrispybmx.com' || (url.pathname.startsWith('/auth/') || url.pathname.startsWith('/api/'))) return '/map';
+    // Dot segments are resolved here: '/.//evil.com' becomes '//evil.com', a protocol-relative URL.
+    if (url.origin !== 'https://maps.chrispybmx.com' || url.pathname.startsWith('//') || url.pathname.startsWith('/auth/') || url.pathname.startsWith('/api/')) return '/map';
     return url.pathname + url.search + url.hash;
   } catch { return '/map'; }
 }
