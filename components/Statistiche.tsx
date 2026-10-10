@@ -23,6 +23,7 @@ export default function Statistiche() {
     const timer = window.setInterval(changed, 60000);
     return () => { window.removeEventListener('storage', changed); window.removeEventListener(ANALYTICS_CONSENT_EVENT, changed); window.clearInterval(timer); };
   }, []);
-  if (process.env.NEXT_PUBLIC_WEB_ANALYTICS_ENABLED !== 'true' || !allowed) return null;
+  // Attive salvo rifiuto; la variabile serve solo a spegnerle per tutti ('false').
+  if (process.env.NEXT_PUBLIC_WEB_ANALYTICS_ENABLED === 'false' || !allowed) return null;
   return <Analytics beforeSend={event => analyticsAllowed() ? pulisciEventoAnalytics(event) : null} />;
 }

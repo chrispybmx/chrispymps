@@ -16,7 +16,7 @@ export default function AnalyticsPreferences() {
   return <div>
     <label style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
       <input type="checkbox" checked={enabled} onChange={event => change(event.target.checked)} />
-      Consenti statistiche facoltative su questo dispositivo
+      Statistiche anonime delle visite su questo dispositivo
     </label>
     {error && <p role="alert">{error}</p>}
   </div>;

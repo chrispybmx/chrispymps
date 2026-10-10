@@ -5,13 +5,10 @@ const MAX_AGE = 180 * 24 * 60 * 60 * 1000;
 export function analyticsChoice(raw: string | null, now = Date.now()): boolean | null {
   try {
     const value = JSON.parse(raw || 'null');
+    // A refusal never expires; a saved acceptance only hides the notice for a while.
     return typeof value?.accepted === 'boolean' && Number.isFinite(value.at)
-      && value.at <= now && now - value.at < MAX_AGE ? value.accepted : null;
+      && value.at <= now && (value.accepted === false || now - value.at < MAX_AGE) ? value.accepted : null;
   } catch { return null; }
-}
-
-export function validAnalyticsConsent(raw: string | null, now = Date.now()): boolean {
-  return analyticsChoice(raw, now) === true;
 }
 
 export function hasAnalyticsChoice(): boolean {
@@ -27,9 +24,11 @@ export function saveAnalyticsChoice(accepted: boolean): boolean {
   } catch { return false; }
 }
 
+/** Cookieless, aggregate statistics run by default; a refusal saved on this
+ *  device, Do Not Track or Global Privacy Control turn them off. */
 export function analyticsAllowed(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   if (navigator.doNotTrack === '1' || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl) return false;
-  try { return validAnalyticsConsent(window.localStorage.getItem(ANALYTICS_CONSENT_KEY)); }
+  try { return analyticsChoice(window.localStorage.getItem(ANALYTICS_CONSENT_KEY)) !== false; }
   catch { return false; }
 }

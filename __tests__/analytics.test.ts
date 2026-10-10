@@ -3,7 +3,8 @@ import { pulisciEventoAnalytics } from '@/lib/analytics';
 const evento = (url: string) => ({ type: 'pageview' as const, url });
 describe('statistiche delle visite', () => {
   it('conta le pagine pubbliche senza parametri né frammento', () => expect(pulisciEventoAnalytics(evento('https://maps.chrispybmx.com/map/spot/roma?q=rail#commenti'))?.url).toBe('https://maps.chrispybmx.com/map/spot/roma'));
-  it('rimuove anche gli UTM potenzialmente personali', () => expect(pulisciEventoAnalytics(evento('https://maps.chrispybmx.com/map?utm_source=instagram&utm_campaign=reel&add=1'))?.url).toBe('https://maps.chrispybmx.com/map'));
+  it('tiene i cinque UTM di campagna per sapere quale post porta visite', () => expect(pulisciEventoAnalytics(evento('https://maps.chrispybmx.com/map?utm_source=instagram&utm_campaign=reel&add=1&utm_id=abc#x'))?.url).toBe('https://maps.chrispybmx.com/map?utm_source=instagram&utm_campaign=reel'));
+  it('scarta un UTM troppo lungo per essere una campagna', () => expect(pulisciEventoAnalytics(evento(`https://maps.chrispybmx.com/map?utm_source=instagram&utm_content=${'x'.repeat(101)}`))?.url).toBe('https://maps.chrispybmx.com/map?utm_source=instagram'));
   it.each([
     'https://maps.chrispybmx.com/auth/confirm?token_hash=pkce_segreto&type=recovery',
     'https://maps.chrispybmx.com/auth/reset-password',

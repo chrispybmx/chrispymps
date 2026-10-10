@@ -47,7 +47,7 @@ export default function CookieBanner() {
         flex: '1 1 260px', minWidth: 0, margin: 0,
         fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bone)', lineHeight: 1.4,
       }}>
-        Cookie tecnici per usare il sito. Le statistiche facoltative restano disattivate senza il tuo consenso.{' '}
+        Solo cookie tecnici. Contiamo le visite in forma anonima e senza cookie: puoi disattivarlo da{' '}
         <a href="/impostazioni/privacy" style={{ color: 'var(--orange)', textDecoration: 'underline', textUnderlineOffset: 2 }}>Privacy e preferenze</a>
       </p>
       <button
