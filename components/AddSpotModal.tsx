@@ -17,6 +17,7 @@ import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client'
 import { createPhotoUploadBatch } from '@/lib/photo-upload-batch';
 import { checkPhoto } from '@/lib/photo-check';
 import { photoMetaFor, rememberPhotoMeta } from '@/lib/photo-meta';
+import { streetViewUrl } from '@/lib/street-view';
 
 interface AddSpotModalProps {
   open:        boolean;
@@ -971,6 +972,27 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
               {/* Posizione confermata → check duplicati → avanti */}
               {hasCoords && (
                 <div style={{ display: 'grid', gap: 12 }}>
+                  {/* Il GPS a volte prende un punto sbagliato (casa, lavoro, una cella lontana).
+                     Mappa e Street View fanno vedere subito se il pin e' davvero sullo spot;
+                     se no, si trascina il pin o si tocca il punto giusto. */}
+                  <LocationMapPicker
+                    lat={lat}
+                    lon={lon}
+                    height={200}
+                    onPick={(pLat, pLon) => {
+                      if (Math.abs(pLat - (lat ?? 0)) < 1e-7 && Math.abs(pLon - (lon ?? 0)) < 1e-7) return;
+                      setLat(pLat); setLon(pLon); fetchCity(pLat, pLon);
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--gray-400)', lineHeight: 1.5 }}>
+                      {text("Il pin è sullo spot? Se no, trascinalo o tocca il punto giusto.", "Is the pin on the spot? If not, drag it or tap the right place.")}
+                    </span>
+                    <a href={streetViewUrl(lat!, lon!)} target="_blank" rel="noopener noreferrer"
+                      style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--orange)', whiteSpace: 'nowrap' }}>
+                      {text("Controlla in Street View ↗", "Check in Street View ↗")}
+                    </a>
+                  </div>
                   <div style={{ background: 'var(--gray-700)', border: '1px solid rgba(0,200,81,0.4)', borderRadius: 6, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#00c851', marginBottom: 2 }}>{text("✅ Posizione confermata", "✅ Location confirmed")}</div>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Spot } from '@/lib/types';
 import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
 import { miniatura } from '@/lib/immagini';
+import { streetViewUrl } from '@/lib/street-view';
 
 interface AdminCardProps {
   spot:       Spot;
@@ -29,7 +30,7 @@ export default function AdminCard({ spot, onApprove, onReject, onEdit, onDelete,
   const nextPhoto = () => setPhotoIdx(i => (i + 1) % totalPhotos);
 
   const mapsUrl  = `https://www.google.com/maps?q=${spot.lat},${spot.lon}`;
-  const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${spot.lat},${spot.lon}`;
+  const streetView = streetViewUrl(spot.lat, spot.lon);
 
   return (
     <div
@@ -212,7 +213,7 @@ export default function AdminCard({ spot, onApprove, onReject, onEdit, onDelete,
           <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--orange)' }}>
             Maps ↗
           </a>
-          <a href={streetViewUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#4db6f5' }}>
+          <a href={streetView} target="_blank" rel="noopener noreferrer" style={{ color: '#4db6f5' }}>
             Street View ↗
           </a>
         </div>

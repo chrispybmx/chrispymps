@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { supabasePublic } from '@/lib/supabase';
 import { PUBLIC_SPOT_COLUMNS, toPublicSpot } from '@/lib/public-spot';
 import { youtubeEmbedUrl } from '@/lib/youtube';
+import { streetViewUrl } from '@/lib/street-view';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { spotStructuredData } from '@/lib/seo';
 import { safeJsonLd } from '@/lib/json-ld';
@@ -223,6 +224,16 @@ export default async function SpotPage(props: Props) {
             boxShadow: 'none',
           }}>
           <MapIcon name="route" /> {text("Apri indicazioni", "Get directions")}
+        </a>
+        {/* Per capire com'e' il posto prima di andarci. */}
+        <a data-metric-streetview="detail" href={streetViewUrl(spot.lat, spot.lon)} target="_blank" rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '12px', borderRadius: 6, marginTop: -8, marginBottom: 16,
+            border: '1px solid var(--gray-600)', color: 'var(--bone)',
+            fontFamily: 'var(--font-mono)', fontSize: 14, textDecoration: 'none',
+          }}>
+          <MapIcon name="photo" /> {text("Guarda in Street View", "View in Street View")}
         </a>
 
       </div>

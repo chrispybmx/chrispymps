@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { TIPI_SPOT, CITTA_ITALIANE, CONDIZIONI, DIFFICOLTA, SUPERFICI } from '@/lib/constants';
 import type { Spot, SpotType, SpotCondition, SpotPhoto } from '@/lib/types';
 import { compressImage } from '@/lib/compress-image';
+import { streetViewUrl } from '@/lib/street-view';
 
 interface Props { spot: Spot }
 
@@ -290,6 +291,12 @@ export default function AdminEditClient({ spot: initial }: Props) {
                 style={{ display: 'inline-block', marginTop: 6, color: 'var(--orange)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
                 Verifica su Google Maps ↗
               </a>
+              {Number.isFinite(spot.lat) && Number.isFinite(spot.lon) && (
+                <a href={streetViewUrl(spot.lat, spot.lon)} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-block', marginTop: 6, marginLeft: 12, color: '#4db6f5', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+                  Street View ↗
+                </a>
+              )}
             </Field>
 
             {/* Elimina spot */}

@@ -29,6 +29,7 @@ import { useLiveSpots } from '@/hooks/useLiveSpots';
 import { pointInBounds, normalizeMapBounds } from '@/lib/spot-query';
 import { useLanguage } from '@/components/LanguageProvider';
 import { EXPLORE_STATE_KEY, parseExploreState, type MapView, type ExploreState } from '@/lib/explore-state';
+import { streetViewUrl } from '@/lib/street-view';
 
 /* ── Haversine ── */
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -912,7 +913,7 @@ function SpotListPanel({
           {selected.difficulty && <p className="cm-meta">{text('Difficoltà','Difficulty')}: {{ beginner: text('Principiante','Beginner'), intermediate: text('Intermedio','Intermediate'), pro: 'Pro' }[selected.difficulty] ?? selected.difficulty}</p>}
           <p className="cm-meta">{getFreshness(selected.condition,selected.condition_updated_at,new Date(),language).label}</p>
           {selected.submitted_by_username && <Link className="cm-contributor" href={`/u/${selected.submitted_by_username}`}>{text('Spot aggiunto da','Spot added by')} @{selected.submitted_by_username}</Link>}
-          <div className="cm-preview-actions"><a data-metric-directions="map" className="btn-primary" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lon}`} target="_blank" rel="noopener noreferrer"><MapIcon name="route" />{text('Apri indicazioni','Get directions')}</a><button className="cm-icon-button" aria-label={isFav(selected.id)?text('Rimuovi dai preferiti', 'Remove from favorites'):text('Aggiungi ai preferiti', 'Save to favorites')} aria-pressed={isFav(selected.id)} onClick={e => onToggleFav(e,selected.id)}><MapIcon name="heart" filled={isFav(selected.id)} /></button></div>
+          <div className="cm-preview-actions"><a data-metric-directions="map" className="btn-primary" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lon}`} target="_blank" rel="noopener noreferrer"><MapIcon name="route" />{text('Apri indicazioni','Get directions')}</a><a data-metric-streetview="map" className="cm-icon-button" href={streetViewUrl(selected.lat, selected.lon)} target="_blank" rel="noopener noreferrer" aria-label={text('Guarda in Street View','View in Street View')} title="Street View"><MapIcon name="photo" /></a><button className="cm-icon-button" aria-label={isFav(selected.id)?text('Rimuovi dai preferiti', 'Remove from favorites'):text('Aggiungi ai preferiti', 'Save to favorites')} aria-pressed={isFav(selected.id)} onClick={e => onToggleFav(e,selected.id)}><MapIcon name="heart" filled={isFav(selected.id)} /></button></div>
         </div>
       </article>}
       {selected && spots.length > 1 && <h3 className="cm-other-heading">{text('Altri risultati sulla mappa', 'Other results on the map')}</h3>}
