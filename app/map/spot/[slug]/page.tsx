@@ -1,5 +1,4 @@
 import SpotMetric from '@/components/SpotMetric';
-import SessionInviteLink from '@/components/SessionInviteLink';
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { notFound,redirect } from 'next/navigation';
@@ -184,7 +183,10 @@ export default async function SpotPage(props: Props) {
             display: 'inline-flex', alignItems: 'center', gap: 5,
           }}>
             <strong>{conditionText(spot.condition, language)}</strong>
-            <span>{fresh.days !== null ? fresh.short : spot.condition === 'alive' ? text('Da confermare', 'Not confirmed') : formatSpotDate(spot.condition_updated_at, language)}</span>
+            {/* Una data vera accanto allo stato: "3 giorni fa" da solo non dice quando. */}
+            <span>{formatSpotDate(spot.condition_updated_at, language)
+              ? `${text('al', 'as of')} ${formatSpotDate(spot.condition_updated_at, language)}`
+              : spot.condition === 'alive' ? text('Da confermare', 'Not confirmed') : null}</span>
           </span>
           {/* 🔥 Like + ❤️ Save — client component */}
           <SpotPageActions spotId={spot.id} initialLikes={spot.likes_count ?? 0} />
@@ -264,8 +266,6 @@ export default async function SpotPage(props: Props) {
             </div>
           </Link>
         )}
-
-        {spot.submitted_by_user_id && spot.submitted_by_username && <SessionInviteLink recipient={spot.submitted_by_username} spotId={spot.id} />}
 
         {/* ── DESCRIZIONE ── */}
         {spot.description && (

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import SessionInviteLink from '@/components/SessionInviteLink';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
@@ -130,8 +129,6 @@ export default function ProfileClient({ profile, joinDate }: Props) {
               📸 @{instaHandle.replace('@','')}
             </a>
           )}
-
-          <div><SessionInviteLink recipient={profile.username} /></div>
 
           {/* Edit button + Preferiti (solo owner) */}
           {isOwn && (

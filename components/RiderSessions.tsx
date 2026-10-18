@@ -152,16 +152,13 @@ export function RiderHistory({ownerId,compact=false}:{ownerId?:string;compact?:b
  const c=useContext(Sessions);if(!c)return ownerId?null:<p>Sessioni non ancora disponibili.</p>;
  if(ownerId&&ownerId!==c.user?.id)return null;
  if(!c.user)return <button className={styles.primary} onClick={requestSignIn}>Accedi per le tue sessioni</button>;
- const pending=c.snapshot?.sessions.filter(s=>s.status==='needs_confirmation').length??0;
  return <section className={compact?styles.profileSummary:styles.history} aria-label="Le tue sessioni">
   {!compact&&<><h2>Le tue sessioni</h2><p className={styles.muted}>Storico privato · Fonte manuale</p></>}
   <SessionError/>
   {!c.snapshot?<p role="status">Caricamento sessioni…</p>:<>
-   <div className={styles.totals}><span><strong>{sessionDuration(c.snapshot.confirmedSeconds)}</strong> Tempo di sessione</span><span><strong>{c.snapshot.confirmedCount}</strong> Sessioni</span></div>
-   {compact?<>
-    <div className={styles.profileLinks}><Link href="/sessioni">{c.snapshot.sessions.some(s=>s.status==='active')?'Sessione in corso':'Gestisci sessioni'}</Link>{pending>0&&<Link className={styles.warning} href="/sessioni">{pending} {pending===1?'sessione da confermare':'sessioni da confermare'}</Link>}</div>
-    <details className={styles.profilePrivacy}><summary>Visibilità dei totali</summary><RiderStatsSharing key={c.user.id} user={c.user} endpoint={c.endpoint==='/api/rider-sessions-preview'?'/api/rider-stats-preview':'/api/rider-stats'}/></details>
-   </>:<>
+   <div className={styles.totals}><span><strong>{sessionDuration(c.snapshot.confirmedSeconds)}</strong> {compact?'In session':'Tempo di sessione'}</span><span><strong>{c.snapshot.confirmedCount}</strong> {compact?'Session fatte':'Sessioni'}</span></div>
+   {/* Profilo: solo i due numeri. Gestione, conferme e privacy stanno in /sessioni. */}
+   {compact?null:<>
    <RiderStatsSharing key={c.user.id} user={c.user} endpoint={c.endpoint==='/api/rider-sessions-preview'?'/api/rider-stats-preview':'/api/rider-stats'}/>
    {c.snapshot.sessions.length===0&&<p>Non hai ancora registrato sessioni. <Link href="/">Trova uno spot</Link></p>}
    {c.snapshot.sessions.filter(s=>s.status!=='confirmed').map(s=><HistoryRow key={s.id} session={s}/>)}

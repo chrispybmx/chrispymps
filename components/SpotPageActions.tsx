@@ -7,7 +7,6 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from './Toast';
 import MapIcon from './MapIcon';
 import { useLanguage } from './LanguageProvider';
-import { SpotSession } from './RiderSessions';
 
 interface Props {
   spotId: string;
@@ -62,7 +61,6 @@ export default function SpotPageActions({ spotId, initialLikes }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {favoriteError && <p role="alert" style={{fontSize:14}}>{text('Preferiti non sincronizzati. Riprova dalla pagina Preferiti.', 'Favorites are not synced. Try again from Favorites.')}</p>}
-      <SpotSession spotId={spotId} />
       {/* Top row: 🔥 + ❤️ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button aria-label={text("Mi piace","Like")} disabled={likeLoading} aria-pressed={liked} onClick={handleLike}

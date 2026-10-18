@@ -166,12 +166,12 @@ export default async function UserProfilePage(
         <RiderPublicStats ownerId={profile.id} />
         {/* Spot pubblicati */}
         {spots.length > 0 && (
-          <details style={{borderTop:'1px solid var(--gray-700)',padding:'16px 0'}}>
-            <summary style={{minHeight:44,cursor:'pointer'}}>Spot pubblicati ({spots.length})</summary>
+          <section style={{borderTop:'1px solid var(--gray-700)',padding:'16px 0'}}>
+            <h2 style={{fontFamily:'var(--font-mono)',fontSize:15,margin:'0 0 12px'}}>Spot pubblicati ({spots.length})</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {spots.map(spot => <SpotTile key={spot.id} spot={spot} username={profile.username} />)}
             </div>
-          </details>
+          </section>
         )}
 
         {/* Preferiti — visibili solo al proprietario del profilo */}
