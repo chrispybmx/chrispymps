@@ -1,5 +1,6 @@
 'use client';
 
+import 'leaflet/dist/leaflet.css';
 import { NEWSLETTER_CONSENT_TEXT } from '@/lib/newsletter-consent';
 import { readSpotDraft, saveSpotDraft, deleteSpotDraft } from '@/lib/spot-draft';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
@@ -167,6 +168,10 @@ function LocationMapPicker({
 
       if (lat != null && lon != null) addMarker(lat, lon);
       map.on('click', (e) => addMarker(e.latlng.lat, e.latlng.lng));
+      /* La mappa nasce dentro un modale che si sta ancora aprendo: senza
+         ricalcolare le dimensioni, tile e pin finiscono fuori posto e il
+         trascinamento non risponde. */
+      setTimeout(() => { if (!cancelled) mapRef.current?.invalidateSize(); }, 250);
     });
 
     return () => {
@@ -249,6 +254,17 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
     }
     const batch = photoUploadBatch.current;
     return () => batch.invalidate();
+  }, [open]);
+
+  /* Ogni volta che si apre "Aggiungi spot" alla posizione, il GPS riparte:
+     la posizione di un'apertura precedente non vale piu'. */
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpen.current && step === 'posizione' && initialLat == null) {
+      setLat(null); setLon(null); setGpsState('idle');
+    }
+    wasOpen.current = open;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al passaggio chiuso → aperto
   }, [open]);
 
   const metricOpen = useRef(false);
@@ -412,14 +428,19 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
     setDraftOwner(null);
     readSpotDraft(owner).then(draft => {
       if (!active) return;
-      setStep(draft?.step ?? 'posizione'); setLat(draft?.lat ?? initialLat ?? null); setLon(draft?.lon ?? initialLon ?? null);
+      /* Se la bozza era ancora alla posizione, quelle coordinate sono vecchie
+         (magari prese a casa o al lavoro): si riparte dal GPS. Dopo, la
+         posizione e' stata confermata e si tiene. */
+      const keepDraftPosition = draft != null && draft.step !== 'posizione';
+      setStep(draft?.step ?? 'posizione');
+      setLat(keepDraftPosition ? draft!.lat : initialLat ?? null); setLon(keepDraftPosition ? draft!.lon : initialLon ?? null);
       setCity(draft?.city ?? ''); setCountry(draft?.country ?? ''); setCountryCode(draft?.countryCode ?? '');
       setName(draft?.name ?? ''); setType(draft?.type ?? ''); setOstacoli(draft?.ostacoli ?? []);
       setDescription(draft?.description ?? ''); setNotes(draft?.notes ?? ''); setDifficulty(draft?.difficulty ?? '');
       const restored = draft?.photos ?? [];
       restored.forEach((file, i) => { const meta = draft?.photoMeta?.[i]; if (meta) rememberPhotoMeta(file, meta); });
       setPhotos(restored); setDraftOwner(owner);
-      if (draft) { setGpsState(draft.lat != null ? 'ok' : 'idle'); setDraftStatus('saved'); }
+      if (draft) { setGpsState(keepDraftPosition && draft.lat != null ? 'ok' : 'idle'); setDraftStatus('saved'); }
     }).catch(() => { if (active) { setDraftOwner(owner); setDraftStatus('error'); } });
     return () => { active = false; };
   // The draft belongs to an account, never to a login token refresh.
@@ -559,7 +580,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
         else if (err.code === 3) setGpsState('timeout'); // timeout
         else setGpsState('error');                        // non disponibile
       },
-      { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS }
+      { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 0 }
     );
   };
 
