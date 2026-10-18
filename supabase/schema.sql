@@ -209,7 +209,7 @@ create trigger set_spot_updated_at
 -- ========== VISTA PUBBLICA GEOJSON ==========
 -- Per export/API standard
 
-create or replace view public_spots_geojson as
+create or replace view public_spots_geojson with (security_invoker = true) as
 select
   id,
   slug,
@@ -231,4 +231,6 @@ select
 from spots
 where status = 'approved';
 
+revoke insert, update, delete, truncate, references, trigger
+  on public_spots_geojson from public, anon, authenticated;
 grant select on public_spots_geojson to anon, authenticated;

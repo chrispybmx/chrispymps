@@ -25,3 +25,8 @@ export function supabaseAdmin() {
     auth: { persistSession: false },
   });
 }
+
+/** Anonymous public data only: safe inside a shared Next.js cache. */
+export function supabasePublic() {
+  return createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+}

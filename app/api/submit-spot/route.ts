@@ -41,6 +41,14 @@ const SpotSchema = z.object({
   difficulty:   z.string().max(30).optional(),
   photo_urls:   z.array(z.string().url().refine(isOwnStorageUrl, 'URL foto non ammesso')).min(1).max(5).optional(),
   access_token: z.string().min(1).max(2048),
+  /* Solo per la coda admin (lib/photo-check.ts). Calcolato dal telefono:
+     e' un indizio per moderare, non una prova. */
+  photo_checks: z.array(z.object({
+    has_gps:    z.boolean(),
+    distance_m: z.number().int().min(0).max(20_100_000).nullable(),
+    taken_at:   z.string().datetime().nullable(),
+    has_camera: z.boolean(),
+  })).max(5).optional().catch(undefined), // dati storti: si scartano, lo spot passa
 });
 
 // Tipi MIME accettati
@@ -254,6 +262,16 @@ export async function POST(req: NextRequest) {
     if (paths.length > 0) await supabase.storage.from('spot-photos').remove(paths);
     await supabase.from('spots').delete().eq('id', spot.id);
     return NextResponse.json({ ok: false, error: 'Le foto non sono state caricate. Riprova.' }, { status: 500 });
+  }
+
+  // 4b. Verifica posizione foto, solo admin. Tabella separata e chiusa (RLS
+  //     senza policy): `spots` e' pubblica. Se la migration non e' ancora
+  //     stata eseguita o l'insert fallisce, lo spot resta valido comunque.
+  if (parsed.photo_checks?.length) {
+    const { error: checkErr } = await supabase.from('spot_photo_checks').insert(
+      parsed.photo_checks.map((c, position) => ({ spot_id: spot.id, position, ...c })),
+    );
+    if (checkErr) console.warn('[submit-spot] photo checks non salvati:', checkErr.message);
   }
 
   // 5. Notifica admin — AWAITED, non fire-and-forget: su serverless il container

@@ -6,10 +6,10 @@ import Link from 'next/link';
 import type { SpotMapPin, SpotType, SpotCondition, Ostacolo } from '@/lib/types';
 import { REGIONI_ITALIA, TIPI_SPOT, OSTACOLI, CONDIZIONI } from '@/lib/constants';
 import TopBar from '@/components/TopBar';
-import AddSpotModal from '@/components/AddSpotModal';
-import AuthModal from '@/components/AuthModal';
+const AddSpotModal = dynamic(() => import('@/components/AddSpotModal'), { ssr: false });
+const AuthModal = dynamic(() => import('@/components/AuthModal'), { ssr: false });
 import BottomNav from '@/components/BottomNav';
-import Lightbox from '@/components/Lightbox';
+const Lightbox = dynamic(() => import('@/components/Lightbox'), { ssr: false });
 import { useToast } from '@/components/Toast';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUser } from '@/hooks/useUser';
@@ -80,23 +80,27 @@ const SpotMap = dynamic(() => import('@/components/SpotMap'), {
   ),
 });
 
-interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean; initialSpotSlug?: string; initialQuery?: string }
+interface MapClientProps { initialSpots: SpotMapPin[]; autoAdd?: boolean; initialSpotSlug?: string; initialQuery?: string; ipView?: MapView | null }
 
 const topOffset_MOBILE  = 116;  // topbar only (filter bar hidden on mobile)
 const topOffset_DESKTOP = 120; // topbar + filter bar
 /** Raggio entro cui uno spot conta come "nella tua zona". */
 const NEARBY_KM       = 25;
 const PANEL_MIN       = 76;
-function DEFAULT_PANEL_H() {
+function MAX_PANEL_H() {
   return typeof window !== 'undefined'
     ? Math.max(200, window.innerHeight - 208)
     : 400;
 }
 
+function DEFAULT_PANEL_H() {
+  return typeof window !== 'undefined' ? Math.min(MAX_PANEL_H(), Math.max(240, Math.round(window.innerHeight * .46))) : 360;
+}
+
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, initialQuery }: MapClientProps) {
+export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, initialQuery, ipView }: MapClientProps) {
   const { text, language } = useLanguage();
   const [spots, setSpots]    = useState<SpotMapPin[]>(initialSpots);
   const [spotsLoading, setSpotsLoading] = useState(initialSpots.length === 0);
@@ -145,6 +149,8 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
   const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [addOpen,            setAddOpen]            = useState(false);
+  const [addMounted, setAddMounted] = useState(false);
+  useEffect(() => { if (addOpen) setAddMounted(true); }, [addOpen]);
   const [addLat,             setAddLat]             = useState<number | undefined>();
   const [addLon,             setAddLon]             = useState<number | undefined>();
   const [flyTarget,          setFlyTarget]          = useState<{ lat: number; lon: number; zoom?: number; exact?: boolean; bounds?: [number, number, number, number] } | null>(null);
@@ -175,7 +181,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
   const didDragRef = useRef(false);
 
   const snapTo = useCallback((h: number) => {
-    setPanelHeight(Math.max(PANEL_MIN, Math.min(h, DEFAULT_PANEL_H())));
+    setPanelHeight(Math.max(PANEL_MIN, Math.min(h, MAX_PANEL_H())));
   }, []);
 
   const onDragStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
@@ -199,8 +205,10 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     dragState.current = null;
     if (!didDragRef.current) return; // The native click handles taps and keyboard activation.
     const delta = startY - e.clientY;
-    const shouldOpen = Math.abs(delta) > 40 ? delta > 0 : startH + delta > (PANEL_MIN + DEFAULT_PANEL_H()) / 2;
-    snapTo(shouldOpen ? DEFAULT_PANEL_H() : PANEL_MIN);
+    const stops = [PANEL_MIN, DEFAULT_PANEL_H(), MAX_PANEL_H()];
+    const target = startH + delta;
+    const candidates = Math.abs(delta) > 40 ? stops.filter(h => delta > 0 ? h > startH + 10 : h < startH - 10) : stops;
+    snapTo((candidates.length ? candidates : stops).reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a));
   }, [snapTo]);
 
   const onDragCancel = useCallback(() => {
@@ -296,7 +304,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     const check = () => {
       setIsDesktop(window.innerWidth >= 768);
       setWindowH(window.innerHeight);
-      setPanelHeight(h => Math.max(PANEL_MIN, Math.min(h, DEFAULT_PANEL_H())));
+      setPanelHeight(h => Math.max(PANEL_MIN, Math.min(h, MAX_PANEL_H())));
     };
     check();
     window.addEventListener('resize', check);
@@ -429,7 +437,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
     return selected && !rows.some(spot => spot.id === selected.id) ? [selected, ...rows] : rows;
   }, [panelSpots, visibleCount, expandedId]);
   const {photos: spotPhotos, error: photoError, retry: retryPhotos} = useMapPhotos(
-    mapBounds || searchQuery ? visibleSpots.map(spot => spot.id) : [], expandedId,
+    (isDesktop || panelHeight > PANEL_MIN + 10) && (mapBounds || searchQuery) ? visibleSpots.map(spot => spot.id) : [], expandedId,
   );
   const visibleWithPhotos = visibleSpots.map(spot => {
     const photos = spotPhotos[spot.id];
@@ -664,6 +672,7 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
       }}>
         {sessionReady && <SpotMap
           initialView={initialView}
+          ipView={ipView}
           onViewChanged={setCurrentView}
           spots={filtered}
           filterType={filterType}
@@ -784,12 +793,12 @@ export default function MapClient({ initialSpots, autoAdd, initialSpotSlug, init
         </div>
       </div>
 
-      <AddSpotModal
+      {(addOpen || addMounted) && <AddSpotModal
         open={addOpen}
         onClose={() => { setAddOpen(false); setAddLat(undefined); setAddLon(undefined); }}
         initialLat={addLat} initialLon={addLon}
-      />
-      <AuthModal open={authOpen} onClose={() => { pendingAddRef.current = false; setAuthOpen(false); }} onSuccess={() => { if (pendingAddRef.current) { pendingAddRef.current = false; setAuthOpen(false); setAddOpen(true); } }} />
+      />}
+      {authOpen && <AuthModal returnTo={pendingAddRef.current ? "/map?add=1" : undefined} open={authOpen} onClose={() => { pendingAddRef.current = false; setAuthOpen(false); }} onSuccess={() => { if (pendingAddRef.current) { pendingAddRef.current = false; setAuthOpen(false); setAddOpen(true); } }} />}
 
       {/* ── ACCESSO SOCIAL FALLITO — prima tornava alla mappa in silenzio ── */}
       <AuthErrorBanner />

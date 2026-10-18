@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { publicSpotPhotos } from '@/lib/public-spot-photos';
 import { supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
+import { toPublicSpot } from '@/lib/public-spot';
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -22,16 +24,19 @@ export async function POST(req: NextRequest) {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase
     .from('spots')
-    .select('*, spot_photos(id, url, position, credit_name)')
+    .select('*, spot_photos(id, url, position, credit_name, moderation_status)')
     .in('id', validIds)
-    .eq('status', 'approved');
+    .eq('status', 'approved')
+    // Solo foto moderate: questa route usa la service key e bypassa le policy.
+    .or('moderation_status.eq.approved,moderation_status.is.null', { referencedTable: 'spot_photos' });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   // Sort foto per position
   const spots = (data ?? []).map(s => ({
-    ...s,
-    spot_photos: (s.spot_photos ?? []).sort((a: { position: number }, b: { position: number }) => a.position - b.position),
+    ...toPublicSpot(s),
+    // Doppio filtro: la query sopra e il codice qui, se il filtro del DB cambiasse.
+    spot_photos: publicSpotPhotos(s.spot_photos),
   }));
 
   return NextResponse.json({ ok: true, data: spots });

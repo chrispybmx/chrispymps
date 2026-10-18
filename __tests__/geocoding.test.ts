@@ -16,7 +16,7 @@ afterEach(() => {
 describe('geocodeForward', () => {
   it('mappa risposta Nominatim in GeoPlace[]', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => [
+      ok: true, json: async () => [
         {
           name:         'Verona',
           lat:          '45.4384',
@@ -38,29 +38,29 @@ describe('geocodeForward', () => {
   });
 
   it('passa limit e featureType nella URL', async () => {
-    mockFetch.mockResolvedValueOnce({ json: async () => [] });
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
 
     await geocodeForward('Milano', { limit: 8, featureType: 'city,town' });
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).toContain('limit=8');
-    expect(calledUrl).toContain('featuretype=city%2Ctown');
+    expect(calledUrl).toContain('featureType=city%2Ctown');
   });
 
   it('URL default: limit=5, ricerca world-wide senza filtro paese', async () => {
-    mockFetch.mockResolvedValueOnce({ json: async () => [] });
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
 
     await geocodeForward('Roma');
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).toContain('limit=5');
     expect(calledUrl).not.toContain('countrycodes');
-    expect(calledUrl).toContain('accept-language=');
+    expect(calledUrl).toContain('language=');
   });
 
   it('displayExtra mostra contesto + paese per luoghi esteri', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => [
+      ok: true, json: async () => [
         {
           name:         'Barcelona',
           lat:          '41.3874',
@@ -76,7 +76,7 @@ describe('geocodeForward', () => {
   });
 
   it('restituisce [] se Nominatim risponde con array vuoto', async () => {
-    mockFetch.mockResolvedValueOnce({ json: async () => [] });
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
 
     const results = await geocodeForward('xyznonexistent');
     expect(results).toEqual([]);
@@ -84,7 +84,7 @@ describe('geocodeForward', () => {
 
   it('usa display_name come fallback se name è vuoto', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => [
+      ok: true, json: async () => [
         {
           name:         '',
           lat:          '41.9028',
@@ -103,7 +103,7 @@ describe('geocodeForward', () => {
 describe('reverseGeocode', () => {
   it('ritorna città + paese da address', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
+      ok: true, json: async () => ({
         address: { city: 'Verona', country: 'Italia', country_code: 'it' },
       }),
     });
@@ -116,7 +116,7 @@ describe('reverseGeocode', () => {
 
   it('fallback su town se city manca', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
+      ok: true, json: async () => ({
         address: { town: 'Bardolino' },
       }),
     });
@@ -127,7 +127,7 @@ describe('reverseGeocode', () => {
 
   it('fallback su village se city e town mancano', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
+      ok: true, json: async () => ({
         address: { village: 'Costermano' },
       }),
     });
@@ -138,7 +138,7 @@ describe('reverseGeocode', () => {
 
   it('città estera: ritorna nome locale + country code', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
+      ok: true, json: async () => ({
         address: { city: 'Paris', country: 'France', country_code: 'fr' },
       }),
     });
@@ -150,7 +150,7 @@ describe('reverseGeocode', () => {
 
   it('ritorna null se address è vuoto', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({ address: {} }),
+      ok: true, json: async () => ({ address: {} }),
     });
 
     const geo = await reverseGeocode(0, 0);
@@ -161,7 +161,7 @@ describe('reverseGeocode', () => {
 
   it('include lat/lon nella URL', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({ address: { city: 'Milano' } }),
+      ok: true, json: async () => ({ address: { city: 'Milano' } }),
     });
 
     await reverseGeocode(45.4654, 9.1859);

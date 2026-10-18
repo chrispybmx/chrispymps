@@ -84,7 +84,7 @@ export function useUser(): UserSession | null | undefined {
       });
 
     // Ascolta i cambiamenti (login / logout)
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_, session) => fromSession(session));
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_, session) => { queueMicrotask(() => { void fromSession(session); }); });
 
     return () => {
       cancelled = true;

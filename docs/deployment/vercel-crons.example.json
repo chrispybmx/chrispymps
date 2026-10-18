@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/internal/session-invite-email", "schedule": "* * * * *" },
+    { "path": "/api/internal/newsletter-maintenance", "schedule": "*/5 * * * *" },
+    { "path": "/api/internal/product-metrics-retention", "schedule": "0 3 * * *" }
+  ]
+}

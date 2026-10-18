@@ -1,5 +1,6 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 export function useDialogFocus(open: boolean, ref: RefObject<HTMLElement>, onClose: () => void) {
+  const close = useRef(onClose); close.current = onClose;
   useEffect(() => {
     if (!open || !ref.current) return;
     const dialog = ref.current;
@@ -7,7 +8,7 @@ export function useDialogFocus(open: boolean, ref: RefObject<HTMLElement>, onClo
     const focusables = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select, textarea, [tabindex="0"]')).filter(el => el.getClientRects().length > 0);
     focusables()[0]?.focus();
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+      if (event.key === 'Escape') { event.preventDefault(); close.current(); }
       if (event.key !== 'Tab') return;
       const list = focusables(), first = list[0], last = list[list.length - 1];
       if (!first) { event.preventDefault(); return; }

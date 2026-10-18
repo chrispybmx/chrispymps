@@ -28,6 +28,6 @@ export async function POST(req: NextRequest) {
   if(!newsletterPreferencesEnabled()) return NextResponse.json({ok:false,error:'Iscrizioni temporaneamente non disponibili. Riprova più tardi.'},{status:503,headers:h});
   try {
     await requestNewsletterConfirmation(parsed.data.email);
-    return NextResponse.json({ok:true,pendingConfirmation:true,message:'Controlla la tua email e conferma l’iscrizione entro 24 ore.'},{status:202,headers:h});
+    return NextResponse.json({ok:true,pendingConfirmation:true,message:'Ti ho mandato una mail: premi il bottone dentro e sei iscritto.'},{status:202,headers:h});
   } catch {return NextResponse.json({ok:false,error:'Non riesco a inviare la conferma. Riprova più tardi.'},{status:503,headers:h});}
 }

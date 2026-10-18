@@ -561,7 +561,7 @@ export default function PrivacyPage() {
             </table>
           </div>
 
-          <h3 style={styles.h3}>localStorage</h3>
+          <h3 style={styles.h3}>Archiviazione sul dispositivo</h3>
           <p style={styles.p}>
             Chrispy Maps utilizza il localStorage del browser per salvare
             preferenze dell&apos;interfaccia e l’avvenuta chiusura dell’avviso cookie.
@@ -571,6 +571,7 @@ export default function PrivacyPage() {
             questi dati dalle impostazioni del browser; la cancellazione locale
             non elimina automaticamente i dati già sincronizzati con l’account.
           </p>
+          <p style={styles.p}>Le bozze degli spot, comprese le fotografie selezionate, sono conservate in IndexedDB sul dispositivo e separate per account. Sono recuperabili per sette giorni; una bozza scaduta viene eliminata alla successiva apertura. Puoi eliminarle dal modulo “Aggiungi spot” o dalle impostazioni del browser. Il link di una selezione “Da girare” contiene gli identificativi degli spot scelti, senza il nome del tuo account: chi lo riceve può inoltrarlo.</p>
         </section>
 
         {/* -------------------------------------------------------- */}

@@ -676,3 +676,11 @@ Due corollari, dalla stessa correzione:
 Trovato da `/revisione` (Codex, con `-c model="gpt-5.5"`: il `gpt-6-astra` del config
 richiede una CLI piu' nuova). Il secondo difetto e' emerso verificando il primo — il
 referto va controllato, ma anche seguito dove porta.
+
+## 2026-10-12 — Moderazione spot: resta all'admin
+
+Proposto di pubblicare subito gli spot nuovi con etichetta "da confermare" (modello
+iNaturalist). Christian l'ha bocciato: arrivano tante foto scadenti e lui lo vede ogni
+giorno dalla coda. Pattern: le idee prese da altri servizi vanno pesate sulla qualita'
+reale dei contributi di questa community, che conosce solo lui. Prima di proporre di
+togliere un controllo umano, chiedere com'e' la coda oggi.

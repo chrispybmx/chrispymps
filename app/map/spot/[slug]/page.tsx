@@ -5,6 +5,8 @@ import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
+import { toPublicSpot } from '@/lib/public-spot';
+import { youtubeEmbedUrl } from '@/lib/youtube';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { spotStructuredData } from '@/lib/seo';
 import { safeJsonLd } from '@/lib/json-ld';
@@ -73,7 +75,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
       .filter(p => p.moderation_status === 'approved' || p.moderation_status == null)
       .sort((a, b) => a.position - b.position);
   }
-  return data as unknown as Spot;
+  return toPublicSpot(data) as unknown as Spot;
 });
 
 
@@ -140,10 +142,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
   const cityPath = spot.city ? citySlug(spot.city) : '';
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
 
-  const isYouTube = spot.youtube_url && /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(spot.youtube_url);
-  const embedUrl = isYouTube
-    ? spot.youtube_url!.replace(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/\s]+)/, 'https://www.youtube-nocookie.com/embed/$1?rel=0')
-    : null;
+  const embedUrl = youtubeEmbedUrl(spot.youtube_url);
 
   return (
     <main className="cm-detail-page" style={{
@@ -198,7 +197,7 @@ export default async function SpotPage({ params, searchParams }: Props) {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: tipo.color, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           <MapIcon name={spot.type} size={18} /> {tipo.label}
         </div>
-        <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 28, color: 'var(--orange)', margin: '0 0 8px', lineHeight: 1.15 }}>
+        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 28, color: 'var(--orange)', margin: '0 0 8px', lineHeight: 1.15 }}>
           {spot.name}
         </h1>
         {spot.city && (
@@ -206,6 +205,19 @@ export default async function SpotPage({ params, searchParams }: Props) {
             {CITY_SLUG_RE.test(cityPath) ? <Link href={`/map/${cityPath}`} style={{ color: 'inherit', textUnderlineOffset: '3px' }}>{spot.city}</Link> : spot.city}{spot.region ? `, ${spot.region}` : ''}
           </div>
         )}
+        {/* ── PORTAMI QUI — grande, prominente ── */}
+        <a data-metric-directions="detail" className="cm-directions" href={mapsUrl} target="_blank" rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '14px', borderRadius: 6, marginBottom: 16,
+            background: 'var(--orange)', color: '#000',
+            fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
+            textDecoration: 'none', letterSpacing: '0.04em',
+            boxShadow: 'none',
+          }}>
+          <MapIcon name="route" /> {text("Apri indicazioni", "Get directions")}
+        </a>
+
       </div>
 
       <div className="cm-detail-body" style={{ padding: '16px 20px 0' }}>
@@ -245,19 +257,6 @@ export default async function SpotPage({ params, searchParams }: Props) {
         )}
 
         <BeforeYouRide spot={spot} language={language} />
-
-        {/* ── PORTAMI QUI — grande, prominente ── */}
-        <a data-metric-directions="detail" className="cm-directions" href={mapsUrl} target="_blank" rel="noopener noreferrer"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '14px', borderRadius: 6, marginBottom: 16,
-            background: 'var(--orange)', color: '#000',
-            fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
-            textDecoration: 'none', letterSpacing: '0.04em',
-            boxShadow: 'none',
-          }}>
-          <MapIcon name="route" /> {text("Apri indicazioni", "Get directions")}
-        </a>
 
         {/* ── CONDIVIDI ── */}
         <div style={{ marginBottom: 20 }}>

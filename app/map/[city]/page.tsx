@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase';
+import { toPublicSpot } from '@/lib/public-spot';
 import { CITTA_ITALIANE, APP_CONFIG } from '@/lib/constants';
 import type { Spot } from '@/lib/types';
 import CityMapList from './CityMapList';
@@ -104,7 +105,7 @@ const getCitySpots = cache(async (slug: string): Promise<Spot[]> => {
     .in('city', names)
     .order('approved_at', { ascending: false });
   if (error) throw new Error('Could not load city spots');
-  return (data ?? []).map(spot => ({ ...spot, spot_photos: (spot.spot_photos ?? []).filter((photo: { moderation_status?: string | null }) => photo.moderation_status === 'approved' || photo.moderation_status === null) })) as Spot[];
+  return (data ?? []).map(spot => ({ ...toPublicSpot(spot), spot_photos: (spot.spot_photos ?? []).filter((photo: { moderation_status?: string | null }) => photo.moderation_status === 'approved' || photo.moderation_status === null) })) as Spot[];
 });
 
 export default async function CityPage({ params }: Props) {

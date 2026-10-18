@@ -48,8 +48,10 @@ async function getData(username: string) {
     /* Spot girati: join spot_riders → spots */
     sb
       .from('spot_riders')
-      .select('spots(id, slug, name, type, city, condition, spot_photos(url, position))')
+      .select('spots!inner(id, slug, name, type, city, condition, spot_photos(url, position))')
       .eq('user_id', profile.id)
+      // Profilo pubblico: solo spot approvati (la service key bypassa le policy).
+      .eq('spots.status', 'approved')
       .limit(50),
     /* Foto caricate dall'utente (approvate) */
     sb

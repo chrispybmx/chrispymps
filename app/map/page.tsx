@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import MapClient from './MapClient';
 import { APP_CONFIG } from '@/lib/constants';
 import { safeJsonLd } from '@/lib/json-ld';
+import { ipViewFromHeaders } from '@/lib/ip-view';
 
 export const metadata: Metadata = {
   title:       'Spot BMX, skate e scooter: mappa della community',
@@ -49,6 +51,8 @@ export default async function MapPage({
 }) {
   const params: { [key: string]: string | string[] | undefined } = searchParams ? await searchParams : {};
   const autoAdd = params['add'] === '1';
+  const requestHeaders = headers();
+  const ipView = ipViewFromHeaders((name) => requestHeaders.get(name));
 
   // Spots loaded CLIENT-SIDE for instant page render
   return (
@@ -65,7 +69,7 @@ export default async function MapPage({
           <p><Link href="/map/about">Il progetto e la community</Link></p>
         </aside>
       </noscript>
-      <MapClient initialSpots={[]} autoAdd={autoAdd} initialSpotSlug={typeof params.spot === 'string' ? params.spot : undefined} initialQuery={typeof params.q === 'string' ? params.q : undefined} />
+      <MapClient initialSpots={[]} autoAdd={autoAdd} initialSpotSlug={typeof params.spot === 'string' ? params.spot : undefined} initialQuery={typeof params.q === 'string' ? params.q : undefined} ipView={ipView} />
     </>
   );
 }

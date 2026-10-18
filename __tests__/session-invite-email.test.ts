@@ -10,7 +10,7 @@ vi.mock('@/lib/supabase', () => ({ supabaseAdmin: mock.admin }));
 vi.mock('resend', () => ({ Resend: mock.resend }));
 vi.mock('@/lib/constants', () => ({ APP_CONFIG: { url: 'https://example.test' } }));
 import { deliverSessionInviteEmail, sessionEmailEnabled } from '@/lib/session-invite-email';
-import { POST as worker } from '@/app/api/internal/session-invite-email/route';
+import { POST as worker, GET as vercelWorker } from '@/app/api/internal/session-invite-email/route';
 
 const INVITE='11111111-1111-4111-8111-111111111111';
 const RECIPIENT='22222222-2222-4222-8222-222222222222';
@@ -27,7 +27,7 @@ const req=(authorization:string|null='Bearer worker-test-secret')=>new NextReque
 
 beforeEach(()=>{
  vi.clearAllMocks();vi.useFakeTimers();vi.setSystemTime(NOW);
- vi.stubEnv('SESSION_INVITES_ENABLED','true');vi.stubEnv('SESSION_INVITES_EMAIL_ENABLED','true');vi.stubEnv('RESEND_API_KEY','test-only-not-a-real-key');vi.stubEnv('SESSION_INVITES_CRON_SECRET','worker-test-secret');
+ vi.stubEnv('CRON_SECRET',undefined);vi.stubEnv('SESSION_INVITES_SITE_URL',undefined);vi.stubEnv('SESSION_INVITES_ENABLED','true');vi.stubEnv('SESSION_INVITES_EMAIL_ENABLED','true');vi.stubEnv('RESEND_API_KEY','test-only-not-a-real-key');vi.stubEnv('SESSION_INVITES_CRON_SECRET','worker-test-secret');
  mock.queries=[];
  mock.responses={
   [OUTBOX]:[job(),{error:null}],
@@ -37,7 +37,7 @@ beforeEach(()=>{
  mock.from.mockImplementation((table:string)=>{
   const query={table,calls:[] as {method:string;args:unknown[]}[]};mock.queries.push(query);
   const builder:Record<string,unknown>={};
-  for(const method of ['select','update','delete','eq','is','lte','lt','or','order','limit','maybeSingle']) builder[method]=(...args:unknown[])=>{query.calls.push({method,args});return builder;};
+  for(const method of ['select','update','delete','eq','is','lte','lt','gte','or','order','limit','maybeSingle']) builder[method]=(...args:unknown[])=>{query.calls.push({method,args});return builder;};
   builder.then=(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>Promise.resolve(mock.responses[table]?.shift()??{data:null,error:null}).then(resolve,reject);
   return builder;
  });
@@ -118,6 +118,70 @@ describe('internal email route authorization',()=>{
   mock.responses[OUTBOX]=[{data:null,error:{message:'internal database detail'}}];const response=await worker(req());expect(response.status).toBe(503);expect(await response.json()).toEqual({ok:false,error:'Coda non disponibile'});expect(mock.send).not.toHaveBeenCalled();
  });
  it('processes at most ten due jobs and exposes only aggregate outcomes',async()=>{
-  mock.responses[OUTBOX]=[{data:[{invite_id:INVITE}],error:null},job(),{error:null}];const response=await worker(req());expect(await response.json()).toEqual({ok:true,processed:1,sent:1});expect(outboxQueries()[0].calls).toContainEqual({method:'limit',args:[10]});
+  mock.responses[OUTBOX]=[{data:[{invite_id:INVITE}],error:null},job(),{error:null}];const response=await worker(req());expect(await response.json()).toEqual({ok:true,processed:1,sent:1,pending:0,requiresReview:0});expect(outboxQueries()[0].calls).toContainEqual({method:'limit',args:[10]});
+ });
+});
+
+
+describe('background failure visibility',()=>{
+ it('reports a provider retry as 503 rather than success',async()=>{
+  mock.responses[OUTBOX]=[{data:[{invite_id:INVITE}],error:null},job(),{error:null},{count:0,error:null}];
+  mock.send.mockResolvedValue({error:{message:'private provider detail'}});
+  const response=await worker(req());expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ok:false,processed:1,sent:0,pending:1,requiresReview:0});
+ });
+ it('reports exhausted jobs even when no new jobs are due',async()=>{
+  mock.responses[OUTBOX]=[{data:[],error:null},{count:2,error:null}];
+  const response=await worker(req());expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ok:false,processed:0,sent:0,pending:0,requiresReview:2});
+  expect(mock.send).not.toHaveBeenCalled();
+ });
+ it('reports a failed claim rather than ignoring a rejected promise',async()=>{
+  mock.responses[OUTBOX]=[{data:[{invite_id:INVITE}],error:null},{error:{message:'claim failed'}},{count:0,error:null}];
+  const response=await worker(req());expect(response.status).toBe(503);
+  expect((await response.json()).pending).toBe(1);expect(mock.send).not.toHaveBeenCalled();
+ });
+ it('handles an unavailable database without exposing exception details',async()=>{
+  mock.admin.mockImplementation(()=>{throw new Error('private connection details');});
+  const response=await worker(req());expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ok:false,error:'Coda non disponibile'});
+ });
+ it('does not claim success when cancellation cannot be stored',async()=>{
+  mock.responses.cm_session_preferences=[{data:{email_enabled:false},error:null}];
+  mock.responses[OUTBOX]=[job(),{error:{message:'delete failed'}},{error:null}];
+  expect(await run()).toBe('retry');expect(mock.send).not.toHaveBeenCalled();
+ });
+ it('surfaces failure to persist a retry',async()=>{
+  mock.responses[OUTBOX]=[job(),{error:{message:'retry write failed'}}];
+  mock.send.mockRejectedValue(new Error('provider down'));
+  await expect(run()).rejects.toThrow('Impossibile pianificare');
+ });
+});
+
+
+describe('scheduler integration and staging links',()=>{
+ it('accepts Vercel GET only with its CRON_SECRET',async()=>{
+  vi.stubEnv('CRON_SECRET','vercel-test-secret');
+  mock.responses[OUTBOX]=[{data:[],error:null},{count:0,error:null}];
+  const response=await vercelWorker(new NextRequest('https://example.test/api/internal/session-invite-email',{headers:{authorization:'Bearer vercel-test-secret'}}));
+  expect(response.status).toBe(200);expect((await response.json()).processed).toBe(0);
+ });
+ it('does not accept the POST-only key on a Vercel GET',async()=>{
+  expect((await vercelWorker(req())).status).toBe(401);expect(mock.admin).not.toHaveBeenCalled();
+ });
+ it('supports the shared cron secret for POST when no dedicated key is set',async()=>{
+  vi.stubEnv('SESSION_INVITES_CRON_SECRET',undefined);vi.stubEnv('CRON_SECRET','worker-test-secret');
+  mock.responses[OUTBOX]=[{data:[],error:null},{count:0,error:null}];
+  expect((await worker(req())).status).toBe(200);
+ });
+ it('keeps staging email links on the configured staging origin',async()=>{
+  vi.stubEnv('SESSION_INVITES_SITE_URL','https://staging.example.test');
+  expect(await run()).toBe('sent');const payload=mock.send.mock.calls[0][0];
+  expect(payload.text).toContain('https://staging.example.test/messaggi?invite=');
+  expect(payload.text).not.toContain('https://example.test');
+ });
+ it('rejects an invalid email origin before sending',async()=>{
+  vi.stubEnv('SESSION_INVITES_SITE_URL','javascript:alert(1)');
+  expect(await run()).toBe('retry');expect(mock.send).not.toHaveBeenCalled();
  });
 });

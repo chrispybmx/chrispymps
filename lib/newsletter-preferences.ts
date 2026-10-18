@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { APP_CONFIG } from '@/lib/constants';
 import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION, NEWSLETTER_WITHDRAWAL_TEXT } from './newsletter-consent';
 import { newsletterMembership, setNewsletterMembership } from './mailerlite-preferences';
+import { newsletterConfirmationEmail } from './newsletter-confirmation-email';
 
 export const newsletterPreferencesEnabled = () => process.env.NEWSLETTER_CONSENT_ENABLED === 'true';
 export const normalizeNewsletterEmail = (email: string) => email.trim().toLowerCase();
@@ -66,10 +67,9 @@ export async function requestNewsletterConfirmation(email: string) {
   const link = `${base.origin}/newsletter/conferma#${token}`;
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
+    const message = newsletterConfirmationEmail(link, `${base.origin}/privacy#newsletter`);
     const result = await resend.emails.send({
-      from: 'Chrispy Maps <noreply@chrispybmx.com>', to: email,
-      subject: 'Conferma la newsletter di Chrispy Maps',
-      text: `Hai richiesto la newsletter BMX di Chrispy Maps. Conferma entro 24 ore aprendo questo link e premendo Conferma:\n${link}\n\nSe non l’hai richiesto, ignora questa email: non sarai iscritto.\nInformativa: ${base.origin}/privacy#newsletter`,
+      from: 'Chrispy Maps <noreply@chrispybmx.com>', to: email, ...message,
     });
     if (result.error) throw new Error('email_failed');
   } catch {

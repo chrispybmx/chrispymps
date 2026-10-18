@@ -27,11 +27,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Verifica che lo spot esista (evita insert orphan su spot_id inesistente)
-  const { data: spotExists } = await supabase
+  const { data: spotExists, error: lookupError } = await supabase
     .from('spots')
     .select('id')
     .eq('id', result.data.spot_id)
-    .single();
+    .maybeSingle();
+
+  if (lookupError) {
+    return NextResponse.json({ ok: false, error: 'Errore interno. Riprova.' }, { status: 500 });
+  }
 
   if (!spotExists) {
     // Risposta generica per non rivelare info sullo spot

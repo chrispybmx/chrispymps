@@ -3,7 +3,7 @@
 import { useLanguage } from '@/components/LanguageProvider';
 
 import { useState, useRef, useEffect } from 'react';
-import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
+import { signIn, signUp, checkUsername, resetPassword, resendConfirmation } from '@/lib/auth-client';
 import DateWheels from '@/components/DateWheels';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { NEWSLETTER_CONSENT_TEXT } from '@/lib/newsletter-consent';
@@ -13,6 +13,7 @@ import { REGIONI_ITALIA } from '@/lib/constants';
 import { puoRicevereMarketing, ETA_MINIMA_MARKETING } from '@/lib/rider-profile';
 
 interface AuthModalProps {
+  returnTo?: string;
   open:          boolean;
   onClose:       () => void;
   defaultTab?:   'accedi' | 'registrati';
@@ -21,7 +22,7 @@ interface AuthModalProps {
 
 type Tab = 'accedi' | 'registrati';
 
-export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSuccess }: AuthModalProps) {
+export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSuccess, returnTo }: AuthModalProps) {
   const { text } = useLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(open, dialogRef, onClose);
@@ -29,6 +30,18 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [done,    setDone]    = useState<'ok' | 'confirm_email' | null>(null);
+
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendUntil, setResendUntil] = useState(0);
+  async function resend(email: string) {
+    if (resendBusy || Date.now() < resendUntil) return;
+    if (!email.trim()) { setError(text('Inserisci prima la tua email.', 'Enter your email first.')); return; }
+    setResendBusy(true); setResendMessage('');
+    try { await resendConfirmation(email, returnTo); setResendUntil(Date.now() + 60000); setResendMessage(text('Se l’account attende conferma, riceverai un nuovo link. Controlla anche lo spam. Attendi un minuto prima di riprovare.', 'If your account needs confirmation, you will receive a new link. Check spam too. Wait a minute before trying again.')); }
+    catch (e) { setResendMessage(e instanceof Error ? e.message : text('Invio non riuscito. Riprova.', 'Could not send. Try again.')); }
+    finally { setResendBusy(false); }
+  }
 
   // Registrazione
   const [regUsername,  setRegUsername]  = useState('');
@@ -54,6 +67,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
 
   // BUG-FIX: useRef per il timer debounce — una variabile locale viene ricreata
   // a ogni render e clearTimeout non annulla mai il timer precedente
+  const usernameVersion = useRef(0);
   const unDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetAll = () => {
@@ -72,12 +86,13 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setRegUsername(clean);
     setUsernameOk(null);
     if (unDebounceRef.current) clearTimeout(unDebounceRef.current);
-    if (clean.length < 3) return;
+    const version = ++usernameVersion.current;
+    if (clean.length < 3) { setCheckingUn(false); return; }
     setCheckingUn(true);
     unDebounceRef.current = setTimeout(async () => {
-      const free = await checkUsername(clean);
-      setUsernameOk(free);
-      setCheckingUn(false);
+      try { const free = await checkUsername(clean); if (version === usernameVersion.current) setUsernameOk(free); }
+      catch { if (version === usernameVersion.current) setError(text('Verifica username non disponibile. Riprova.', 'Username check unavailable. Try again.')); }
+      finally { if (version === usernameVersion.current) setCheckingUn(false); }
     }, 600);
   };
 
@@ -118,7 +133,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     setLoading(true); setError(null);
     traccia.current?.inviato();
     try {
-      const result = await signUp(regEmail, regPassword, regUsername, { newsletter, birthDate, region, onNewsletterResult: setNewsletterMessage });
+      const result = await signUp(regEmail, regPassword, regUsername, { returnTo, newsletter, birthDate, region, onNewsletterResult: setNewsletterMessage });
       traccia.current?.riuscito();
       setDone(result);
       if (result === 'ok' && onSuccess && !newsletter) onSuccess();
@@ -148,7 +163,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
     width: '100%', boxSizing: 'border-box',
     background: 'var(--gray-700)', border: '1px solid var(--gray-600)',
     borderRadius: 4, color: 'var(--bone)', fontFamily: 'var(--font-mono)',
-    fontSize: 15, padding: '10px 12px', outline: 'none',
+    fontSize: 16, padding: '10px 12px', outline: 'none',
   };
   const lbl: React.CSSProperties = {
     fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)',
@@ -179,6 +194,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
           <button onClick={handleClose} aria-label={text("Chiudi accesso", "Close sign-in")} className="btn-ghost" style={{ fontSize: 20 }}>✕</button>
         </div>
 
+        {resendMessage && <p role="status" style={{ padding: '12px 20px' }}>{resendMessage}</p>}
         {/* Done: email confirmation needed */}
         {newsletterMessage && <p role="status" style={{padding:'12px 20px',lineHeight:1.5}}>{newsletterMessage}</p>}
         {done === 'confirm_email' && (
@@ -194,6 +210,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
             <p style={{ color: 'var(--gray-400)', fontSize: 14 }}>
               {text("Dopo la conferma potrai accedere e aggiungere spot.", "Once confirmed, you can sign in and add spots.")}
             </p>
+            <button type="button" className="btn-ghost" disabled={resendBusy} onClick={() => void resend(regEmail)}>{resendBusy ? text('Invio…', 'Sending…') : text('Invia di nuovo la conferma', 'Resend confirmation')}</button>
             <button onClick={handleClose} className="btn-primary" style={{ marginTop: 24, width: '100%', justifyContent: 'center' }}>
               {text("OK, ho capito", "Got it")}
             </button>
@@ -207,6 +224,7 @@ export default function AuthModal({ open, onClose, defaultTab = 'accedi', onSucc
           <PersonalizzaMappa username={regUsername} onFinito={handleClose} />
         )}
 
+        {!done && tab === 'accedi' && <button type="button" className="btn-ghost" disabled={resendBusy} onClick={() => void resend(loginEmail)} style={{ margin: '12px 20px' }}>{text('Non hai ricevuto la conferma email?', 'Missing your confirmation email?')}</button>}
         {!done && (
           <div style={{ padding: '0 20px 20px' }}>
 

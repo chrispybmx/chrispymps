@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { distanceKm } from '@/lib/nearby-radar';
 
+// Lista live: senza questo Next 14 prerenderizza il GET al build e congela i rider in session.
+export const dynamic = 'force-dynamic';
+
 const SESSION_HOURS = 3;
 const MAX_DISTANCE_KM = 1; // must be within 1 km of spot
 
@@ -66,7 +69,10 @@ export async function POST(req: NextRequest) {
   const username = profile?.username ?? 'anonimo';
 
   if (action === 'leave') {
-    await sb.from('sessions').delete().eq('user_id', user.id);
+    const { error: deleteError } = await sb.from('sessions').delete().eq('user_id', user.id);
+    if (deleteError) {
+      return NextResponse.json({ ok: false, error: 'Errore interno. Riprova.' }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, message: 'Sessione chiusa.' });
   }
 
@@ -98,7 +104,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Remove any existing session for this user
-    await sb.from('sessions').delete().eq('user_id', user.id);
+    const { error: deleteError } = await sb.from('sessions').delete().eq('user_id', user.id);
+    if (deleteError) {
+      return NextResponse.json({ ok: false, error: 'Errore interno. Riprova.' }, { status: 500 });
+    }
 
     // Create new session
     const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000).toISOString();

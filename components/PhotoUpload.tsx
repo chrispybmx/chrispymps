@@ -5,6 +5,7 @@ import { useLanguage } from '@/components/LanguageProvider';
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { APP_CONFIG } from '@/lib/constants';
 import { compressImage } from '@/lib/compress-image';
+import { readPhotoMeta, rememberPhotoMeta } from '@/lib/photo-meta';
 
 interface PhotoUploadProps {
   photos:     File[];
@@ -49,7 +50,9 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
         setError(text(`Formato non supportato: ${f.name}. Usa una foto.`, `Unsupported format: ${f.name}. Choose a photo.`));
         continue;
       }
+      const meta = await readPhotoMeta(f); // prima di comprimere: la compressione cancella i metadati
       const compressed = await compressImage(f);
+      rememberPhotoMeta(compressed, meta);
       if (compressed.size > MAX_SIZE_MB * 1024 * 1024) {
         setError(text(`${f.name} supera ${MAX_SIZE_MB}MB anche dopo compressione.`, `${f.name} is still larger than ${MAX_SIZE_MB} MB after compression.`));
         continue;

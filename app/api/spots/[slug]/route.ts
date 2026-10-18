@@ -5,6 +5,8 @@ import { supabaseServer, supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
 import { TIPI_SPOT_TUTTI, OSTACOLI_TUTTI } from '@/lib/constants';
 import { citySlug } from '@/lib/slugify';
+import { toPublicSpot } from '@/lib/public-spot';
+import { publicSpotPhotos } from '@/lib/public-spot-photos';
 
 /**
  * Invalida le pagine che mostrano uno spot. Senza questo la pagina spot (ISR,
@@ -46,10 +48,11 @@ export async function GET(
     .from('spots')
     .select(`
       *,
-      spot_photos (id, url, position, credit_name)
+      spot_photos (id, url, position, credit_name, moderation_status)
     `)
     .eq('slug', params.slug)
     .eq('status', 'approved')
+    .or('moderation_status.eq.approved,moderation_status.is.null', { referencedTable: 'spot_photos' })
     .single();
 
   if (error || !data) {
@@ -57,11 +60,10 @@ export async function GET(
   }
 
   // Ordina foto per posizione
-  if (data.spot_photos) {
-    data.spot_photos.sort((a: { position: number }, b: { position: number }) => a.position - b.position);
-  }
+  // Doppio filtro: la query sopra e il codice qui, se il filtro del DB cambiasse.
+  data.spot_photos = publicSpotPhotos(data.spot_photos);
 
-  return NextResponse.json({ ok: true, data }, {
+  return NextResponse.json({ ok: true, data: toPublicSpot(data) }, {
     headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
   });
 }

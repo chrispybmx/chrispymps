@@ -47,21 +47,28 @@ export async function GET(req: NextRequest) {
   const sb   = supabaseAdmin();
   const oggi = new Date().toISOString().slice(0, 10);
 
-  const { data, error } = await sb
-    .from('rider_details')
-    .select('user_id, birth_date, region, disciplines, riding_since_year, setup_brand, newsletter_opt_in, created_at');
-
-  if (error) {
-    console.error('[export/riders]', error.message);
-    return NextResponse.json({ ok: false, error: 'Lettura non riuscita' }, { status: 500 });
-  }
-
   type Riga = {
     user_id: string; birth_date: string | null; region: string | null;
     disciplines: string[] | null; riding_since_year: number | null;
     setup_brand: string | null; newsletter_opt_in: boolean; created_at: string;
   };
-  const righe = (data ?? []) as Riga[];
+  const righe: Riga[] = [];
+  const pageSize = 1000;
+  // Stable ordering prevents ties from moving profiles between page boundaries.
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await sb
+      .from('rider_details')
+      .select('user_id, birth_date, region, disciplines, riding_since_year, setup_brand, newsletter_opt_in, created_at')
+      .order('user_id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      console.error('[export/riders]', error.message);
+      return NextResponse.json({ ok: false, error: 'Lettura non riuscita' }, { status: 500 });
+    }
+    const pagina = (data ?? []) as Riga[];
+    righe.push(...pagina);
+    if (pagina.length < pageSize) break;
+  }
 
   let csv: string;
   let nomeFile: string;
@@ -90,8 +97,17 @@ export async function GET(req: NextRequest) {
     nomeFile = `chrispymaps-aggregato-${oggi}.csv`;
   } else {
     /* Anagrafica. L'email va presa da auth.users, non è in rider_details. */
-    const { data: utenti } = await sb.auth.admin.listUsers({ perPage: 1000 });
-    const emailPerId = new Map((utenti?.users ?? []).map(u => [u.id, u.email ?? '']));
+    const emailPerId = new Map<string, string>();
+    for (let page = 1; ; page++) {
+      const { data: utenti, error } = await sb.auth.admin.listUsers({ page, perPage: pageSize });
+      if (error) {
+        console.error('[export/riders] auth:', error.message);
+        return NextResponse.json({ ok: false, error: 'Lettura non riuscita' }, { status: 500 });
+      }
+      const users = utenti?.users ?? [];
+      for (const user of users) emailPerId.set(user.id, user.email ?? '');
+      if (users.length < pageSize) break;
+    }
 
     const out = righe.map(r => [
       emailPerId.get(r.user_id) ?? '',

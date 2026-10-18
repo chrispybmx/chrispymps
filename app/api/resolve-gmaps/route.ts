@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requestGeocoding } from '@/lib/geocoding-server';
 import { resolve4 } from 'dns/promises';
 import { isPrivateIp } from '@/lib/ssrf';
 
@@ -122,7 +123,8 @@ export async function GET(req: NextRequest) {
       }, { status: 422 });
     }
 
-    const geocoded = await geocodeWithNominatim(place);
+    const local = process.env.CHRISPY_LOCAL_PREVIEW === 'true' && ['localhost', '127.0.0.1', '[::1]'].includes(req.nextUrl.hostname);
+    const geocoded = await geocodeWithNominatim(place, local);
     if (!geocoded) {
       return NextResponse.json({
         ok: false,
@@ -161,7 +163,8 @@ function extractPlaceQuery(url: string): string | null {
     const u = new URL(url);
     // ?q=Nome+del+posto
     const q = u.searchParams.get('q');
-    if (q && q.trim().length > 2) return decodeURIComponent(q).replace(/\+/g, ' ');
+    // searchParams decodifica gia': un secondo decode lanciava URIError su '%'.
+    if (q && q.trim().length > 2) return q.replace(/\+/g, ' ');
     // /place/Nome+posto/
     const placeMatch = url.match(/\/place\/([^/@]+)/);
     if (placeMatch) return decodeURIComponent(placeMatch[1]).replace(/\+/g, ' ');
@@ -169,7 +172,10 @@ function extractPlaceQuery(url: string): string | null {
   return null;
 }
 
-async function geocodeWithNominatim(query: string): Promise<{ lat: number; lon: number } | null> {
+/* Passa dal limitatore condiviso di lib/geocoding-server: chiamare Nominatim
+   direttamente, fino a 4 volte di fila, sfondava il limite di 1 richiesta al
+   secondo che vale per tutto il sito. Su "busy" si aspetta lo slot e si riprova. */
+async function geocodeWithNominatim(query: string, local: boolean): Promise<{ lat: number; lon: number } | null> {
   // Prova la query originale, poi versioni semplificate
   const attempts = [
     query,
@@ -179,28 +185,20 @@ async function geocodeWithNominatim(query: string): Promise<{ lat: number; lon: 
     query.split(',').slice(-2).join(',').trim(),
     // Solo l'ultima parola (città)
     query.split(',').pop()?.trim() ?? '',
-  ].filter(Boolean);
+  ].filter((a, i, all) => a.length >= 3 && all.indexOf(a) === i);
 
   for (const attempt of attempts) {
-    if (attempt.length < 3) continue;
-    try {
-      const encoded = encodeURIComponent(attempt);
-      const nominatimCtrl = new AbortController();
-      const nominatimTimeout = setTimeout(() => nominatimCtrl.abort(), 6_000);
-      let res: Response;
+    const params = new URLSearchParams({ format: 'json', q: attempt, limit: '1', addressdetails: '0' });
+    for (let tentativo = 0; tentativo < 3; tentativo++) {
       try {
-        res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&addressdetails=0`,
-          { headers: { 'User-Agent': 'ChrispyMPS/1.0 (contact: info@chrispybmx.com)' }, signal: nominatimCtrl.signal }
-        );
-      } finally {
-        clearTimeout(nominatimTimeout);
+        const data = await requestGeocoding('search', params, local) as { lat: string; lon: string }[];
+        if (Array.isArray(data) && data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+        break;
+      } catch (err) {
+        if (err instanceof Error && err.message === 'busy') { await new Promise(r => setTimeout(r, 1200)); continue; }
+        return null; // servizio non disponibile: inutile insistere con le altre varianti
       }
-      const data = await res.json();
-      if (data && data.length > 0) {
-        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-      }
-    } catch {}
+    }
   }
   return null;
 }

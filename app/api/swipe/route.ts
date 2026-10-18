@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { UUID_RE } from '@/lib/validation';
 import { supabaseAdmin } from '@/lib/supabase';
 import { distanceKm } from '@/lib/nearby-radar';
 
@@ -111,11 +112,16 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, error: 'Non autenticato' }, { status: 401 });
 
   const { spotId, direction } = await req.json().catch(() => ({}));
-  if (typeof spotId !== 'string' || (direction !== 'like' && direction !== 'pass')) {
+  if (typeof spotId !== 'string' || !UUID_RE.test(spotId) || (direction !== 'like' && direction !== 'pass')) {
     return NextResponse.json({ ok: false, error: 'Richiesta non valida' }, { status: 400 });
   }
 
   const sb = supabaseAdmin();
+
+  // Si vota solo uno spot pubblico: niente like su spot in attesa o rifiutati.
+  const { data: spot, error: spotErr } = await sb.from('spots').select('id').eq('id', spotId).eq('status', 'approved').maybeSingle();
+  if (spotErr) return NextResponse.json({ ok: false, error: 'Salvataggio non riuscito. Riprova.' }, { status: 503 });
+  if (!spot) return NextResponse.json({ ok: false, error: 'Spot non trovato' }, { status: 404 });
 
   /* Il like alimenta il contatore pubblico e la cartella personale.
      Insert semplice invece di upsert: così non dipendiamo dal nome esatto del

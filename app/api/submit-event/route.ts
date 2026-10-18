@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const issues = parsed.error.issues
       .map((i) => `${i.path.join('.') || 'campo'}: ${i.message}`)
       .join(' | ');
-    console.error('[submit-event] validation failed:', issues, '| raw:', JSON.stringify(raw));
+    console.error('[submit-event] validation failed:', issues);
     return NextResponse.json(
       { ok: false, error: `Dati non validi: ${issues}` },
       { status: 400 },

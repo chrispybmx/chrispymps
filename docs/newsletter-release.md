@@ -67,7 +67,7 @@ Al momento il progetto locale non contiene una connessione SQL `SUPABASE_DB_URL`
 - `node scripts/check-newsletter-consent-sql.mjs <entry-point-di-@electric-sql/pglite>`: 31 verifiche PostgreSQL isolate, tra cui ruoli, atomicità, lease, scadenze, replay, revoche e retention.
 - `node scripts/check-product-metrics-sql.mjs <entry-point-di-@electric-sql/pglite>`: contatori, permessi e retention.
 
-PGlite è stato installato solo nella cartella temporanea di collaudo; non è una dipendenza del sito né del database remoto.
+Aggiornamento del 26 settembre: PGlite è ora una dipendenza di sviluppo fissata nel lockfile, per rendere ripetibili i collaudi con `npm run verifica:sql`. Non viene importato dal codice applicativo o installato sul database remoto.
 
 Fonti tecniche: [MailerLite subscribers](https://developers.mailerlite.com/api/subscribers), [groups](https://developers.mailerlite.com/api/groups), [webhooks](https://developers.mailerlite.com/api/webhooks). Indicazioni privacy: [Garante cookie](https://www.garanteprivacy.it/faq/cookie), [MailerLite DPA](https://www.mailerlite.com/legal/data-processing-agreement).
 

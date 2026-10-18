@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { publicSpotPhotos } from '@/lib/public-spot-photos';
 import { supabaseAdmin } from '@/lib/supabase';
 
 /**
@@ -32,8 +33,10 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await sb
     .from('spots')
-    .select('id, slug, name, type, city, condition, lat, lon, spot_photos(url, position)')
+    .select('id, slug, name, type, city, condition, lat, lon, spot_photos(url, position, moderation_status)')
     .eq('status', 'approved')
+    // Solo foto moderate: questa route usa la service key e bypassa le policy.
+    .or('moderation_status.eq.approved,moderation_status.is.null', { referencedTable: 'spot_photos' })
     .gte('lat', lat - latDelta)
     .lte('lat', lat + latDelta)
     .gte('lon', lon - lonDelta)
@@ -54,7 +57,7 @@ export async function GET(req: NextRequest) {
       const a = Math.sin(dLat / 2) ** 2 +
                 Math.cos(toRad(lat)) * Math.cos(toRad(spot.lat)) * Math.sin(dLon / 2) ** 2;
       const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return { ...spot, distance: Math.round(distance) };
+      return { ...spot, spot_photos: publicSpotPhotos(spot.spot_photos), distance: Math.round(distance) };
     })
     .filter(s => s.distance <= radiusM)
     .sort((a, b) => a.distance - b.distance);

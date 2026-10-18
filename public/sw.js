@@ -7,7 +7,7 @@
 // riceve header CSP e le fetch qui dentro non sono ristrette. Il CSP della
 // pagina governa solo la registrazione (worker-src), non il traffico interno.
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const STATIC_CACHE  = `chrispymaps-static-${CACHE_VERSION}`;
 const MAP_CACHE     = `chrispymaps-map-${CACHE_VERSION}`;
 const PAGE_CACHE    = `chrispymaps-pages-${CACHE_VERSION}`;
