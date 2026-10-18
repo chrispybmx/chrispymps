@@ -15,3 +15,16 @@ export function publicSpotPayload(row: Record<string, unknown>) {
     .sort((a, b) => a.position - b.position);
   return data;
 }
+
+/* Per le query che restano su select('*'): toglie le note di moderazione e
+   l'id del contributor (riga con email in `contributors`). Dove possibile
+   usare publicSpotPayload, che e' un elenco esplicito. */
+const PRIVATE_SPOT_FIELDS = ['reviewer_notes', 'submitted_by'] as const;
+
+type PrivateSpotField = typeof PRIVATE_SPOT_FIELDS[number];
+
+export function toPublicSpot<T extends object>(row: T): Omit<T, PrivateSpotField> {
+  const copy = { ...row } as Record<string, unknown>;
+  for (const field of PRIVATE_SPOT_FIELDS) delete copy[field];
+  return copy as Omit<T, PrivateSpotField>;
+}

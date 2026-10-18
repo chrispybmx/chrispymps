@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
+const databaseError = () => NextResponse.json({ ok: false, error: 'Errore database' }, { status: 500 });
+
 /* ── POST /api/comment-likes  →  toggle like su un commento ── */
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('Authorization');
@@ -22,42 +24,49 @@ export async function POST(req: NextRequest) {
   }
 
   // Leggi il commento (per sapere chi è l'autore e il testo)
-  const { data: comment } = await admin
+  const { data: comment, error: commentError } = await admin
     .from('comments')
     .select('id, user_id, username, text, likes_count')
     .eq('id', comment_id)
     .maybeSingle();
 
+  if (commentError) return databaseError();
   if (!comment) return NextResponse.json({ ok: false, error: 'Commento non trovato' }, { status: 404 });
 
   // Profilo di chi fa il like
-  const { data: likerProfile } = await admin
+  const { data: likerProfile, error: profileError } = await admin
     .from('profiles')
     .select('username')
     .eq('id', user.id)
     .maybeSingle();
+  if (profileError) return databaseError();
   const likerUsername = likerProfile?.username
     ?? (user.user_metadata?.username as string)
     ?? user.email?.split('@')[0]
     ?? 'qualcuno';
 
   // Controlla se il like esiste già
-  const { data: existing } = await admin
+  const { data: existing, error: existingError } = await admin
     .from('comment_likes')
     .select('id')
     .eq('comment_id', comment_id)
     .eq('user_id', user.id)
     .maybeSingle();
 
+  if (existingError) return databaseError();
   if (existing) {
     // Rimuovi like
-    await admin.from('comment_likes').delete().eq('id', existing.id);
-    const { data: c } = await admin.from('comments').select('likes_count').eq('id', comment_id).maybeSingle();
+    const { error } = await admin.from('comment_likes').delete().eq('id', existing.id);
+    if (error) return databaseError();
+    const { data: c, error: countError } = await admin.from('comments').select('likes_count').eq('id', comment_id).maybeSingle();
+    if (countError) return databaseError();
     return NextResponse.json({ ok: true, liked: false, likes_count: c?.likes_count ?? 0 });
   } else {
     // Aggiungi like
-    await admin.from('comment_likes').insert({ comment_id, user_id: user.id });
-    const { data: c } = await admin.from('comments').select('likes_count').eq('id', comment_id).maybeSingle();
+    const { error } = await admin.from('comment_likes').insert({ comment_id, user_id: user.id });
+    if (error) return databaseError();
+    const { data: c, error: countError } = await admin.from('comments').select('likes_count').eq('id', comment_id).maybeSingle();
+    if (countError) return databaseError();
     const newCount = c?.likes_count ?? 0;
 
     // Notifica all'autore del commento (solo se diverso da chi mette like)

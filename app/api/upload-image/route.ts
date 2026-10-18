@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { detectMime, MIME_EXT } from '@/lib/mime';
@@ -40,13 +41,18 @@ export async function POST(req: NextRequest) {
   // Ottimizza (resize+JPEG) e strip EXIF/GPS. Flyer event/news hanno testo:
   // risoluzione e qualità più alte per non sfocarlo.
   const isFlyer = purpose === 'event' || purpose === 'news';
-  const { buffer: optimized, contentType, ext } = await optimizeImage(
-    Buffer.from(buf),
-    isFlyer ? { maxDim: 2000, quality: 88 } : {},
-  );
+  let optimizedImage: Awaited<ReturnType<typeof optimizeImage>>;
+  try {
+    optimizedImage = await optimizeImage(Buffer.from(buf), isFlyer ? { maxDim: 2000, quality: 88 } : {});
+  } catch {
+    // HEIC non decodificabile o file rovinato: errore chiaro invece di un 500.
+    return NextResponse.json({ ok: false, error: 'Immagine non leggibile. Prova con un JPG o PNG.' }, { status: 400 });
+  }
+  const { buffer: optimized, contentType, ext } = optimizedImage;
 
   const folder = purpose === 'event' ? 'events' : purpose === 'news' ? 'news' : 'uploads';
-  const filename = `${folder}/${user.id}_${Date.now()}.${ext}`;
+  // Suffisso casuale: due upload nello stesso millisecondo non si sovrascrivono.
+  const filename = `${folder}/${user.id}_${Date.now()}_${randomUUID().slice(0, 8)}.${ext}`;
 
   const { error: uploadErr } = await sb.storage
     .from('spot-photos') // reuse existing bucket

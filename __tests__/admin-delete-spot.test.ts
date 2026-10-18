@@ -1,5 +1,6 @@
 import { beforeEach,expect,it,vi } from 'vitest';
 const mocks=vi.hoisted(()=>({auth:vi.fn(),photos:vi.fn(),remove:vi.fn(),deleteSpot:vi.fn()}));
+vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
 vi.mock('@/lib/auth',()=>({isAdminAuthenticated:mocks.auth}));
 vi.mock('@/lib/supabase',()=>({supabaseAdmin:()=>({
  from:(table:string)=>table==='spot_photos'?{select:()=>({eq:mocks.photos})}:{delete:()=>({eq:mocks.deleteSpot})},

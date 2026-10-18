@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { UUID_RE } from '@/lib/validation';
 import { JAM_ROMA } from '@/lib/jamroma';
+import { publicPresenceKey } from '@/lib/jamroma-presence-key';
 
 const SLUG = JAM_ROMA.slug;
 
@@ -9,7 +11,7 @@ function round5(n: number): number {
   return Math.round(n * 100000) / 100000;
 }
 
-/** GET — rider online (last_seen_at < 2 min) */
+/** GET — rider online (last_seen_at negli ultimi 5 minuti) */
 export async function GET() {
   const sb = supabaseAdmin();
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
@@ -27,7 +29,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     count: data?.length ?? 0,
-    riders: data ?? [],
+    riders: (data ?? []).map(({ id, ...rider }) => ({ ...rider, id: publicPresenceKey(id) })),
   });
 }
 
@@ -96,11 +98,34 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   } else {
     // Anonimo: inserisci (scade naturalmente dopo 2 min senza aggiornamento)
-    const { error } = await sb
+    const { data, error } = await sb
       .from('event_live_presence')
-      .insert(row);
+      .insert(row)
+      .select('id')
+      .single();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    // L'id serve al client per togliersi dalla mappa quando preme Stop.
+    return NextResponse.json({ ok: true, presenceId: data.id });
   }
 
+  return NextResponse.json({ ok: true });
+}
+
+/** DELETE: il rider smette di condividere e sparisce subito dalla mappa.
+    Loggato: si cancella la sua riga. Anonimo: serve l'id restituito dal POST. */
+export async function DELETE(req: NextRequest) {
+  const sb = supabaseAdmin();
+  const auth = req.headers.get('authorization');
+  if (auth?.startsWith('Bearer ')) {
+    const { data: { user } } = await sb.auth.getUser(auth.slice(7));
+    if (!user) return NextResponse.json({ ok: false, error: 'Token non valido' }, { status: 401 });
+    const { error } = await sb.from('event_live_presence').delete().eq('event_slug', SLUG).eq('user_id', user.id);
+    if (error) return NextResponse.json({ ok: false, error: 'Riprova' }, { status: 503 });
+    return NextResponse.json({ ok: true });
+  }
+  const id = req.nextUrl.searchParams.get('id');
+  if (!id || !UUID_RE.test(id)) return NextResponse.json({ ok: false, error: 'id non valido' }, { status: 400 });
+  const { error } = await sb.from('event_live_presence').delete().eq('event_slug', SLUG).eq('id', id).is('user_id', null);
+  if (error) return NextResponse.json({ ok: false, error: 'Riprova' }, { status: 503 });
   return NextResponse.json({ ok: true });
 }

@@ -1,3 +1,4 @@
+import { exactIlikePattern } from '@/lib/username-pattern';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
@@ -33,13 +34,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Controlla unicità nella tabella profiles
-  const { data: existing } = await adminClient
+  // Pattern esatto (niente jolly) e niente maybeSingle: con due righe dava errore e il controllo passava.
+  const { data: matches, error: matchErr } = await adminClient
     .from('profiles')
     .select('id')
-    .ilike('username', username)
-    .maybeSingle();
+    .ilike('username', exactIlikePattern(username))
+    .limit(2);
+  if (matchErr) return NextResponse.json({ error: 'Verifica username non disponibile. Riprova.' }, { status: 503 });
 
-  if (existing && existing.id !== user.id) {
+  if ((matches ?? []).some(m => m.id !== user.id)) {
     return NextResponse.json({ error: 'Username già in uso' }, { status: 409 });
   }
 

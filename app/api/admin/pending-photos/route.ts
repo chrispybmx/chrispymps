@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { spotPhotoStoragePath } from '@/lib/storage-path';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { onPhotoApproved, onContentRejected } from '@/lib/xp';
 import { UUID_RE } from '@/lib/validation';
@@ -75,29 +76,39 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
 
-    // Update linked contribution + award XP
-    const { data: photo } = await supabase
+    /* La foto e' gia' approvata. Contributo e XP vanno attesi: su serverless
+       una promessa non attesa viene troncata quando parte la risposta.
+       Se falliscono la foto resta approvata, ma l'admin lo deve sapere. */
+    const avvisi: string[] = [];
+    const { data: photo, error: photoErr } = await supabase
       .from('spot_photos')
       .select('contribution_id, uploaded_by, spot_id')
       .eq('id', photo_id)
       .single();
+    if (photoErr) avvisi.push('dati foto non letti: contributo e XP non aggiornati');
 
     if (photo?.contribution_id) {
-      await supabase
+      const { error: contribErr } = await supabase
         .from('spot_contributions')
         .update({ status: 'approved', reviewed_at: new Date().toISOString() })
         .eq('id', photo.contribution_id);
+      if (contribErr) avvisi.push('contributo non aggiornato');
     }
 
-    // Award XP (fire-and-forget)
     if (photo?.uploaded_by && photo?.spot_id) {
-      onPhotoApproved(photo.uploaded_by, photo.spot_id, photo.contribution_id).catch(console.error);
+      try { await onPhotoApproved(photo.uploaded_by, photo.spot_id, photo.contribution_id); }
+      catch (err) { console.error('[pending-photos] xp:', err); avvisi.push('XP non assegnati'); }
     }
 
-    return NextResponse.json({ ok: true, message: 'Foto approvata' });
+    return NextResponse.json({
+      ok: true,
+      message: avvisi.length ? `Foto approvata, ma: ${avvisi.join(', ')}.` : 'Foto approvata',
+      ...(avvisi.length ? { warnings: avvisi } : {}),
+    });
   }
 
   if (action === 'reject') {
+    const avvisiRifiuto: string[] = [];
     // Delete photo from storage + DB
     const { data: photo } = await supabase
       .from('spot_photos')
@@ -142,25 +153,32 @@ export async function POST(req: NextRequest) {
       }
 
       /* Solo ora il file: la riga non c'e' piu', quindi nessuno lo cerca. */
-      const urlParts = photo.url.split('/spot-photos/');
-      if (urlParts[1]) {
-        await supabase.storage.from('spot-photos').remove([urlParts[1]]);
+      const storagePath = spotPhotoStoragePath(photo.url);
+      if (storagePath) {
+        const { error: storageErr } = await supabase.storage.from('spot-photos').remove([storagePath]);
+        if (storageErr) { console.error('[pending-photos] storage:', storageErr.message); avvisiRifiuto.push('file non eliminato dallo storage'); }
       }
 
       // Update contribution
       if (photo.contribution_id) {
-        await supabase
+        const { error: contribErr } = await supabase
           .from('spot_contributions')
           .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
           .eq('id', photo.contribution_id);
+        if (contribErr) avvisiRifiuto.push('contributo non aggiornato');
       }
     }
 
-    // Trust penalty for rejected photo
+    // Trust penalty for rejected photo (attesa: su serverless non si perde)
     if (photo?.uploaded_by) {
-      onContentRejected(photo.uploaded_by, 'photo').catch(console.error);
+      try { await onContentRejected(photo.uploaded_by, 'photo'); }
+      catch (err) { console.error('[pending-photos] trust:', err); avvisiRifiuto.push('fiducia non aggiornata'); }
     }
 
-    return NextResponse.json({ ok: true, message: 'Foto rifiutata e rimossa' });
+    return NextResponse.json({
+      ok: true,
+      message: avvisiRifiuto.length ? `Foto rifiutata, ma: ${avvisiRifiuto.join(', ')}.` : 'Foto rifiutata e rimossa',
+      ...(avvisiRifiuto.length ? { warnings: avvisiRifiuto } : {}),
+    });
   }
 }

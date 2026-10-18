@@ -32,6 +32,8 @@ interface SpotMapProps {
   onAddSpotAt:        (lat: number, lon: number) => void;
   flyTarget?:         { lat: number; lon: number; zoom?: number; exact?: boolean; bounds?: [number, number, number, number] } | null;
   initialView?: MapView | null;
+  /** Zona approssimata dall'IP: usata solo se manca initialView. */
+  ipView?: MapView | null;
   onViewChanged?: (view: MapView) => void;
   selectedPin?:       SpotMapPin | null;
   overlayOffsetPx?:   number;
@@ -71,7 +73,7 @@ function pinSvg(type: SpotType, condition: string, isSelected = false, updatedAt
 export default function SpotMap({
   liveMode=false,liveCounts,
   spots, filterType, filterRegionBbox, searchQuery, onSpotClick, onAddSpotAt, flyTarget,
-  initialView, onViewChanged, selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
+  initialView, ipView, onViewChanged, selectedPin, overlayOffsetPx = 160, fitAllTrigger, radiusMode, radiusCenter, radiusKm, onMapClick,
   locateTrigger, onLocatingChange, onLocateError, onBoundsChanged, darkMap: darkMapProp, onUserLocated,
 }: SpotMapProps) {
   const { text } = useLanguage();
@@ -205,6 +207,14 @@ export default function SpotMap({
         hasInitialFit.current = true;
         map.setView([initialView.lat, initialView.lon], initialView.zoom, {animate:false});
         setZoom(initialView.zoom);
+        emitBounds();
+      } else if (ipView) {
+        /* Primo accesso senza posizione: zona dall'IP invece dell'Italia intera.
+           Se poi arriva la posizione precisa (sotto), la sostituisce. */
+        hasInitialFit.current = true;
+        map.setView([ipView.lat, ipView.lon], ipView.zoom, {animate:false});
+        map.panBy([0, overlayOffsetPx], { animate: false });
+        setZoom(ipView.zoom);
         emitBounds();
       } else map.fitBounds(PLACEHOLDER_BOUNDS, {
         paddingTopLeft:     [20, 10],

@@ -8,6 +8,13 @@ const Schema = z.object({
   avatar_url:       z.string().url().max(500).optional().nullable(),
 });
 
+// Stesso formato di app/api/upload-image: uploads/{userId}_{timestamp}... Fail-closed se manca l'env.
+function isOwnAvatarUrl(url: string, userId: string): boolean {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!base) return false;
+  return url.startsWith(`${base}/storage/v1/object/public/spot-photos/uploads/${userId}_`) && !url.includes('..');
+}
+
 /* POST /api/profile — update own profile */
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -20,6 +27,14 @@ export async function POST(req: NextRequest) {
   const body  = await req.json().catch(() => ({}));
   const result = Schema.safeParse(body);
   if (!result.success) return NextResponse.json({ ok: false, error: 'Dati non validi' }, { status: 422 });
+
+  /* L'avatar deve essere un file caricato da questo utente con /api/upload-image.
+     Un URL esterno qualsiasi finiva nel profilo e nella classifica pubblica:
+     tracciamento di chi visita e immagini non controllate. */
+  const avatar = result.data.avatar_url;
+  if (avatar && !isOwnAvatarUrl(avatar, user.id)) {
+    return NextResponse.json({ ok: false, error: 'Carica l\'avatar dal sito' }, { status: 422 });
+  }
 
   const sb = supabaseAdmin();
   const { error } = await sb

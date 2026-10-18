@@ -15,6 +15,8 @@ import { useUser } from '@/hooks/useUser';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { signIn, signUp, checkUsername, resetPassword } from '@/lib/auth-client';
 import { createPhotoUploadBatch } from '@/lib/photo-upload-batch';
+import { checkPhoto } from '@/lib/photo-check';
+import { photoMetaFor, rememberPhotoMeta } from '@/lib/photo-meta';
 
 interface AddSpotModalProps {
   open:        boolean;
@@ -48,6 +50,9 @@ const lbl: React.CSSProperties = {
 };
 
 /* ── Estrai coordinate da URL Google Maps, Apple Maps, DMS iPhone o stringa "lat, lon" ── */
+/** Primo tentativo subito, poi due attese (il proxy risponde Retry-After: 2). */
+const GEO_RETRY_DELAYS_MS = [0, 2000, 4000];
+
 function parseCoordInput(raw: string): { lat: number; lon: number } | null {
   // Rimuovi parentesi, virgolette e spazi extra — gestisce "(lat, lon)", "[lat, lon]" ecc.
   const s = raw.trim().replace(/^[\s([\]"']+|[\s)\]"']+$/g, '').trim();
@@ -353,15 +358,25 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
   const [country, setCountry] = useState('');
   const [countryCode, setCountryCode] = useState('');
   const geoRequest = useRef<AbortController | null>(null);
+  const [geoFailed, setGeoFailed] = useState(false);
+  /* Il proxy di geocoding ha uno slot condiviso da tutti: un 429 e' normale
+     quando qualcun altro cerca nello stesso secondo. Si riprova, e se va male
+     lo si dice invece di mandare lo spot senza citta' (slug "-italy-"). */
   const fetchCity = useCallback(async (eLat: number, eLon: number) => {
     geoRequest.current?.abort();
     const controller = new AbortController(); geoRequest.current = controller;
-    setCity(''); setCountry(''); setCountryCode('');
-    try {
-      const geo = await reverseGeocode(eLat, eLon, controller.signal);
+    setCity(''); setCountry(''); setCountryCode(''); setGeoFailed(false);
+    for (const wait of GEO_RETRY_DELAYS_MS) {
+      if (wait) await new Promise(resolve => setTimeout(resolve, wait));
       if (controller.signal.aborted) return;
-      setCity(geo.city ?? ''); setCountry(geo.country ?? ''); setCountryCode(geo.countryCode ?? '');
-    } catch { /* Coordinates remain usable without a locality. */ }
+      try {
+        const geo = await reverseGeocode(eLat, eLon, controller.signal);
+        if (controller.signal.aborted) return;
+        setCity(geo.city ?? ''); setCountry(geo.country ?? ''); setCountryCode(geo.countryCode ?? '');
+        return;
+      } catch { /* riprova */ }
+    }
+    if (!controller.signal.aborted) setGeoFailed(true);
   }, []);
   useEffect(() => () => geoRequest.current?.abort(), []);
 
@@ -400,7 +415,9 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
       setCity(draft?.city ?? ''); setCountry(draft?.country ?? ''); setCountryCode(draft?.countryCode ?? '');
       setName(draft?.name ?? ''); setType(draft?.type ?? ''); setOstacoli(draft?.ostacoli ?? []);
       setDescription(draft?.description ?? ''); setNotes(draft?.notes ?? ''); setDifficulty(draft?.difficulty ?? '');
-      setPhotos(draft?.photos ?? []); setDraftOwner(owner);
+      const restored = draft?.photos ?? [];
+      restored.forEach((file, i) => { const meta = draft?.photoMeta?.[i]; if (meta) rememberPhotoMeta(file, meta); });
+      setPhotos(restored); setDraftOwner(owner);
       if (draft) { setGpsState(draft.lat != null ? 'ok' : 'idle'); setDraftStatus('saved'); }
     }).catch(() => { if (active) { setDraftOwner(owner); setDraftStatus('error'); } });
     return () => { active = false; };
@@ -412,7 +429,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
     if (lat == null && lon == null && !name && !photos.length && !description && !notes && !type) return;
     const generation = ++draftGeneration.current;
     setDraftStatus('saving');
-    saveSpotDraft(draftOwner, { updatedAt: Date.now(), step, lat, lon, city, country, countryCode, name, type, ostacoli, description, notes, difficulty, photos })
+    saveSpotDraft(draftOwner, { updatedAt: Date.now(), step, lat, lon, city, country, countryCode, name, type, ostacoli, description, notes, difficulty, photos, photoMeta: photos.map(photoMetaFor) })
       .then(() => { if (generation === draftGeneration.current) setDraftStatus('saved'); })
       .catch(() => { if (generation === draftGeneration.current) setDraftStatus('error'); });
   }, [draftOwner, user?.id, step, lat, lon, city, country, countryCode, name, type, ostacoli, description, notes, difficulty, photos]);
@@ -558,6 +575,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
       }
       // Only a complete upload of this exact selection can replace its files.
       const photoUrls = photoUploadBatch.current.urlsFor(photos);
+      const photo_checks = photos.map((p) => checkPhoto(photoMetaFor(p), { lat, lon }));
 
       let res: Response;
       if (photoUrls) {
@@ -575,6 +593,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
             guardians: notes || undefined,
             difficulty: difficulty || undefined,
             photo_urls: photoUrls,
+            photo_checks,
             access_token: session.access_token,
           }),
         });
@@ -590,6 +609,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
           description: description || undefined,
           guardians: notes || undefined,
           difficulty: difficulty || undefined,
+          photo_checks,
           access_token: session.access_token,
         }));
         photos.forEach((p, i) => fd.append(`photo_${i}`, p));
@@ -1199,6 +1219,12 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
 
               {uploadError && <div role="status"><ErrBox msg={uploadError} /><button type="button" className="btn-secondary" disabled={submitting} onClick={() => handlePhotosChange(photos)}>{text("Riprova caricamento foto", "Retry photo upload")}</button></div>}
               {error && <ErrBox msg={error} />}
+              {geoFailed && lat != null && lon != null && (
+                <div role="status">
+                  <ErrBox msg={text("Non sono riuscito a trovare la città dello spot. Puoi inviarlo lo stesso, ma riprova: con la città finisce nella pagina giusta.", "Couldn't find the spot's city. You can still send it, but try again so it lands on the right city page.")} />
+                  <button type="button" className="btn-secondary" disabled={submitting} onClick={() => fetchCity(lat, lon)}>{text("Riprova a trovare la città", "Retry finding the city")}</button>
+                </div>
+              )}
 
               <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--gray-700)', borderRadius: 6 }}>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.6, margin: 0 }}>

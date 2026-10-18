@@ -7,7 +7,8 @@ import { headers } from 'next/headers';
 import { localSessionPreview } from '@/lib/rider-preview-server';
 import Link from 'next/link';
 import { supabasePublic } from '@/lib/supabase';
-import { PUBLIC_SPOT_COLUMNS } from '@/lib/public-spot';
+import { PUBLIC_SPOT_COLUMNS, toPublicSpot } from '@/lib/public-spot';
+import { youtubeEmbedUrl } from '@/lib/youtube';
 import { TIPI_SPOT, CONDIZIONI, APP_CONFIG } from '@/lib/constants';
 import { spotStructuredData } from '@/lib/seo';
 import { safeJsonLd } from '@/lib/json-ld';
@@ -76,7 +77,7 @@ const getSpot = cache(async (slug: string): Promise<Spot | null> => {
       .filter(p => p.moderation_status === 'approved' || p.moderation_status == null)
       .sort((a, b) => a.position - b.position);
   }
-  return data as unknown as Spot;
+  return toPublicSpot(data) as unknown as Spot;
 });
 
 
@@ -148,10 +149,7 @@ export default async function SpotPage(props: Props) {
   const cityPath = spot.city ? citySlug(spot.city) : '';
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`;
 
-  const isYouTube = spot.youtube_url && /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(spot.youtube_url);
-  const embedUrl = isYouTube
-    ? spot.youtube_url!.replace(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/\s]+)/, 'https://www.youtube-nocookie.com/embed/$1?rel=0')
-    : null;
+  const embedUrl = youtubeEmbedUrl(spot.youtube_url);
 
   return (
     <main className="cm-detail-page" style={{

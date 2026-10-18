@@ -4,16 +4,19 @@ const mock = vi.hoisted(() => ({ getUser: vi.fn(), from: vi.fn(), responses: [] 
 vi.mock('@/lib/supabase', () => ({ supabaseAdmin: () => ({ auth: { getUser: mock.getUser }, from: mock.from }) }));
 import { GET, POST } from '@/app/api/swipe/route';
 const ok = (data: unknown = null) => ({ data, error: null });
+const SPOT_ID = '11111111-1111-4111-8111-111111111111';
+// POST: prima si verifica che lo spot esista e sia approvato.
+const approved = { data: { id: SPOT_ID }, error: null };
 const fail = { data: null, error: { code: 'XX000', message: 'write unavailable' } };
 const spot = { id: 'spot', slug: 'spot', name: 'Spot', type: 'street', lat: 45, lon: 11, spot_photos: [{ url: 'approved.jpg', position: 1, moderation_status: 'approved' }] };
 const get = (query = '') => GET(new NextRequest('http://localhost/api/swipe' + query, { headers: { Authorization: 'Bearer test' } }));
-const post = (direction = 'like') => POST(new NextRequest('http://localhost/api/swipe', { method: 'POST', headers: { Authorization: 'Bearer test' }, body: JSON.stringify({ spotId: 'spot', direction }) }));
+const post = (direction = 'like') => POST(new NextRequest('http://localhost/api/swipe', { method: 'POST', headers: { Authorization: 'Bearer test' }, body: JSON.stringify({ spotId: SPOT_ID, direction }) }));
 beforeEach(() => {
   vi.clearAllMocks(); mock.responses = []; mock.queries = [];
   mock.getUser.mockResolvedValue({ data: { user: { id: 'rider' } }, error: null });
   mock.from.mockImplementation((table: string) => {
     const value = mock.responses.shift() ?? ok();
-    const q: any = { table, then: (resolve: any) => Promise.resolve(value).then(resolve) };
+    const q: any = { table, then: (resolve: any) => Promise.resolve(value).then(resolve), maybeSingle: () => Promise.resolve(value) };
     for (const method of ['select', 'eq', 'insert', 'upsert']) q[method] = vi.fn(() => q);
     mock.queries.push(q); return q;
   });
@@ -40,21 +43,21 @@ describe('swipe deck', () => {
 });
 describe('swipe persistence', () => {
   it.each([[fail, ok()], [ok(), fail]])('does not mark the card seen or claim success after a partial failure', async (like, favorite) => {
-    mock.responses = [like, favorite];
+    mock.responses = [approved, like, favorite];
     const result = await post(); expect(result.status).toBe(503); expect(await result.json()).toMatchObject({ ok: false });
-    expect(mock.queries.map(q => q.table)).toEqual(['spot_likes', 'spot_favorites']);
+    expect(mock.queries.map(q => q.table)).toEqual(['spots', 'spot_likes', 'spot_favorites']);
   });
   it('allows an idempotent retry after a partial save', async () => {
-    mock.responses = [{ data: null, error: { code: '23505' } }, ok(), ok()];
+    mock.responses = [approved, { data: null, error: { code: '23505' } }, ok(), ok()];
     expect((await post()).status).toBe(200);
-    expect(mock.queries.map(q => q.table)).toEqual(['spot_likes', 'spot_favorites', 'spot_swipes']);
+    expect(mock.queries.map(q => q.table)).toEqual(['spots', 'spot_likes', 'spot_favorites', 'spot_swipes']);
   });
   it('reports a failed final history write', async () => {
-    mock.responses = [ok(), ok(), fail]; expect((await post()).status).toBe(500);
+    mock.responses = [approved, ok(), ok(), fail]; expect((await post()).status).toBe(500);
   });
   it('passes without creating likes or favorites', async () => {
-    mock.responses = [ok()]; expect((await post('pass')).status).toBe(200);
-    expect(mock.queries.map(q => q.table)).toEqual(['spot_swipes']);
+    mock.responses = [approved, ok()]; expect((await post('pass')).status).toBe(200);
+    expect(mock.queries.map(q => q.table)).toEqual(['spots', 'spot_swipes']);
   });
   it('rejects unauthenticated writes', async () => {
     mock.getUser.mockResolvedValue({ data: { user: null }, error: null });

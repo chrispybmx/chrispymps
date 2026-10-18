@@ -723,7 +723,7 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
             </button>
             {e.spot && (
               <Link
-                href={`/spot/${e.spot.slug}`}
+                href={`/map/spot/${e.spot.slug}`}
                 style={{
                   fontFamily: 'var(--font-mono)', fontSize: 13,
                   color: '#fff',
@@ -833,7 +833,7 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
             </button>
             {e.spot && (
               <Link
-                href={`/spot/${e.spot.slug}`}
+                href={`/map/spot/${e.spot.slug}`}
                 style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)', border: '1px solid var(--gray-600)', padding: '5px 12px', borderRadius: 6, textDecoration: 'none' }}
               >
                 🗺️ Spot
@@ -900,7 +900,7 @@ function EventCard({ event: e, past }: { event: CalendarEvent; past?: boolean })
           </h2>
 
           {e.spot ? (
-            <Link href={`/spot/${e.spot.slug}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', textDecoration: 'none', marginBottom: 4 }}>
+            <Link href={`/map/spot/${e.spot.slug}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--orange)', textDecoration: 'none', marginBottom: 4 }}>
               📍 {e.spot.name} ↗
             </Link>
           ) : (e.location || e.city) ? (
@@ -928,7 +928,7 @@ function EventCard({ event: e, past }: { event: CalendarEvent; past?: boolean })
               </button>
             )}
             {e.spot && (
-              <Link href={`/spot/${e.spot.slug}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)', border: '1px solid var(--gray-600)', padding: '4px 10px', borderRadius: 4, textDecoration: 'none' }}>
+              <Link href={`/map/spot/${e.spot.slug}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bone)', border: '1px solid var(--gray-600)', padding: '4px 10px', borderRadius: 4, textDecoration: 'none' }}>
                 🗺️ Vai allo spot
               </Link>
             )}

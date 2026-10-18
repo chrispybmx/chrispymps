@@ -31,6 +31,12 @@ export async function GET() {
       .gte('created_at', daGiorni(30)),
     sb.from('rider_details').select('region, disciplines, birth_date'),
   ]);
+  // Una query fallita non deve diventare "zero": l'admin leggerebbe numeri falsi.
+  const fallita = [spots, swipes, funnel, riders].find(r => r.error);
+  if (fallita) {
+    console.error('[admin/numeri]', fallita.error?.message);
+    return NextResponse.json({ ok: false, error: 'Numeri non disponibili, riprova.' }, { status: 503 });
+  }
 
   /* ── Freschezza: il debito che cresce da solo ── */
   const perTono: Record<string, number> = {};

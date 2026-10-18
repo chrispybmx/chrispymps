@@ -15,7 +15,12 @@ export async function GET() {
     .order('created_at', { ascending: true });
 
   // Resiliente a tabella non ancora creata (migration non applicata)
-  if (error) return NextResponse.json({ ok: true, count: 0, rsvps: [] });
+  if (error?.code === '42P01' || error?.code === 'PGRST205') {
+    return NextResponse.json({ ok: true, count: 0, rsvps: [] });
+  }
+  if (error) {
+    return NextResponse.json({ ok: false, error: 'Errore interno. Riprova.' }, { status: 500 });
+  }
 
   return NextResponse.json({
     ok: true,
@@ -70,13 +75,16 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   } else {
     // Anonimo: dedup per display_name (evita spam)
-    const { data: existing } = await sb
+    const { data: existing, error: lookupError } = await sb
       .from('event_rsvps')
       .select('id')
       .eq('event_slug', SLUG)
       .is('user_id', null)
       .eq('display_name', displayName)
       .maybeSingle();
+    if (lookupError) {
+      return NextResponse.json({ ok: false, error: 'Errore interno. Riprova.' }, { status: 500 });
+    }
     if (existing) {
       return NextResponse.json({ ok: true }); // gia registrato, non duplicare
     }
@@ -100,11 +108,15 @@ export async function DELETE(req: NextRequest) {
   if (!user)
     return NextResponse.json({ ok: false, error: 'Sessione scaduta' }, { status: 401 });
 
-  await sb
+  const { error } = await sb
     .from('event_rsvps')
     .delete()
     .eq('event_slug', SLUG)
     .eq('user_id', user.id);
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: 'Errore interno. Riprova.' }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }

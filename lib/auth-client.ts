@@ -1,5 +1,5 @@
 import { authReturnUrl } from './auth-navigation';
-import { NEWSLETTER_CONSENT_VERSION } from './newsletter-consent';
+import { exactIlikePattern } from './username-pattern';
 import { puoRicevereMarketing } from './rider-profile';
 import { supabaseBrowser } from './supabase-browser';
 import { registrationDetails } from './registration';
@@ -14,7 +14,8 @@ export interface UserSession {
 /** Controlla se uno username è disponibile */
 export async function checkUsername(username: string): Promise<boolean> {
   const sb = supabaseBrowser();
-  const { data, error } = await sb.from('profiles').select('id').ilike('username', username).maybeSingle();
+  // Pattern esatto: '_' non deve fare da jolly ('bmx_rider' trovava anche 'bmxArider').
+  const { data, error } = await sb.from('profiles').select('id').ilike('username', exactIlikePattern(username)).maybeSingle();
   if (error) throw new Error('Verifica username non disponibile. Riprova.');
   return !data; // true = libero
 }
@@ -36,7 +37,11 @@ export async function signUp(
   if (!free) throw new Error('Username già in uso. Scegline un altro.');
 
   // 2. Crea account Supabase (username salvato anche in user_metadata per accesso rapido)
-  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: authReturnUrl(opts?.returnTo), data: { username, onboarding_pending: true, registration_version:2, initial_rider_details: parsed.data } } });
+  const wantsNewsletter = !!opts?.newsletter && (puoRicevereMarketing(opts.birthDate) || (!opts.birthDate && opts.over16 === true));
+  // La newsletter si attiva in completeAccount: con la conferma email dell'account vale come
+  // double opt-in; con l'autoconferma il server manda la conferma della newsletter.
+  const newsletterMeta = wantsNewsletter ? { newsletter_requested: true, newsletter_over16: opts?.over16 === true } : {};
+  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: authReturnUrl(opts?.returnTo), data: { username, onboarding_pending: true, registration_version:2, initial_rider_details: parsed.data, ...newsletterMeta } } });
   if (error) throw new Error(translateAuthError(error.message));
   if (!data.user) throw new Error('Errore nella registrazione. Riprova.');
 
@@ -44,16 +49,8 @@ export async function signUp(
   // confirmation the rider is in right away and can add a spot; with Confirm Email on,
   // the server completes the profile after the link (see /auth/callback).
   if (data.session) await completeSignedInAccount(data.session.access_token);
-  if (opts?.newsletter && (puoRicevereMarketing(opts.birthDate) || (!opts.birthDate && opts.over16 === true))) {
-    // Confirmation email proves ownership before any marketing group is changed.
-    try {
-      const response = await fetch('/api/newsletter/subscribe', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email,source:'newsletter',consent:true,over16:true,consentVersion:NEWSLETTER_CONSENT_VERSION}),
-      });
-      const result = await response.json();
-      opts.onNewsletterResult?.(response.ok && result.ok ? 'Newsletter: controlla l’email e conferma l’iscrizione.' : 'Account creato. La newsletter non è stata attivata: riprova dal profilo.');
-    } catch { opts.onNewsletterResult?.('Account creato. La newsletter non è stata attivata: riprova dal profilo.'); }
+  if (wantsNewsletter) {
+    opts?.onNewsletterResult?.(data.session ? 'Newsletter: controlla l’email e conferma l’iscrizione.' : 'Conferma l’email dell’account: così attivi anche la newsletter.');
   } else if (opts?.newsletter) {
     opts.onNewsletterResult?.('Newsletter non attivata: è riservata a chi ha almeno 16 anni.');
   }

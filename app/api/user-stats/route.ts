@@ -5,6 +5,9 @@ import { supabaseAdmin } from '@/lib/supabase';
  * GET /api/user-stats?username=X
  * Public: aggregate XP and badges only, never location/activity history.
  */
+const statsUnavailable = () =>
+  NextResponse.json({ ok: false, error: 'Statistiche non disponibili' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+
 export async function GET(req: NextRequest) {
   const username = req.nextUrl.searchParams.get('username');
   if (!username || username.length < 2) {
@@ -14,29 +17,33 @@ export async function GET(req: NextRequest) {
   const sb = supabaseAdmin();
 
   // Get profile → user_id
-  const { data: profile } = await sb
+  const { data: profile, error: profileErr } = await sb
     .from('profiles')
     .select('id, username')
     .eq('username', username)
     .maybeSingle();
 
+  if (profileErr) return statsUnavailable();
   if (!profile) {
     return NextResponse.json({ ok: false, error: 'Utente non trovato' }, { status: 404 });
   }
 
   // Get user_stats
-  const { data: stats } = await sb
+  const { data: stats, error: statsErr } = await sb
     .from('user_stats')
     .select('lifetime_xp,monthly_xp,current_level,trust_score,approved_spots_count,approved_photos_count,status_confirmations_count,current_streak_weeks')
     .eq('user_id', profile.id)
     .maybeSingle();
 
   // Get badges
-  const { data: userBadges } = await sb
+  const { data: userBadges, error: badgesErr } = await sb
     .from('user_badges')
     .select('badge_key, awarded_at, badges(name, description, emoji, category)')
     .eq('user_id', profile.id)
     .order('awarded_at', { ascending: false });
+
+  // Un errore non deve diventare "XP a zero" mostrato come dato vero.
+  if (statsErr || badgesErr) return statsUnavailable();
 
   // Default stats if no record yet
   const defaultStats = {

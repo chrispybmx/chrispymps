@@ -32,3 +32,4 @@ export function supabaseAdmin() {
     auth: { persistSession: false },
   });
 }
+

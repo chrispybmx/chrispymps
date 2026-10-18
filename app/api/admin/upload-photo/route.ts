@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -74,9 +75,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Ottimizza (resize+JPEG) e strip EXIF/GPS prima dell'upload
-    const { buffer: optimized, contentType, ext: outExt } = await optimizeImage(buffer);
+    let optimizedImage: Awaited<ReturnType<typeof optimizeImage>>;
+    try { optimizedImage = await optimizeImage(buffer); }
+    catch { console.warn('[upload-photo] immagine non leggibile'); continue; }
+    const { buffer: optimized, contentType, ext: outExt } = optimizedImage;
 
-    const path = `${spotId}/${Date.now()}_${i}.${outExt}`;
+    const path = `${spotId}/${Date.now()}_${i}_${randomUUID().slice(0, 8)}.${outExt}`;
 
     const { error: uploadErr } = await supabase.storage
       .from('spot-photos')
@@ -89,12 +93,18 @@ export async function POST(req: NextRequest) {
 
     const { data: urlData } = supabase.storage.from('spot-photos').getPublicUrl(path);
 
-    await supabase.from('spot_photos').insert({
+    const { error: insertErr } = await supabase.from('spot_photos').insert({
       spot_id:  spotId,
       url:      urlData.publicUrl,
-      position: position++,
+      position: position,
     });
-
+    // Senza riga a DB la foto non compare: si toglie il file e non la si conta come caricata.
+    if (insertErr) {
+      console.error('[upload-photo] insert error:', insertErr.message);
+      await supabase.storage.from('spot-photos').remove([path]);
+      continue;
+    }
+    position++;
     uploadedUrls.push(urlData.publicUrl);
   }
 

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { JAM_ROMA, JAM_SPOTS, getJamState, type JamState } from '@/lib/jamroma';
 import { useUser } from '@/hooks/useUser';
+import { createPresenceSession, type PresenceSession } from '@/lib/jamroma-presence-client';
 
 /* ═══════════════════════════════════════════════
    Poster palette
@@ -44,6 +45,20 @@ export default function JamRomaClient() {
   const [sharingError, setSharingError] = useState('');
   const [showConsentModal, setShowConsentModal] = useState(false);
   const presenceInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  /* Valori letti dalla sessione di presenza al momento della richiesta, non al
+     primo render: il login o il nome possono cambiare mentre si condivide. */
+  const userRef = useRef(user);
+  userRef.current = user;
+  const anonNameRef = useRef(anonName);
+  anonNameRef.current = anonName;
+  const presence = useRef<PresenceSession | null>(null);
+  if (!presence.current) {
+    presence.current = createPresenceSession({
+      fetch: (...args) => fetch(...args),
+      getToken: () => userRef.current?.accessToken,
+      getDisplayName: () => anonNameRef.current,
+    });
+  }
 
   useEffect(() => {
     const iv = setInterval(() => setJamState(getJamState()), 30_000);
@@ -127,20 +142,14 @@ export default function JamRomaClient() {
     setShowConsentModal(false);
     if (!('geolocation' in navigator)) { setSharingError('Geolocalizzazione non supportata'); return; }
     setSharingError('');
+    const session = presence.current!;
+    // Una posizione GPS che arriva dopo lo Stop viene ignorata dalla sessione.
     const sendPosition = (pos: GeolocationPosition) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (user?.accessToken) headers['Authorization'] = `Bearer ${user.accessToken}`;
-      fetch('/api/events/jamroma/presence', {
-        method: 'POST', headers,
-        body: JSON.stringify({
-          lat: pos.coords.latitude, lon: pos.coords.longitude,
-          sharing_enabled: true,
-          ...(user ? {} : { display_name: anonName || 'Rider' }),
-        }),
-      }).catch(() => {});
+      void session.send({ lat: pos.coords.latitude, lon: pos.coords.longitude });
     };
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        session.start();
         setSharing(true);
         sendPosition(pos);
         // Aggiorna mappa subito cosi l'utente si vede
@@ -159,12 +168,27 @@ export default function JamRomaClient() {
     );
   };
 
-  const stopSharing = () => {
+  /* Toglie subito il rider dalla mappa: senza questo la posizione restava
+     visibile agli altri fino alla scadenza, anche dopo aver premuto Stop. */
+  const stopSharing = async () => {
     setSharing(false);
     if (presenceInterval.current) { clearInterval(presenceInterval.current); presenceInterval.current = null; }
+    const removed = await presence.current!.stop();
+    if (!removed) {
+      // Il pulsante Stop resta visibile per riprovare; la posizione non viene piu' inviata.
+      setSharing(true);
+      setSharingError('Non sono riuscito a toglierti dalla mappa. Premi di nuovo Stop: altrimenti sparisci da solo entro 5 minuti.');
+    } else setSharingError('');
+    setTimeout(fetchRiders, 500);
   };
 
-  useEffect(() => () => { if (presenceInterval.current) clearInterval(presenceInterval.current); }, []);
+  useEffect(() => {
+    const session = presence.current;
+    return () => {
+      if (presenceInterval.current) clearInterval(presenceInterval.current);
+      if (session?.active) void session.stop();
+    };
+  }, []);
 
   /* ── Inline keyframes via <style> ── */
   const jamStyles = `

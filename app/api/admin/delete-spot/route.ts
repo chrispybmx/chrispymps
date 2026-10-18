@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { UUID_RE } from '@/lib/validation';
@@ -20,12 +21,16 @@ export async function POST(req: Request) {
     .from('spot_photos')
     .select('url')
     .eq('spot_id', spot_id);
-
   if (photosError) return NextResponse.json({ ok: false, error: 'Impossibile leggere le foto dello spot.' }, { status: 500 });
 
   // Do not remove files while a database constraint can still reject deletion.
   const { error } = await supabase.from('spots').delete().eq('id', spot_id);
   if (error) return NextResponse.json({ ok: false, error: 'Impossibile eliminare lo spot.' }, { status: 500 });
+
+  // Niente pagina fantasma: pagine spot e città, home e sitemap si rigenerano.
+  revalidatePath('/map', 'layout');
+  revalidatePath('/');
+  revalidatePath('/sitemap.xml');
 
   // 2. Elimina file dallo storage Supabase (se presenti)
   if (photos && photos.length > 0) {

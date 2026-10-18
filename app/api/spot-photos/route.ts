@@ -48,36 +48,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Spot non trovato o non approvato.' }, { status: 404 });
   }
 
-  // 3. Anti-spam: max photos per spot per user
-  const { count: userPhotosOnSpot } = await supabase
-    .from('spot_photos')
-    .select('id', { count: 'exact', head: true })
-    .eq('spot_id', spotId)
-    .eq('uploaded_by', user.id);
-
-  if ((userPhotosOnSpot ?? 0) >= MAX_PHOTOS_PER_SPOT_PER_USER) {
-    return NextResponse.json({
-      ok: false,
-      error: `Hai già caricato ${MAX_PHOTOS_PER_SPOT_PER_USER} foto su questo spot. Massimo raggiunto.`,
-    }, { status: 429 });
-  }
-
-  // 4. Anti-spam: max photos per week
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { count: weeklyPhotos } = await supabase
-    .from('spot_photos')
-    .select('id', { count: 'exact', head: true })
-    .eq('uploaded_by', user.id)
-    .gte('created_at', weekAgo);
-
-  if ((weeklyPhotos ?? 0) >= MAX_PHOTOS_PER_WEEK) {
-    return NextResponse.json({
-      ok: false,
-      error: `Limite settimanale di ${MAX_PHOTOS_PER_WEEK} foto raggiunto. Riprova tra qualche giorno.`,
-    }, { status: 429 });
-  }
-
-  // 5. Extract photo files
+  // 3. Extract photo files (prima dei limiti: contano anche quelle in arrivo)
   const photos: File[] = [];
   for (const [key, value] of formData.entries()) {
     if (key.startsWith('photo_') && value instanceof File) {
@@ -91,6 +62,43 @@ export async function POST(req: NextRequest) {
 
   if (photos.length > 3) {
     return NextResponse.json({ ok: false, error: 'Massimo 3 foto per volta.' }, { status: 400 });
+  }
+
+  // 4. Anti-spam: max photos per spot per user
+  const { count: userPhotosOnSpot, error: spotCountErr } = await supabase
+    .from('spot_photos')
+    .select('id', { count: 'exact', head: true })
+    .eq('spot_id', spotId)
+    .eq('uploaded_by', user.id);
+
+  if (spotCountErr) return NextResponse.json({ ok: false, error: 'Verifica limiti non riuscita. Riprova.' }, { status: 503 });
+  if ((userPhotosOnSpot ?? 0) + photos.length > MAX_PHOTOS_PER_SPOT_PER_USER) {
+    const restanti = Math.max(0, MAX_PHOTOS_PER_SPOT_PER_USER - (userPhotosOnSpot ?? 0));
+    return NextResponse.json({
+      ok: false,
+      error: restanti === 0
+        ? `Hai già caricato ${MAX_PHOTOS_PER_SPOT_PER_USER} foto su questo spot. Massimo raggiunto.`
+        : `Su questo spot puoi aggiungere ancora ${restanti} foto.`,
+    }, { status: 429 });
+  }
+
+  // 5. Anti-spam: max photos per week
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { count: weeklyPhotos, error: weekCountErr } = await supabase
+    .from('spot_photos')
+    .select('id', { count: 'exact', head: true })
+    .eq('uploaded_by', user.id)
+    .gte('created_at', weekAgo);
+
+  if (weekCountErr) return NextResponse.json({ ok: false, error: 'Verifica limiti non riuscita. Riprova.' }, { status: 503 });
+  if ((weeklyPhotos ?? 0) + photos.length > MAX_PHOTOS_PER_WEEK) {
+    const restanti = Math.max(0, MAX_PHOTOS_PER_WEEK - (weeklyPhotos ?? 0));
+    return NextResponse.json({
+      ok: false,
+      error: restanti === 0
+        ? `Limite settimanale di ${MAX_PHOTOS_PER_WEEK} foto raggiunto. Riprova tra qualche giorno.`
+        : `Questa settimana puoi caricare ancora ${restanti} foto.`,
+    }, { status: 429 });
   }
 
   // 6. Validate + upload each photo
@@ -131,8 +139,13 @@ export async function POST(req: NextRequest) {
       const mime = detectMime(buf);
       if (!mime || !MIME_EXT[mime]) return { url: null, filename: null };
 
-      // Ottimizza (resize+JPEG) e strip EXIF/GPS prima dell'upload
-      const { buffer: optimized, contentType, ext } = await optimizeImage(Buffer.from(buf));
+      // Ottimizza (resize+JPEG) e strip EXIF/GPS prima dell'upload.
+      // sharp lancia su HEIC non decodificabili o file troncati: si scarta
+      // quella foto invece di far cadere tutta la richiesta con un 500.
+      let optimizedImage: Awaited<ReturnType<typeof optimizeImage>>;
+      try { optimizedImage = await optimizeImage(Buffer.from(buf)); }
+      catch (err) { console.error('[spot-photos] optimize error:', err instanceof Error ? err.message : err); return { url: null, filename: null }; }
+      const { buffer: optimized, contentType, ext } = optimizedImage;
 
       const filename = `${spotId}/user_${user.id}_${Date.now()}_${i}.${ext}`;
 

@@ -19,8 +19,9 @@ export async function GET() {
         .order('event_date', { ascending: true });
     }
 
+    if (result.error) throw result.error;
     return NextResponse.json({ ok: true, data: result.data ?? [] });
-  } catch { return NextResponse.json({ ok: true, data: [] }); }
+  } catch { return NextResponse.json({ ok: false, error: 'Lettura non riuscita' }, { status: 500 }); }
 }
 
 export async function POST(req: Request) {

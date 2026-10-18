@@ -425,3 +425,14 @@ Verificato su copia specchio in dev (:3200), mobile 375x812 e desktop, posizione
 Vicino a me → "5 spot entro 25 km", chip ok; selezione 25→25 con 24 altri; X foto = bottone (elementFromPoint);
 maniglia 64→309; menu scrollH 899 > 812, Contatti cliccabile; vista iniziale Italia. tsc 0, vitest 316/316, lint pulito.
 Aperto: col pannello chiuso il banner cookie (prima visita) copre l'intestazione del pannello. Punto 4 (pagina città) e 5 (polish) non fatti.
+
+# Verifica posizione foto (solo admin) — 2026-10-12
+
+Obiettivo: nella coda admin, per ogni spot pending, un'etichetta che dice se la foto
+e' stata scattata vicino al pin. Mai bloccare l'invio, mai visibile al pubblico.
+
+1. [x] `lib/photo-check.ts`: da metadati foto (GPS, data, marca fotocamera) + pin → distanza e verdetto → verify: test vitest (vicino, lontano, senza GPS, senza fotocamera)
+2. [x] Lettura metadati dal file ORIGINALE nel form, prima della compressione (`exifr`, import dinamico, errori ignorati) → verify: test della funzione di lettura con file senza EXIF non lancia
+3. [x] `submit-spot` accetta `photo_checks` opzionale (zod), salva in tabella separata; se la tabella manca o fallisce, lo spot si salva lo stesso → verify: typecheck + test esistenti verdi
+4. [ ] Migration `spot_photo_checks` con RLS attiva e nessuna policy (leggibile solo dal service role) → verify: ATTENDE OK DI CHRISTIAN prima dell'esecuzione
+5. [x] Admin: etichetta 📍/⚠️/📷/🌐 sulla card pending, query separata con fallback → verify: typecheck, admin carica anche senza tabella

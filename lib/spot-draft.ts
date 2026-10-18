@@ -1,8 +1,12 @@
 import type { Ostacolo, SpotType } from './types';
+import type { PhotoMeta } from './photo-check';
 export interface SpotDraft {
   updatedAt: number; step: 'posizione' | 'foto' | 'dettagli';
   lat: number | null; lon: number | null; city: string; country: string; countryCode: string;
   name: string; type: SpotType | ''; ostacoli: Ostacolo[]; description: string; notes: string; difficulty: string; photos: File[];
+  /** EXIF letto dagli originali, allineato a `photos`: i File ripristinati da
+      IndexedDB sono copie nuove e senza questo perderebbero GPS e fotocamera. */
+  photoMeta?: PhotoMeta[];
 }
 const MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 let queue: Promise<unknown> = Promise.resolve();

@@ -11,6 +11,7 @@ import type { Spot, SpotType } from '@/lib/types';
 import { TIPI_SPOT, CITTA_ITALIANE } from '@/lib/constants';
 import AdminApprovati from '@/components/AdminApprovati';
 import AdminContesti from '@/components/AdminContesti';
+import { photoCheckLabel, type PhotoCheck } from '@/lib/photo-check';
 
 type Tab = 'pending' | 'contesti' | 'approvati' | 'all' | 'photos' | 'import' | 'stats' | 'events' | 'news' | 'comments' | 'users' | 'numeri';
 
@@ -36,6 +37,27 @@ interface AdminUser {
 
 interface AdminDashboardProps {
   initialSpots: Spot[];
+  photoChecks?: Record<string, PhotoCheck[]>;
+}
+
+const TONE_COLOR = { ok: '#4caf50', warn: 'var(--orange)', neutral: '#8a8580' } as const;
+
+/** Indizio sulla posizione delle foto: visibile solo qui, mai al pubblico. */
+function PhotoCheckBadges({ checks }: { checks?: PhotoCheck[] }) {
+  if (!checks?.length) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 0 6px' }}>
+      {checks.map((c, i) => {
+        const l = photoCheckLabel(c);
+        return (
+          <span key={i} title={c.taken_at ? `Scattata il ${new Date(c.taken_at).toLocaleDateString('it-IT')}` : undefined}
+            style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: `1px solid ${TONE_COLOR[l.tone]}`, color: TONE_COLOR[l.tone] }}>
+            {checks.length > 1 ? `Foto ${i + 1}: ` : ''}{l.icon} {l.text}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 /* ─── Event / News types ─── */
@@ -112,7 +134,7 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4,
 };
 
-export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
+export default function AdminDashboard({ initialSpots, photoChecks = {} }: AdminDashboardProps) {
   const router = useRouter();
   const [tab, setTab]     = useState<Tab>('pending');
   /* Numeri: si caricano solo quando apri la scheda. */
@@ -518,11 +540,14 @@ export default function AdminDashboard({ initialSpots }: AdminDashboardProps) {
             <EmptyState icon="✅" text="Coda vuota. Nessuno spot da moderare." />
           ) : (
             pending.map(spot => (
-              <AdminCard key={spot.id} spot={spot}
-                onApprove={handleApprove} onReject={handleReject}
-                onEdit={handleEdit} onDelete={handleDelete}
-                loading={loading === spot.id}
-              />
+              <div key={spot.id}>
+                <PhotoCheckBadges checks={photoChecks[spot.id]} />
+                <AdminCard spot={spot}
+                  onApprove={handleApprove} onReject={handleReject}
+                  onEdit={handleEdit} onDelete={handleDelete}
+                  loading={loading === spot.id}
+                />
+              </div>
             ))
           )}
         </div>

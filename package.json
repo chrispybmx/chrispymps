@@ -2,7 +2,7 @@
   "name": "chrispymps",
   "version": "0.1.0",
   "private": true,
-  "description": "ChrispyMPS \u2014 Find Your Spot. La mappa BMX street italiana.",
+  "description": "ChrispyMPS — Find Your Spot. La mappa BMX street italiana.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -25,6 +25,7 @@
     "@types/leaflet": "^1.9.21",
     "@vercel/analytics": "^2.0.1",
     "dotenv": "^17.4.2",
+    "exifr": "^7.1.3",
     "leaflet": "^1.9.4",
     "next": "^15.5.27",
     "pg": "^8.21.0",
