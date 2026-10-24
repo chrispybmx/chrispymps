@@ -13,57 +13,19 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#0a0a0a',
-        gap: 24,
-        padding: 24,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: 'VT323, monospace',
-          fontSize: 96,
-          color: '#ff6a00',
-          letterSpacing: '0.05em',
-        }}
-      >
-        404
+    <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: 'var(--black)', padding: 24 }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
+        <p style={{ color: 'var(--orange)', fontWeight: 600, fontSize: 14, margin: 0 }}>Errore 404</p>
+        <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '2.5rem', lineHeight: 1.05, color: 'var(--bone)', margin: '8px 0 12px' }}>
+          Questo spot non esiste
+        </h1>
+        <p style={{ color: '#bdbbb4', fontSize: 16, lineHeight: 1.6, margin: '0 0 24px' }}>
+          Il link è sbagliato o la pagina è stata tolta. Sulla mappa ce ne sono di veri.
+        </p>
+        <Link href="/map" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 20px', background: 'var(--orange)', color: '#0a0a0a', fontWeight: 700, borderRadius: 6, textDecoration: 'none' }}>
+          Torna alla mappa
+        </Link>
       </div>
-      <div
-        style={{
-          fontFamily: 'VT323, monospace',
-          fontSize: 20,
-          color: '#888',
-          textAlign: 'center',
-          maxWidth: 400,
-          textTransform: 'uppercase',
-          letterSpacing: '0.15em',
-        }}
-      >
-        Pagina non trovata
-      </div>
-      <Link
-        href="/"
-        style={{
-          fontFamily: 'VT323, monospace',
-          fontSize: 16,
-          color: '#0a0a0a',
-          background: '#ff6a00',
-          border: 'none',
-          padding: '8px 24px',
-          textDecoration: 'none',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Torna alla mappa
-      </Link>
-    </div>
+    </main>
   );
 }

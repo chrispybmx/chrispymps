@@ -8,73 +8,24 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#0a0a0a',
-        gap: 24,
-        padding: 24,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: 'VT323, monospace',
-          fontSize: 48,
-          color: '#ff6a00',
-          letterSpacing: '0.05em',
-        }}
-      >
-        ERRORE
+    <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: 'var(--black)', padding: 24 }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
+        <p style={{ color: 'var(--orange)', fontWeight: 600, fontSize: 14, margin: 0 }}>Errore</p>
+        <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '2.5rem', lineHeight: 1.05, color: 'var(--bone)', margin: '8px 0 12px' }}>
+          Qualcosa si è rotto
+        </h1>
+        <p style={{ color: '#bdbbb4', fontSize: 16, lineHeight: 1.6, margin: '0 0 24px' }}>
+          Non è colpa tua. Riprova; se succede ancora, torna alla mappa.
+        </p>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button type="button" onClick={reset} style={{ minHeight: 44, padding: '0 20px', background: 'var(--orange)', color: '#0a0a0a', fontWeight: 700, border: 0, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 16 }}>
+            Riprova
+          </button>
+          <a href="/map" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 20px', color: 'var(--bone)', border: '1px solid var(--gray-600)', borderRadius: 6, textDecoration: 'none', fontWeight: 600 }}>
+            Mappa
+          </a>
+        </div>
       </div>
-      <div
-        style={{
-          fontFamily: 'VT323, monospace',
-          fontSize: 18,
-          color: '#888',
-          textAlign: 'center',
-          maxWidth: 400,
-        }}
-      >
-        Qualcosa è andato storto. Riprova o torna alla mappa.
-      </div>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button
-          onClick={reset}
-          style={{
-            fontFamily: 'VT323, monospace',
-            fontSize: 16,
-            color: '#0a0a0a',
-            background: '#ff6a00',
-            border: 'none',
-            padding: '8px 24px',
-            cursor: 'pointer',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Riprova
-        </button>
-        <a
-          href="/"
-          style={{
-            fontFamily: 'VT323, monospace',
-            fontSize: 16,
-            color: '#ff6a00',
-            background: 'transparent',
-            border: '1px solid #ff6a00',
-            padding: '8px 24px',
-            textDecoration: 'none',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Mappa
-        </a>
-      </div>
-    </div>
+    </main>
   );
 }

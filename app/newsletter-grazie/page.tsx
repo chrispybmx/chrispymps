@@ -7,91 +7,52 @@ export const metadata: Metadata = {
   description: 'Informazioni sulla newsletter BMX e sulla conferma dell’iscrizione.',
 };
 
+const heading = { fontFamily: 'var(--font-heading)' } as const;
+
 export default function NewsletterThankYouPage() {
   return (
-    <main className="min-h-screen bg-zinc-950 text-white overflow-x-hidden relative">
-      {/* VHS scanlines overlay */}
-      <div
-        className="pointer-events-none fixed inset-0 z-50 opacity-5"
-        style={{
-          background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)',
-        }}
-        aria-hidden="true"
-      />
+    <main className="min-h-[100dvh] bg-black text-bone">
+      <div className="mx-auto max-w-xl px-5 pb-16 pt-16 sm:pt-24">
+        <p className="text-vhs-sm font-semibold text-orange">Newsletter · quasi fatto</p>
+        <h1 style={heading} className="mt-3 text-[2.5rem] font-bold leading-[1.05] sm:text-[3.25rem]">
+          Controlla la tua email
+        </h1>
+        <p className="mt-5 text-vhs-lg text-gray-200">
+          Se hai chiesto <strong className="text-bone">Cinque cose dal mondo BMX</strong>, ti ho mandato un link:
+          aprilo e premi Conferma. Senza quel passaggio la newsletter non parte.
+        </p>
 
-      {/* Gradient BG */}
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-950/20 to-transparent -z-10" />
-
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-5 text-center">
-        <div className="max-w-2xl">
-          {/* Checkmark */}
-          <div className="mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-orange-600 text-white text-4xl font-bold">
-              ✓
-            </div>
+        <dl className="mt-10 border-t border-gray-700">
+          <div className="border-b border-gray-700 py-4">
+            <dt className="font-semibold text-bone">Quando arriva</dt>
+            <dd className="mt-1 text-gray-200">Il lunedì mattina, dopo che hai confermato.</dd>
           </div>
-
-          {/* Main heading */}
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight font-mono">
-            Newsletter BMX
-          </h1>
-
-          {/* Subheading */}
-          <p className="text-xl text-zinc-300 mb-6 leading-relaxed">
-            Se hai richiesto <span className="text-orange-400 font-bold">Cinque cose dal mondo BMX</span>, controlla l’email e completa la conferma.
-          </p>
-
-          {/* Info box */}
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-6 mb-8 space-y-4 text-left">
-            <div>
-              <h2 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-2">📧 Quando arriva</h2>
-              <p className="text-zinc-300">
-                La newsletter esce il lunedì. Per riceverla devi aver completato l’iscrizione.
-              </p>
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-2">📨 Gestisci l'iscrizione</h2>
-              <p className="text-zinc-300">
-                In fondo a ogni email troverai un link per <strong>disiscriverti</strong> in qualsiasi momento, senza domande.
-              </p>
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-2">🔒 I tuoi dati</h2>
-              <p className="text-zinc-300">
-                La tua email è protetta. Leggi la nostra <a href="/privacy#newsletter" target="_blank" rel="noopener" className="text-orange-400 hover:underline">Privacy Policy</a> per i dettagli.
-              </p>
-            </div>
+          <div className="border-b border-gray-700 py-4">
+            <dt className="font-semibold text-bone">Come esci</dt>
+            <dd className="mt-1 text-gray-200">In fondo a ogni email c&apos;è il link per disiscriverti, senza domande.</dd>
           </div>
-
-          {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a
-              href="https://chrispybmx.com/"
-              className="inline-block px-8 py-3 bg-orange-600 hover:bg-orange-700 text-black font-bold rounded-lg transition-colors"
-            >
-              ← Torna al sito
-            </a>
-            <a
-              href="https://maps.chrispybmx.com/map"
-              className="inline-block px-8 py-3 border border-orange-600 text-orange-400 hover:bg-orange-600/10 font-bold rounded-lg transition-colors"
-            >
-              Guarda la mappa spot →
-            </a>
+          <div className="border-b border-gray-700 py-4">
+            <dt className="font-semibold text-bone">I tuoi dati</dt>
+            <dd className="mt-1 text-gray-200">
+              Uso la tua email solo per la newsletter. I dettagli sono nella{' '}
+              <a href="/privacy#newsletter" className="text-orange underline-offset-4 hover:underline">privacy</a>.
+            </dd>
           </div>
+        </dl>
+
+        <div className="mt-10 flex flex-wrap gap-3">
+          <a href="/map" className="inline-flex min-h-[44px] items-center rounded-md bg-orange px-5 font-bold text-black">
+            Guarda la mappa spot
+          </a>
+          <a href="https://chrispybmx.com/" className="inline-flex min-h-[44px] items-center rounded-md border border-gray-600 px-5 font-semibold text-bone hover:border-orange">
+            chrispybmx.com
+          </a>
         </div>
+
+        <p className="mt-12 text-vhs-sm text-gray-400">
+          Problemi? <a href="mailto:christian.ceresato@gmail.com" className="hover:text-orange">Scrivimi</a>
+        </p>
       </div>
-
-      {/* Footer links */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950 to-transparent p-4 text-center text-xs text-zinc-500 space-y-2">
-        <div className="flex flex-wrap gap-4 justify-center">
-          <a href="/privacy#newsletter" target="_blank" rel="noopener" className="hover:text-orange-400">Privacy Policy</a>
-          <span>•</span>
-          <a href="/privacy#cookie" target="_blank" rel="noopener" className="hover:text-orange-400">Cookie Policy</a>
-          <span>•</span>
-          <a href="mailto:christian.ceresato@gmail.com" className="hover:text-orange-400">Contatti</a>
-        </div>
-        <p>© 2026 Chrispy BMX</p>
-      </footer>
     </main>
   );
 }

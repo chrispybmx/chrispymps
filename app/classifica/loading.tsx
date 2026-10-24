@@ -13,7 +13,7 @@ export default function ClassificaLoading() {
     >
       <div
         style={{
-          fontFamily: 'VT323, monospace',
+          fontFamily: 'var(--font-ui)',
           fontSize: 32,
           color: '#ff6a00',
           letterSpacing: '0.05em',
@@ -22,7 +22,7 @@ export default function ClassificaLoading() {
       >
         CLASSIFICA
       </div>
-      <div style={{ fontFamily: 'VT323, monospace', fontSize: 14, color: '#888', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: '#888' }}>
         Caricamento...
       </div>
       <div style={{ width: 160, height: 3, background: '#1a1a1a', borderRadius: 2, overflow: 'hidden' }}>

@@ -82,8 +82,8 @@ const config: Config = {
         'scanlines': 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)',
       },
       boxShadow: {
-        'vhs':     '0 0 20px rgba(255, 106, 0, 0.3)',
-        'vhs-lg':  '0 0 40px rgba(255, 106, 0, 0.4)',
+        'vhs':     '0 2px 8px rgba(0, 0, 0, 0.4)',
+        'vhs-lg':  '0 4px 14px rgba(0, 0, 0, 0.5)',
         'vhs-pin': '2px 4px 12px rgba(0,0,0,0.6)',
       },
       rotate: {
