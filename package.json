@@ -45,7 +45,7 @@
     "@types/xml2js": "^0.4.14",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^15.5.28",
+    "eslint-config-next": "^16.4.2",
     "fake-indexeddb": "^6.2.5",
     "postcss": "^8.4.40",
     "qrcode": "^1.5.4",
