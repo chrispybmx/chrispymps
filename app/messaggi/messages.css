@@ -34,9 +34,9 @@
 .cm-msg-blocked-riders li>span { min-width:0; overflow-wrap:anywhere; }
 .cm-msg-blocked-riders .cm-msg-button { flex-shrink:0; font-size:14px!important; }
 .cm-msg-inbox-list { overflow:auto; overscroll-behavior:contain; min-height:0; flex:1; }
-.cm-msg-inbox-row { display:flex; gap:12px; padding:18px 18px; align-items:flex-start; border-bottom:1px solid var(--msg-line); border-left:3px solid transparent; }
+.cm-msg-inbox-row { display:flex; gap:12px; padding:18px 18px; align-items:flex-start; border-bottom:1px solid var(--msg-line); }
 .cm-msg-inbox-row:hover { background:#211f1c; }
-.cm-msg-inbox-row.is-selected { border-left-color:var(--orange); background:#292018; }
+.cm-msg-inbox-row.is-selected { background:#2e2219; box-shadow:inset 0 0 0 1px #6b4a2e; }
 .cm-msg-inbox-copy { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
 .cm-msg-inbox-copy strong { display:flex; align-items:center; flex-wrap:wrap; gap:7px; font-size:16px; overflow-wrap:anywhere; }
 .cm-msg-inbox-copy >span { font-size:15px; overflow-wrap:anywhere; }
@@ -54,7 +54,7 @@
 .cm-msg-empty h1,.cm-msg-empty h2 { color:#f3ead8; }
 .cm-msg-empty >svg { color:var(--orange); }
 .cm-msg-empty p { font-size:15px; }
-.cm-msg-error { padding:12px 16px; border-left:3px solid #efad80; color:#ffd3b4; background:#2b211b; font-size:14px; overflow-wrap:anywhere; flex:none; }
+.cm-msg-error { padding:12px 16px; border:1px solid #7a5640; color:#ffd3b4; background:#2b211b; font-size:14px; overflow-wrap:anywhere; flex:none; }
 .cm-msg-error .cm-msg-text-button { display:block; text-align:left; }
 .cm-msg-notice { padding:10px 20px; color:#e7d0b7; background:#28231d; font-size:14px; }
 .cm-msg-more { display:flex; margin:16px auto; }
@@ -111,7 +111,7 @@
 .cm-msg-closed,.cm-msg-conversation-start { margin:16px 0; font-size:14px; color:var(--msg-muted); }
 .cm-msg-message-list { list-style:none; display:flex; flex-direction:column; gap:14px; }
 .cm-msg-message-list li { display:flex; justify-content:flex-start; }
-.cm-msg-message-list li>div { max-width:82%; border-left:2px solid #726b62; padding:10px 14px; background:#252421; }
+.cm-msg-message-list li>div { max-width:82%; border:1px solid #3a3833; padding:10px 14px; background:#252421; }
 .cm-msg-message-list li.is-mine { justify-content:flex-end; }
 .cm-msg-message-list li.is-mine>div { background:#332619; border-left:0; border-right:2px solid var(--orange); }
 .cm-msg-message-list p { white-space:pre-wrap; overflow-wrap:anywhere; }

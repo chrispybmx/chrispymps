@@ -694,7 +694,7 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
 
           {(e.location || e.city) && (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: e.description ? 6 : 10 }}>
-              📍 {[e.location, e.city].filter(Boolean).join(' — ')} · 🕐 {time}
+              📍 {[e.location, e.city].filter(Boolean).join(' · ')} · 🕐 {time}
             </div>
           )}
 
@@ -775,7 +775,7 @@ function PosterCard({ event: e }: { event: CalendarEvent }) {
           {(e.location || e.city) && (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginBottom: 3 }}>
               {e.country_code && <span style={{ marginRight: 6 }}>{String.fromCodePoint(...e.country_code.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65))}</span>}
-              📍 {[e.location, e.city, e.country].filter(Boolean).join(' — ')}
+              📍 {[e.location, e.city, e.country].filter(Boolean).join(' · ')}
             </div>
           )}
 
@@ -905,7 +905,7 @@ function EventCard({ event: e, past }: { event: CalendarEvent; past?: boolean })
             </Link>
           ) : (e.location || e.city) ? (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', marginBottom: 4 }}>
-              📍 {[e.location, e.city].filter(Boolean).join(' — ')}
+              📍 {[e.location, e.city].filter(Boolean).join(' · ')}
             </div>
           ) : null}
 

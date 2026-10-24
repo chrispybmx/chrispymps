@@ -111,7 +111,7 @@ export default function EventsMap({ events }: { events: CalendarEvent[] }) {
           <div style="min-width:200px;font-family:-apple-system,sans-serif">
             <div style="font-weight:600;font-size:14px;margin-bottom:6px;line-height:1.3">${ev.title}</div>
             <div style="font-size:12px;color:#666;margin-bottom:4px">
-              ${flagEmoji} ${ev.city || ''} ${ev.country ? '— ' + ev.country : ''}
+              ${flagEmoji} ${ev.city || ''} ${ev.country ? '· ' + ev.country : ''}
             </div>
             <div style="font-size:12px;color:#666;margin-bottom:8px">📅 ${date}${dateEnd}</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">

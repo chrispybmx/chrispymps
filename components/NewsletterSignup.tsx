@@ -68,7 +68,7 @@ export default function NewsletterSignup() {
         fontFamily: 'var(--font-mono)', fontSize: 20,
         color: 'var(--bone)', margin: '0 0 8px 0', lineHeight: 1.3,
       }}>
-        Cinque cose dal mondo BMX — ogni lunedì
+        Cinque cose dal mondo BMX, ogni lunedì
       </h3>
 
       <p style={{

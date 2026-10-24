@@ -33,12 +33,12 @@ type AuthTab = 'accedi' | 'registrati';
 
 const STEPS: Step[] = ['posizione', 'foto', 'dettagli'];
 const STEP_LABEL: Record<Step, string> = {
-  posizione: '1 — Posizione',
-  foto:      '2 — Foto',
-  dettagli:  '3 — Dettagli',
+  posizione: '1 · Posizione',
+  foto:      '2 · Foto',
+  dettagli:  '3 · Dettagli',
   successo:  '',
 };
-const STEP_LABEL_EN: Record<Step, string> = { posizione: '1 — Location', foto: '2 — Photos', dettagli: '3 — Details', successo: '' };
+const STEP_LABEL_EN: Record<Step, string> = { posizione: '1 · Location', foto: '2 · Photos', dettagli: '3 · Details', successo: '' };
 
 const inp: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
@@ -761,7 +761,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
             ) : (
               <div>
                 <p style={{ color: 'var(--gray-400)', fontSize: 14, lineHeight: 1.6, marginBottom: 18 }}>
-                  {text("Accedi o crea un account — il tuo", "Sign in or create an account — your")} <strong style={{ color: 'var(--orange)' }}>@username</strong> {text("apparirà sullo spot.", "will appear on the spot.")}
+                  {text("Accedi o crea un account: il tuo", "Sign in or create an account: your")} <strong style={{ color: 'var(--orange)' }}>@username</strong> {text("apparirà sullo spot.", "will appear on the spot.")}
                 </p>
 
                 <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--gray-700)' }}>
@@ -896,7 +896,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
                             {text("Prendiamo la posizione dello spot dal tuo telefono", "Use your phone to locate the spot")}
                           </div>
                           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.6 }}>
-                            {text("Tocca", "Tap")} <strong style={{ color: 'var(--orange)' }}>{text("\"Consenti\"", "\"Allow\"")}</strong> {text("quando appare il dialog — serve solo per piazzare il pin, non ti tracciamo.", "when prompted — this only places the spot pin. We do not track you.")}
+                            {text("Tocca", "Tap")} <strong style={{ color: 'var(--orange)' }}>{text("\"Consenti\"", "\"Allow\"")}</strong> {text("quando appare il dialog: serve solo per piazzare il pin, non ti tracciamo.", "when prompted — this only places the spot pin. We do not track you.")}
                           </div>
                         </div>
                         <button onClick={() => getGPS()} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
@@ -956,7 +956,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
                   )}
                   {/* Via di fuga per chi NON è sullo spot — piccola, sotto tutto. */}
                   <button onClick={() => { setLocMode('coords'); setGpsState('idle'); }} style={backLink}>
-                    {text("Non sono nello spot — inserisci le coordinate →", "I am not at the spot — enter coordinates →")}
+                    {text("Non sono nello spot: inserisci le coordinate →", "I am not at the spot: enter coordinates →")}
                   </button>
                 </div>
               )}
@@ -1038,7 +1038,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
                     }}
                     style={backLink}
                   >
-                    {text("Non sono nello spot — ho le coordinate →", "I am not at the spot — I have coordinates →")}
+                    {text("Non sono nello spot: ho le coordinate →", "I am not at the spot: I have coordinates →")}
                   </button>
 
                   {/* ── NEARBY SPOTS — duplicate detection ── */}
@@ -1120,7 +1120,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
                           className="btn-primary"
                           style={{ flex: 1, justifyContent: 'center', fontSize: 14, padding: '10px' }}
                         >
-                          {text("🆕 È UN ALTRO SPOT — CONTINUA", "🆕 IT IS A DIFFERENT SPOT — CONTINUE")}
+                          {text("È un altro spot, continua", "It is a different spot, continue")}
                         </button>
                       </div>
                     </div>
@@ -1129,7 +1129,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
                   {/* Avanti button — shown when no nearby or dismissed */}
                   {(nearbySpots.length === 0 || nearbyDismissed) && !nearbyLoading && (
                     <button onClick={() => setStep('foto')} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                      {text("Avanti — Foto →", "Next — Photos →")}
+                      {text("Avanti: foto →", "Next: photos →")}
                     </button>
                   )}
                 </div>
@@ -1163,7 +1163,7 @@ export default function AddSpotModal({ open, onClose, initialLat, initialLon, on
                   className="btn-primary"
                   style={{ flex: 2, justifyContent: 'center', opacity: photos.length === 0 ? 0.4 : 1 }}
                 >
-                  {text("Avanti — Dettagli →", "Next — Details →")}
+                  {text("Avanti: dettagli →", "Next: details →")}
                 </button>
               </div>
             </div>

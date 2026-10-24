@@ -200,7 +200,7 @@ export default function SideMenu({ open, onClose, onOpenAuth }: SideMenuProps) {
 
         {/* Footer */}
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--gray-700)', fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.6 }}>
-          <div>Chrispy Maps v1.0 — BETA</div>
+          <div>Chrispy Maps v1.0 · beta</div>
           <div>{text('Community BMX, skate e scooter', 'BMX, skate and scooter community')}</div>
           <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <a href="/regole" style={{ color: 'var(--orange)', textDecoration: 'none' }}>{text('Regole', 'Community rules')}</a>

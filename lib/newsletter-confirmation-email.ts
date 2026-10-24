@@ -16,7 +16,7 @@ export function newsletterConfirmationEmail(link: string, privacyUrl: string) {
   const href = escapeAttr(link);
   const privacy = escapeAttr(privacyUrl);
 
-  const subject = 'Un clic e sei dentro — newsletter Chrispy Maps';
+  const subject = 'Un clic e sei dentro: newsletter Chrispy Maps';
 
   const html = `<!DOCTYPE html>
 <html lang="it">

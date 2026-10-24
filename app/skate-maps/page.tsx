@@ -6,7 +6,7 @@ import { safeJsonLd } from '@/lib/json-ld';
 const url = `${APP_CONFIG.url}/skate-maps`;
 
 export const metadata: Metadata = {
-  title: 'Skate Maps Italia — Trova Skatepark, Bowl e Street Spot',
+  title: 'Skate Maps Italia: skatepark, bowl e street spot',
   description: 'La mappa italiana di skatepark, bowl, street spot, pumptrack e park scooter. Community-driven, aggiornata e gratuita. Trova lo spot perfetto vicino a te.',
   alternates: { canonical: url },
   keywords: [
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     'pumptrack Italia', 'street spot skate', 'park scooter Italia', 'skatepark vicino a me',
   ],
   openGraph: {
-    title: 'Skate Maps Italia — Chrispy Maps',
+    title: 'Skate Maps Italia | Chrispy Maps',
     description: 'Trova skatepark, bowl, street spot e pumptrack in tutta Italia.',
     url,
     siteName: 'Chrispy Maps',
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
   },
-  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Skate Maps Italia — Chrispy Maps' },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Skate Maps Italia | Chrispy Maps' },
 };
 
 const FAQ = [

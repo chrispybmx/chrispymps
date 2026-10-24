@@ -22,7 +22,7 @@ const barlowText = Barlow({ weight: ['400', '500', '600', '700'], subsets: ['lat
 export const metadata: Metadata = {
   title: {
     template: `%s | Chrispy Maps`,
-    default:  `Chrispy Maps — Mappa Spot BMX, Skate & Scooter Italia`,
+    default:  `Chrispy Maps: mappa spot BMX, skate e scooter`,
   },
   description: APP_CONFIG.description,
   metadataBase:    new URL(APP_CONFIG.url),
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
       url:    '/opengraph-image',
       width:  1200,
       height: 630,
-      alt:    'Chrispy Maps — la mappa freestyle: spot BMX, skatepark e spot scooter',
+      alt:    'Chrispy Maps, la mappa freestyle: spot BMX, skatepark e spot scooter',
     }],
   },
   twitter: {

@@ -416,8 +416,8 @@ export const APP_CONFIG = {
   // Firma usata OVUNQUE si condivide: testo del messaggio (share nativo,
   // WhatsApp) e anteprima del link (OG/Twitter card). Serve a far riconoscere
   // il progetto quando il link gira nelle chat, dove il dominio da solo non dice nulla.
-  shareTagline: 'Chrispy Maps — la mappa freestyle',
-  description: 'La mappa community-driven per trovare spot BMX, skatepark, spot scooter e street spot. Nata in Italia, aperta al mondo — aggiornata dalla community.',
+  shareTagline: 'Chrispy Maps, la mappa freestyle',
+  description: 'La mappa community-driven per trovare spot BMX, skatepark, spot scooter e street spot. Nata in Italia, aperta al mondo, aggiornata dalla community.',
   url:         'https://maps.chrispybmx.com',
   mapUrl:      'https://maps.chrispybmx.com', // home = mappa, /map reindirizza qui
   mapCenter:   [42.5, 12.5] as [number, number], // Centro Italia

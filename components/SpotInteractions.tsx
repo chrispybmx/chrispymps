@@ -164,7 +164,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
         <div style={{ color: 'var(--gray-500)', fontSize: 13, fontFamily: 'var(--font-mono)', padding: '8px 0 16px' }}>{t('Caricamento…', 'Loading…')}</div>
       ) : roots.length === 0 ? (
         <div style={{ color: 'var(--gray-600)', fontSize: 13, fontFamily: 'var(--font-mono)', padding: '12px 0 16px', textAlign: 'center' }}>
-          {t('Nessun commento ancora — sii il primo!', 'No comments yet. Add the first one!')}
+          {t('Nessun commento ancora. Scrivi il primo!', 'No comments yet. Add the first one!')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
@@ -184,7 +184,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
 
               {/* Risposte indentate */}
               {replies(c.id).length > 0 && (
-                <div style={{ marginLeft: 20, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, borderLeft: '2px solid rgba(255,106,0,0.2)', paddingLeft: 12 }}>
+                <div style={{ marginLeft: 20, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, borderLeft: '1px solid var(--gray-600)', paddingLeft: 12 }}>
                   {replies(c.id).map(r => (
                     <CommentBubble
                       key={r.id}
@@ -204,7 +204,7 @@ export default function SpotInteractions({ spotId, spotSlug }: Props) {
               {replyTo?.id === c.id && token && (
                 <div style={{
                   marginLeft: 20, marginTop: 8,
-                  borderLeft: '2px solid rgba(255,106,0,0.4)', paddingLeft: 12,
+                  borderLeft: '1px solid var(--gray-600)', paddingLeft: 12,
                 }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gray-400)', marginBottom: 6 }}>
                     ↩ {t('Rispondi a', 'Reply to')} <span style={{ color: 'var(--orange)' }}>@{replyTo.username}</span>

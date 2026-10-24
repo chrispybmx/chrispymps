@@ -171,7 +171,7 @@ export default async function CityPage(props: Props) {
         <p style={{ color: 'var(--gray-400)', fontSize: 15, marginBottom: 4 }}>
           {spots.length === 0
             ? 'Nessuno spot approvato ancora. Sii il primo a segnalarne uno!'
-            : `${spots.length} spot pubblicati — BMX, skate & scooter`}
+            : `${spots.length} spot pubblicati: BMX, skate e scooter`}
         </p>
         {/* Testo SEO visibile — descrive la città, aiuta il ranking */}
         {spots.length > 0 && <p style={{ color: 'var(--gray-400)', fontSize: 12, fontFamily: 'var(--font-mono)', marginTop: 8, lineHeight: 1.5 }}>
@@ -230,7 +230,7 @@ export default async function CityPage(props: Props) {
       {/* Sezione FAQ testuale — aiuta Google a capire la pagina */}
       {faqs.length > 0 && <div style={{ padding: '32px 20px 0', borderTop: '1px solid var(--gray-800)', marginTop: 24 }}>
         <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--gray-400)', marginBottom: 16 }}>
-          DOMANDE FREQUENTI — {cityLabel.toUpperCase()}
+          Domande frequenti su {cityLabel}
         </h2>
         <div style={{ display: 'grid', gap: 12 }}>
           {faqs.map(([q, a]) => (

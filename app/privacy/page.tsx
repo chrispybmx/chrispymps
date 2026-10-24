@@ -188,61 +188,61 @@ const dataRows = [
   {
     trattamento: 'Registrazione account',
     dati: 'Email, username, credenziali gestite da Supabase Auth, data di nascita dichiarata; dati facoltativi del profilo rider (Paese di residenza, regione, discipline, esperienza e setup)',
-    base: 'Art. 6(1)(b) — esecuzione contratto',
+    base: 'Art. 6(1)(b): esecuzione contratto',
     durata: 'Fino alla cancellazione dell’account, salvo conservazioni necessarie per obblighi di legge o tutela dei diritti',
   },
   {
     trattamento: 'Invio spot',
     dati: '@username, coordinate GPS dello spot, citta e paese, foto (metadati EXIF/GPS rimossi automaticamente al caricamento), descrizione',
-    base: 'Art. 6(1)(b) — esecuzione contratto',
+    base: 'Art. 6(1)(b): esecuzione contratto',
     durata: 'Durata pubblicazione dello spot',
   },
   {
     trattamento: 'Comunicazioni di servizio',
-    dati: 'Email, username (benvenuto, regolamento d’uso, avvisi account — tramite MailerLite)',
-    base: 'Art. 6(1)(b) — esecuzione contratto',
+    dati: 'Email, username (benvenuto, regolamento d’uso, avvisi account, tramite MailerLite)',
+    base: 'Art. 6(1)(b): esecuzione contratto',
     durata: 'Durata account',
   },
   {
     trattamento: 'Newsletter',
     dati: 'Email, username',
-    base: 'Art. 6(1)(a) — consenso',
+    base: 'Art. 6(1)(a): consenso',
     durata: 'Fino a revoca del consenso',
   },
   {
     trattamento: 'Geolocalizzazione',
     dati: 'Coordinate GPS del dispositivo',
-    base: 'Art. 6(1)(a) — consenso',
+    base: 'Art. 6(1)(a): consenso',
     durata: 'Non conservato server-side',
   },
   {
     trattamento: 'Spot Radar',
     dati: 'Coordinate periodiche del dispositivo',
-    base: 'Art. 6(1)(a) — consenso',
+    base: 'Art. 6(1)(a): consenso',
     durata: 'Solo client-side (localStorage)',
   },
   {
     trattamento: 'Email di moderazione',
     dati: 'Email utente',
-    base: 'Art. 6(1)(b) — esecuzione contratto',
+    base: 'Art. 6(1)(b): esecuzione contratto',
     durata: 'Durata account',
   },
   {
     trattamento: 'Cookie tecnici',
     dati: 'Dati di sessione',
-    base: 'Art. 6(1)(f) — legittimo interesse',
+    base: 'Art. 6(1)(f): legittimo interesse',
     durata: 'Secondo i tempi indicati nella sezione cookie',
   },
   {
     trattamento: 'Sessioni personali',
     dati: 'Account, spot scelto, inizio, fine, stato, fonte manuale e valutazione facoltativa della sessione',
-    base: 'Art. 6(1)(b) — servizio richiesto dall’utente',
+    base: 'Art. 6(1)(b): servizio richiesto dall’utente',
     durata: 'Fino alla cancellazione della sessione o dell’account; identificativi tecnici anti-duplicazione fino alla cancellazione dell’account',
   },
   {
     trattamento: 'Presenza condivisa allo spot',
     dati: 'Associazione temporanea tra sessione e spot, scelta di visibilità e scadenza',
-    base: 'Art. 6(1)(a) — consenso facoltativo',
+    base: 'Art. 6(1)(a): consenso facoltativo',
     durata: 'Visibilità per due ore, salvo rinnovo esplicito; revocabile subito',
   },
 ];
@@ -373,22 +373,22 @@ export default function PrivacyPage() {
           </p>
           <ul style={styles.ul}>
             <li style={styles.li}>
-              <strong>Supabase Inc.</strong> (USA) — database, autenticazione,
+              <strong>Supabase Inc.</strong> (USA): database, autenticazione,
               storage
             </li>
             <li style={styles.li}>
-              <strong>Vercel Inc.</strong> (USA) — hosting, CDN e statistiche aggregate delle visite (Web Analytics, senza cookie)
+              <strong>Vercel Inc.</strong> (USA): hosting, CDN e statistiche aggregate delle visite (Web Analytics, senza cookie)
             </li>
             <li style={styles.li}>
-              <strong>Resend Inc.</strong> (USA) — invio email transazionali
+              <strong>Resend Inc.</strong> (USA): invio email transazionali
               (moderazione, reset password)
             </li>
             <li style={styles.li}>
-              <strong>MailerLite UAB</strong> (Lituania) — invio newsletter e
+              <strong>MailerLite UAB</strong> (Lituania): invio newsletter e
               comunicazioni di servizio relative all&apos;account
             </li>
             <li style={styles.li}>
-              <strong>OpenStreetMap Foundation</strong> (Regno Unito) — servizio
+              <strong>OpenStreetMap Foundation</strong> (Regno Unito): servizio
               di geocoding Nominatim: quando cerchi un luogo o selezioni una
               posizione, le relative coordinate vengono inviate a
               nominatim.openstreetmap.org per ottenere il nome di citta e paese.
@@ -396,23 +396,23 @@ export default function PrivacyPage() {
               Nessun dato identificativo (email, username) viene trasmesso.
             </li>
             <li style={styles.li}>
-              <strong>CARTO</strong> (CARTO Inc., USA) — mappe di sfondo
+              <strong>CARTO</strong> (CARTO Inc., USA): mappe di sfondo
               (basemaps.cartocdn.com). Il tuo browser richiede a CARTO i riquadri
               della mappa che stai guardando: nella richiesta viaggiano
               l&apos;indirizzo IP e, implicitamente, l&apos;area geografica
               inquadrata. Nessun dato del tuo account viene trasmesso.
             </li>
             <li style={styles.li}>
-              <strong>Brevo</strong> — fornitore email alternativo previsto dal codice,
+              <strong>Brevo</strong>: fornitore email alternativo previsto dal codice,
               utilizzato solo se configurato dal gestore. La configurazione puo
               prevedere anche una copia verso questo fornitore.
             </li>
             <li style={styles.li}>
-              <strong>Upstash</strong> — limiti tecnici delle richieste, quando
+              <strong>Upstash</strong>: limiti tecnici delle richieste, quando
               configurato; non e un sistema di session replay.
             </li>
             <li style={styles.li}>
-              <strong>YouTube</strong> (Google Ireland Limited, Irlanda) — video
+              <strong>YouTube</strong> (Google Ireland Limited, Irlanda): video
               incorporati nelle pagine delle notizie e, quando presente, nella
               scheda di uno spot. Usiamo il dominio youtube-nocookie.com, che non
               installa cookie di profilazione finche non avvii il video; al
@@ -460,27 +460,27 @@ export default function PrivacyPage() {
           </p>
           <ul style={styles.ul}>
             <li style={styles.li}>
-              <strong>Accesso</strong> (Art. 15) — ottenere conferma
+              <strong>Accesso</strong> (Art. 15): ottenere conferma
               dell&apos;esistenza di un trattamento e accedere ai tuoi dati
             </li>
             <li style={styles.li}>
-              <strong>Rettifica</strong> (Art. 16) — correggere dati inesatti o
+              <strong>Rettifica</strong> (Art. 16): correggere dati inesatti o
               incompleti
             </li>
             <li style={styles.li}>
-              <strong>Cancellazione</strong> (Art. 17) — richiedere la
+              <strong>Cancellazione</strong> (Art. 17): richiedere la
               cancellazione dei tuoi dati (&quot;diritto all&apos;oblio&quot;)
             </li>
             <li style={styles.li}>
-              <strong>Limitazione</strong> (Art. 18) — limitare il trattamento
+              <strong>Limitazione</strong> (Art. 18): limitare il trattamento
               in determinate circostanze
             </li>
             <li style={styles.li}>
-              <strong>Portabilita</strong> (Art. 20) — ricevere i tuoi dati in
+              <strong>Portabilita</strong> (Art. 20): ricevere i tuoi dati in
               formato strutturato e leggibile da dispositivo automatico
             </li>
             <li style={styles.li}>
-              <strong>Opposizione</strong> (Art. 21) — opporti al trattamento
+              <strong>Opposizione</strong> (Art. 21): opporti al trattamento
               basato su legittimo interesse
             </li>
           </ul>

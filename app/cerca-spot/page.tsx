@@ -5,10 +5,10 @@ import { CercaSpotBtn } from '@/components/CommunityActions';
 
 export const metadata: Metadata = {
   title: 'Cerca Spot BMX, Skatepark e Street Spot',
-  description: 'Chiedi alla community BMX italiana di aiutarti a trovare lo spot perfetto nella tua zona. Ledge, rail, park, bowl — qualcuno lo conosce.',
+  description: 'Chiedi alla community BMX italiana di aiutarti a trovare lo spot perfetto nella tua zona. Ledge, rail, park, bowl: qualcuno lo conosce.',
   alternates: { canonical: 'https://maps.chrispybmx.com/cerca-spot' },
   openGraph: {
-    title: 'Cerca Spot — Chrispy Maps',
+    title: 'Cerca spot | Chrispy Maps',
     description: 'La community ti aiuta a trovare spot BMX nella tua zona.',
     url: 'https://maps.chrispybmx.com/cerca-spot',
     siteName: 'Chrispy Maps',
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
   },
-  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Cerca Spot — Chrispy Maps' },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Cerca spot | Chrispy Maps' },
 };
 
 export const dynamic = 'force-dynamic';
@@ -84,7 +84,7 @@ export default async function CercaSpotPage() {
             Non trovi lo spot giusto?
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gray-400)', lineHeight: 1.6, marginBottom: 14 }}>
-            Descrivi cosa cerchi e dove. La community ti aiuterà a trovarlo — o magari qualcuno lo aggiungerà alla mappa.
+            Descrivi cosa cerchi e dove. La community ti aiuterà a trovarlo, o magari qualcuno lo aggiungerà alla mappa.
           </div>
           <CercaSpotBtn />
         </div>

@@ -46,7 +46,7 @@ export default function ProfileGamification({ username }: Props) {
       <img
         src={level.current.image}
         alt={level.current.name}
-        title={`${level.current.name} — ${stats.lifetime_xp} XP`}
+        title={`${level.current.name} · ${stats.lifetime_xp} XP`}
         style={{ width: 48, height: 48, objectFit: 'contain' }}
       />
       <div style={{

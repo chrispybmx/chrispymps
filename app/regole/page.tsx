@@ -236,8 +236,8 @@ export default function RegolePage() {
           </p>
           <p style={styles.p}>
             Se cancelli l’account, gli spot che hai aggiunto e che sono già
-            approvati restano sulla mappa come contributi anonimi — servono a chi
-            li usa — mentre tutto il resto dei tuoi dati sparisce. I dettagli
+            approvati restano sulla mappa come contributi anonimi (servono a chi
+            li usa), mentre tutto il resto dei tuoi dati sparisce. I dettagli
             stanno nella{' '}
             <Link href="/privacy" style={styles.link}>
               privacy policy

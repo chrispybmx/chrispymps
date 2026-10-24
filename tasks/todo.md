@@ -4,6 +4,15 @@ type: note
 permalink: ai/antigravity/tasks/todo
 ---
 
+
+# Anti-template (ottobre 2026)
+
+1. [x] Homepage: prima vista mai vuota → verify: apro / senza storage, lista mostra spot (>0)
+2. [x] Newsletter: via pillola+hero centrato, mostra edizione vera → verify: screenshot, niente pillola/—
+3. [x] Pulizia: bordini laterali colorati, glow decorativi, — nei testi UI → verify: grep conta 0 (esclusi dati/commenti), tsc+lint+test
+4. [x] Pagine vecchie (404, error, about, classifica loading, newsletter-grazie): via VT323/VHS, stile nuovo → verify: grep VT323 0 fuori admin, screenshot
+5. [ ] Build + test completi, poi chiedo push
+
 # World-wide readiness — todo
 
 ## Fase 1 — DB: country su spots

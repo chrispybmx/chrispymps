@@ -75,11 +75,11 @@ export async function generateMetadata(props: { params: Promise<{ username: stri
     .eq('status', 'approved');
 
   if (!profile) {
-    return { title: `Profilo non trovato — Chrispy Maps` };
+    return { title: `Profilo non trovato` };
   }
 
   const url         = `${APP_CONFIG.url}/u/${profile.username}`;
-  const title       = `@${profile.username} — Profilo Rider`;
+  const title       = `@${profile.username}, profilo rider`;
   const spotsStr    = spotsCount ? `${spotsCount} spot pubblicati` : '';
   const bioStr      = profile.bio ? ` · ${profile.bio}` : '';
   const description = `Profilo di @${profile.username} su Chrispy Maps.${spotsStr ? ` ${spotsStr}.` : ''}${bioStr} Spot BMX, skate e scooter in Italia.`;

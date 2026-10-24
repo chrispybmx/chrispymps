@@ -4,12 +4,12 @@ import { ScriviPostBtn } from '@/components/CommunityActions';
 import { supabaseServer } from '@/lib/supabase';
 
 export const metadata: Metadata = {
-  title: 'News BMX Italia — Aggiornamenti Spot e Community',
+  title: 'News BMX Italia: spot e community',
   description: 'Ultime notizie, aggiornamenti spot, nuovi skatepark e contenuti dalla community BMX italiana su Chrispy Maps.',
   alternates: { canonical: 'https://maps.chrispybmx.com/news' },
   keywords: ['news BMX Italia', 'aggiornamenti skatepark', 'community BMX', 'nuovi spot BMX'],
   openGraph: {
-    title: 'News BMX — Chrispy Maps',
+    title: 'News BMX | Chrispy Maps',
     description: 'Ultime notizie dalla community BMX italiana.',
     url: 'https://maps.chrispybmx.com/news',
     siteName: 'Chrispy Maps',
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
   },
-  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'News BMX — Chrispy Maps' },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'News BMX | Chrispy Maps' },
 };
 
 export const dynamic = 'force-dynamic';

@@ -126,7 +126,7 @@ export default function PhotoUpload({ photos, onChange, maxPhotos = APP_CONFIG.m
                 gap: 10, padding: '18px 16px',
                 background: 'var(--orange)', border: 'none',
                 borderRadius: 10, cursor: 'pointer',
-                boxShadow: '0 2px 16px rgba(255,106,0,0.3)',
+                boxShadow: 'none',
                 transition: 'transform 0.1s',
                 WebkitTapHighlightColor: 'transparent',
               }}

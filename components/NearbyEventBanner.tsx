@@ -75,7 +75,7 @@ export default function NearbyEventBanner({ userPos }: Props) {
           border: '1px solid rgba(255,106,0,0.42)',
           borderRadius: 14, padding: '10px 14px',
           textDecoration: 'none', color: 'var(--bone)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(255,106,0,0.12)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
         }}
       >
         {event.cover_url ? (

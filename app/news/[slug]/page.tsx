@@ -65,7 +65,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
 
   const url         = `${APP_CONFIG.url}/news/${article.slug}`;
   const title       = article.title;
-  const description = article.excerpt ?? `Leggi "${article.title}" su Chrispy Maps — news BMX, skate e scooter dall'Italia.`;
+  const description = article.excerpt ?? `Leggi "${article.title}" su Chrispy Maps: news BMX, skate e scooter dall'Italia.`;
   const tags        = article.tags ? article.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const coverImg    = article.cover_url ?? '/opengraph-image';
   const publishedAt = article.published_at ?? article.created_at;
@@ -342,8 +342,6 @@ export default async function ArticlePage(props: { params: Promise<{ slug: strin
             color: 'var(--gray-400)',
             lineHeight: 1.6,
             margin: '0 0 28px',
-            borderLeft: '3px solid var(--orange)',
-            paddingLeft: 14,
           }}>
             {article.excerpt}
           </p>

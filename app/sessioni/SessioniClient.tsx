@@ -179,7 +179,7 @@ export default function SessioniClient() {
               fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
               background: 'var(--orange)', color: '#000', border: 'none',
               borderRadius: 10, cursor: 'pointer', letterSpacing: '0.04em',
-              boxShadow: '0 2px 16px rgba(255,106,0,0.3)',
+              boxShadow: 'none',
             }}
           >
             🔴 SONO IN SESSION

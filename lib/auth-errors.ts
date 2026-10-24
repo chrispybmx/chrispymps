@@ -40,7 +40,7 @@ const MESSAGGI: Record<string, string> = {
      niente — è una configurazione da sistemare, non un intoppo momentaneo, e
      dirlo evita di far sbattere la gente contro lo stesso muro. */
   unexpected_failure:
-    'Accesso con Google non disponibile: è un problema di configurazione dalla nostra parte, non tuo. Entra con email e password — lo stiamo sistemando.',
+    'Accesso con Google non disponibile: è un problema di configurazione dalla nostra parte, non tuo. Entra con email e password, lo stiamo sistemando.',
   temporarily_unavailable:
     'Google non è raggiungibile in questo momento. Riprova tra poco.',
 };

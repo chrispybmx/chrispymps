@@ -36,7 +36,7 @@ export const JAM_SPOTS = [
     lat: 41.82808,
     lon: 12.47158,
     meetingPoint: true,
-    description: 'Punto di ritrovo — Meeting point della jam',
+    description: 'Punto di ritrovo della jam',
   },
   {
     spotId: 'e37f38cc-0c86-4b58-b890-07de02fbc94a',

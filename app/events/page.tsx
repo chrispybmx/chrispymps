@@ -5,12 +5,12 @@ import { ProponiEventoBtn } from '@/components/CommunityActions';
 import { supabaseServer } from '@/lib/supabase';
 
 export const metadata: Metadata = {
-  title: 'Eventi BMX Italia — Gare, Jam e Contest',
+  title: 'Eventi BMX Italia: gare, jam e contest',
   description: 'Gare, jam, contest e raduni BMX, skate e scooter in Italia. Calendario eventi della community su Chrispy Maps.',
   alternates: { canonical: 'https://maps.chrispybmx.com/events' },
   keywords: ['eventi BMX Italia', 'gare BMX', 'jam BMX', 'contest skate Italia', 'raduni scooter'],
   openGraph: {
-    title: 'Eventi BMX — Chrispy Maps',
+    title: 'Eventi BMX | Chrispy Maps',
     description: 'Calendario eventi BMX, skate e scooter in Italia.',
     url: 'https://maps.chrispybmx.com/events',
     siteName: 'Chrispy Maps',
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
   },
-  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Eventi BMX — Chrispy Maps' },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Eventi BMX | Chrispy Maps' },
 };
 
 export const dynamic = 'force-dynamic';

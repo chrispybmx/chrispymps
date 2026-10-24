@@ -43,7 +43,7 @@ export default async function SupportPage() {
     }}>
       <style>{`
         .sup-back:hover { opacity: 0.7; }
-        .sup-cta-btn:hover { background: #ff8c2a !important; box-shadow: 0 0 40px rgba(255,106,0,0.5) !important; transform: translateY(-1px); }
+        .sup-cta-btn:hover { background: #ff8c2a !important; transform: translateY(-1px); }
         .sup-cta-btn { transition: background 0.15s, box-shadow 0.15s, transform 0.15s; }
         .rev-card:hover { border-color: rgba(99,91,255,0.7) !important; background: rgba(99,91,255,0.07) !important; }
         .rev-card { transition: border-color 0.15s, background 0.15s; }
@@ -147,7 +147,7 @@ export default async function SupportPage() {
               fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
               padding: '15px 24px', borderRadius: 10,
               textDecoration: 'none', letterSpacing: '0.05em',
-              boxShadow: '0 0 28px rgba(255,106,0,0.25)',
+              boxShadow: 'none',
             }}
           >
             + AGGIUNGI UNO SPOT
@@ -319,7 +319,7 @@ export default async function SupportPage() {
             color: 'var(--gray-600)', display: 'flex',
             alignItems: 'center', gap: 8,
           }}>
-            <span>— Chrispy</span>
+            <span>Chrispy</span>
             <span style={{ color: 'var(--gray-700)' }}>·</span>
             <a
               href={LINKS.instagram}

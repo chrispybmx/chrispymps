@@ -112,7 +112,7 @@ export default function OnboardingHints({ totalSpots, nearbyCount, nearest, onGo
         maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto',
         padding: '22px 20px 20px',
         animation: 'slideUp 0.3s ease-out',
-        boxShadow: '0 8px 40px rgba(255,106,0,0.15)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
       }}>
 
         {/* Il numero è il messaggio */}

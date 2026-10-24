@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://maps.chrispybmx.com/classifica' },
   keywords: ['classifica spot BMX', 'migliori skatepark Italia', 'top rider BMX', 'spot più fotografati'],
   openGraph: {
-    title: 'Classifica — Chrispy Maps',
+    title: 'Classifica | Chrispy Maps',
     description: 'Top spot e rider BMX in Italia.',
     url: 'https://maps.chrispybmx.com/classifica',
     siteName: 'Chrispy Maps',
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
   },
-  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Classifica — Chrispy Maps' },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Classifica | Chrispy Maps' },
 };
 
 export const revalidate = 600;

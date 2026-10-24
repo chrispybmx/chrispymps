@@ -77,7 +77,7 @@
 .empty p { color:var(--muted); }
 .empty>svg { color:var(--orange); }
 .textLink { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:var(--orange)!important; }
-.feedback { border-left:3px solid var(--orange); padding:12px 16px; margin-bottom:20px; background:#2c231b; color:#ffcea3; font-size:14px; }
+.feedback { border:1px solid #6b4a2e; padding:12px 16px; margin-bottom:20px; background:#2c231b; color:#ffcea3; font-size:14px; }
 .feedback button,.riders p button { min-height:44px; border:0; color:var(--orange); background:none; text-decoration:underline; margin-left:8px; }
 .riders { margin-bottom:24px; border-bottom:1px solid var(--line); padding-bottom:20px; }
 .riders h2 { font-size:16px; margin-bottom:10px; }

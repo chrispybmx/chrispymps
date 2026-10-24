@@ -10,12 +10,12 @@ const baseMetadata: Metadata = {
   description: 'Trova spot della community con fotografie, località e caratteristiche. Cerca un posto o un rider e salva gli spot per la prossima uscita.',
   alternates: { canonical: 'https://maps.chrispybmx.com/scopri' },
   openGraph: {
-    title: 'Scopri spot — Chrispy Maps',
+    title: 'Scopri spot | Chrispy Maps',
     description: 'Fotografie e informazioni condivise dai rider. Cerca spot per luogo, categoria e ostacoli.',
     url: 'https://maps.chrispybmx.com/scopri', siteName: 'Chrispy Maps', locale: 'it_IT', type: 'website',
     images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
   },
-  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Scopri spot — Chrispy Maps' },
+  twitter: { card: 'summary_large_image', site: '@chrispy_bmx', title: 'Scopri spot | Chrispy Maps' },
 };
 
 export async function generateMetadata(

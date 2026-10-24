@@ -128,9 +128,9 @@ export async function sendContributorConfirmation(
   <p>Ciao <span class="highlight">${eContribName}</span>,</p>
   <p>ho ricevuto il tuo spot <strong>${eName}</strong>${eCity ? ` a ${eCity}` : ''}.</p>
   <p>Lo do un'occhiata il prima possibile. Se è tutto ok lo troverai sulla mappa entro 24-48 ore.</p>
-  <p>Grazie per contribuire alla mappa — senza gente come te questo progetto non esisterebbe.</p>
+  <p>Grazie per contribuire alla mappa: senza gente come te questo progetto non esisterebbe.</p>
   <div class="sig">
-    <p>— Chrispy<br>
+    <p>Chrispy<br>
     <a href="https://www.instagram.com/chriceresato" style="color:#ff6a00;">@chriceresato</a> |
     <a href="${APP_CONFIG.mapUrl}" style="color:#ff6a00;">maps.chrispybmx.com</a></p>
   </div>
@@ -169,10 +169,10 @@ export async function sendApprovalEmail(
   <h1>SPOT APPROVATO ✅</h1>
   <p>Ciao <span class="highlight">${eContribName}</span>,</p>
   <p>il tuo spot <strong>${eName}</strong>${eCity ? ` a ${eCity}` : ''} è ora visibile sulla mappa!</p>
-  <p>Condividilo con la crew — ogni link condiviso aiuta la mappa a crescere.</p>
+  <p>Condividilo con la crew: ogni link condiviso aiuta la mappa a crescere.</p>
   <a href="${spotUrl}" class="btn">Vedi il tuo spot →</a>
   <div class="sig">
-    <p>— Chrispy<br>
+    <p>Chrispy<br>
     <a href="https://www.instagram.com/chriceresato" style="color:#ff6a00;">@chriceresato</a></p>
   </div>
 </div></body></html>
@@ -240,7 +240,7 @@ export async function sendEventSubmissionNotification(params: {
   <hr class="sep">
   <a href="${approveUrl}" class="btn" style="background:#00c851;">✅ PUBBLICA</a>
   <a href="${rejectUrl}" class="btn" style="background:#ff4444;color:#fff;">❌ RIFIUTA</a>
-  <p style="color:#888;font-size:12px;margin-top:8px;">Un click e basta — link validi 7 giorni, nessun login richiesto.</p>
+  <p style="color:#888;font-size:12px;margin-top:8px;">Un click e basta. Link validi 7 giorni, nessun login richiesto.</p>
   <hr class="sep">
   <a href="${adminUrl}" style="color:#ff6a00;font-size:13px;">📱 oppure apri la dashboard admin</a>
   <hr class="sep">
@@ -280,9 +280,9 @@ export async function sendRejectionEmail(
   <p>Ciao ${eContribName},</p>
   <p>ho dovuto scartare lo spot <strong>${eName}</strong>.</p>
   ${eReason ? `<div class="reason">${eReason}</div>` : ''}
-  <p>Puoi riprovare con un altro spot — ogni contributo è benvenuto.</p>
+  <p>Puoi riprovare con un altro spot: ogni contributo è benvenuto.</p>
   <div class="sig">
-    <p>— Chrispy<br>
+    <p>Chrispy<br>
     <a href="https://www.instagram.com/chriceresato" style="color:#ff6a00;">@chriceresato</a></p>
   </div>
 </div></body></html>
