@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export default function GlobalError({
   _error,
   reset,
@@ -21,9 +23,9 @@ export default function GlobalError({
           <button type="button" onClick={reset} style={{ minHeight: 44, padding: '0 20px', background: 'var(--orange)', color: '#0a0a0a', fontWeight: 700, border: 0, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 16 }}>
             Riprova
           </button>
-          <a href="/map" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 20px', color: 'var(--bone)', border: '1px solid var(--gray-600)', borderRadius: 6, textDecoration: 'none', fontWeight: 600 }}>
+          <Link href="/map" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 20px', color: 'var(--bone)', border: '1px solid var(--gray-600)', borderRadius: 6, textDecoration: 'none', fontWeight: 600 }}>
             Mappa
-          </a>
+          </Link>
         </div>
       </div>
     </main>

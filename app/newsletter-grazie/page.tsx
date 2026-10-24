@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Metadata } from 'next';
 import { PRIVATE_ROBOTS } from '@/lib/seo';
 
@@ -35,15 +36,15 @@ export default function NewsletterThankYouPage() {
             <dt className="font-semibold text-bone">I tuoi dati</dt>
             <dd className="mt-1 text-gray-200">
               Uso la tua email solo per la newsletter. I dettagli sono nella{' '}
-              <a href="/privacy#newsletter" className="text-orange underline-offset-4 hover:underline">privacy</a>.
+              <Link href="/privacy#newsletter" className="text-orange underline-offset-4 hover:underline">privacy</Link>.
             </dd>
           </div>
         </dl>
 
         <div className="mt-10 flex flex-wrap gap-3">
-          <a href="/map" className="inline-flex min-h-[44px] items-center rounded-md bg-orange px-5 font-bold text-black">
+          <Link href="/map" className="inline-flex min-h-[44px] items-center rounded-md bg-orange px-5 font-bold text-black">
             Guarda la mappa spot
-          </a>
+          </Link>
           <a href="https://chrispybmx.com/" className="inline-flex min-h-[44px] items-center rounded-md border border-gray-600 px-5 font-semibold text-bone hover:border-orange">
             chrispybmx.com
           </a>
