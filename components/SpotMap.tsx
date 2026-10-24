@@ -84,6 +84,9 @@ export default function SpotMap({
   const mapInstance      = useRef<import('leaflet').Map | null>(null);
   const markersRef       = useRef<import('leaflet').LayerGroup | null>(null);
   const hasInitialFit    = useRef(false);
+  /* Vista dall'IP in attesa degli spot: se in quella zona non ce n'e' nessuno,
+     la prima schermata sarebbe vuota; allora si inquadrano gli spot veri. */
+  const ipFitPending     = useRef(false);
   const circleRef        = useRef<import('leaflet').Circle | null>(null);
   const centerMarkerRef  = useRef<import('leaflet').Marker | null>(null);
   const userMarkerRef    = useRef<import('leaflet').Marker | null>(null);
@@ -212,6 +215,7 @@ export default function SpotMap({
         /* Primo accesso senza posizione: zona dall'IP invece dell'Italia intera.
            Se poi arriva la posizione precisa (sotto), la sostituisce. */
         hasInitialFit.current = true;
+        ipFitPending.current = true;
         map.setView([ipView.lat, ipView.lon], ipView.zoom, {animate:false});
         map.panBy([0, overlayOffsetPx], { animate: false });
         setZoom(ipView.zoom);
@@ -224,7 +228,7 @@ export default function SpotMap({
       });
       /* Se l'utente interagisce prima che arrivino gli spot, l'auto-fit non deve
          scavalcare la sua vista. */
-      map.once('dragstart', () => { hasInitialFit.current = true; });
+      map.once('dragstart', () => { hasInitialFit.current = true; ipFitPending.current = false; });
 
       /* ── Posizione all'avvio, ma solo per chi l'ha gia' concessa ──
          Si apre a livello citta' invece che a zoom paese: il primo fotogramma
@@ -266,6 +270,7 @@ export default function SpotMap({
             mapInstance.current.setView([latitude, longitude], LOCAL_ZOOM, { animate: false });
             mapInstance.current.panBy([0, overlayOffsetPx], { animate: false });
             hasInitialFit.current = true;
+            ipFitPending.current = false;
 
             /* Dot blu "Sei qui" */
             const dotSvg = `<div style="
@@ -429,6 +434,13 @@ export default function SpotMap({
     }
 
     prevSelIdRef.current = selPinRef.current?.id ?? null;
+
+    /* ── Vista dall'IP senza spot visibili: si passa all'auto-fit sugli spot ── */
+    if (ipFitPending.current && filtered.length && mapInstance.current) {
+      ipFitPending.current = false;
+      const view = mapInstance.current.getBounds();
+      if (!filtered.some(p => view.contains([p.lat, p.lon]))) hasInitialFit.current = false;
+    }
 
     /* ── Auto-fit al primo render con spot: sul grosso degli spot, non sugli estremi ── */
     const core = !hasInitialFit.current ? coreBounds(filtered) : null;
