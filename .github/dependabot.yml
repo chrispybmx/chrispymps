@@ -1,10 +1,19 @@
 version: 2
 updates:
+  # Solo patch e minor: i salti di versione (Next 16, TypeScript 7, ESLint 10)
+  # rompono la build e vanno fatti a mano. Gli aggiornamenti di sicurezza
+  # arrivano comunque: le security updates di Dependabot non seguono "ignore".
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      minor-e-patch:
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
