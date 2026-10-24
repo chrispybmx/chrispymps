@@ -27,13 +27,13 @@
     "dotenv": "^17.4.2",
     "exifr": "^7.1.3",
     "leaflet": "^1.9.4",
-    "next": "^15.5.27",
+    "next": "^15.5.28",
     "pg": "^8.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "resend": "^4.0.0",
     "sharp": "^0.35.5",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
@@ -45,7 +45,7 @@
     "@types/xml2js": "^0.4.14",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^15.5.27",
+    "eslint-config-next": "^15.5.28",
     "fake-indexeddb": "^6.2.5",
     "postcss": "^8.4.40",
     "qrcode": "^1.5.4",
