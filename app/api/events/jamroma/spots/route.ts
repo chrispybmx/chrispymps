@@ -11,7 +11,9 @@ export async function GET() {
 
   const { data: dbSpots } = await sb
     .from('spots')
-    .select('id, name, slug, lat, lon, city, type, spot_photos (url, position)')
+    .select('id, name, slug, lat, lon, city, type, spot_photos (url, position, moderation_status)')
+    // Solo foto moderate: la route usa la service key e bypassa le policy.
+    .or('moderation_status.eq.approved,moderation_status.is.null', { referencedTable: 'spot_photos' })
     .in('id', spotIds);
 
   const spots = JAM_SPOTS.map(jam => {

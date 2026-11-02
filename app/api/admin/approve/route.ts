@@ -121,6 +121,15 @@ async function approveSpot(spotId: string, req: NextRequest): Promise<NextRespon
     }, { status: 409 });
   }
 
+  /* Spot gia' approvato in passato e tornato in attesa per una modifica del
+     proprietario (vedi PATCH /api/spots/[slug]): si rimette online e basta.
+     Niente email di benvenuto, XP o notifiche "nuovo spot": altrimenti
+     modificare e farsi riapprovare diventerebbe un modo per accumulare punti. */
+  if (spot.approved_at) {
+    revalidatePath(`/map/spot/${spot.slug}`);
+    return NextResponse.json({ ok: true, riapprovato: true });
+  }
+
   // Effetti collaterali AWAITED. Non possono essere fire-and-forget: su
   // serverless il container si congela dopo il return e le promise non attese
   // non completano (email mai inviata, notifica mai inserita, XP mai assegnati).

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sendAdminNotification } from '@/lib/email';
+import type { Spot, Contributor } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { supabasePublic, supabaseAdmin } from '@/lib/supabase';
@@ -78,7 +80,7 @@ async function authorizeOwner(spotId: string, token: string) {
 
   const { data: spot } = await supabase
     .from('spots')
-    .select('id, submitted_by_user_id, status, slug, city')
+    .select('id, submitted_by_user_id, status, slug, city, approved_at, name, description, guardians, type, lat, lon, condition, surface')
     .eq('id', spotId)
     .single();
 
@@ -124,6 +126,19 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ slug: s
   }
   patch.updated_at = new Date().toISOString();
 
+  /* I testi liberi di uno spot gia' approvato tornano in moderazione.
+     Prima andavano online subito: bastava far approvare uno spot pulito e poi
+     riscriverne nome o descrizione per pubblicare qualunque cosa senza che
+     nessuno la vedesse. Categoria e difficolta' restano immediate: sono valori
+     da un elenco chiuso, non testo. */
+  const testoCambiato = (['name', 'description', 'guardians'] as const)
+    .some(k => k in patch && (patch[k] ?? null) !== (auth.spot[k] ?? null));
+  const inModerazione = auth.spot.status === 'approved' && testoCambiato;
+  if (inModerazione) {
+    patch.status = 'pending';
+    patch.approved_at = auth.spot.approved_at ?? patch.updated_at;
+  }
+
   const { data: updated, error: updErr } = await auth.supabase
     .from('spots')
     .update(patch)
@@ -137,7 +152,21 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ slug: s
   }
 
   revalidateSpot(updated?.slug ?? auth.spot.slug, auth.spot.city);
-  return NextResponse.json({ ok: true, slug: updated?.slug });
+
+  if (inModerazione) {
+    // Stessa email dei nuovi spot, con i link approva/rifiuta. Un errore email
+    // non annulla il salvataggio: lo spot resta comunque in coda in dashboard.
+    try {
+      await sendAdminNotification(
+        { ...auth.spot, ...patch, id: spotId } as unknown as Spot,
+        { id: auth.user.id, name: 'modifica di uno spot approvato', email: auth.user.email ?? '', instagram_handle: null } as unknown as Contributor,
+      );
+    } catch (e) {
+      console.error('[spots PATCH] admin notification:', e);
+    }
+  }
+
+  return NextResponse.json({ ok: true, slug: updated?.slug, inModerazione });
 }
 
 export async function DELETE(req: NextRequest, props: { params: Promise<{ slug: string }> }) {

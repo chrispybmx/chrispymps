@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { SpotMapPin } from '@/lib/types';
 import { TIPI_SPOT } from '@/lib/constants';
 import 'leaflet/dist/leaflet.css';
+import { escapeHtml } from '@/lib/escape-html';
 
 let L: typeof import('leaflet') | null = null;
 
@@ -90,7 +91,7 @@ export default function CityMapInner({ spots, activeId, flyTarget, onPinClick }:
       iconAnchor: active ? [16, 16] : [12, 12],
     });
     const marker = L.marker([pin.lat, pin.lon], { icon, zIndexOffset: active ? 1000 : 0 });
-    marker.bindTooltip(pin.name, { permanent: false, direction: 'top', offset: [0, active ? -18 : -14] });
+    marker.bindTooltip(escapeHtml(pin.name), { permanent: false, direction: 'top', offset: [0, active ? -18 : -14] });
     marker.on('click', () => onPinRef.current(pin));
     marker.addTo(mapInstance.current!);
     markersRef.current.set(pin.id, marker);

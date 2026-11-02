@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import type { CalendarEvent } from './EventsCalendar';
+import { escapeHtml } from '@/lib/escape-html';
 
 let L: typeof import('leaflet') | null = null;
 
@@ -109,14 +110,14 @@ export default function EventsMap({ events }: { events: CalendarEvent[] }) {
 
         const popup = `
           <div style="min-width:200px;font-family:-apple-system,sans-serif">
-            <div style="font-weight:600;font-size:14px;margin-bottom:6px;line-height:1.3">${ev.title}</div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:6px;line-height:1.3">${escapeHtml(ev.title)}</div>
             <div style="font-size:12px;color:#666;margin-bottom:4px">
-              ${flagEmoji} ${ev.city || ''} ${ev.country ? '· ' + ev.country : ''}
+              ${flagEmoji} ${escapeHtml(ev.city)} ${ev.country ? '· ' + escapeHtml(ev.country) : ''}
             </div>
             <div style="font-size:12px;color:#666;margin-bottom:8px">📅 ${date}${dateEnd}</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
-              ${ev.discipline ? `<span style="font-size:10px;padding:2px 6px;background:${DISCIPLINE_COLOR[ev.discipline]||'#999'}22;color:${DISCIPLINE_COLOR[ev.discipline]||'#999'};border-radius:3px;text-transform:uppercase">${DISCIPLINE_EMOJI[ev.discipline]||''} ${ev.discipline}</span>` : ''}
-              ${ev.level ? `<span style="font-size:10px;padding:2px 6px;background:#facc1522;color:#a16207;border-radius:3px">${LEVEL_LABEL[ev.level] || ev.level}</span>` : ''}
+              ${ev.discipline ? `<span style="font-size:10px;padding:2px 6px;background:${DISCIPLINE_COLOR[ev.discipline]||'#999'}22;color:${DISCIPLINE_COLOR[ev.discipline]||'#999'};border-radius:3px;text-transform:uppercase">${DISCIPLINE_EMOJI[ev.discipline]||''} ${escapeHtml(ev.discipline)}</span>` : ''}
+              ${ev.level ? `<span style="font-size:10px;padding:2px 6px;background:#facc1522;color:#a16207;border-radius:3px">${escapeHtml(LEVEL_LABEL[ev.level] || ev.level)}</span>` : ''}
             </div>
             <a href="https://maps.chrispybmx.com/events" style="font-size:12px;color:#ff6b00;text-decoration:none;font-weight:500">Vedi su Chrispy Maps →</a>
           </div>

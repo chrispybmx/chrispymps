@@ -49,6 +49,11 @@ export default function SpotOwnerActions(props: Props) {
   // Owner-gate: niente da mostrare se non è il proprietario loggato
   if (!user || !props.ownerId || user.id !== props.ownerId) return null;
 
+  const textChanged =
+    name.trim() !== (props.name ?? '') ||
+    (description.trim() || null) !== (props.description ?? null) ||
+    (guardians.trim() || null) !== (props.guardians ?? null);
+
   const close = () => { setOpen(false); setConfirmDelete(false); setError(null); };
 
   const handleSave = async () => {
@@ -69,9 +74,16 @@ export default function SpotOwnerActions(props: Props) {
       });
       const j = await res.json();
       if (!j.ok) throw new Error(j.error ?? 'Errore durante il salvataggio.');
-      toast('Spot aggiornato', 'success');
       close();
-      router.refresh();
+      if (j.inModerazione) {
+        /* Nome o descrizione cambiati: lo spot torna offline finche' non viene
+           riapprovato, quindi questa pagina non esiste piu' per ora. */
+        toast('Modifica ricevuta: lo spot torna sulla mappa appena la controllo.', 'success');
+        router.push('/map');
+      } else {
+        toast('Spot aggiornato', 'success');
+        router.refresh();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore sconosciuto.');
     } finally { setSaving(false); }
@@ -210,6 +222,12 @@ export default function SpotOwnerActions(props: Props) {
                   </div>
 
                   {error && <ErrBox msg={error} />}
+
+                  {textChanged && (
+                    <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--gray-400)', margin: 0 }}>
+                      Hai cambiato nome, descrizione o accesso: lo spot sparisce dalla mappa finché non lo ricontrollo.
+                    </p>
+                  )}
 
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => setConfirmDelete(true)} className="btn-secondary" style={{ justifyContent: 'center', color: '#ff6b6b', borderColor: 'rgba(255,68,68,0.4)' }}>
