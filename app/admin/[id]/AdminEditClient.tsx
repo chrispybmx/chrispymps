@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { TIPI_SPOT, CITTA_ITALIANE, CONDIZIONI, DIFFICOLTA, SUPERFICI } from '@/lib/constants';
+import { TIPI_SPOT, CITTA_ITALIANE, CONDIZIONI, DIFFICOLTA, SUPERFICI, condizioneSpot } from '@/lib/constants';
 import type { Spot, SpotType, SpotCondition, SpotPhoto } from '@/lib/types';
 import { compressImage } from '@/lib/compress-image';
 import { streetViewUrl } from '@/lib/street-view';
@@ -420,9 +420,9 @@ export default function AdminEditClient({ spot: initial }: Props) {
             <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--gray-800)', border: '1px solid var(--gray-700)', borderRadius: 4 }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-400)', textTransform: 'uppercase', marginBottom: 4 }}>Condizione corrente</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: CONDIZIONI[spot.condition].bg }} />
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: condizioneSpot(spot.condition).bg }} />
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--bone)' }}>
-                  {CONDIZIONI[spot.condition].label}
+                  {condizioneSpot(spot.condition).label}
                 </span>
               </div>
               {spot.condition_updated_at && (

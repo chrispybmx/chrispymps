@@ -100,6 +100,21 @@ export const CONDIZIONI: Record<SpotCondition, { label: string; color: string; b
  *  una, e il rider lo scopre con un 422 senza spiegazione. */
 export const CONDIZIONI_TUTTE = Object.keys(CONDIZIONI) as [SpotCondition, ...SpotCondition[]];
 
+/* Lettura sicura per dati arrivati dal database. Un valore che non e' (piu')
+   nell'elenco, come lo spot di prova di tipo `race` del 13 ottobre, dava
+   `undefined` e mandava in crash l'intera dashboard admin al primo `.color`.
+   Meglio una scheda con "Sconosciuto" che una pagina che non si apre. */
+const TIPO_SCONOSCIUTO = { label: 'Sconosciuto', emoji: '\u2753', color: '#9ca3af', contesto: false } as const;
+const CONDIZIONE_SCONOSCIUTA = { label: 'Sconosciuta', color: '#000', bg: '#9ca3af' } as const;
+
+export function tipoSpot(type: string | null | undefined): (typeof TIPI_SPOT)[SpotType] {
+  return (type && (TIPI_SPOT as Record<string, (typeof TIPI_SPOT)[SpotType]>)[type]) || TIPO_SCONOSCIUTO;
+}
+
+export function condizioneSpot(condition: string | null | undefined): (typeof CONDIZIONI)[SpotCondition] {
+  return (condition && (CONDIZIONI as Record<string, (typeof CONDIZIONI)[SpotCondition]>)[condition]) || CONDIZIONE_SCONOSCIUTA;
+}
+
 // ===== DIFFICOLTÀ =====
 export const DIFFICOLTA = [
   { value: 'beginner',     label: 'Beginner' },

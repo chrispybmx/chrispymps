@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Spot } from '@/lib/types';
-import { TIPI_SPOT, CONDIZIONI } from '@/lib/constants';
+import { TIPI_SPOT, CONDIZIONI, tipoSpot, condizioneSpot } from '@/lib/constants';
 import { miniatura } from '@/lib/immagini';
 import { streetViewUrl } from '@/lib/street-view';
 
@@ -17,8 +17,8 @@ interface AdminCardProps {
 }
 
 export default function AdminCard({ spot, onApprove, onReject, onEdit, onDelete, loading, showStatus }: AdminCardProps) {
-  const tipo    = TIPI_SPOT[spot.type];
-  const cond    = CONDIZIONI[spot.condition];
+  const tipo    = tipoSpot(spot.type);
+  const cond    = condizioneSpot(spot.condition);
   const photos  = spot.spot_photos ?? [];
   const isPending = spot.status === 'pending';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TIPI_SPOT, APP_CONFIG } from '@/lib/constants';
+import { TIPI_SPOT, APP_CONFIG, tipoSpot } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 import { miniatura } from '@/lib/immagini';
 
@@ -54,7 +54,7 @@ export default function AdminApprovati() {
   const link = (s: SpotApprovato) => `${APP_CONFIG.url}/map/spot/${s.slug}`;
 
   const messaggio = (s: SpotApprovato) => {
-    const tipo = TIPI_SPOT[s.type];
+    const tipo = tipoSpot(s.type);
     const dove = s.city ? ` a ${s.city}` : '';
     const chi  = s.autore ? ` — grazie @${s.autore}` : '';
     return `Nuovo spot sulla mappa: ${s.name}${dove} ${tipo?.emoji ?? ''}${chi}\n${link(s)}`;
@@ -90,7 +90,7 @@ export default function AdminApprovati() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {spot.map(s => {
-          const tipo = TIPI_SPOT[s.type];
+          const tipo = tipoSpot(s.type);
           return (
             <div key={s.id} style={{
               display: 'flex', gap: 12, alignItems: 'center',

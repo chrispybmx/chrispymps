@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, OSTACOLI } from '@/lib/constants';
+import { TIPI_SPOT, TIPI_SPOT_SELEZIONABILI, OSTACOLI, tipoSpot } from '@/lib/constants';
 import { miniatura } from '@/lib/immagini';
 import type { Ostacolo, SpotType } from '@/lib/types';
 
@@ -116,7 +116,7 @@ export default function AdminContesti() {
 
   const tutte  = spot.photo_urls?.length ? spot.photo_urls : spot.cover_url ? [spot.cover_url] : [];
   const attuale = tutte[foto];
-  const vecchio = TIPI_SPOT[spot.type];
+  const vecchio = tipoSpot(spot.type);
 
   return (
     <div style={{ padding: '16px 20px 0', maxWidth: 620, margin: '0 auto' }}>

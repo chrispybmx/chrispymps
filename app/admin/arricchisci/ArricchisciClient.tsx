@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { TIPI_SPOT } from '@/lib/constants';
+import { TIPI_SPOT, tipoSpot } from '@/lib/constants';
 import type { SpotType } from '@/lib/types';
 
 export interface SpotRow {
@@ -153,7 +153,7 @@ export default function ArricchisciClient({ initialSpots }: { initialSpots: Spot
         )}
 
         {lista.map(s => {
-          const tipo = TIPI_SPOT[s.type];
+          const tipo = tipoSpot(s.type);
           const len  = s.description.trim().length;
           const isSaving = saving === s.id;
           return (
